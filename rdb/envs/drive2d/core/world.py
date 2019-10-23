@@ -4,12 +4,12 @@ import jax.numpy as np
 import numpy as onp
 from pathlib import Path
 from os.path import join
+import copy
 from collections import OrderedDict
 
 import pyglet
 from pyglet import gl, graphics
 from gym.envs.classic_control import rendering
-
 from rdb.envs.drive2d.core import lane, feature, car
 from rdb.optim.utils import *
 
@@ -20,7 +20,7 @@ pyglet.resource.path.append(str(Path(__file__).parent.parent.joinpath("assets"))
 
 
 class DriveWorld(gym.Env):
-    def __init__(self, main_car, cars, lanes, dt, objects=[]):
+    def __init__(self, main_car, cars, lanes, dt, objects=[], subframes=3):
         self._main_car = main_car
         self._cars = cars
         self._lanes = lanes
@@ -28,7 +28,13 @@ class DriveWorld(gym.Env):
         self._dt = dt
         self._car_sprites = {c.color: car_sprite(c.color) for c in cars + [main_car]}
         self._obj_sprites = {o.name: object_sprite(o.name) for o in objects}
-        self.subframes = 6
+
+        # Subframe rendering
+        self._subframes = subframes
+        self._sub_cars = [car.copy() for car in self._cars]
+        self._sub_main_car = self.main_car.copy()
+        self._prev_cars = [car.copy() for car in self._cars]
+        self._prev_main_car = self.main_car.copy()
 
         # Render specifics
         self._window = None
@@ -44,6 +50,10 @@ class DriveWorld(gym.Env):
         self.feat_fns = feat_fns
 
     @property
+    def subframes(self):
+        return self._subframes
+
+    @property
     def dt(self):
         return self._dt
 
@@ -54,6 +64,14 @@ class DriveWorld(gym.Env):
         for car in cars:
             state.append(car.state)
         return np.concatenate(state)
+
+    @state.setter
+    def state(self, state):
+        cars = self._cars + [self.main_car]
+        last_idx = 0
+        for car in cars:
+            car.state = state[last_idx : last_idx + len(car.state)]
+            last_idx += len(car.state)
 
     def get_dynamics_fns(self):
         """ Build Dict(key: dynamics_fn) mapping
@@ -91,7 +109,7 @@ class DriveWorld(gym.Env):
             def car_dist_fn(state, actions, car_idx=car_idx):
                 car_pos = state[..., np.arange(*car_idx)]
                 main_pos = state[..., np.arange(*main_idx)]
-                return feature.dist2(car_pos, main_pos)
+                return feature.dist_to(car_pos, main_pos)
 
             car_fns[c_i] = car_dist_fn
 
@@ -102,7 +120,7 @@ class DriveWorld(gym.Env):
 
             def lane_dist_fn(state, actions, lane=lane):
                 main_pos = state[..., np.arange(*main_idx)]
-                return feature.dist2lane(lane.center, lane.normal, main_pos)
+                return feature.dist_to_lane(lane.center, lane.normal, main_pos)
 
             lane_fns[l_i] = lane_dist_fn
 
@@ -132,6 +150,10 @@ class DriveWorld(gym.Env):
         self.main_car.reset()
 
     def step(self, action):
+        for car, prev_car in zip(self._cars, self._prev_cars):
+            prev_car.state = copy.deepcopy(car.state)
+        self._prev_main_car.state = copy.deepcopy(self.main_car.state)
+
         for car in self._cars:
             car.control(self.dt)
         self.main_car.control(action, self.dt)
@@ -139,34 +161,41 @@ class DriveWorld(gym.Env):
         done = False
         return self.state, rew, done, {}
 
-    def render(self, mode="rgb_array"):
+    def render(self, mode="rgb_array", cars=None, main_car=None):
         assert mode in ["human", "state_pixels", "rgb_array"]
 
         if self._window is None:
             caption = f"{self.__class__}"
             # JH Note: strange pyglet rendering requires /2
             self._window = pyglet.window.Window(
-                width=int(WINDOW_W / 2), height=int(WINDOW_H / 2)
+                width=int(WINDOW_W / 2),
+                height=int(WINDOW_H / 2)
+                # width=int(WINDOW_W), height=int(WINDOW_H)
             )
         self._window.switch_to()
         if mode == "human":
             # Bring up window
             self._window.dispatch_events()
         self._window.clear()
-        # gl.glViewport(0, 0, int(WINDOW_W / 2), int(WINDOW_H / 2))
         gl.glViewport(0, 0, int(WINDOW_W), int(WINDOW_H))
         gl.glMatrixMode(gl.GL_PROJECTION)
         gl.glPushMatrix()
         gl.glLoadIdentity()
 
+        if cars is None:
+            cars = self._cars
+        if main_car is None:
+            main_car = self.main_car
+
+        self.center_camera(main_car)
         self.draw_background()
         for lane in self._lanes:
             self.draw_lane(lane)
         for obj in self._objects:
             self.draw_object(obj)
-        for car in self._cars:
+        for car in cars:
             self.draw_car(car)
-        self.draw_car(self.main_car)
+        self.draw_car(main_car)
         gl.glPopMatrix()
 
         img_data = pyglet.image.get_buffer_manager().get_color_buffer().get_image_data()
@@ -178,9 +207,20 @@ class DriveWorld(gym.Env):
             self._window.flip()
         return arr
 
-    def center_camera(self):
-        center_x = self.main_car.state[0]
-        center_y = self.main_car.state[1]
+    def sub_render(self, mode="rgb_array", subframe=0):
+        """ Alpha-interpolate adjacent frames to make animation look smoother """
+        ratio = (subframe + 1.0) / float(self._subframes)
+        for c_i in range(len(self._cars)):
+            diff_state = self._cars[c_i].state - self._prev_cars[c_i].state
+            self._sub_cars[c_i].state = ratio * diff_state + self._prev_cars[c_i].state
+
+        diff_state = self._main_car.state - self._prev_main_car.state
+        self._sub_main_car.state = ratio * diff_state + self._prev_main_car.state
+        return self.render(mode=mode, cars=self._sub_cars, main_car=self._sub_main_car)
+
+    def center_camera(self, main_car):
+        center_x = main_car.state[0]
+        center_y = main_car.state[1]
         gl.glOrtho(
             center_x - 1.0 / self._magnify,
             center_x + 1.0 / self._magnify,
@@ -193,7 +233,6 @@ class DriveWorld(gym.Env):
     def draw_background(self):
         if self._grass is None:
             self._grass = pyglet.resource.texture("grass.png")
-        self.center_camera()
         gl.glEnable(self._grass.target)
         gl.glEnable(gl.GL_BLEND)
         gl.glBindTexture(self._grass.target, self._grass.id)

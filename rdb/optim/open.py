@@ -15,6 +15,7 @@ TODO:
 [1] Shooting method
 [2] CEM-Method
 """
+key = jax.random.PRNGKey(0)
 
 
 def concate_xu(x, u):
@@ -59,19 +60,19 @@ def vec_to_dict(vec, dims, shapes):
 
 
 class OpenLoopOptimizer(object):
-    def __init__(self, f_dyn, f_rew, udim, horizon):
+    def __init__(self, f_dyn, f_cost, udim, horizon):
         """
         Equations
         x_{t+1} = f_dyn(x_{t}, u_{t})
-        r_{t}   = f_rew(x_{t}, u_{t}, x_{t+1})
+        c_{t}   = f_cost(x_{t}, u_{t}, x_{t+1})
 
         Params
-        : f_dyn   : forward dynamics
-        : f_rew   : reward function
-        : udim    : dimension of action
-        : horizon : time horizon
+        : f_dyn    : forward dynamics
+        : f_cost   : cost function
+        : udim     : dimension of action
+        : horizon  : time horizon
         """
-        self.f_rew = f_rew
+        self.f_cost = f_cost
         self.f_dyn = f_dyn
         self.udim = udim
         self.horizon = horizon
@@ -86,8 +87,8 @@ class OpenLoopOptimizer(object):
 class LocalOptimizer(OpenLoopOptimizer):
     """ L-BFGS based optimizer """
 
-    def __init__(self, f_dyn, f_rew, udim, horizon, jit=False):
-        super().__init__(f_dyn, f_rew, udim, horizon)
+    def __init__(self, f_dyn, f_cost, udim, horizon, jit=False):
+        super().__init__(f_dyn, f_cost, udim, horizon)
         # Optimize reward based on JAX & scipy.optim
         self.grad_xu = jax.grad(self.cost_xu)
         self.hessian_xu = jax.hessian(self.cost_xu)
@@ -108,7 +109,7 @@ class LocalOptimizer(OpenLoopOptimizer):
         for t in range(self.horizon):
             x_dict = self.vec_to_dict(x)
             next_x_dict = self.f_dyn(x_dict, u[t])
-            cost += -1 * self.f_rew(x_dict, u[t], next_x_dict)
+            cost += self.f_cost(x_dict, u[t], next_x_dict)
             x, _, _ = self.dict_to_vec(next_x_dict)
         return cost
 
@@ -216,7 +217,7 @@ class LocalOptimizer(OpenLoopOptimizer):
         return xmax, rmax, x_info
 
 
-def optimize_u_fn(f_dyn, f_rew, udim, horizon, dt):
+def optimize_u_fn(f_dyn, f_cost, udim, horizon, dt):
     @jax.jit
     def forward(xu):
         x, u = divide_xu(xu, udim * horizon)
@@ -239,7 +240,7 @@ def optimize_u_fn(f_dyn, f_rew, udim, horizon, dt):
         _, u = divide_xu(xu, udim * horizon)
         u = u.reshape(horizon, udim)
         for t in range(horizon):
-            cost += -1 * f_rew(xs[t], u[t])
+            cost += f_cost(xs[t], u[t])
         return cost
 
     grad_xu = jax.jit(jax.grad(cost_xu))
@@ -255,15 +256,21 @@ def optimize_u_fn(f_dyn, f_rew, udim, horizon, dt):
         return float(cost_xu(xu))
 
     # Optimize
-    def func(u0, x0):
+    def func(u0, x0, num_repeat=0):
         u0 = u0.flatten()
-        cost_u_ = partial(cost_u, x0=x0)
-        grad_u_ = partial(grad_u, x0=x0)
-        umax, cmin, info = fmin_l_bfgs_b(cost_u_, u0, grad_u_)
+        cost_u_x0 = partial(cost_u, x0=x0)
+        grad_u_x0 = partial(grad_u, x0=x0)
+        umax, cmin, info = fmin_l_bfgs_b(cost_u_x0, u0, grad_u_x0)
         umax = umax.reshape(-1, udim)
-        rmax = -cmin
+        for _ in range(num_repeat):
+            u0_ = jax.random.uniform(key, u0.shape)
+            umax_, cmin_, info_ = fmin_l_bfgs_b(cost_u_x0, u0_, grad_u_x0)
+            umax_ = umax_.reshape(-1, udim)
+            if cmin_ < cmin:
+                print(f"old {cmin} new {cmin_}")
+                umax, cmin, info = umax_, cmin_, info_
         xs = forward(concate_xu(x0, umax))
-        u_info = {"du": info["grad"], "xs": xs}
-        return umax, rmax, u_info
+        u_info = {"du": info["grad"], "xs": xs, "cost_fn": cost_u_x0}
+        return umax, cmin, u_info
 
     return func

@@ -9,7 +9,7 @@ README updated (19/10/17)
 ```bash
 pip install -e .
 # To develop the code, do
-pip install pre-commit
+pip install pre-commit pytest
 pre-commit install
 ```
 
@@ -18,7 +18,7 @@ pre-commit install
 # Simple merge lane example
 python examples/run_highway.py
 
-# Plot reward surface over possible tasks (takes ~2mins to run)
+# Plot reward surface over possible tasks (takes 5~6mins to run)
 python examples/plot_highway.py
 ```
 

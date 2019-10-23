@@ -10,6 +10,7 @@ class HighwayDriveWorld(DriveWorld):
     def __init__(self, main_car, cars=[], num_lanes=3, lane_width=0.13, dt=0.1):
         lanes, fences = self.build_lanes(num_lanes, lane_width)
         self._fences = self.build_fences(lanes)
+        self._lane_width = lane_width
         super().__init__(main_car, cars, lanes, dt)
 
     @property
@@ -26,19 +27,20 @@ class HighwayDriveWorld(DriveWorld):
         return lanes, fences
 
     def build_fences(self, lanes):
-        fences = [lanes[0].shifted(-1), lanes[-1].shifted(1)]
+        fences = [lanes[0].shifted(-0.5), lanes[-1].shifted(0.5)]
         return fences
 
     def get_feat_fns(self, indices):
         fns = super().get_feat_fns(indices)
 
         fence_fns = [None] * len(self._fences)
-        for f_i, fence in enumerate(self._fences):
+        normals = np.array([[1.0, 0.0], [-1.0, 0.0]])
+        for f_i, (fence, normal) in enumerate(zip(self._fences, normals)):
             main_idx = indices["main_car"]
 
-            def fence_dist_fn(state, actions, fence=fence):
+            def fence_dist_fn(state, actions, fence=fence, normal=normal):
                 main_pos = state[..., np.arange(*main_idx)]
-                return feature.dist2lane(fence.center, fence.normal, main_pos)
+                return feature.dist_inside_fence(fence.center, normal, main_pos)
 
             fence_fns[f_i] = fence_dist_fn
         fns["dist_fences"] = concat_funcs(fence_fns)

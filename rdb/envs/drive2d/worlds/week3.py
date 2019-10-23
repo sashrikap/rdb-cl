@@ -25,6 +25,8 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
         horizon=10,
         num_lanes=3,
         lane_width=0.13,
+        car_length=0.1,
+        car_width=0.08,
     ):
         cars = []
         for state, speed in zip(car_states, car_speeds):
@@ -33,22 +35,61 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
         self.goal_speed = goal_speed
         self.goal_lane = goal_lane
         self.control_bound = control_bound
+        self._car_length = car_length
+        self._car_width = car_width
         super().__init__(main_car, cars, num_lanes=num_lanes, dt=dt)
-        self.rew_features = self.build_rew_features()
+        self.cost_features = self.build_cost_features()
 
-    def build_rew_features(self):
+    def build_cost_features(self):
+        """
+        Types:
+
+        : Gaussian : exp(-dist^2/sigma^2)
+        : Exponent : exp(run_over)
+        """
         features = {}
         sum_keep = partial(np.sum, keepdims=True)
-        features["dist_cars"] = compose(sum_keep, partial(exp_feat, sigma=0.3))
-        features["dist_lanes"] = compose(
-            quadratic_feat, partial(index_feat, index=self.goal_lane)
+        # Gaussian
+        features["dist_cars"] = compose(
+            np.sum,
+            partial(
+                gaussian_feat,
+                # sigma=self._car_length,
+                sigma=2 * np.array([self._car_width, self._car_length]),
+                # mu=2 * np.array([self._car_width, self._car_length]),
+            ),
         )
-        features["dist_fences"] = compose(sum_keep, partial(exp_feat, sigma=0.3))
+        # Gaussian
+        features["dist_lanes"] = compose(
+            np.sum,
+            neg_feat,
+            partial(gaussian_feat, sigma=self._car_length),
+            partial(index_feat, index=self.goal_lane),
+        )
+        # Exp barrier function
+        """
+        # Exponential cost gives ill-conditioned optimization
+        features["dist_fences"] = compose(
+            np.sum,
+            neg_feat,
+            partial(neg_exp_feat, sigma=self._lane_width / 4),
+            partial(diff_feat, subtract=self._car_width)
+        )"""
+        features["dist_fences"] = compose(
+            np.sum, partial(sigmoid_feat, mu=8.0 / self._car_width), neg_feat
+        )
+        """features["dist_fences"] = compose(
+            np.sum,
+            partial(gaussian_feat, sigma=self._car_length),
+            partial(index_feat, index=self.goal_lane),
+        )"""
 
         bound = self.control_bound
         # features["control"] = partial(bounded_feat, lower=-bound, upper=bound, width=0.5)
-        features["control"] = quadratic_feat
-        features["speed"] = partial(abs_feat, goal=self.goal_speed)
+        features["control"] = compose(np.sum, quadratic_feat)
+        features["speed"] = compose(
+            np.sum, partial(quadratic_feat, goal=self.goal_speed)
+        )
         return features
 
 
@@ -58,19 +99,26 @@ class Week3_01(HighwayDriveWorld_Week3):
         main_state = np.array([0, 0, np.pi / 2, main_speed])
         goal_speed = 0.8
         goal_lane = 0
-        horizon = 20
-        dt = 0.1
+        horizon = 10
+        dt = 0.2
         control_bound = 0.5
-        car1 = np.array([0.0, 0.2, np.pi / 2, 0])
-        car2 = np.array([-0.125, 0.2, np.pi / 2, 0])
+        ## Weird 1
+        # car1 = np.array([0.0, 0.45, np.pi / 2, 0])
+        # car2 = np.array([-0.125, 0.4, np.pi / 2, 0])
+        ## Weird 2
+        # car1 = np.array([0.0, 0.45, np.pi / 2, 0])
+        # car2 = np.array([-0.125, 0.4, np.pi / 2, 0])
+        car1 = np.array([0.0, 0.3, np.pi / 2, 0])
+        car2 = np.array([-0.125, 0.15, np.pi / 2, 0])
         car_states = np.array([car1, car2])
         car_speeds = np.array([0.6, 0.6])
         weights = {
-            "dist_cars": -1.0,
-            "dist_lanes": -5.0,
-            "dist_fences": -0.5,
-            "speed": -2.0,
-            "control": -1.0,
+            "dist_cars": 100.0,
+            "dist_lanes": 10.0,
+            "dist_fences": 100.0,
+            # "dist_fences": 5,
+            "speed": 4.0,
+            "control": 80.0,
         }
         super().__init__(
             main_state,
