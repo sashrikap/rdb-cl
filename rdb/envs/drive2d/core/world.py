@@ -170,7 +170,7 @@ class DriveWorld(gym.Env):
             self._window = pyglet.window.Window(
                 width=int(WINDOW_W / 2),
                 height=int(WINDOW_H / 2)
-                # width=int(WINDOW_W), height=int(WINDOW_H)
+                # width=int(WINDOW_W), height=int(WINDOW_H),
             )
         self._window.switch_to()
         if mode == "human":

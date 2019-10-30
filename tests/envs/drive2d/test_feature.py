@@ -17,6 +17,17 @@ def test_diff_to():
     assert np.allclose(diff_to(x, y), result)
 
 
+def test_diff_feat():
+    x = np.array([1, 2])
+    mu = np.array([3, 2])
+    result = np.array([-2, 0])
+    assert np.allclose(diff_feat(x, mu), result)
+    x = np.array([1, 2])
+    mu = 3
+    result = np.array([-2, -1])
+    assert np.allclose(diff_feat(x, mu), result)
+
+
 def test_dist_to_lane():
     center = np.array([0.0, 0.0])
     normal = np.array([1.0, 0.0])

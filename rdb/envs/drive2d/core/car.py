@@ -1,7 +1,6 @@
 import jax.numpy as np
 from rdb.envs.drive2d.core.dynamics import *
 from rdb.optim.utils import *
-from rdb.optim.open import LocalOptimizer
 from copy import deepcopy
 
 

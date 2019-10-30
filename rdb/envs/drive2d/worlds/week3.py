@@ -55,7 +55,7 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
             partial(
                 gaussian_feat,
                 # sigma=self._car_length,
-                sigma=2 * np.array([self._car_width, self._car_length]),
+                sigma=np.array([self._car_width, self._car_length]),
                 # mu=2 * np.array([self._car_width, self._car_length]),
             ),
         )
@@ -66,24 +66,16 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
             partial(gaussian_feat, sigma=self._car_length),
             partial(index_feat, index=self.goal_lane),
         )
-        # Exp barrier function
-        """
-        # Exponential cost gives ill-conditioned optimization
-        features["dist_fences"] = compose(
-            np.sum,
-            neg_feat,
-            partial(neg_exp_feat, sigma=self._lane_width / 4),
-            partial(diff_feat, subtract=self._car_width)
-        )"""
-        features["dist_fences"] = compose(
-            np.sum, partial(sigmoid_feat, mu=8.0 / self._car_width), neg_feat
-        )
+        # Quadratic barrier function
         """features["dist_fences"] = compose(
-            np.sum,
-            partial(gaussian_feat, sigma=self._car_length),
-            partial(index_feat, index=self.goal_lane),
+            np.sum, partial(sigmoid_feat, mu=8.0 / self._car_width), neg_feat
         )"""
-
+        features["dist_fences"] = compose(
+            np.sum,
+            quadratic_feat,
+            neg_relu_feat,
+            partial(diff_feat, subtract=self._car_width),
+        )
         bound = self.control_bound
         # features["control"] = partial(bounded_feat, lower=-bound, upper=bound, width=0.5)
         features["control"] = compose(np.sum, quadratic_feat)
@@ -109,15 +101,23 @@ class Week3_01(HighwayDriveWorld_Week3):
         # car1 = np.array([0.0, 0.45, np.pi / 2, 0])
         # car2 = np.array([-0.125, 0.4, np.pi / 2, 0])
         car1 = np.array([0.0, 0.3, np.pi / 2, 0])
-        car2 = np.array([-0.125, 0.15, np.pi / 2, 0])
+        car2 = np.array([-0.125, 0.9, np.pi / 2, 0])
         car_states = np.array([car1, car2])
         car_speeds = np.array([0.6, 0.6])
-        weights = {
+        weights_191023 = {
             "dist_cars": 100.0,
             "dist_lanes": 10.0,
-            "dist_fences": 100.0,
+            "dist_fences": 200.0,
             # "dist_fences": 5,
             "speed": 4.0,
+            "control": 80.0,
+        }
+        weights = {
+            "dist_cars": 100.0,
+            "dist_lanes": 100.0,
+            "dist_fences": 200.0,
+            # "dist_fences": 5,
+            "speed": 16.0,
             "control": 80.0,
         }
         super().__init__(

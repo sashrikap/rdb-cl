@@ -103,6 +103,11 @@ def relu_feat(data):
 
 
 @jax.jit
+def neg_relu_feat(data):
+    return relu_feat(neg_feat(data))
+
+
+@jax.jit
 def sigmoid_feat(data, mu=1.0):
     data = make_batch(data)
     return 0.5 * (np.tanh(data / (2.0 * mu)) + 1)
@@ -110,6 +115,7 @@ def sigmoid_feat(data, mu=1.0):
 
 @jax.jit
 def diff_feat(data, subtract):
+    data = make_batch(data)
     return data - subtract
 
 

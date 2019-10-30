@@ -11,6 +11,7 @@ from tqdm import tqdm
 from matplotlib import cm
 from rdb.visualize.render import *
 
+MAKE_MP4 = True
 
 env = gym.make("Week3_01-v0")
 obs = env.reset()
@@ -27,40 +28,56 @@ y0_idx = 1
 y1_idx = 5
 
 
-opt_u, r_max, info = opt_u_fn(np.zeros((horizon, udim)) * 0.1, env.state)
-y0_range = np.arange(-1.5, 1.5, 0.05)
-y1_range = np.arange(-1.5, 1.5, 0.05)
+# y0_range = np.arange(-1.5, 1.5, 0.05)
+# y1_range = np.arange(-1.5, 1.5, 0.05)
+y0_range = np.arange(-1.0, 1.01, 0.1)
+y1_range = np.arange(-1.0, 1.01, 0.1)
 
 all_rews = []
+all_trajs = []
 list_opt_u = []
 list_states = []
 list_rews = []
 list_paths = []
 for y0 in tqdm(y0_range):
     rews = []
+    trajs = []
     for y1 in y1_range:
         state = copy.deepcopy(state0)
         state[y0_idx] = y0
         state[y1_idx] = y1
-        opt_u, c_min, info = opt_u_fn(np.zeros((horizon, udim)) * 0.1, state)
+        opt_u, c_min, info = opt_u_fn(np.zeros((horizon, udim)), state, mpc=False)
         r_max = -1 * c_min
         rews.append(r_max)
+        trajs.append(info["xs"])
         list_rews.append(r_max)
         list_opt_u.append(opt_u)
         list_states.append(state)
-        list_paths.append(f"data/plot/y0({y0:.2f})_y1({y1:.2f})_rew({r_max:.3f}).mp4")
+        list_paths.append(f"data/191030/y0({y0:.2f})_y1({y1:.2f})_rew({r_max:.3f}).mp4")
+    all_trajs.append(trajs)
     all_rews.append(rews)
 
-# batch_render_env(env, list_states, list_opt_u, list_paths, fps=3, width=300)
-"""for state, opt_u, path in zip(list_states, list_opt_u, list_paths):
-    print(f"state {np.mean(state)} opt u {np.mean(opt_u)}")
-    render_env(env, state, opt_u, fps=3, path=path)"""
+
+list_states, list_opt_u, list_paths = (
+    onp.array(list_states),
+    onp.array(list_opt_u),
+    onp.array(list_paths),
+)
+list_rews = onp.array(all_rews).flatten()
+ind = onp.argsort(list_rews, axis=0)
+list_states, list_opt_u, list_paths = list_states[ind], list_opt_u[ind], list_paths[ind]
+if MAKE_MP4:
+    for state, opt_u, path in zip(list_states, list_opt_u, list_paths):
+        print(f"state {np.mean(state)} opt u {np.mean(opt_u)}")
+        render_env(env, state, opt_u, fps=3, path=path)
 
 
 fig = plt.figure()
 ax = plt.axes(projection="3d")
 X, Y = onp.meshgrid(y0_range, y1_range)
 Z = onp.array(all_rews).T
+
+# onp.savez("grid.npz", y0_range, y1_range, all_rews)
 # ax.plot_wireframe(X, Y, Z, color='black')
 surf = ax.plot_surface(
     X, Y, Z, cmap=cm.coolwarm, linewidth=0, antialiased=True, rstride=1, cstride=1

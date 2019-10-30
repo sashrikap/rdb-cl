@@ -34,6 +34,88 @@ def to_numpy(arr):
     return onp.array(arr).astype(onp.float64)
 
 
+def optimize_u_fn(f_dyn, f_cost, udim, horizon, dt):
+    @jax.jit
+    def forward(xu):
+        x, u = divide_xu(xu, udim * horizon)
+        xs = [x]
+        u = u.reshape(horizon, udim)
+        for t in range(horizon):
+            next_x = x + f_dyn(x, u[t]) * dt
+            xs.append(next_x)
+            x = next_x
+        return np.array(xs)
+
+    @jax.jit
+    def costs_xu(xu):
+        """
+        Param:
+        : xu : concatenate([x, u])
+        """
+        costs = np.array([])
+        xs = forward(xu)
+        _, u = divide_xu(xu, udim * horizon)
+        u = u.reshape(horizon, udim)
+        for t in range(horizon):
+            costs = np.append(costs, f_cost(xs[t], u[t]))
+        return costs
+
+    cost_xu = jax.jit(lambda xu: np.sum(costs_xu(xu)))
+    grad_xu = jax.jit(jax.grad(cost_xu))
+    # grad_xu = jax.grad(cost_xu)
+
+    def grad_u(u, x0):
+        xu = concate_xu(x0, u)
+        return to_numpy(grad_xu(xu))[-udim * horizon :]
+
+    # Numpy-based reward
+    def cost_u(u, x0):
+        xu = concate_xu(x0, u)
+        return float(cost_xu(xu))
+
+    # Optimize
+    def func(u0, x0, mpc=False):
+        if mpc:
+            opt_u, xs, du = [], [], []
+            cmin = 0.0
+            for t in range(horizon):
+                u0 = u0.flatten()
+                xs.append(x0)
+                cost_u_x0 = partial(cost_u, x0=x0)
+                grad_u_x0 = partial(grad_u, x0=x0)
+                opt_u_t, cmin_t, info_t = fmin_l_bfgs_b(cost_u_x0, u0, grad_u_x0)
+                opt_u_t = opt_u_t.reshape(-1, udim)
+                opt_u.append(opt_u_t[0])
+                cmin += f_cost(x0, opt_u_t[0])
+                xs_t = forward(concate_xu(x0, opt_u_t))
+                du.append(info_t["grad"][0])
+                # Forward 1 timestep, record 1st action
+                x0 = xs_t[1]
+                u0 = opt_u_t
+            xs.append(x0)
+            u_info = {"du": du, "xs": xs}
+            return opt_u, cmin, u_info
+        else:
+            u0 = u0.flatten()
+            cost_u_x0 = partial(cost_u, x0=x0)
+            grad_u_x0 = partial(grad_u, x0=x0)
+            opt_u, cmin, info = fmin_l_bfgs_b(cost_u_x0, u0, grad_u_x0)
+            opt_u = opt_u.reshape(-1, udim)
+            xu = concate_xu(x0, opt_u)
+            xs = forward(xu)
+            costs = costs_xu(xu)
+            u_info = {
+                "du": info["grad"],
+                "xs": xs,
+                "cost_fn": cost_u_x0,
+                "costs": costs,
+            }
+            return opt_u, cmin, u_info
+
+    return func
+
+
+'''
 def dict_to_vec(dict_var):
     """
     Convert dictionary variable to vector
@@ -171,7 +253,7 @@ class LocalOptimizer(OpenLoopOptimizer):
 
         # Optimize
         u0 = u0.flatten()
-        umax, rmax, info = fmin_l_bfgs_b(cost_u, u0, grad_u, maxiter=10)
+        umax, rmax, info = fmin_l_bfgs_b(cost_u, u0, grad_u)
         umax = umax.reshape(-1, self.udim)
         u_info = {"du": info["grad"]}
         return umax, rmax, u_info
@@ -215,62 +297,4 @@ class LocalOptimizer(OpenLoopOptimizer):
         x_info = {"dx": info["grad"]}
         xmax = self.vec_to_dict(xmax)
         return xmax, rmax, x_info
-
-
-def optimize_u_fn(f_dyn, f_cost, udim, horizon, dt):
-    @jax.jit
-    def forward(xu):
-        x, u = divide_xu(xu, udim * horizon)
-        xs = [x]
-        u = u.reshape(horizon, udim)
-        for t in range(horizon):
-            next_x = x + f_dyn(x, u[t]) * dt
-            xs.append(next_x)
-            x = next_x
-        return np.array(xs)
-
-    @jax.jit
-    def cost_xu(xu):
-        """
-        Param:
-        : xu : concatenate([x, u])
-        """
-        cost = 0.0
-        xs = forward(xu)
-        _, u = divide_xu(xu, udim * horizon)
-        u = u.reshape(horizon, udim)
-        for t in range(horizon):
-            cost += f_cost(xs[t], u[t])
-        return cost
-
-    grad_xu = jax.jit(jax.grad(cost_xu))
-    # grad_xu = jax.grad(cost_xu)
-
-    def grad_u(u, x0):
-        xu = concate_xu(x0, u)
-        return to_numpy(grad_xu(xu))[-udim * horizon :]
-
-    # Numpy-based reward
-    def cost_u(u, x0):
-        xu = concate_xu(x0, u)
-        return float(cost_xu(xu))
-
-    # Optimize
-    def func(u0, x0, num_repeat=0):
-        u0 = u0.flatten()
-        cost_u_x0 = partial(cost_u, x0=x0)
-        grad_u_x0 = partial(grad_u, x0=x0)
-        umax, cmin, info = fmin_l_bfgs_b(cost_u_x0, u0, grad_u_x0)
-        umax = umax.reshape(-1, udim)
-        for _ in range(num_repeat):
-            u0_ = jax.random.uniform(key, u0.shape)
-            umax_, cmin_, info_ = fmin_l_bfgs_b(cost_u_x0, u0_, grad_u_x0)
-            umax_ = umax_.reshape(-1, udim)
-            if cmin_ < cmin:
-                print(f"old {cmin} new {cmin_}")
-                umax, cmin, info = umax_, cmin_, info_
-        xs = forward(concate_xu(x0, umax))
-        u_info = {"du": info["grad"], "xs": xs, "cost_fn": cost_u_x0}
-        return umax, cmin, u_info
-
-    return func
+'''
