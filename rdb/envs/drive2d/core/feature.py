@@ -1,4 +1,3 @@
-from rdb.mdp.feature import Feature
 import jax.numpy as np
 import jax
 
@@ -20,6 +19,7 @@ def make_batch(state):
 # Environment specific
 @jax.jit
 def dist_to(x, y):
+    """ sqrt((y1 - x1)^2 + (y2 - x2)^2)"""
     x = make_batch(x)
     y = make_batch(y)
     diff = np.array(x[..., :2]) - np.array(y[..., :2])
@@ -27,8 +27,23 @@ def dist_to(x, y):
 
 
 @jax.jit
+def divide_by(x, y):
+    """ (x1/y1, x2/y2) """
+    x = make_batch(x)
+    y = make_batch(y)
+    return x / y
+
+
+@jax.jit
+def sum_square(x):
+    """ x1 * x1 + x2 * x2 """
+    x = make_batch(x)
+    return np.sum(x * x, keepdims=True)
+
+
+@jax.jit
 def diff_to(x, y):
-    """ (x2 - x1, y2 - y1)"""
+    """ (y1 - x1, y2 - x2)"""
     x = make_batch(x)
     y = make_batch(y)
     diff = np.array(x[..., :2]) - np.array(y[..., :2])
@@ -37,6 +52,7 @@ def diff_to(x, y):
 
 @jax.jit
 def dist_to_lane(center, normal, x):
+    """ lane.normal @ diff_to_lane """
     x = make_batch(x)
     diff = np.array(center) - np.array(x[..., :2])
     return np.abs(np.sum(normal * diff, axis=-1))
@@ -98,12 +114,14 @@ def neg_feat(data):
 
 @jax.jit
 def relu_feat(data):
+    """ f(x) = x if x >= 0; 0 otherwise """
     data = make_batch(data)
     return (np.abs(data) + data) / 2.0
 
 
 @jax.jit
 def neg_relu_feat(data):
+    """ f(x) = x if x < 0; 0 otherwise """
     return relu_feat(neg_feat(data))
 
 
@@ -115,21 +133,32 @@ def sigmoid_feat(data, mu=1.0):
 
 @jax.jit
 def diff_feat(data, subtract):
+    """ f(x, sub) = x - sub """
     data = make_batch(data)
     return data - subtract
 
 
 @jax.jit
 def neg_exp_feat(data, mu):
+    """ f(x, mu) = -exp(x / mu) """
     data = make_batch(data)
-    # print(f"neg exp {np.sum(np.exp(-data / (2 * sigma ** 2)), axis=-1)}")
     return np.exp(-data / mu)
 
 
 @jax.jit
-def gaussian_feat(data, sigma=1.0, mu=0.0):
-    quad = quadratic_feat(data, goal=mu)
-    gaus = neg_exp_feat(quad, 2 * sigma ** 2) / np.sqrt(2 * np.pi * sigma ** 2)
+def gaussian_feat(data, sigma=None, mu=0.0):
+    """ Assumes independent components"""
+    data = make_batch(data)
+    dim = data.shape[-1]
+    # Make sigma diagonalizable vector
+    if sigma is None:
+        sigma = np.eye(dim)
+    else:
+        sigma = np.atleast_1d(sigma) ** 2
+    diff = data - mu
+    exp = np.exp(-0.5 * diff @ np.diag(1 / sigma) @ diff.T)
+    gaus = exp / (np.sqrt((2 * np.pi) ** dim * np.prod(sigma)))
+    gaus = np.sum(gaus, axis=-1)
     return gaus
 
 

@@ -19,6 +19,7 @@ setup(
         "moviepy",
         "pygame",
         "toolz",
+        "funcy",
         "PyOpenGL",
     ],
 )

@@ -1,7 +1,8 @@
 import jax.numpy as np
-from rdb.envs.drive2d.worlds.highway import HighwayDriveWorld
+from rdb.optim.utils import *
 from rdb.envs.drive2d.core.car import *
 from rdb.envs.drive2d.core.feature import *
+from rdb.envs.drive2d.worlds.highway import HighwayDriveWorld
 from functools import partial
 from toolz.functoolz import compose
 
@@ -25,8 +26,6 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
         horizon=10,
         num_lanes=3,
         lane_width=0.13,
-        car_length=0.1,
-        car_width=0.08,
     ):
         cars = []
         for state, speed in zip(car_states, car_speeds):
@@ -35,65 +34,60 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
         self.goal_speed = goal_speed
         self.goal_lane = goal_lane
         self.control_bound = control_bound
-        self._car_length = car_length
-        self._car_width = car_width
         super().__init__(main_car, cars, num_lanes=num_lanes, dt=dt)
-        self.cost_features = self.build_cost_features()
 
-    def build_cost_features(self):
+    def get_nonlinear_features_dict(self, feats_dict):
         """
-        Types:
-
-        : Gaussian : exp(-dist^2/sigma^2)
-        : Exponent : exp(run_over)
+        Params
+        : feats_dict : dict of environment feature functions
+        Types
+        : Gaussian   : exp(-dist^2/sigma^2)
+        : Exponent   : exp(run_over)
         """
-        features = {}
+        nonlinear_dict = {}
         sum_keep = partial(np.sum, keepdims=True)
         # Gaussian
-        features["dist_cars"] = compose(
+        nonlinear_dict["dist_cars"] = compose(
             np.sum,
             partial(
                 gaussian_feat,
-                # sigma=self._car_length,
-                sigma=np.array([self._car_width, self._car_length]),
-                # mu=2 * np.array([self._car_width, self._car_length]),
+                sigma=np.array([self._car_width / 3, self._car_length / 2]),
             ),
+            abs_feat,
         )
         # Gaussian
-        features["dist_lanes"] = compose(
+        nonlinear_dict["dist_lanes"] = compose(
             np.sum,
             neg_feat,
             partial(gaussian_feat, sigma=self._car_length),
             partial(index_feat, index=self.goal_lane),
         )
         # Quadratic barrier function
-        """features["dist_fences"] = compose(
+        """nonlinear_dict["dist_fences"] = compose(
             np.sum, partial(sigmoid_feat, mu=8.0 / self._car_width), neg_feat
         )"""
-        features["dist_fences"] = compose(
-            np.sum,
-            quadratic_feat,
-            neg_relu_feat,
-            partial(diff_feat, subtract=self._car_width),
-        )
+        nonlinear_dict["dist_fences"] = compose(np.sum, quadratic_feat, neg_relu_feat)
         bound = self.control_bound
-        # features["control"] = partial(bounded_feat, lower=-bound, upper=bound, width=0.5)
-        features["control"] = compose(np.sum, quadratic_feat)
-        features["speed"] = compose(
+        nonlinear_dict["control"] = compose(np.sum, quadratic_feat)
+        nonlinear_dict["speed"] = compose(
             np.sum, partial(quadratic_feat, goal=self.goal_speed)
         )
-        return features
+        feats_dict = chain_funcs(nonlinear_dict, feats_dict)
+        return feats_dict
 
 
 class Week3_01(HighwayDriveWorld_Week3):
     def __init__(self):
         main_speed = 0.8
+        car_speed = 0.6
         main_state = np.array([0, 0, np.pi / 2, main_speed])
         goal_speed = 0.8
         goal_lane = 0
         horizon = 10
-        dt = 0.2
+        dt = 0.25
         control_bound = 0.5
+        lane_width = 0.13
+        num_lanes = 3
         ## Weird 1
         # car1 = np.array([0.0, 0.45, np.pi / 2, 0])
         # car2 = np.array([-0.125, 0.4, np.pi / 2, 0])
@@ -101,25 +95,44 @@ class Week3_01(HighwayDriveWorld_Week3):
         # car1 = np.array([0.0, 0.45, np.pi / 2, 0])
         # car2 = np.array([-0.125, 0.4, np.pi / 2, 0])
         car1 = np.array([0.0, 0.3, np.pi / 2, 0])
-        car2 = np.array([-0.125, 0.9, np.pi / 2, 0])
+        car2 = np.array([-lane_width, 0.9, np.pi / 2, 0])
         car_states = np.array([car1, car2])
-        car_speeds = np.array([0.6, 0.6])
+        car_speeds = np.array([car_speed, car_speed])
         weights_191023 = {
             "dist_cars": 100.0,
             "dist_lanes": 10.0,
             "dist_fences": 200.0,
-            # "dist_fences": 5,
             "speed": 4.0,
             "control": 80.0,
         }
-        weights = {
-            "dist_cars": 100.0,
-            "dist_lanes": 100.0,
-            "dist_fences": 200.0,
-            # "dist_fences": 5,
-            "speed": 16.0,
-            "control": 80.0,
+        weights_191030 = {
+            "dist_cars": 1,
+            "dist_lanes": 50.0,
+            "dist_fences": 1200.0,
+            "speed": 500.0,
+            "control": 50.0,
         }
+        weights_191101 = {
+            "dist_cars": 10,
+            "dist_lanes": 50.0,
+            "dist_fences": 1200.0,
+            "speed": 500.0,
+            "control": 50.0,
+        }
+        weights = {
+            "dist_cars": 50,
+            "dist_lanes": 30.0,
+            "dist_fences": 5000.0,
+            "speed": 1000.0,
+            "control": 20.0,
+        }
+        # weights = {
+        #     "dist_cars": 1,
+        #     "dist_lanes": 10.0,
+        #     "dist_fences": 1200.0,
+        #     "speed": 1000.0,
+        #     "control": 50.0,
+        # }
         super().__init__(
             main_state,
             goal_speed,
@@ -130,4 +143,6 @@ class Week3_01(HighwayDriveWorld_Week3):
             car_speeds,
             dt,
             horizon,
+            num_lanes,
+            lane_width,
         )

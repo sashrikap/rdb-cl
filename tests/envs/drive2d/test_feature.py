@@ -64,17 +64,16 @@ def test_quadratic():
 
 
 def test_gaussian():
-    def gaussian(x, mu, sig):
-        return np.exp(-np.power(x - mu, 2.0) / (2 * np.power(sig, 2.0)))
+    from scipy.stats import multivariate_normal
 
     data = np.array([-1, -1])
     mu = np.array([0.5, 0.5])
     sigma = np.array([0.1, 0.2])
-    result = gaussian(data, mu, sigma)
-    assert np.allclose(gaussian_feat(data, sigma, mu), result)
+    var = multivariate_normal(mean=mu, cov=np.diag(sigma ** 2))
+    assert np.allclose(gaussian_feat(data, sigma, mu), [var.pdf(data)])
 
     data = np.array([-5, -3])
     mu = np.array([0.5, 0.1])
     sigma = np.array([0.1, 0.2])
-    result = gaussian(data, mu, sigma)
-    assert np.allclose(gaussian_feat(data, sigma, mu), result)
+    var = multivariate_normal(mean=mu, cov=np.diag(sigma ** 2))
+    assert np.allclose(gaussian_feat(data, sigma, mu), [var.pdf(data)])

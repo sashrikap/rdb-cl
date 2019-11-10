@@ -26,6 +26,16 @@ def test_weights():
     assert np.allclose(fn(1, 2), 1)
 
 
+def test_partial():
+    from functools import partial
+
+    def func(a, b, c):
+        print(f"a {a} b {b} c {c}")
+
+    p_func = partial(func, b=1)
+    p_func(a=2, c=3)
+
+
 def test_chain():
     def f1(a, b):
         return a + b
@@ -36,7 +46,7 @@ def test_chain():
     inner = {"a": f1}
     outer = {"a": f2}
     chain = chain_funcs(outer, inner)
-    assert np.allclose(chain["a"](1, 2), [9, -1])
+    assert np.allclose(chain["a"](1, 2), [9.0])
 
 
 def test_index():

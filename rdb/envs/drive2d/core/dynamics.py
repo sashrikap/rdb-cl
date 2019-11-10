@@ -7,7 +7,7 @@ Includes:
 [1] Vectorizable Car dynamics (simple non-holonomic)
 
 Conventions:
-[1] State [x (forward), y (horizontal), angle, speed]
+[1] State [x (horizontal), y (forward), angle, speed]
 """
 
 

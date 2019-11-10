@@ -20,7 +20,27 @@ pyglet.resource.path.append(str(Path(__file__).parent.parent.joinpath("assets"))
 
 
 class DriveWorld(gym.Env):
-    def __init__(self, main_car, cars, lanes, dt, objects=[], subframes=3):
+    """
+    General driving world
+
+    Key Attributes
+    : main_car :
+    : cars     :
+    : objects  :
+    : dt       : timestep
+    """
+
+    def __init__(
+        self,
+        main_car,
+        cars,
+        lanes,
+        dt,
+        objects=[],
+        subframes=3,
+        car_length=0.1,
+        car_width=0.08,
+    ):
         self._main_car = main_car
         self._cars = cars
         self._lanes = lanes
@@ -28,6 +48,9 @@ class DriveWorld(gym.Env):
         self._dt = dt
         self._car_sprites = {c.color: car_sprite(c.color) for c in cars + [main_car]}
         self._obj_sprites = {o.name: object_sprite(o.name) for o in objects}
+        self._car_length = car_length
+        self._car_width = car_width
+        self._indices = None
 
         # Subframe rendering
         self._subframes = subframes
@@ -43,11 +66,8 @@ class DriveWorld(gym.Env):
         self._magnify = 1.0
 
         self.xdim = np.prod(self.state.shape)
-        dynamics_fns, indices = self.get_dynamics_fns()
-        self.dynamics_fn = concat_funcs(dynamics_fns.values())
-        self.indices = indices
-        feat_fns = self.get_feat_fns(indices)
-        self.feat_fns = feat_fns
+        self._dynamics_fn, self._indices = self.get_dynamics_fn()
+        self._features_dict, self._features_fn = self.get_features_fn()
 
     @property
     def subframes(self):
@@ -73,10 +93,36 @@ class DriveWorld(gym.Env):
             car.state = state[last_idx : last_idx + len(car.state)]
             last_idx += len(car.state)
 
-    def get_dynamics_fns(self):
-        """ Build Dict(key: dynamics_fn) mapping
+    @property
+    def features_dict(self):
+        return self._features_dict
 
-        Keys: cars0, cars1, main_car
+    @property
+    def features_fn(self):
+        return self._features_fn
+
+    @property
+    def dynamics_fn(self):
+        return self._dynamics_fn
+
+    @property
+    def cars(self):
+        return self._cars
+
+    @property
+    def main_car(self):
+        return self._main_car
+
+    def get_dynamics_fn(self):
+        """ Build Dict(key: dynamics_fn) mapping
+        Usage
+        ``` feat_1 = feature_fn_1(state) ```
+        Keys:
+        : cars0    :
+        : cars1    :
+        : main_car :
+        Output
+        : dynamic_fns : e.g. dyn_fns['cars_0'](state) =  next_car0_s
         """
         dynamics_keys = [f"cars{i}" for i in range(len(self._cars))] + ["main_car"]
         fns, indices = OrderedDict(), OrderedDict()
@@ -90,33 +136,44 @@ class DriveWorld(gym.Env):
             fn = index_func(car.dynamics_fn, idx)
             fns[key] = fn
             indices[key] = idx
-        return fns, indices
+        dynamics_fn = concat_funcs(fns.values())
+        return dynamics_fn, indices
 
-    def get_feat_fns(self, indices):
+    def get_raw_features_dict(self):
         """ Build Dict(key: feature_fn) mapping
-
-        Param:
-        : masks : state masks
+        Usage
+            ``` feat_1 = feature_fn_1(state) ```
+        Keys:
+        : dist_cars  :
+        : dist_lanes :
+        : speed      :
+        : control    :
+        Param
+        : indices  : e.g. {'car0': (0, 3)}
+        Output
+        : feat_fns : e.g. {'dist_cars': lambda state: return dist}
         """
-        fns = OrderedDict()
+        assert self._indices is not None, "Need to define state indices"
+        feats_dict = OrderedDict()
         # Car feature functions
         car_fns = [None] * len(self._cars)
         for c_i, car in enumerate(self._cars):
             key = f"cars{c_i}"
-            car_idx = indices[key]
-            main_idx = indices["main_car"]
+            car_idx = self._indices[key]
+            main_idx = self._indices["main_car"]
+            # car_shape = np.array([self._car_width, self._car_length])
 
             def car_dist_fn(state, actions, car_idx=car_idx):
                 car_pos = state[..., np.arange(*car_idx)]
                 main_pos = state[..., np.arange(*main_idx)]
-                return feature.dist_to(car_pos, main_pos)
+                return feature.diff_to(car_pos, main_pos)
 
             car_fns[c_i] = car_dist_fn
 
         # Lane feature functions
         lane_fns = [None] * len(self._lanes)
         for l_i, lane in enumerate(self._lanes):
-            main_idx = indices["main_car"]
+            main_idx = self._indices["main_car"]
 
             def lane_dist_fn(state, actions, lane=lane):
                 main_pos = state[..., np.arange(*main_idx)]
@@ -130,19 +187,20 @@ class DriveWorld(gym.Env):
         def control_fn(state, actions):
             return feature.control_magnitude(actions)
 
-        fns["dist_cars"] = concat_funcs(car_fns)
-        fns["dist_lanes"] = concat_funcs(lane_fns)
-        fns["speed"] = speed_fn
-        fns["control"] = control_fn
-        return fns
+        feats_dict["dist_cars"] = concat_funcs(car_fns)
+        feats_dict["dist_lanes"] = concat_funcs(lane_fns)
+        feats_dict["speed"] = speed_fn
+        feats_dict["control"] = control_fn
+        return feats_dict
 
-    @property
-    def cars(self):
-        return self._cars
+    def get_features_fn(self):
+        feats_dict = self.get_raw_features_dict()
+        feats_dict = self.get_nonlinear_features_dict(feats_dict)
+        merged_fn = merge_dict_funcs(feats_dict)
+        return feats_dict, merged_fn
 
-    @property
-    def main_car(self):
-        return self._main_car
+    def get_nonlinear_features_dict(self, feats_dict):
+        raise NotImplementedError
 
     def reset(self):
         for car in self._cars:
@@ -173,9 +231,9 @@ class DriveWorld(gym.Env):
                 # width=int(WINDOW_W), height=int(WINDOW_H),
             )
         self._window.switch_to()
-        if mode == "human":
-            # Bring up window
-            self._window.dispatch_events()
+        # if mode == "human":
+        # Bring up window
+        self._window.dispatch_events()
         self._window.clear()
         gl.glViewport(0, 0, int(WINDOW_W), int(WINDOW_H))
         gl.glMatrixMode(gl.GL_PROJECTION)
@@ -197,14 +255,15 @@ class DriveWorld(gym.Env):
             self.draw_car(car)
         self.draw_car(main_car)
         gl.glPopMatrix()
+        self.draw_text()
 
         img_data = pyglet.image.get_buffer_manager().get_color_buffer().get_image_data()
         arr = onp.fromstring(img_data.data, dtype=onp.uint8, sep="")
         # arr = arr.reshape(int(WINDOW_W / 2), int(WINDOW_H / 2), 4)
         arr = arr.reshape(int(WINDOW_W), int(WINDOW_H), 4)
         arr = arr[::-1, :, 0:3]
-        if mode == "human":
-            self._window.flip()
+        # if mode == "human":
+        self._window.flip()
         return arr
 
     def sub_render(self, mode="rgb_array", subframe=0):
@@ -264,8 +323,19 @@ class DriveWorld(gym.Env):
         sprite.draw()
 
     def draw_text(self):
-        self.label.text = "Speed: 0"
-        self.label.draw()
+        if self._label is None:
+            assert self._window is not None
+            self._label = pyglet.text.Label(
+                "Speed: ",
+                font_name="Times New Roman",
+                font_size=24,
+                x=30,
+                y=self._window.height - 30,
+                anchor_x="left",
+                anchor_y="top",
+            )
+        self._label.text = f"Speed: {self._main_car.state[3]:.3f}"
+        self._label.draw()
 
     def draw_lane(self, lane):
         gl.glColor3f(0.4, 0.4, 0.4)

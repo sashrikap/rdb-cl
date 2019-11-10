@@ -35,6 +35,37 @@ def weigh_funcs(funcs_dict, weights_dict):
     return compose(add_op, juxt(fns))
 
 
+def weigh_funcs_runtime(funcs_dict):
+    """
+    Weigh multiple functions by runtime weights
+    """
+
+    def func(*args, weights_dict):
+        output = 0.0
+        for key, fn in funcs_dict.items():
+            if key in weights_dict.keys():
+                w = weights_dict[key]
+                # w * fn(args)
+                output += w * fn(*args)
+        return output
+
+    return func
+
+
+def merge_dict_funcs(funcs_dict):
+    """
+    Execute a dictionary of functions individually
+    """
+
+    def func(*args):
+        output = OrderedDict()
+        for key, fn in funcs_dict.items():
+            output[key] = fn(*args)
+        return output
+
+    return func
+
+
 def chain_funcs(outer_dict, inner_dict):
     """
     Chain dictionaries of functions
@@ -49,10 +80,21 @@ def chain_funcs(outer_dict, inner_dict):
 
 
 def concat_funcs(funcs):
+    """
+    Concatenate output values of list of functions into a list
+
+    Useful for:
+    [1] Dynamics function [next_x1, next_x2] = f([x1, x2])
+    """
     return compose(np.concatenate, juxt(funcs))
 
 
 def combine_funcs(funcs):
+    """
+    Append output values of list of functions into a list
+
+    Usage: `[output1, output2] = f(data)`
+    """
     return compose(np.asarray, juxt(funcs))
 
 

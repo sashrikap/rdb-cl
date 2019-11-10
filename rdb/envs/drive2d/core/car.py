@@ -57,20 +57,40 @@ class OptimalControlCar(Car):
         """
         super().__init__(env, init_state, horizon, color)
         self.cost_weights = cost_weights
-        self.features = None
-        self.cost_fn = None
+        self._features_fn = None
+        self._cost_fn = None
+        self._cost_runtime = None
+
+    @property
+    def features_fn(self):
+        return self._features_fn
+
+    @property
+    def cost_fn(self):
+        return self._cost_fn
+
+    @property
+    def cost_runtime(self):
+        return self._cost_runtime
 
     def reset(self):
         super().reset()
-        self.cost_fn = self.build_cost_fn(self.env.cost_features, self.cost_weights)
+        # Cost & feature funcs defined post initialization
+        self._cost_fn, self._cost_runtime = self.build_cost_fn()
+        self._features_fn = self.env.features_fn
 
-    def build_cost_fn(self, feature_fns, weights):
-        """ cost = cost_fn(state, action)
+    def build_cost_fn(self):
+        """ Return two types of cost functions
+        ```
+        cost = cost_fn(state, action)
+        cost = cost_runtime(state, action, weights)
+        ```
         """
-        env_feat_fns = self.env.feat_fns
-        cost_feat_fns = chain_funcs(feature_fns, env_feat_fns)
-        cost_fn = weigh_funcs(cost_feat_fns, weights)
-        return cost_fn
+        env_feats_dict = self.env.features_dict
+        # Pre-defined & runtime costs
+        cost_fn = weigh_funcs(env_feats_dict, self.cost_weights)
+        cost_runtime = weigh_funcs_runtime(env_feats_dict)
+        return cost_fn, cost_runtime
 
     def control(self, u, dt):
         diff = self.dynamics_fn(self.state, u)

@@ -2,6 +2,16 @@ import jax.numpy as np
 import jax
 
 
+def test_multi_arguments():
+    def func(arg1, arg2):
+        return np.sum(arg1 * arg2)
+
+    grad1 = jax.grad(func)
+    args = (np.array([1.0, 2.0]), np.array([3.0, 4.0]))
+    result = np.array([3.0, 4.0])
+    assert np.allclose(grad1(*args), result)
+
+
 def test_index():
     """ Test some indexing operations and whether JAX preserves gradient"""
 
