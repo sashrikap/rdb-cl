@@ -4,7 +4,8 @@ import copy
 import jax.numpy as np
 import numpy as onp
 import rdb.envs.drive2d
-import rdb.optim.open as opt_open
+from rdb.optim.open import shooting_optimizer
+from rdb.optim.runner import Runner
 from tqdm import tqdm
 from rdb.visualize.render import *
 
@@ -13,6 +14,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 
 MAKE_MP4 = True
+REPLAN = True
 
 env = gym.make("Week3_01-v0")
 obs = env.reset()
@@ -20,11 +22,11 @@ main_car = env.main_car
 udim = 2
 horizon = 10
 T = 30
-opt_u_fn = opt_open.optimize_u_fn(
-    env.dynamics_fn, main_car.cost_fn, udim, horizon, env.dt
+optimizer = shooting_optimizer(
+    env.dynamics_fn, main_car.cost_fn, udim, horizon, env.dt, replan=REPLAN, T=T
 )
+runner = Runner(env, main_car)
 
-now = time.time()
 state0 = copy.deepcopy(env.state)
 y0_idx = 1
 y1_idx = 5
@@ -41,7 +43,7 @@ y1_range = np.arange(-0.5, 0.51, 0.1)
 
 all_rews = []
 all_trajs = []
-list_opt_u = []
+list_actions = []
 list_states = []
 list_rews = []
 list_paths = []
@@ -52,33 +54,37 @@ for y0 in tqdm(y0_range):
         state = copy.deepcopy(state0)
         state[y0_idx] = y0
         state[y1_idx] = y1
-        opt_u, c_min, info = opt_u_fn(np.zeros((horizon, udim)), state, mpc=True, T=T)
-        r_max = -1 * c_min
-        rews.append(r_max)
-        trajs.append(info["xs"])
-        list_rews.append(r_max)
-        list_opt_u.append(opt_u)
+        actions = optimizer(state)
+        traj, cost, info = runner(state, actions)
+        rew = -1 * cost
+
+        rews.append(rew)
+        trajs.append(traj)
+        list_rews.append(rew)
+        list_actions.append(actions)
         list_states.append(state)
-        list_paths.append(f"data/191030/y0({y0:.2f})_y1({y1:.2f})_rew({r_max:.3f}).mp4")
-        # list_paths.append(f"data/191101/y0({y0:.2f})_y1({y1:.2f})_rew({r_max:.3f}).mp4")
+        list_paths.append(f"data/191030/y0({y0:.2f})_y1({y1:.2f})_rew({rew:.3f}).mp4")
+        # list_paths.append(f"data/191101/y0({y0:.2f})_y1({y1:.2f})_rew({rew:.3f}).mp4")
     all_trajs.append(trajs)
     all_rews.append(rews)
 
 
-list_states, list_opt_u, list_paths = (
-    onp.array(list_states),
-    onp.array(list_opt_u),
-    onp.array(list_paths),
-)
+list_states = onp.array(list_states)
+list_actions = onp.array(list_actions)
+list_paths = onp.array(list_paths)
 list_rews = onp.array(all_rews).flatten()
+
 ind = onp.argsort(list_rews, axis=0)
-list_states, list_opt_u, list_paths = list_states[ind], list_opt_u[ind], list_paths[ind]
+list_states, list_actions, list_paths = (
+    list_states[ind],
+    list_actions[ind],
+    list_paths[ind],
+)
 if MAKE_MP4:
-    for state, opt_u, path in tqdm(
-        zip(list_states, list_opt_u, list_paths), total=len(list_states)
+    for state, actions, path in tqdm(
+        zip(list_states, list_actions, list_paths), total=len(list_states)
     ):
-        # print(f"state {np.mean(state)} opt u {np.mean(opt_u)}")
-        render_env(env, state, opt_u, fps=3, path=path)
+        render_env(env, state, actions, fps=3, path=path)
 
 
 fig = plt.figure()

@@ -219,7 +219,7 @@ class DriveWorld(gym.Env):
         done = False
         return self.state, rew, done, {}
 
-    def render(self, mode="rgb_array", cars=None, main_car=None):
+    def render(self, mode="rgb_array", cars=None, main_car=None, text=None):
         assert mode in ["human", "state_pixels", "rgb_array"]
 
         if self._window is None:
@@ -255,7 +255,7 @@ class DriveWorld(gym.Env):
             self.draw_car(car)
         self.draw_car(main_car)
         gl.glPopMatrix()
-        self.draw_text()
+        self.draw_text(text)
 
         img_data = pyglet.image.get_buffer_manager().get_color_buffer().get_image_data()
         arr = onp.fromstring(img_data.data, dtype=onp.uint8, sep="")
@@ -322,19 +322,23 @@ class DriveWorld(gym.Env):
         sprite.opacity = opacity
         sprite.draw()
 
-    def draw_text(self):
+    def draw_text(self, text=None):
         if self._label is None:
             assert self._window is not None
             self._label = pyglet.text.Label(
                 "Speed: ",
-                font_name="Times New Roman",
-                font_size=24,
+                font_name="Palatino",
+                font_size=15,
                 x=30,
                 y=self._window.height - 30,
+                width=200,
                 anchor_x="left",
                 anchor_y="top",
+                multiline=True,
             )
         self._label.text = f"Speed: {self._main_car.state[3]:.3f}"
+        if text is not None:
+            self._label.text += "\n" + text
         self._label.draw()
 
     def draw_lane(self, lane):

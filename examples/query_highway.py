@@ -3,7 +3,7 @@ import time, copy
 import jax.numpy as np
 import rdb.envs.drive2d
 from rdb.optim.open import shooting_optimizer
-
+from rdb.optim.runner import Runner
 
 env = gym.make("Week3_01-v0")
 obs = env.reset()
@@ -21,34 +21,23 @@ weights = {
     "control": 80.0,
 }
 T = 20
-if not REOPTIMIZE:
-    T = horizon
+REPLAN = True
 optimizer = shooting_optimizer(
-    env.dynamics_fn, env.cost_runtime, udim, horizon, env.dt, T=T, mpc=REOPTIMIZE
+    env.dynamics_fn, main_car.cost_runtime, udim, horizon, env.dt, T=T, replan=REPLAN
 )
+runner = Runner(env, main_car)
 state = copy.deepcopy(env.state)
 state[y0_idx] = 0.4
 state[y1_idx] = -0.2
 env.state = state
 
-opt_u, c_min, info = optimizer(
-    np.ones((horizon, udim)) * 0.0, env.state, weights=weights
-)
-r_max = -1 * c_min
+actions = optimizer(env.state, weights=weights)
+traj, cost, info = runner(state, actions)
 env.render("human")
-print(f"Rmax {r_max}")
-print(opt_u)
+print(f"Total cost {cost}")
 
 total_cost = 0
 for t in range(T):
-    action = opt_u[t]
-    cost = main_car.cost_fn(env.state, action)
-    total_cost += cost
-    env.step(action)
+    env.step(actions[t])
     env.render("human")
-
-    r_max = -1 * c_min
     time.sleep(0.2)
-
-
-# Scenario 2

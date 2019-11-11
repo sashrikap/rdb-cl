@@ -4,6 +4,7 @@ import jax.numpy as np
 import rdb.envs.drive2d
 import scipy.stats
 from rdb.optim.open import shooting_optimizer
+from rdb.optim.runner import Runner
 from functools import partial
 from tqdm import tqdm
 
@@ -37,9 +38,8 @@ udim = 2
 horizon = 10
 
 cost_runtime = main_car.cost_runtime
-optimizer = shooting_optimizer(
-    env.dynamics_fn, cost_runtime, udim, horizon, env.dt, mpc=True
-)
+optimizer = shooting_optimizer(env.dynamics_fn, cost_runtime, udim, horizon, env.dt)
+runner = Runner(env, main_car)
 
 y0_idx, y1_idx = 1, 5
 y0_range = np.arange(-1.0, 1.01, 0.9)
@@ -56,14 +56,13 @@ for y0 in tqdm(y0_range):
         state = copy.deepcopy(state0)
         state[y0_idx] = y0
         state[y1_idx] = y1
-        opt_u1, c_min1, info1 = optimizer(
-            np.zeros((horizon, udim)), state, weights=weights1
-        )
-        opt_u2, c_min2, info2 = optimizer(
-            np.zeros((horizon, udim)), state, weights=weights2
-        )
-        trajs1.append(info1["xs"])
-        trajs2.append(info2["xs"])
+        actions1 = optimizer(state, weights=weights1)
+        traj1, cost1, info1 = runner(state, actions1)
+        actions2 = optimizer(state, weights=weights2)
+        traj2, cost2, info2 = runner(state, actions2)
+
+        trajs1.append(traj1)
+        trajs2.append(traj2)
     all_trajs1.append(trajs1)
     all_trajs2.append(trajs2)
 

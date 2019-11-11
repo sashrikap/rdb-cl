@@ -2,7 +2,6 @@ import gym
 import time
 import numpy as onp
 import rdb.envs.drive2d
-import rdb.optim.open as opt_open
 
 env = gym.make("Week3_01-v0")
 obs = env.reset()

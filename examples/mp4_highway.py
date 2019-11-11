@@ -2,24 +2,21 @@ import gym
 import time, copy
 import jax.numpy as np
 import rdb.envs.drive2d
-import rdb.optim.open as opt_open
+from rdb.optim.open import shooting_optimizer
 from rdb.visualize.render import render_env
 
+REPLAN = True
 env = gym.make("Week3_01-v0")
 obs = env.reset()
 main_car = env.main_car
 udim = 2
 horizon = 10
-state0 = copy.deepcopy(env.state)
+state = copy.deepcopy(env.state)
 
-opt_u_fn = opt_open.optimize_u_fn(
-    env.dynamics_fn, main_car.cost_fn, udim, horizon, env.dt
+optimizer = shooting_optimizer(
+    env.dynamics_fn, main_car.cost_fn, udim, horizon, env.dt, replan=REPLAN
 )
 
-now = time.time()
-opt_u, c_min, info = opt_u_fn(np.ones((horizon, udim)) * 0.1, env.state)
-print(opt_u)
-r_max = -1 * c_min
-
+actions = optimizer(env.state)
 pathname = f"data/video.mp4"
-render_env(env, state0, opt_u, 10, pathname)
+render_env(env, state, actions, 10, pathname)

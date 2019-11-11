@@ -4,10 +4,10 @@ import jax.numpy as np
 import numpy as onp
 import rdb.envs.drive2d
 from rdb.optim.open import shooting_optimizer
+from rdb.optim.runner import Runner
 from matplotlib import pyplot as plt
 from rdb.visualize.render import render_env
 
-REOPTIMIZE = True
 MAKE_MP4 = True
 
 env = gym.make("Week3_01-v0")
@@ -15,9 +15,12 @@ obs = env.reset()
 main_car = env.main_car
 udim = 2
 horizon = 10
+T = horizon
+
 optimizer = shooting_optimizer(
-    env.dynamics_fn, main_car.cost_runtime, udim, horizon, env.dt, mpc=REOPTIMIZE
+    env.dynamics_fn, main_car.cost_runtime, udim, horizon, env.dt, T=T
 )
+runner = Runner(env, main_car)
 weights = {
     "dist_cars": 50,
     "dist_lanes": 30.0,
@@ -41,24 +44,15 @@ state[y1_idx] = 0.05
 env.state = state
 
 # Optimize for control
-opt_u, c_min, info = optimizer(np.zeros((horizon, udim)), env.state, weights=weights)
-r_max = -1 * c_min
+actions = optimizer(env.state, weights=weights)
+traj, cost, info = runner(env.state, actions)
+
+rew = -1 * cost
 env.render("human")
-print(f"Rmax {r_max}")
-print(opt_u)
+print(f"Total cost {cost}")
 
-T = horizon
-total_cost = 0
-actions = []
+# Render actions
 for t in range(T):
-    action = opt_u[t]
-    actions.append(action)
-    cost = main_car.cost_fn(env.state, action)
-    total_cost += cost
-    env.step(action)
+    env.step(actions[t])
     env.render("human")
-
-    r_max = -1 * c_min
     time.sleep(0.2)
-
-print(f"Rew {-1 * total_cost:.3f}")
