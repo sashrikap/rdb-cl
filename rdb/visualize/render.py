@@ -1,7 +1,10 @@
 from moviepy.editor import ImageSequenceClip
-import multiprocessing
 from functools import partial
 from matplotlib import pyplot as plt
+from os import makedirs
+from os.path import join
+from scipy.misc import imsave, imresize
+import multiprocessing
 
 
 def save_video(frames, fps, width, path):
@@ -28,9 +31,17 @@ def forward_env(env, actions, init_state=None):
     return frames
 
 
-def render_env(env, state, actions, fps, path="data/video.mp4", width=450):
+def render_env(
+    env, state, actions, fps, path="data/video.mp4", width=450, savepng=False
+):
     frames = forward_env(env, actions, state)
     save_video(frames, int(fps / env.dt), width, path)
+    if savepng:
+        dirname = path.replace(".mp4", "")
+        makedirs(dirname, exist_ok=True)
+        for i, frame in enumerate(frames):
+            frame = imresize(frame, (width, width))
+            imsave(join(dirname, f"frame_{i:03d}.png"), frame)
 
 
 def batch_render_env(env, states, actions, paths, fps, width, workers=4):

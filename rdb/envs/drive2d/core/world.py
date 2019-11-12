@@ -4,10 +4,12 @@ import jax.numpy as np
 import numpy as onp
 from pathlib import Path
 from os.path import join
-import copy
+from copy import deepcopy
 from collections import OrderedDict
+from tqdm import tqdm
 
 import pyglet
+import matplotlib.cm
 from pyglet import gl, graphics
 from gym.envs.classic_control import rendering
 from rdb.envs.drive2d.core import lane, feature, car
@@ -40,6 +42,7 @@ class DriveWorld(gym.Env):
         subframes=3,
         car_length=0.1,
         car_width=0.08,
+        speed_factor=100,
     ):
         self._main_car = main_car
         self._cars = cars
@@ -51,6 +54,7 @@ class DriveWorld(gym.Env):
         self._car_length = car_length
         self._car_width = car_width
         self._indices = None
+        self._speed_factor = speed_factor  # real world speed (mph) per simulation speed
 
         # Subframe rendering
         self._subframes = subframes
@@ -64,8 +68,10 @@ class DriveWorld(gym.Env):
         self._label = None
         self._grass = None
         self._magnify = 1.0
+        self._cm = matplotlib.cm.coolwarm
+        self._heat_fn = None
 
-        self.xdim = np.prod(self.state.shape)
+        self.xdim = onp.prod(self.state.shape)
         self._dynamics_fn, self._indices = self.get_dynamics_fn()
         self._features_dict, self._features_fn = self.get_features_fn()
 
@@ -116,8 +122,8 @@ class DriveWorld(gym.Env):
     def get_dynamics_fn(self):
         """ Build Dict(key: dynamics_fn) mapping
         Usage
-        ``` feat_1 = feature_fn_1(state) ```
-        Keys:
+        [1] feat_1 = feature_fn_1(state)
+        Keys
         : cars0    :
         : cars1    :
         : main_car :
@@ -142,7 +148,7 @@ class DriveWorld(gym.Env):
     def get_raw_features_dict(self):
         """ Build Dict(key: feature_fn) mapping
         Usage
-            ``` feat_1 = feature_fn_1(state) ```
+        [1] feat_1 = feature_fn_1(state)
         Keys:
         : dist_cars  :
         : dist_lanes :
@@ -187,11 +193,14 @@ class DriveWorld(gym.Env):
         def control_fn(state, actions):
             return feature.control_magnitude(actions)
 
-        feats_dict["dist_cars"] = concat_funcs(car_fns)
-        feats_dict["dist_lanes"] = concat_funcs(lane_fns)
+        feats_dict["dist_cars"] = concat_funcs(car_fns, axis=0)
+        feats_dict["dist_lanes"] = concat_funcs(lane_fns, axis=0)
         feats_dict["speed"] = speed_fn
         feats_dict["control"] = control_fn
         return feats_dict
+
+    def get_features_keys(self):
+        return ["dist_cars", "dist_lanes", "speed", "control"]
 
     def get_features_fn(self):
         feats_dict = self.get_raw_features_dict()
@@ -209,8 +218,8 @@ class DriveWorld(gym.Env):
 
     def step(self, action):
         for car, prev_car in zip(self._cars, self._prev_cars):
-            prev_car.state = copy.deepcopy(car.state)
-        self._prev_main_car.state = copy.deepcopy(self.main_car.state)
+            prev_car.state = deepcopy(car.state)
+        self._prev_main_car.state = deepcopy(self.main_car.state)
 
         for car in self._cars:
             car.control(self.dt)
@@ -219,7 +228,15 @@ class DriveWorld(gym.Env):
         done = False
         return self.state, rew, done, {}
 
-    def render(self, mode="rgb_array", cars=None, main_car=None, text=None):
+    def render(
+        self,
+        mode="rgb_array",
+        cars=None,
+        main_car=None,
+        text=None,
+        draw_heat=False,
+        weights=None,
+    ):
         assert mode in ["human", "state_pixels", "rgb_array"]
 
         if self._window is None:
@@ -254,6 +271,10 @@ class DriveWorld(gym.Env):
         for car in cars:
             self.draw_car(car)
         self.draw_car(main_car)
+        if draw_heat:
+            self.set_heat(weights)
+            self.draw_heatmap()
+
         gl.glPopMatrix()
         self.draw_text(text)
 
@@ -336,7 +357,8 @@ class DriveWorld(gym.Env):
                 anchor_y="top",
                 multiline=True,
             )
-        self._label.text = f"Speed: {self._main_car.state[3]:.3f}"
+        speed = self._main_car.state[3] * self._speed_factor
+        self._label.text = f"Speed: {speed:.2f} mph"
         if text is not None:
             self._label.text += "\n" + text
         self._label.draw()
@@ -346,7 +368,7 @@ class DriveWorld(gym.Env):
         W = 1000
         normal, forward = lane.normal, lane.forward
         pt1, pt2, width = lane.pt1, lane.pt2, lane.width
-        quad_strip = np.hstack(
+        quad_strip = onp.hstack(
             [
                 pt1 - forward * W - 0.5 * width * normal,
                 pt1 - forward * W + 0.5 * width * normal,
@@ -357,7 +379,7 @@ class DriveWorld(gym.Env):
         graphics.draw(4, gl.GL_QUAD_STRIP, ("v2f", quad_strip))
         gl.glColor3f(1.0, 1.0, 1.0)
         W = 1000
-        line_strip = np.hstack(
+        line_strip = onp.hstack(
             [
                 pt1 - forward * W - 0.5 * width * normal,
                 pt1 + forward * W - 0.5 * width * normal,
@@ -366,6 +388,53 @@ class DriveWorld(gym.Env):
             ]
         )
         graphics.draw(4, gl.GL_LINES, ("v2f", line_strip))
+
+    def set_heat(self, weights=None):
+        def val(x, y):
+            if weights is None:
+                cost_fn = self._main_car.cost_fn
+            else:
+                cost_fn = partial(self._main_car.cost_runtime, weights=weights)
+            state = deepcopy(self.state)
+            main_idx = self._indices["main_car"]
+            state[main_idx[0] : main_idx[0] + 3] = [x, y, onp.pi / 3]
+            act = onp.array([0, 0])
+            return cost_fn(state, act)
+
+        self._heat_fn = val
+
+    def draw_heatmap(self):
+        center = self.main_car.state[:2]
+        c0 = center - onp.array([1.0, 1.0]) / self._magnify
+        c1 = center + onp.array([1.0, 1.0]) / self._magnify
+
+        SIZE = (32, 32)
+        # SIZE = (16, 16)
+        vals = onp.zeros(SIZE)
+        # Sweep for cost values
+        for i, x in enumerate(tqdm(onp.linspace(c0[0], c1[0], SIZE[0]))):
+            for j, y in enumerate(onp.linspace(c0[1], c1[1], SIZE[1])):
+                vals[j, i] = self._heat_fn(x, y)
+        vals = (vals - onp.min(vals)) / (onp.max(vals) - onp.min(vals) + 1e-6)
+        # Convert to color map and draw
+        vals = self._cm(vals)
+        vals[:, :, 3] = 0.5
+        vals = (vals * 255.99).astype("uint8").flatten()
+        vals = (gl.GLubyte * vals.size)(*vals)
+        img = pyglet.image.ImageData(SIZE[0], SIZE[1], "RGBA", vals, pitch=SIZE[1] * 4)
+        heatmap = img.get_texture()
+        gl.glClearColor(1.0, 1.0, 1.0, 1.0)
+        gl.glEnable(heatmap.target)
+        gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
+        gl.glEnable(gl.GL_BLEND)
+        gl.glBindTexture(heatmap.target, heatmap.id)
+        graphics.draw(
+            4,
+            gl.GL_QUADS,
+            ("v2f", (c0[0], c0[1], c1[0], c0[1], c1[0], c1[1], c0[0], c1[1])),
+            ("t2f", (0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0)),
+        )
+        gl.glDisable(heatmap.target)
 
 
 def centered_image(filename):

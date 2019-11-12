@@ -79,14 +79,26 @@ def chain_funcs(outer_dict, inner_dict):
     return output
 
 
-def concat_funcs(funcs):
+def concat_funcs(funcs, axis=-1):
     """
     Concatenate output values of list of functions into a list
 
     Useful for:
     [1] Dynamics function [next_x1, next_x2] = f([x1, x2])
     """
-    return compose(np.concatenate, juxt(funcs))
+    concat = partial(np.concatenate, axis=axis)
+    return compose(concat, juxt(funcs))
+
+
+def stack_funcs(funcs, axis=0):
+    """
+    Concatenate output values of list of functions into a list
+
+    Useful for:
+    [1] Dynamics function [next_x1, next_x2] = f([x1, x2])
+    """
+    stack = partial(np.stack, axis=0)
+    return compose(stack, juxt(funcs))
 
 
 def combine_funcs(funcs):

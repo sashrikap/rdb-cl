@@ -14,13 +14,29 @@ class Car(object):
         self.env = env
         self.horizon = horizon
         self.dynamics_fn = car_dynamics_fn(friction)
-        self.init_state = init_state
-        self.state = init_state
+        self._init_state = init_state
+        self._state = init_state
         self.color = color
         # Initilialize trajectory data
 
     def reset(self):
-        self.state = self.init_state
+        self._state = self._init_state
+
+    @property
+    def state(self):
+        return self._state
+
+    @state.setter
+    def state(self, state):
+        self._state = state
+
+    @property
+    def init_state(self):
+        return self._init_state
+
+    @init_state.setter
+    def init_state(self, init_state):
+        self._init_state = init_state
 
     def control(self, u, dt):
         raise NotImplementedError
@@ -37,12 +53,12 @@ class FixSpeedCar(Car):
         self.dynamics_fn = fixspeed_dynamics_fn(fix_speed)
 
     def control(self, dt):
-        self.state += self.dynamics_fn(self.state, None) * dt
+        self._state += self.dynamics_fn(self._state, None) * dt
 
     def copy(self):
         return FixSpeedCar(
             self.env,
-            deepcopy(self.init_state),
+            deepcopy(self._init_state),
             self.fix_speed,
             self.horizon,
             self.color,
@@ -93,14 +109,14 @@ class OptimalControlCar(Car):
         return cost_fn, cost_runtime
 
     def control(self, u, dt):
-        diff = self.dynamics_fn(self.state, u)
-        self.state += self.dynamics_fn(self.state, u) * dt
+        diff = self.dynamics_fn(self._state, u)
+        self._state += self.dynamics_fn(self._state, u) * dt
 
     def copy(self):
         return OptimalControlCar(
             self.env,
             deepcopy(self.cost_weights),
-            deepcopy(self.init_state),
+            deepcopy(self._init_state),
             self.horizon,
             self.color,
         )

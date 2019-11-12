@@ -66,6 +66,27 @@ def dist_inside_fence(center, normal, x):
 
 
 @jax.jit
+def diff_to_fence(center, normal, x):
+    """
+    Params
+    : center : (2,)
+    : normal : (2,)
+    : x      : (nbatch, 2)
+    Outout
+    : diff   : (nbatch, 2)
+    """
+    x = make_batch(x)
+    diff = np.array(x[..., :2]) - np.array(center)
+    diff = normal * diff
+    angle = np.array(x[..., 2])
+    vh = np.concatenate([np.sin(angle), -np.cos(angle)], axis=-1)
+    vv = np.concatenate([np.cos(angle), np.sin(angle)], axis=-1)
+    diff_h = np.sum(diff * vh, axis=-1, keepdims=True)
+    diff_v = np.sum(diff * vv, axis=-1, keepdims=True)
+    return np.concatenate([diff_h, diff_v], axis=-1)
+
+
+@jax.jit
 def speed_forward(state):
     state = make_batch(state)
     return state[..., 3] * np.sin(state[..., 2])
@@ -155,11 +176,20 @@ def gaussian_feat(data, sigma=None, mu=0.0):
         sigma = np.eye(dim)
     else:
         sigma = np.atleast_1d(sigma) ** 2
+
+    # Number of data points
+    num = data.shape[-2]
+    feats = []
     diff = data - mu
-    exp = np.exp(-0.5 * diff @ np.diag(1 / sigma) @ diff.T)
-    gaus = exp / (np.sqrt((2 * np.pi) ** dim * np.prod(sigma)))
-    gaus = np.sum(gaus, axis=-1)
-    return gaus
+    for i in range(num):
+        diff_i = diff[i, :]
+        exp = np.exp(-0.5 * diff_i @ np.diag(1 / sigma) @ diff_i.T)
+        gaus = exp / (np.sqrt((2 * np.pi) ** dim * np.prod(sigma)))
+        # gaus = np.sum(gaus, axis=-1)
+        gaus = np.sum(gaus)
+        feats.append(gaus)
+    feats = np.array(feats)
+    return feats
 
 
 @jax.jit

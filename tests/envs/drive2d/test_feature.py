@@ -68,9 +68,12 @@ def test_gaussian():
 
     data = np.array([-1, -1])
     mu = np.array([0.5, 0.5])
-    sigma = np.array([0.1, 0.2])
+    sigma = np.array([1, 2])
     var = multivariate_normal(mean=mu, cov=np.diag(sigma ** 2))
     assert np.allclose(gaussian_feat(data, sigma, mu), [var.pdf(data)])
+    import pdb
+
+    pdb.set_trace()
 
     data = np.array([-5, -3])
     mu = np.array([0.5, 0.1])

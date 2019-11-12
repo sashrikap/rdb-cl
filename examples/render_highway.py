@@ -3,7 +3,7 @@ import time
 import numpy as onp
 import rdb.envs.drive2d
 
-env = gym.make("Week3_01-v0")
+env = gym.make("Week3_02-v0")
 obs = env.reset()
 main_car = env.main_car
 udim = 2
@@ -18,5 +18,5 @@ env.render("human")
 time.sleep(2)
 for t in range(horizon):
     env.step(opt_u[t])
-    env.render("human")
+    env.render("human", draw_heat=True)
     time.sleep(1)

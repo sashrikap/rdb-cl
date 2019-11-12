@@ -49,9 +49,9 @@ class Optimizer(object):
         : replan   : True if replan at every step
 
         Usage
-        ```optimizer(u0, x0, weights)```
+        [1] optimizer(u0, x0, weights)
         Note
-            If `weights` is provided, it is user's reponsibility to
+        [1] If `weights` is provided, it is user's reponsibility to
         ensure that cost_u & grad_u can accept `weights` as argument
         """
         self._udim = udim
@@ -61,6 +61,8 @@ class Optimizer(object):
         self.h_traj_u = h_traj_u
         self.h_grad_u = h_grad_u
         self.h_cost_u = h_cost_u
+        self._compiled = False
+
         if self._T is None:
             self._T = horizon
         if not self._replan:
@@ -83,6 +85,9 @@ class Optimizer(object):
         return self.h_traj_u(x0, u)
 
     def __call__(self, x0, u0=None, weights=None, init="zeros"):
+        if not self._compiled:
+            print("First time running optimizer, compiling with jit...")
+            self._compiled = True
         if u0 is None:
             if init == "zeros":
                 u0 = np.zeros((self._horizon, self._udim))
@@ -154,7 +159,7 @@ def shooting_optimizer(f_dyn, f_cost, udim, horizon, dt, replan=True, T=None):
     : T       : trajectory length, if replan=False, must be None
 
     Note
-    The following functions are moved outside of Optimizer class definition
+    [1] The following functions are moved outside of Optimizer class definition
     as standalone functions to speed up jax complication
     : h_forward  : full horizon forward function
                    `array((T, xdim)) = h_forward(xu, length)`
