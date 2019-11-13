@@ -5,7 +5,7 @@ import ipywidgets as widgets
 
 from matplotlib import cm
 from mpl_toolkits import mplot3d
-from ipywidgets import interact, interactive, fixed
+from ipywidgets import interact, interactive, fixed, Button, Layout
 from IPython.display import display
 
 """
@@ -46,7 +46,7 @@ def plot_episode(frames, name="Figure"):
         description="Press play",
         disabled=False,
     )
-    slider = widgets.IntSlider(min=0, max=nframes - 1)
+    slider = widgets.IntSlider(min=0, max=nframes - 1, layout=Layout(width="3000px"))
     widgets.jslink((player, "value"), (slider, "value"))
     interactive(view_image, i=slider)
     box = widgets.HBox([player, slider])

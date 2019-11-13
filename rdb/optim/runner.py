@@ -57,6 +57,9 @@ class Runner(object):
     def collect_frames(self, actions, width=450, mode="rgb_array", text=""):
         self._env.reset()
         frames = []
+        if mode == "rgb_array":
+            frames = [self._env.render("rgb_array", text=text)]
+        # Rollout
         for act in actions:
             self._env.step(act)
             if mode == "human":

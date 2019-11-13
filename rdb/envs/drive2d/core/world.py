@@ -287,7 +287,7 @@ class DriveWorld(gym.Env):
         self._window.flip()
         return arr
 
-    def sub_render(self, mode="rgb_array", subframe=0):
+    def sub_render(self, mode="rgb_array", subframe=0, text=None):
         """ Alpha-interpolate adjacent frames to make animation look smoother """
         ratio = (subframe + 1.0) / float(self._subframes)
         for c_i in range(len(self._cars)):
@@ -296,7 +296,9 @@ class DriveWorld(gym.Env):
 
         diff_state = self._main_car.state - self._prev_main_car.state
         self._sub_main_car.state = ratio * diff_state + self._prev_main_car.state
-        return self.render(mode=mode, cars=self._sub_cars, main_car=self._sub_main_car)
+        return self.render(
+            mode=mode, cars=self._sub_cars, main_car=self._sub_main_car, text=text
+        )
 
     def center_camera(self, main_car):
         center_x = main_car.state[0]
@@ -394,7 +396,7 @@ class DriveWorld(gym.Env):
             if weights is None:
                 cost_fn = self._main_car.cost_fn
             else:
-                cost_fn = partial(self._main_car.cost_runtime, weights=weights)
+                cost_fn = partial(self._main_car.cost_runtime, weights_dict=weights)
             state = deepcopy(self.state)
             main_idx = self._indices["main_car"]
             state[main_idx[0] : main_idx[0] + 3] = [x, y, onp.pi / 3]

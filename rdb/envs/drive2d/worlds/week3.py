@@ -1,3 +1,4 @@
+import jax
 import jax.numpy as np
 from rdb.optim.utils import *
 from rdb.envs.drive2d.core.car import *
@@ -58,45 +59,49 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
         nonlinear_dict["dist_cars"] = compose(
             np.sum,
             partial(
-                gaussian_feat,
-                sigma=np.array(
-                    [
-                        (self._car_width + self._lane_width) / 2,
-                        self._car_length + self._car_width,
-                    ]
-                ),
+                gaussian_feat, sigma=np.array([self._car_width / 2, self._car_length])
             ),
             # debug_print
             # abs_feat,
         )
         # Gaussian
-        """nonlinear_dict["dist_lanes"] = compose(
+        nonlinear_dict["dist_lanes"] = compose(
             np.sum,
             neg_feat,
             partial(gaussian_feat, sigma=self._car_length),
             partial(index_feat, index=self.goal_lane),
-        )"""
-        nonlinear_dict["dist_lanes"] = compose(
-            np.sum, quadratic_feat, partial(index_feat, index=self.goal_lane)
         )
+        """nonlinear_dict["dist_lanes"] = compose(
+            np.sum, quadratic_feat, partial(index_feat, index=self.goal_lane)
+        )"""
         # Quadratic barrier function
         """nonlinear_dict["dist_fences"] = compose(
             np.sum, partial(sigmoid_feat, mu=8.0 / self._car_width), neg_feat
         )"""
-        # nonlinear_dict["dist_fences"] = compose(np.sum, quadratic_feat, neg_relu_feat)
         nonlinear_dict["dist_fences"] = compose(
+            np.sum,
+            quadratic_feat,
+            neg_relu_feat,
+            lambda dist: dist - (self._lane_width + self._car_length) / 2,
+        )
+        """nonlinear_dict["dist_fences"] = compose(
             np.sum,
             partial(
                 gaussian_feat,
                 sigma=np.array([self._car_width / 3, self._car_length / 3]),
             ),
             # debug_print
-        )
+        )"""
         bound = self.control_bound
         nonlinear_dict["control"] = compose(np.sum, quadratic_feat)
         nonlinear_dict["speed"] = compose(
             np.sum, partial(quadratic_feat, goal=self.goal_speed)
         )
+
+        # Speed up
+        for key, fn in nonlinear_dict.items():
+            nonlinear_dict[key] = jax.jit(fn)
+
         feats_dict = chain_funcs(nonlinear_dict, feats_dict)
         return feats_dict
 
@@ -191,8 +196,8 @@ class Week3_02(HighwayDriveWorld_Week3):
         car_speeds = np.array([car_speed, car_speed])
         weights = {
             "dist_cars": 0.0,
-            "dist_lanes": 50.0,
-            "dist_fences": 0.0,
+            "dist_lanes": 0.0,
+            "dist_fences": 50.0,
             "speed": 1000.0,
             "control": 20.0,
         }

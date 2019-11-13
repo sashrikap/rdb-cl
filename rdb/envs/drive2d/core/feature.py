@@ -143,7 +143,8 @@ def relu_feat(data):
 @jax.jit
 def neg_relu_feat(data):
     """ f(x) = x if x < 0; 0 otherwise """
-    return relu_feat(neg_feat(data))
+    data = make_batch(data)
+    return -(np.abs(-data) - data) / 2.0
 
 
 @jax.jit

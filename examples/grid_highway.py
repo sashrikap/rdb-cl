@@ -30,11 +30,11 @@ y0_idx = 1
 y1_idx = 5
 
 weights = {
-    "dist_cars": 100.0,
-    "dist_lanes": 10.0,
-    "dist_fences": 300.0,
-    "speed": 20.0,
-    "control": 80.0,
+    "dist_cars": 40.0,
+    "dist_lanes": 50.0,
+    "dist_fences": 1.0,
+    "speed": 100.0,
+    "control": 8.0,
 }
 
 # y0_range = np.arange(-1.5, 1.5, 0.05)
@@ -45,8 +45,8 @@ weights = {
 # y1_range = np.arange(-1.0, 1.01, 0.9)
 # y0_range = np.arange(-0.5, 0.51, 0.1)
 # y1_range = np.arange(-0.5, 0.51, 0.1)
-y0_range = np.arange(-0.5, 0.51, 0.5)
-y1_range = np.arange(-0.5, 0.51, 0.5)
+y0_range = np.arange(-0.5, 0.51, 0.1)
+y1_range = np.arange(-0.5, 0.51, 0.1)
 
 all_rews = []
 all_trajs = []
@@ -54,6 +54,7 @@ list_actions = []
 list_states = []
 list_rews = []
 list_paths = []
+list_pairs = []
 for y0 in tqdm(y0_range):
     rews = []
     trajs = []
@@ -67,6 +68,7 @@ for y0 in tqdm(y0_range):
 
         rews.append(rew)
         trajs.append(traj)
+        list_pairs.append((y0, y1))
         list_rews.append(rew)
         list_actions.append(actions)
         list_states.append(state)
@@ -79,7 +81,8 @@ for y0 in tqdm(y0_range):
 list_states = onp.array(list_states)
 list_actions = onp.array(list_actions)
 list_paths = onp.array(list_paths)
-list_rews = onp.array(all_rews).flatten()
+list_rews = onp.array(list_rews)
+all_rews = onp.array(all_rews)
 
 ind = onp.argsort(list_rews, axis=0)
 list_states, list_actions, list_paths = (
@@ -88,10 +91,13 @@ list_states, list_actions, list_paths = (
     list_paths[ind],
 )
 if MAKE_MP4:
-    for state, actions, path in tqdm(
-        zip(list_states, list_actions, list_paths), total=len(list_states)
+    for state, actions, path, rew, pair in tqdm(
+        zip(list_states, list_actions, list_paths, list_rews, list_pairs),
+        total=len(list_states),
     ):
-        render_env(env, state, actions, fps=3, path=path, savepng=SAVE_PNG)
+        y0, y1 = pair
+        text = f"Total cost: {-1 * rew:.3f}\nTesting y0({y0:.2f}) y1({y1:.2f})"
+        render_env(env, state, actions, fps=3, path=path, savepng=SAVE_PNG, text=text)
 
 
 plot_3d(y0_range, y1_range, all_rews)

@@ -12,7 +12,7 @@ def save_video(frames, fps, width, path):
     clip.write_videofile(path, logger=None)
 
 
-def forward_env(env, actions, init_state=None):
+def forward_env(env, actions, init_state=None, text=None):
     # Render and save environment given pre-specified actions
     env.reset()
     if init_state is not None:
@@ -25,16 +25,16 @@ def forward_env(env, actions, init_state=None):
         env.step(act)
         if has_subframe:
             for s_i in range(env.subframes):
-                frames.append(env.sub_render("rgb_array", s_i))
+                frames.append(env.sub_render("rgb_array", s_i, text=text))
         else:
-            frames.append(env.render("rgb_array"))
+            frames.append(env.render("rgb_array", text=text))
     return frames
 
 
 def render_env(
-    env, state, actions, fps, path="data/video.mp4", width=450, savepng=False
+    env, state, actions, fps, path="data/video.mp4", width=450, savepng=False, text=None
 ):
-    frames = forward_env(env, actions, state)
+    frames = forward_env(env, actions, state, text=text)
     save_video(frames, int(fps / env.dt), width, path)
     if savepng:
         dirname = path.replace(".mp4", "")

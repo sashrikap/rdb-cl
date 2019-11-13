@@ -1,5 +1,6 @@
 import abc
 import gym
+import jax
 import jax.numpy as np
 from rdb.envs.drive2d.core.world import DriveWorld
 from rdb.envs.drive2d.core import lane, feature
@@ -55,11 +56,12 @@ class HighwayDriveWorld(DriveWorld):
 
             def fence_dist_fn(state, actions, fence=fence, normal=normal):
                 main_pos = state[..., np.arange(*main_idx)]
-                # return feature.dist_inside_fence(fence.center, normal, main_pos)
-                return feature.diff_to_fence(fence.center, normal, main_pos)
+                return feature.dist_inside_fence(fence.center, normal, main_pos)
+                # return feature.diff_to_fence(fence.center, normal, main_pos)
 
             fence_fns[f_i] = fence_dist_fn
         feats_dict["dist_fences"] = concat_funcs(fence_fns, axis=0)
+        feats_dict["dist_fences"] = jax.jit(feats_dict["dist_fences"])
 
         return feats_dict
 
