@@ -1,9 +1,12 @@
 import numpy as np
 import time
+import rdb
+from os.path import join, dirname
 from functools import partial
 from collections import Counter, OrderedDict
-from scipy.misc import imsave, imresize
-from rdb.visualize.render import forward_env
+from scipy.misc import imresize
+from imageio import imsave
+from rdb.visualize.render import forward_env, render_env
 
 """
 Forward environments and collect trajectorys
@@ -20,13 +23,14 @@ class Runner(object):
     : feats : features
     """
 
-    def __init__(self, env, agent):
+    def __init__(self, env, cost_runtime=None, cost_fn=None):
         self._env = env
-        self._agent = agent
         self._dt = env.dt
         self._dynamics_fn = env.dynamics_fn
-        self._cost_runtime = agent.cost_runtime
-        self._cost_fn = agent.cost_fn
+
+        # Define cost function
+        self._cost_runtime = cost_runtime
+        self._cost_fn = cost_fn
 
     @property
     def env(self):
@@ -40,7 +44,7 @@ class Runner(object):
         """
         feats = None
         for x, act in zip(xs, actions):
-            feats_x = self.env.features_fn(x, act)
+            feats_x = self._env.features_fn(x, act)
             if feats is None:
                 feats = OrderedDict()
                 for key in feats_x:
@@ -73,6 +77,23 @@ class Runner(object):
                 raise NotImplementedError
         return frames
 
+    def collect_mp4(self, state, actions, width=450, path=None, text=None):
+        if path is None:
+            path = join(dirname(rdb.__file__), "..", "data", "recording.mp4")
+        self._env.reset()
+        self._env.state = state
+        render_env(self._env, state, actions, fps=3, path=path, text=text)
+        return path
+
+    def collect_thumbnail(self, state, actions, width=450, path=None, text=None):
+        if path is None:
+            path = join(dirname(rdb.__file__), "..", "data", "thumbnail.png")
+        self._env.reset()
+        self._env.state = state
+        frame = self._env.render("rgb_array", text=text)
+        frame = imresize(frame, (width, width))
+        imsave(path, frame)
+
     def __call__(self, x0, actions, weights=None):
         """
         Param
@@ -81,18 +102,22 @@ class Runner(object):
         """
         # TODO: action space shape checking
         length = len(actions)
-        cost_fn = self._cost_fn
         if weights is not None:
+            assert self._cost_runtime is not None, "Cost function improperly defined"
             cost_fn = partial(self._cost_runtime, weights=weights)
+        else:
+            assert self._cost_fn is not None, "Cost function improperly defined"
+            cost_fn = self._cost_fn
 
         x = x0
         xs = [x]
         total_cost = 0.0
         info = dict(costs=[], feats={}, feats_sum={})
 
+        cost = 0.0
         for t in range(length):
             next_x = x + self._dynamics_fn(x, actions[t]) * self._dt
-            cost = cost_fn(x, actions[t])
+            cost += cost_fn(x, actions[t])
             total_cost += cost
             info["costs"].append(x)
             xs.append(next_x)

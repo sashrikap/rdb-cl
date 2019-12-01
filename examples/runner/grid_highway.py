@@ -4,7 +4,7 @@ import copy
 import jax.numpy as np
 import numpy as onp
 import rdb.envs.drive2d
-from rdb.optim.open import shooting_optimizer
+from rdb.optim.mpc import shooting_optimizer
 from rdb.optim.runner import Runner
 from tqdm import tqdm
 from rdb.visualize.render import render_env
@@ -14,7 +14,7 @@ MAKE_MP4 = True
 SAVE_PNG = True
 REPLAN = True
 
-env = gym.make("Week3_01-v0")
+env = gym.make("Week3_02-v0")
 obs = env.reset()
 main_car = env.main_car
 udim = 2
@@ -23,7 +23,7 @@ T = 30
 optimizer = shooting_optimizer(
     env.dynamics_fn, main_car.cost_runtime, udim, horizon, env.dt, replan=REPLAN, T=T
 )
-runner = Runner(env, main_car)
+runner = Runner(env, main_car.cost_runtime, main_car.cost_fn)
 
 state0 = copy.deepcopy(env.state)
 y0_idx = 1
@@ -48,56 +48,40 @@ weights = {
 y0_range = np.arange(-0.5, 0.51, 0.1)
 y1_range = np.arange(-0.5, 0.51, 0.1)
 
-all_rews = []
-all_trajs = []
 list_actions = []
-list_states = []
-list_rews = []
-list_paths = []
+list_costs = []
+list_trajs = []
 list_pairs = []
 for y0 in tqdm(y0_range):
-    rews = []
-    trajs = []
     for y1 in y1_range:
-        state = copy.deepcopy(state0)
-        state[y0_idx] = y0
-        state[y1_idx] = y1
-        actions = optimizer(state, weights=weights)
-        traj, cost, info = runner(state, actions)
-        rew = -1 * cost
+        env.set_init_state(y0, y1)
+        actions = optimizer(env.state, weights=weights)
+        traj, cost, info = runner(env.state, actions)
 
-        rews.append(rew)
-        trajs.append(traj)
+        list_trajs.append(traj)
+        list_costs.apoend(cost)
         list_pairs.append((y0, y1))
         list_rews.append(rew)
         list_actions.append(actions)
-        list_states.append(state)
-        list_paths.append(f"data/191111/y0({y0:.2f})_y1({y1:.2f}).mp4")
-        # list_paths.append(f"data/191101/y0({y0:.2f})_y1({y1:.2f})_rew({rew:.3f}).mp4")
-    all_trajs.append(trajs)
-    all_rews.append(rews)
 
-
-list_states = onp.array(list_states)
 list_actions = onp.array(list_actions)
-list_paths = onp.array(list_paths)
 list_rews = onp.array(list_rews)
-all_rews = onp.array(all_rews)
 
-ind = onp.argsort(list_rews, axis=0)
-list_states, list_actions, list_paths = (
-    list_states[ind],
-    list_actions[ind],
-    list_paths[ind],
-)
+
 if MAKE_MP4:
-    for state, actions, path, rew, pair in tqdm(
-        zip(list_states, list_actions, list_paths, list_rews, list_pairs),
-        total=len(list_states),
+    for actions, rew, pair in tqdm(
+        zip(list_actions, list_rews, list_pairs), total=len(list_pairs)
     ):
         y0, y1 = pair
-        text = f"Total cost: {-1 * rew:.3f}\nTesting y0({y0:.2f}) y1({y1:.2f})"
-        render_env(env, state, actions, fps=3, path=path, savepng=SAVE_PNG, text=text)
+        env.set_init_state(y0, y1)
+        env.reset()
+        state = env.state
+        text = f"Total cost: {-1 * rew:.3f}\nTesting\ny0({y0:.2f}) y1({y1:.2f})"
+        mp4_path = f"data/191113/testing/recording_y0({y0:.2f})_y1({y1:.2f}).mp4"
+        tbn_path = f"data/191113/testing/thumbnail_y0({y0:.2f})_y1({y1:.2f}).png"
+        runner.collect_mp4(
+            env, state, actions, fps=3, path=path, savepng=SAVE_PNG, text=text
+        )
 
 
 plot_3d(y0_range, y1_range, all_rews)

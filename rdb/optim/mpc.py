@@ -6,7 +6,7 @@ import jax.random as random
 import numpy as onp
 
 """
-Open-loop control methods
+Model Predictive Controllers
 
 Includes:
 [1] Shooting method optimizer
@@ -36,23 +36,32 @@ def to_numpy(arr):
 
 # Optimize
 class Optimizer(object):
-    """ Generic Optimizer """
+    """Generic Optimizer.
+
+    Example:
+        >>> # General API
+        >>> actions = optimizer(x0, u0=u0, weights=weights)
+    """
 
     def __init__(
         self, h_traj_u, h_grad_u, h_cost_u, udim, horizon, replan=True, T=None
     ):
         """
-        Params
-        : h_traj_u : func(us, x0), return horizon
-        : h_grad_u : func(us, x0, weights), horizon gradient
-        : h_cost_u : func(us, x0, weights), horizon cost
-        : replan   : True if replan at every step
+        Args:
+            h_traj_u (fn): func(us, x0), return horizon
+            h_grad_u (fn): func(us, x0, weights), horizon gradient
+            h_cost_u (fn): func(us, x0, weights), horizon cost
+            replan (bool): True if replan at every step
 
-        Usage
-        [1] optimizer(u0, x0, weights)
-        Note
-        [1] If `weights` is provided, it is user's reponsibility to
-        ensure that cost_u & grad_u can accept `weights` as argument
+        Example:
+            >>> # No initialization
+            >>> actions = optimizer(x0, weights=weights)
+            >>> # With initialization
+            >>> actions = optimizer(x0, u0=u0, weights=weights)
+
+        Note:
+            * If `weights` is provided, it is user's reponsibility to ensure that cost_u & grad_u can accept `weights` as argument
+
         """
         self._udim = udim
         self._replan = replan
@@ -71,10 +80,11 @@ class Optimizer(object):
 
     def cost_u(self, x0, u, weights):
         """
-        Params
-        : u       : array of actions
-        : x0      : initial state
-        : weights : cost function weights
+        Args
+            u (ndarray): array of actions
+            x0 (ndarray): initial state
+            weights (dict): cost function weights
+
         """
         return self.h_cost_u(x0, u, weights)
 
@@ -144,31 +154,30 @@ class Optimizer(object):
 
 
 def shooting_optimizer(f_dyn, f_cost, udim, horizon, dt, replan=True, T=None):
-    """
-    Create shooting optimizer
+    """Create shooting optimizer.
 
-    Params
-    : f_dyn   : 1 step dynamics function
-    : f_cost  : 1 step cost function
-                `f_cost(state, act)`, use pre-specified weight
-                `f_cost(state, act, weight)`, use weight at runtime
-    : udim    : action dimension
-    : horizon : planning horizon
-    : dt      : timestep size
-    : replan  : bool, plan once or replan at every step
-    : T       : trajectory length, if replan=False, must be None
+    Args:
+        f_dyn (fn): 1 step dynamics function
+        f_cost (fn): 1 step cost function
+                    `f_cost(state, act)`, use pre-specified weight
+                    `f_cost(state, act, weight)`, use weight at runtime
+        udim (int): action dimension
+        horizon (int): planning horizon
+        dt (float): timestep size
+        replan (bool): bool, plan once or replan at every step
+        T (int): trajectory length, if replan=False, must be None
 
-    Note
-    [1] The following functions are moved outside of Optimizer class definition
-    as standalone functions to speed up jax complication
-    : h_forward  : full horizon forward function
-                   `array((T, xdim)) = h_forward(xu, length)`
-    : h_costs_xu : full horizon cost function, per timestep
-                   `cost = h_cost_xu(xu, length)`
-    : h_cost_u   : full horizon cost function, total
+    Note:
+        * The following functions are moved outside of Optimizer class definition as standalone functions to speed up jax complication
+        >> h_forward: full horizon forward function
+                    `array((T, xdim)) = h_forward(xu, length)`
+        >> h_costs_xu: full horizon cost function, per timestep
+                     `cost = h_cost_xu(xu, length)`
+        >> h_cost_u: full horizon cost function, total
                    `cost = h_cost_u(x0, u, weights)`
-    : h_grad_u   : d(full horizon cost)/du,
+        >> h_grad_u: d(full horizon cost)/du,
                    `grad = h_grad_u(x0, u, weights)`
+
     """
 
     @jax.jit

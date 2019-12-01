@@ -4,7 +4,7 @@ import copy
 import jax.numpy as np
 import numpy as onp
 import rdb.envs.drive2d
-from rdb.optim.open import shooting_optimizer
+from rdb.optim.mpc import shooting_optimizer
 from rdb.optim.runner import Runner
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
@@ -19,7 +19,7 @@ main_car = env.main_car
 udim = 2
 horizon = 10
 optimizer = shooting_optimizer(env.dynamics_fn, main_car.cost_fn, udim, horizon, env.dt)
-runner = Runner(env, main_car)
+runner = Runner(env, main_car.cost_runtime, main_car.cost_fn)
 
 state = copy.deepcopy(env.state)
 y0_idx = 1

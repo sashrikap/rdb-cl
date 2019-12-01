@@ -4,7 +4,7 @@ import copy
 import jax.numpy as np
 import numpy as onp
 import rdb.envs.drive2d
-import rdb.optim.open as opt_open
+import rdb.optim.mpc as mpc
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -17,9 +17,7 @@ obs = env.reset()
 main_car = env.main_car
 udim = 2
 horizon = 10
-opt_u_fn = opt_open.optimize_u_fn(
-    env.dynamics_fn, main_car.cost_fn, udim, horizon, env.dt
-)
+opt_u_fn = mpc.optimize_u_fn(env.dynamics_fn, main_car.cost_fn, udim, horizon, env.dt)
 
 now = time.time()
 state0 = copy.deepcopy(env.state)

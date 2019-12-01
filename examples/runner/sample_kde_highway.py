@@ -3,7 +3,7 @@ import numpy as onp
 import jax.numpy as np
 import rdb.envs.drive2d
 import scipy.stats
-from rdb.optim.open import shooting_optimizer
+from rdb.optim.mpc import shooting_optimizer
 from rdb.optim.runner import Runner
 from functools import partial
 from tqdm import tqdm
@@ -39,7 +39,7 @@ horizon = 10
 
 cost_runtime = main_car.cost_runtime
 optimizer = shooting_optimizer(env.dynamics_fn, cost_runtime, udim, horizon, env.dt)
-runner = Runner(env, main_car)
+runner = Runner(env, main_car.cost_runtime, main_car.cost_fn)
 
 y0_idx, y1_idx = 1, 5
 y0_range = np.arange(-1.0, 1.01, 0.9)

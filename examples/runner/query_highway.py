@@ -2,7 +2,7 @@ import gym
 import time, copy
 import jax.numpy as np
 import rdb.envs.drive2d
-from rdb.optim.open import shooting_optimizer
+from rdb.optim.mpc import shooting_optimizer
 from rdb.optim.runner import Runner
 
 env = gym.make("Week3_01-v0")
@@ -25,7 +25,7 @@ REPLAN = True
 optimizer = shooting_optimizer(
     env.dynamics_fn, main_car.cost_runtime, udim, horizon, env.dt, T=T, replan=REPLAN
 )
-runner = Runner(env, main_car)
+runner = Runner(env, main_car.cost_runtime, main_car.cost_fn)
 state = copy.deepcopy(env.state)
 state[y0_idx] = 0.4
 state[y1_idx] = -0.2

@@ -49,6 +49,7 @@ class DriveWorld(gym.Env):
         self._lanes = lanes
         self._objects = objects
         self._dt = dt
+        self._udim = 2
         self._car_sprites = {c.color: car_sprite(c.color) for c in cars + [main_car]}
         self._obj_sprites = {o.name: object_sprite(o.name) for o in objects}
         self._car_length = car_length
@@ -82,6 +83,10 @@ class DriveWorld(gym.Env):
     @property
     def dt(self):
         return self._dt
+
+    @property
+    def udim(self):
+        return self._udim
 
     @property
     def state(self):

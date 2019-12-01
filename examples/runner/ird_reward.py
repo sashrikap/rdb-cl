@@ -3,7 +3,7 @@ import time, copy
 import numpy as np
 import rdb.envs.drive2d
 from tqdm import tqdm
-from rdb.optim.open import shooting_optimizer
+from rdb.optim.mpc import shooting_optimizer
 from rdb.optim.runner import Runner
 from rdb.visualize.plot import plot_3d, plot_episode
 from rdb.visualize.save import save_rewards
@@ -23,7 +23,7 @@ T = 20
 optimizer = shooting_optimizer(
     env.dynamics_fn, main_car.cost_runtime, udim, horizon, env.dt, T=T
 )
-runner = Runner(env, main_car)
+runner = Runner(env, main_car.cost_runtime, main_car.cost_fn)
 
 ## Training environments
 weights = {
