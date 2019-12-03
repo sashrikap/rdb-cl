@@ -9,15 +9,17 @@ register(
 )
 
 
-register(
-    id="HighwayDrive-v0",
-    entry_point="rdb.envs.drive2d.worlds.highway:HighwayDriveWorld",
-)
-
 # Drive world
 from .worlds import week3
+from .worlds import week4
 
 # Automatically register all Week3_xx environmnts
 for k, c in week3.__dict__.items():
     if "Week3_" in k:
+        register(id=f"{k}-v0", entry_point=f"{c.__module__}:{c.__name__}")
+
+
+# Automatically register all Week4_xx environmnts
+for k, c in week4.__dict__.items():
+    if "Week4_" in k:
         register(id=f"{k}-v0", entry_point=f"{c.__module__}:{c.__name__}")

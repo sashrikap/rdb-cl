@@ -88,7 +88,8 @@ def test_args():
 
 
 def test_juxt():
-    from toolz.functoolz import juxt, compose
+    from toolz.functoolz import juxt
+    from rdb.optim.utils import compose
     import jax, time
 
     key = jax.random.PRNGKey(0)
@@ -99,6 +100,7 @@ def test_juxt():
         return np.max([fn(*args) for fn in funcs])
 
     juxt_max2 = compose(np.max, juxt(funcs))
+    comp_fn = compose(np.square, juxt_max2)
     now = time.time()
     grad1 = jax.jit(jax.grad(juxt_max1))
     print("t1", time.time() - now)
@@ -112,3 +114,5 @@ def test_juxt():
     grad2(jax.random.uniform(key, (100, 100))).shape
     print("t4", time.time() - now)
     now = time.time()
+    assert np.allclose(juxt_max2([10, 20, 30]), 60)
+    assert np.allclose(comp_fn([10, 20, 30]), 3600)

@@ -15,6 +15,9 @@ from gym.envs.classic_control import rendering
 from rdb.envs.drive2d.core import lane, feature, car
 from rdb.optim.utils import *
 
+import platform
+
+SYSTEM = platform.system()
 
 WINDOW_W = 1200
 WINDOW_H = 1200
@@ -22,14 +25,14 @@ pyglet.resource.path.append(str(Path(__file__).parent.parent.joinpath("assets"))
 
 
 class DriveWorld(gym.Env):
-    """
-    General driving world
+    """General driving world.
 
-    Key Attributes
-    : main_car :
-    : cars     :
-    : objects  :
-    : dt       : timestep
+    Attributes:
+        main_car: the main autonomous car
+        cars: a list of cars
+        objects: a list of objects
+        dt: timestep
+
     """
 
     def __init__(
@@ -50,8 +53,6 @@ class DriveWorld(gym.Env):
         self._objects = objects
         self._dt = dt
         self._udim = 2
-        self._car_sprites = {c.color: car_sprite(c.color) for c in cars + [main_car]}
-        self._obj_sprites = {o.name: object_sprite(o.name) for o in objects}
         self._car_length = car_length
         self._car_width = car_width
         self._indices = None
@@ -125,15 +126,17 @@ class DriveWorld(gym.Env):
         return self._main_car
 
     def get_dynamics_fn(self):
-        """ Build Dict(key: dynamics_fn) mapping
-        Usage
-        [1] feat_1 = feature_fn_1(state)
-        Keys
-        : cars0    :
-        : cars1    :
-        : main_car :
-        Output
-        : dynamic_fns : e.g. dyn_fns['cars_0'](state) =  next_car0_s
+        """Build Dict(key: dynamics_fn) mapping.
+
+        Example:
+            >>> feat_1 = feature_fn_1(state)
+            >>> dyn_fn[indices['cars_0']](state) =  next_car0_s
+
+        Output:
+            indices["cars0"] : func idx
+            indices["cars1"] : func idx
+            indices["main_car"] : func idx
+
         """
         dynamics_keys = [f"cars{i}" for i in range(len(self._cars))] + ["main_car"]
         fns, indices = OrderedDict(), OrderedDict()
@@ -151,18 +154,23 @@ class DriveWorld(gym.Env):
         return dynamics_fn, indices
 
     def get_raw_features_dict(self):
-        """ Build Dict(key: feature_fn) mapping
-        Usage
-        [1] feat_1 = feature_fn_1(state)
-        Keys:
-        : dist_cars  :
-        : dist_lanes :
-        : speed      :
-        : control    :
-        Param
-        : indices  : e.g. {'car0': (0, 3)}
-        Output
-        : feat_fns : e.g. {'dist_cars': lambda state: return dist}
+        """Build Dict(key: feature_fn) mapping.
+
+        Example:
+            >>> feat_1 = feature_fn_1(state)
+
+        Output:
+            indices["dist_cars"]: `dist = func(state)`
+            indices["dist_lanes"]:
+            indices["speed"]:
+            indices["control"]:
+
+        Require:
+            self._indices: e.g. {'car0': (0, 3)}
+
+        Output:
+            feat_fns: e.g. {'dist_cars': lambda state: return dist}
+
         """
         assert self._indices is not None, "Need to define state indices"
         feats_dict = OrderedDict()
@@ -208,10 +216,10 @@ class DriveWorld(gym.Env):
         return ["dist_cars", "dist_lanes", "speed", "control"]
 
     def get_features_fn(self):
-        feats_dict = self.get_raw_features_dict()
-        feats_dict = self.get_nonlinear_features_dict(feats_dict)
-        merged_fn = merge_dict_funcs(feats_dict)
-        return feats_dict, merged_fn
+        raw_feats_dict = self.get_raw_features_dict()
+        nlr_feats_dict = self.get_nonlinear_features_dict(raw_feats_dict)
+        merged_feats_fn = merge_dict_funcs(nlr_feats_dict)
+        return nlr_feats_dict, merged_feats_fn
 
     def get_nonlinear_features_dict(self, feats_dict):
         raise NotImplementedError
@@ -248,16 +256,17 @@ class DriveWorld(gym.Env):
             caption = f"{self.__class__}"
             # JH Note: strange pyglet rendering requires /2
             self._window = pyglet.window.Window(
-                width=int(WINDOW_W / 2),
-                height=int(WINDOW_H / 2)
-                # width=int(WINDOW_W), height=int(WINDOW_H),
+                width=int(WINDOW_W / 2), height=int(WINDOW_H / 2)
             )
         self._window.switch_to()
         # if mode == "human":
         # Bring up window
         self._window.dispatch_events()
         self._window.clear()
-        gl.glViewport(0, 0, int(WINDOW_W), int(WINDOW_H))
+        if SYSTEM == "Darwin":
+            gl.glViewport(0, 0, int(WINDOW_W), int(WINDOW_H))
+        else:  # Linux, etc
+            gl.glViewport(0, 0, int(WINDOW_W / 2), int(WINDOW_H / 2))
         gl.glMatrixMode(gl.GL_PROJECTION)
         gl.glPushMatrix()
         gl.glLoadIdentity()
@@ -270,12 +279,12 @@ class DriveWorld(gym.Env):
         self.center_camera(main_car)
         self.draw_background()
         for lane in self._lanes:
-            self.draw_lane(lane)
+            lane.render()
         for obj in self._objects:
-            self.draw_object(obj)
+            obj.render()
         for car in cars:
-            self.draw_car(car)
-        self.draw_car(main_car)
+            car.render()
+        main_car.render()
         if draw_heat:
             self.set_heat(weights)
             self.draw_heatmap()
@@ -285,8 +294,10 @@ class DriveWorld(gym.Env):
 
         img_data = pyglet.image.get_buffer_manager().get_color_buffer().get_image_data()
         arr = onp.fromstring(img_data.data, dtype=onp.uint8, sep="")
-        # arr = arr.reshape(int(WINDOW_W / 2), int(WINDOW_H / 2), 4)
-        arr = arr.reshape(int(WINDOW_W), int(WINDOW_H), 4)
+        if SYSTEM == "Darwin":
+            arr = arr.reshape(int(WINDOW_W), int(WINDOW_H), 4)
+        else:
+            arr = arr.reshape(int(WINDOW_W / 2), int(WINDOW_H / 2), 4)
         arr = arr[::-1, :, 0:3]
         # if mode == "human":
         self._window.flip()
@@ -331,24 +342,6 @@ class DriveWorld(gym.Env):
             ("t2f", (0.0, 0.0, W * 5.0, 0.0, W * 5.0, W * 5.0, 0.0, W * 5.0)),
         )
         gl.glDisable(self._grass.target)
-
-    def draw_object(self, obj, opacity=255):
-        sprite = self._obj_sprites[obj.name]
-        sprite.x, sprite.y = obj.state[1], obj.state[0]
-        rotation = 0.0
-        if len(obj.state) >= 3:
-            rotation = obj.state[2]
-        sprite.rotation = rotation
-        sprite.opacity = opacity
-        sprite.draw()
-
-    def draw_car(self, car, opacity=255):
-        sprite = self._car_sprites[car.color]
-        sprite.x, sprite.y = car.state[0], car.state[1]
-        # sprite.x, sprite.y = 0, 0
-        sprite.rotation = -car.state[2] * 180 / onp.pi
-        sprite.opacity = opacity
-        sprite.draw()
 
     def draw_text(self, text=None):
         if self._label is None:

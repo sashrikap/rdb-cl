@@ -1,7 +1,24 @@
 import jax.numpy as np
+import pyglet
+import numpy as onp
 from rdb.envs.drive2d.core.dynamics import *
 from rdb.optim.utils import *
 from copy import deepcopy
+
+
+def centered_image(filename):
+    img = pyglet.resource.image(filename)
+    img.anchor_x = img.width / 2.0
+    img.anchor_y = img.height / 2.0
+    return img
+
+
+def car_sprite(color, scale=0.15 / 600.0):
+    sprite = pyglet.sprite.Sprite(
+        centered_image("car-{}.png".format(color)), subpixel=True
+    )
+    sprite.scale = scale
+    return sprite
 
 
 class Car(object):
@@ -16,7 +33,8 @@ class Car(object):
         self.dynamics_fn = car_dynamics_fn(friction)
         self._init_state = init_state
         self._state = init_state
-        self.color = color
+        self._sprite = None
+        self._color = color
         # Initilialize trajectory data
 
     def reset(self):
@@ -38,11 +56,24 @@ class Car(object):
     def init_state(self, init_state):
         self._init_state = init_state
 
+    @property
+    def color(self):
+        return self._color
+
     def control(self, u, dt):
         raise NotImplementedError
 
     def copy(self):
         raise NotImplementedError
+
+    def render(self, opacity=255):
+        if self._sprite is None:
+            self._sprite = car_sprite(self.color)
+        self._sprite.x, self._sprite.y = self.state[0], self.state[1]
+        # sprite.x, sprite.y = 0, 0
+        self._sprite.rotation = -self.state[2] * 180 / onp.pi
+        self._sprite.opacity = opacity
+        self._sprite.draw()
 
 
 class FixSpeedCar(Car):

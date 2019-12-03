@@ -9,9 +9,10 @@ setup(
     packages=find_packages(),
     install_requires=[
         "numpy",
-        "scipy",
+        "pillow",
+        "scipy==1.1.0",
         "pyglet==1.3.2",
-        "numpy",
+        "numpyro",
         "matplotlib",
         "jax",
         "jaxlib",

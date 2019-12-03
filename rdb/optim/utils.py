@@ -1,8 +1,21 @@
 import jax.numpy as np
+import functools
 from collections import OrderedDict
 from functools import partial, reduce
-from toolz.functoolz import juxt, compose
+from toolz.functoolz import juxt
 from operator import mul, add
+
+
+def compose(*functions):
+    """Compose list of functions
+
+    Example:
+    >>> f(g(h(x))) == compose(f, g, h)(x)
+
+    """
+    return functools.reduce(
+        lambda f, g: lambda *args: f(g(*args)), functions, lambda x: x
+    )
 
 
 def sum_funcs(funcs):

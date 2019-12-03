@@ -41,12 +41,14 @@ class Optimizer(object):
     Example:
         >>> # General API
         >>> actions = optimizer(x0, u0=u0, weights=weights)
+
     """
 
     def __init__(
         self, h_traj_u, h_grad_u, h_cost_u, udim, horizon, replan=True, T=None
     ):
-        """
+        """Construct Optimizer.
+
         Args:
             h_traj_u (fn): func(us, x0), return horizon
             h_grad_u (fn): func(us, x0, weights), horizon gradient

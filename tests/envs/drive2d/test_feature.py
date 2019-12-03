@@ -17,6 +17,14 @@ def test_diff_to():
     assert np.allclose(diff_to(x, y), result)
 
 
+def test_dist_to_segment():
+    pt1 = np.array([1, 0])
+    pt2 = np.array([0.5, 0])
+    x = np.array([0.75, 1])
+    result = np.array([1.0])
+    assert np.allclose(dist_to_segment(x, pt1, pt2), result)
+
+
 def test_diff_feat():
     x = np.array([1, 2])
     mu = np.array([3, 2])
@@ -71,9 +79,6 @@ def test_gaussian():
     sigma = np.array([1, 2])
     var = multivariate_normal(mean=mu, cov=np.diag(sigma ** 2))
     assert np.allclose(gaussian_feat(data, sigma, mu), [var.pdf(data)])
-    import pdb
-
-    pdb.set_trace()
 
     data = np.array([-5, -3])
     mu = np.array([0.5, 0.1])

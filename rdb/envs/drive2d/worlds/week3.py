@@ -5,7 +5,6 @@ from rdb.envs.drive2d.core.car import *
 from rdb.envs.drive2d.core.feature import *
 from rdb.envs.drive2d.worlds.highway import HighwayDriveWorld
 from functools import partial
-from toolz.functoolz import compose
 
 """
 Sample adversarial scenarios where one autonomous car is merging

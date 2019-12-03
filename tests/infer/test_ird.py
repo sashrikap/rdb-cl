@@ -5,7 +5,7 @@ import numpyro
 import numpyro.distributions as dist
 
 
-def ttest_PGM_kernel():
+def test_PGM_kernel():
     prior_fn = lambda: numpyro.sample("s", dist.Uniform(0.0, 10.0))
 
     def likelihood(prior, obs, std):
@@ -21,7 +21,7 @@ def ttest_PGM_kernel():
     # import pdb; pdb.set_trace()
 
 
-def ttest_PGM_method():
+def test_PGM_method():
     def prior():
         return numpyro.sample("s", dist.Uniform(0.0, 10.0))
 
@@ -91,4 +91,6 @@ def test_IRD_OC():
         "control": 20.0,
     }
     _, samples = pgm.posterior(user_weights, state)
-    # import pdb; pdb.set_trace()
+    import pdb
+
+    pdb.set_trace()

@@ -8,6 +8,8 @@ from rdb.optim.runner import Runner
 from rdb.visualize.render import render_env
 from rdb.visualize.preprocess import normalize_features
 
+DUMMY_ACTION = False
+DRAW_HEAT = False
 REPLAN = True
 MAKE_MP4 = False
 
@@ -18,40 +20,50 @@ udim = 2
 horizon = 10
 
 T = 30
-if not REPLAN:
-    T = horizon
-optimizer = shooting_optimizer(
-    env.dynamics_fn, main_car.cost_runtime, udim, horizon, env.dt, replan=REPLAN, T=T
-)
-runner = Runner(env, main_car.cost_runtime, main_car.cost_fn)
 
-y0_idx, y1_idx = 1, 5
-state = copy.deepcopy(env.state)
-# state[y0_idx] = 0.4
-# state[y1_idx] = -0.2
-state[y0_idx] = -0.5
-state[y1_idx] = 0.2
-# state[y0_idx] = 0.5
-# state[y1_idx] = 0.0
-env.state = state
+if not DUMMY_ACTION:
+    if not REPLAN:
+        T = horizon
+    optimizer = shooting_optimizer(
+        env.dynamics_fn,
+        main_car.cost_runtime,
+        udim,
+        horizon,
+        env.dt,
+        replan=REPLAN,
+        T=T,
+    )
+    runner = Runner(env, main_car.cost_runtime, main_car.cost_fn)
 
-weights = {
-    "dist_cars": 100.0,
-    "dist_lanes": 10.0,
-    "dist_fences": 300.0,
-    "speed": 20.0,
-    "control": 80.0,
-}
+    y0_idx, y1_idx = 1, 5
+    state = copy.deepcopy(env.state)
+    # state[y0_idx] = 0.4
+    # state[y1_idx] = -0.2
+    state[y0_idx] = -0.5
+    state[y1_idx] = 0.2
+    # state[y0_idx] = 0.5
+    # state[y1_idx] = 0.0
+    env.state = state
 
-actions = optimizer(env.state, weights=weights)
-traj, cost, info = runner(env.state, actions)
+    weights = {
+        "dist_cars": 100.0,
+        "dist_lanes": 10.0,
+        "dist_fences": 300.0,
+        "speed": 20.0,
+        "control": 80.0,
+    }
 
-env.render("human")
-print(f"Total cost {cost}")
+    actions = optimizer(env.state, weights=weights)
+    traj, cost, info = runner(env.state, actions)
+    print(f"Total cost {cost}")
+else:
+    actions = np.zeros((T, udim))
+
+env.render("human", draw_heat=DRAW_HEAT)
 
 for t in range(T):
     env.step(actions[t])
-    env.render("human")
+    env.render("human", draw_heat=DRAW_HEAT)
     time.sleep(0.2)
 
 if MAKE_MP4:

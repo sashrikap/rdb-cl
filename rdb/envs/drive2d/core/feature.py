@@ -11,6 +11,8 @@ TODO:
 
 @jax.jit
 def make_batch(state):
+    if type(state) == list:
+        state = np.asarray(state)
     if len(state.shape) == 1:
         state = np.expand_dims(state, 0)
     return np.asarray(state)
@@ -18,12 +20,26 @@ def make_batch(state):
 
 # Environment specific
 @jax.jit
-def dist_to(x, y):
-    """ sqrt((y1 - x1)^2 + (y2 - x2)^2)"""
+def dist_to(x, target):
+    """ sqrt((target1 - x1)^2 + (target2 - x2)^2)"""
     x = make_batch(x)
-    y = make_batch(y)
-    diff = np.array(x[..., :2]) - np.array(y[..., :2])
+    target = make_batch(target)
+    diff = np.array(x[..., :2]) - np.array(target[..., :2])
     return np.linalg.norm(diff, axis=-1)
+
+
+@jax.jit
+def dist_to_segment(x, pt1, pt2):
+    """ Distance to line segment pt1-pt2 """
+    x = make_batch(x)[..., :2]
+    pt1 = make_batch(pt1)[..., :2]
+    pt2 = make_batch(pt2)[..., :2]
+    delta = pt2 - pt1
+    sum_sqr = np.sum(np.square(delta), axis=-1)
+    u = np.sum(delta * (x - pt1) / sum_sqr, axis=-1)
+    u = np.clip(u, 0, 1.0)
+    dx = pt1 + u * delta - x
+    return np.linalg.norm(dx, axis=-1)
 
 
 @jax.jit

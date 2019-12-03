@@ -100,6 +100,7 @@ class IRDOptimalControl(PGM):
     Example:
         >>> ird_oc = IRDOptimalControl(driving_env, runner, beta, prior_fn)
         >>> _, samples = ird_oc.posterior()
+
     """
 
     def __init__(
@@ -112,12 +113,12 @@ class IRDOptimalControl(PGM):
         method="NUTS",
         sampler_args={"num_samples": 100, "num_warmups": 100},
     ):
-        """Constructor.
+        """Construct IRD For optimal control.
 
         Args:
-            controller : controller function, `actions = controller(state, weights)`
-            runner : runner function, `traj, cost, info = runner(state, actions)`
-            beta : temperature param: p ~ exp(beta * reward)
+            controller: controller function, `actions = controller(state, weights)`
+            runner: runner function, `traj, cost, info = runner(state, actions)`
+            beta: temperature param: p ~ exp(beta * reward)
 
         """
         self._all_obs = []
