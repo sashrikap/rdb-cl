@@ -37,6 +37,9 @@ def test_factor_nuts():
     key = random.PRNGKey(1)
     obs = 1.0
     shape = (100,)
+    import pdb
+
+    pdb.set_trace()
     kernel = NUTS(kernel)
     mcmc = MCMC(kernel, num_warmup=100, num_samples=1000)
     mcmc.run(key)

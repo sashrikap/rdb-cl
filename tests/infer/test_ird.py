@@ -2,6 +2,7 @@ from rdb.infer.ird_oc import *
 from rdb.infer.algos import *
 import jax.numpy as np
 import numpyro
+from jax import random, vmap
 import numpyro.distributions as dist
 
 
@@ -61,28 +62,43 @@ def test_IRD_OC():
     env.reset()
     state = copy.deepcopy(env.state)
 
-    def prior():
+    def prior_log_prob(state):
         w_log_dist_cars = 0.0
-        w_log_dist_lanes = numpyro.sample("dist_lanes", dist.Uniform(0, 10))
-        w_log_dist_fences = numpyro.sample("dist_fences", dist.Uniform(0, 10))
-        w_log_speed = numpyro.sample("speed", dist.Uniform(0, 10))
-        w_log_control = numpyro.sample("control", dist.Uniform(0, 10))
-        return {
+        log_dist_lanes = np.log(state["dist_lanes"])
+        if log_dist_lanes < 0 or log_dist_lanes > 10:
+            return -np.inf
+        log_dist_fences = np.log(state["dist_fences"])
+        if log_dist_fences < 0 or log_dist_fences > 10:
+            return -np.inf
+        log_speed = np.log(state["speed"])
+        if log_speed < 0 or log_speed > 10:
+            return -np.inf
+        log_control = np.log(state["control"])
+        if log_control < 0 or log_control > 10:
+            return -np.inf
+        return 0.0
+        """return {
             "dist_cars": np.exp(w_log_dist_cars),
             "dist_fences": np.exp(w_log_dist_fences),
             "dist_fences": np.exp(w_log_dist_fences),
             "speed": np.exp(w_log_speed),
             "control": np.exp(w_log_control),
-        }
+        }"""
 
+    def proposal(weight):
+        std_dict = {"dist_lanes": 1.0, "dist_fences": 1.0, "speed": 1.0, "control": 1.0}
+        next_weight = copy.deepcopy(weight)
+        for key, val in next_weight.items():
+            log_val = np.log(val)
+            if key in std_dict.keys():
+                std = std_dict[key]
+                next_log_val = numpyro.sample("next_weight", dist.Normal(log_val, std))
+                next_weight[key] = np.exp(next_log_val)
+        return next_weight
+
+    key = random.PRNGKey(1)
     pgm = IRDOptimalControl(
-        env,
-        controller,
-        runner,
-        beta,
-        prior_fn=prior,
-        method="NUTS",
-        sampler_args={"num_samples": 20, "num_warmups": 20},
+        key, env, controller, runner, beta, prior_log_prob=prior_log_prob
     )
     user_weights = {
         "dist_cars": 50,
@@ -92,8 +108,11 @@ def test_IRD_OC():
         "control": 20.0,
     }
 
-    actions = controller(state, weights=user_weights)
-    _, samples = pgm.posterior(user_weights, state)
+    sampler = MetropolisHasting(
+        key, pgm, num_warmups=10, num_samples=10, proposal_fn=proposal
+    )
+    sampler.init(user_weights)
+    samples = sampler.sample(user_weights, init_state=state)
     import pdb
 
     pdb.set_trace()

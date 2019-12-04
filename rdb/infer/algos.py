@@ -1,8 +1,12 @@
 from jax import random
-from numpyro.infer import MCMC, NUTS, MCMCKernel
+from numpyro.handlers import scale, condition, seed
+from numpyro.infer import MCMC, NUTS
+from tqdm import tqdm, trange
 import numpyro
+import numpyro.distributions as dist
+import jax.numpy as np
 
-"""Approximate Inference Algorithms.
+"""MCMC Inference Algorithms.
 
 Given p(y | theta), estimate p(theta | y)
 
@@ -27,28 +31,36 @@ class Inference(object):
     """ Generic Inference Class
 
     Args:
-        prior (fn): `prior = f()`
+        model (fn)
+
+    Example:
+        >>> data = self.model() # p(obs | theta) p(theta)
 
     Notes:
-        prior: p(theta)
-        likelihood: p(obs | theta)
+        model: p(theta) p(obs | theta)
 
     """
 
-    def __init__(self, prior, likelihood, num_samples, num_warmups, jit_args=True):
-        self._prior = prior
-        self._likelihood = likelihood
+    def __init__(self, rng_key, model, num_samples, num_warmups):
+        self._rng_key = rng_key
+        # self._model = seed(model, rng_seed=rng_key)
+        self._model = model
         self._num_samples = num_samples
         self._num_warmups = num_warmups
-        self._key = random.PRNGKey(1)
-        self._jit_args = jit_args
-        self._kernel = self._create_kernel()
+        self._init_state = None
 
     @property
     def num_samples(self):
         return self._num_samples
 
-    def posterior(self, obs, *args, **kwargs):
+    @property
+    def model(self):
+        return self._model
+
+    def init(self, state):
+        self._init_state = state
+
+    def sample(self, obs, *args, **kwargs):
         """Estimate p(theta | obs).
 
         Notes:
@@ -56,14 +68,6 @@ class Inference(object):
             [2] Sample p(obs, theta) = p(obs | theta) p(theta)
             [3] Divide p(obs, theta) / p(obs)
 
-        """
-        raise NotImplementedError
-
-    def _create_kernel(self):
-        """ Create sampling kernel function.
-
-        Example:
-            >>> data = kernel_fn() # p(obs | theta) p(theta)
         """
         raise NotImplementedError
 
@@ -78,7 +82,7 @@ class Inference(object):
         raise NotImplementedError
 
 
-class MHMonteCarlo(Inference):
+class MetropolisHasting(Inference):
     """Metropolis-Hasting Algorithm.
 
     Note:
@@ -87,38 +91,63 @@ class MHMonteCarlo(Inference):
     """
 
     def __init__(
-        self,
-        prior,
-        likelihood,
-        num_samples,
-        num_warmups,
-        jit_model_args=True,
-        step_size=1.0,
+        self, rng_key, model, num_samples, num_warmups, proposal_fn, step_size=1.0
     ):
-        super().__init__(prior, likelihood, num_samples, num_warmups)
+        super().__init__(rng_key, model, num_samples, num_warmups)
         self._step_size = step_size
+        self._proposal = seed(proposal_fn, rng_seed=rng_key)
+        self._coin_flip = self._create_coin_flip()
 
-    def _create_kernel(self):
-        """Numpyro-based kernel."""
+    def _mh_step(self, obs, state, log_prob, *args, **kwargs):
+        next_state = self._proposal(state)
+        next_log_prob = self._model(obs, next_state, **kwargs)
+        log_ratio = next_log_prob - log_prob
+        accept = self._coin_flip() < np.exp(log_ratio)
+        if not accept:
+            next_state = state
+            next_log_prob = log_prob
+        return accept, next_state, next_log_prob
 
-        def kernel_fn(data, *args, **kargs):
-            prior = self._prior_fn()
-            log_prob = self._likelihood_fn(prior, data, *args, **kargs)
-            return log_prob
+    def _create_coin_flip(self):
+        def fn():
+            return numpyro.sample("accept", dist.Uniform(0, 1))
 
-        return kernel_fn
+        return seed(fn, self._rng_key)
 
-    def _mh_step(self):
-        pass
+    def init(self, state):
+        self._init_state = state
 
-    def posterior(self, obs, *args, **kwargs):
-        for i in range(self._num_warmups):
-            pass
+    def sample(self, obs, verbose=True, *args, **kwargs):
+        assert self._init_state is not None, "Need to initialize"
+        state = self._init_state
+        log_prob = self._model(obs, state, **kwargs)
+        range_ = range(self._num_warmups)
+        if verbose:
+            range_ = trange(self._num_warmups, desc="MH Warmup")
+        for i in range_:
+            _, state, log_prob = self._mh_step(obs, state, log_prob, **kwargs)
 
         samples = []
-        for i in range(self._num_samples):
-            pass
-        return posterior, samples
+        accepts = []
+        ratio = 0.0
+        num_steps = 0
+        range_ = range(self._num_samples)
+        if verbose:
+            range_ = trange(self._num_samples, desc="MH Sampling")
+        for i in range_:
+            accept = False
+            while not accept:
+                num_steps += 1
+                accept, state, log_prob = self._mh_step(obs, state, log_prob, **kwargs)
+                accepts.append(accept)
+            ratio = float(np.sum(accepts)) / len(accepts)
+            if verbose:
+                range_.set_description(f"MH Sampling; Accept {100 * ratio:.1f}%")
+            samples.append(state)
+        if verbose:
+            print(f"Acceptance ratio {ratio}")
+        self._init_state = None
+        return samples
 
 
 class NUTSMonteCarlo(Inference):
@@ -130,96 +159,48 @@ class NUTSMonteCarlo(Inference):
 
     """
 
-    def __init__(
-        self,
-        prior,
-        likelihood,
-        num_samples,
-        num_warmups,
-        jit_model_args=True,
-        step_size=1.0,
-    ):
-        super().__init__(prior, likelihood, num_samples, num_warmups)
+    def __init__(self, rng_key, model, num_samples, num_warmups, step_size=1.0):
+        super().__init__(rng_key, model, num_samples, num_warmups)
         self._step_size = step_size
 
-    def _create_kernel(self):
-        """Numpyro-based kernel."""
-
-        def kernel_fn(data, *args, **kargs):
-            prior = self._prior_fn()
-            log_prob = self._likelihood_fn(prior, data, *args, **kargs)
-            numpyro.factor("log_prob", log_prob)
-
-        return kernel_fn
-
-    def posterior(self, obs, *args, **kwargs):
+    def sample(self, obs, *args, **kwargs):
         mcmc = MCMC(
             NUTS(self._kernel, step_size=self._step_size),
             num_warmup=self._num_warmups,
             num_samples=self._num_samples,
-            jit_model_args=self._jit_args,
         )
-        mcmc.run(self._key, obs, *args, **kwargs)
+        mcmc.run(self._rng_key, obs, *args, **kwargs)
         samples = mcmc.get_samples()
-        posterior = None
-        return posterior, samples
+        return samples
 
 
-class HMCMonteCarlo(Inference):
+class HamiltonionMonteCarlo(Inference):
     """Hamiltonion Monte Carlo Sampling.
 
     Note:
         * Backed by numpyro implementation
-        * Requires kernel to provide gradient information
+        * Requires model to provide gradient information
 
     """
 
-    def __init__(
-        self, kernel, num_samples, num_warmups, jit_model_args=True, step_size=1.0
-    ):
-        super().__init__(kernel, num_samples, num_warmups)
+    def __init__(self, rng_key, model, num_samples, num_warmups, step_size=1.0):
+        super().__init__(rng_key, model, num_samples, num_warmups)
         self._step_size = step_size
 
-    def _create_kernel(self):
-        """Numpyro-based kernel."""
-
-        def kernel_fn(data, *args, **kargs):
-            prior = self._prior_fn()
-            log_prob = self._likelihood_fn(prior, data, *args, **kargs)
-            numpyro.factor("log_prob", log_prob)
-
-        return kernel_fn
-
-    def posterior(self, obs, *args, **kwargs):
+    def sample(self, obs, *args, **kwargs):
         mcmc = MCMC(
-            HMC(self._kernel, step_size=self._step_size),
+            HMC(self._model, step_size=self._step_size),
             num_warmup=self._num_warmups,
             num_samples=self._num_samples,
-            jit_model_args=self._jit_args,
         )
-        mcmc.run(self._key, obs, *args, **kwargs)
+        mcmc.run(self._rng_key, obs, *args, **kwargs)
         samples = mcmc.get_samples()
-        posterior = None
-        return posterior, samples
-
-
-class MetropolisHasting(Inference):
-    def __init__(self, kernel, num_samples):
-        super().__init__(kernel, num_samples, num_warmups)
-
-    def posterior(self, *args, **kwargs):
-        posterior, samples = self.marginal()
-        return posterior, samples
-
-    def marginal(self):
-        samples = []
-        marginal = None
-        return marginal, samples
+        return samples
 
 
 class RejectionSampling(Inference):
-    def __init__(self, kernel, num_samples, num_warmups):
-        super().__init__(kernel, num_samples, num_warmups)
+    def __init__(self, rng_key, model, num_samples, num_warmups):
+        super().__init__(rng_key, model, num_samples, num_warmups)
 
-    def posterior(self, obs, *args, **kargs):
+    def sample(self, obs, *args, **kargs):
         pass
