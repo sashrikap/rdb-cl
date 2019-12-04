@@ -394,7 +394,7 @@ class DriveWorld(gym.Env):
             if weights is None:
                 cost_fn = self._main_car.cost_fn
             else:
-                cost_fn = partial(self._main_car.cost_runtime, weights_dict=weights)
+                cost_fn = partial(self._main_car.cost_runtime, weights=weights)
             state = deepcopy(self.state)
             main_idx = self._indices["main_car"]
             state[main_idx[0] : main_idx[0] + 3] = [x, y, onp.pi / 3]

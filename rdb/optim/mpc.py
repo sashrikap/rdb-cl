@@ -82,7 +82,7 @@ class Optimizer(object):
 
     def cost_u(self, x0, u, weights):
         """
-        Args
+        Args:
             u (ndarray): array of actions
             x0 (ndarray): initial state
             weights (dict): cost function weights
@@ -109,8 +109,10 @@ class Optimizer(object):
                 raise NotImplementedError(f"Initialization undefined for '{init}'")
 
         if self._replan:
-            """
+            """Replan.
+
             Reoptimize control sequence at every timestep
+
             """
             opt_u, xs, du = [], [], []
             cmin = 0.0
@@ -134,8 +136,10 @@ class Optimizer(object):
             # return opt_u, cmin, u_info
             return opt_u
         else:
-            """
-            Shooting: Only optimize control sequence at the beginning
+            """No Replan.
+
+            Only optimize control sequence at the beginning
+
             """
             u0 = u0.flatten()
             # Runime cost function weights
@@ -184,7 +188,7 @@ def shooting_optimizer(f_dyn, f_cost, udim, horizon, dt, replan=True, T=None):
 
     @jax.jit
     def h_forward(xu):
-        """ Forward `horizon` steps """
+        """Forward `horizon` steps. """
         x, u = divide_xu(xu, udim * horizon)
         xs = [x]
         u = u.reshape(horizon, udim)
@@ -196,16 +200,18 @@ def shooting_optimizer(f_dyn, f_cost, udim, horizon, dt, replan=True, T=None):
 
     @jax.jit
     def h_costs_xu(xu, weights):
-        """
-        Params
-        : xu : concatenate([x, u])
+        """Compute cost given start state & actions.
+
+        Args:
+            xu (ndarray): concatenate([x, u])
+
         """
         if weights is None:
             # Pre-specified weights
             f_cost_ = f_cost
         else:
             # Runime cost function weights
-            f_cost_ = partial(f_cost, weights_dict=weights)
+            f_cost_ = partial(f_cost, weights=weights)
         costs = np.array([])
         xs = h_forward(xu)
         _, u = divide_xu(xu, udim * horizon)

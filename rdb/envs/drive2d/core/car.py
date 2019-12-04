@@ -23,10 +23,11 @@ def car_sprite(color, scale=0.15 / 600.0):
 
 class Car(object):
     def __init__(self, env, init_state, horizon, color, friction=0.1):
-        """
-        Params
-        : init_state : initial state
-        : horizon    : planning horizon
+        """General Car Object.
+
+        Args:
+            init_state: initial state
+            horizon: planning horizon
         """
         self.env = env
         self.horizon = horizon
@@ -98,9 +99,11 @@ class FixSpeedCar(Car):
 
 class OptimalControlCar(Car):
     def __init__(self, env, cost_weights, init_state, horizon=10, color="yellow"):
-        """
-        Params
-        : env : world
+        """Autonomous car with optimal controller.
+
+        Args:
+            env: world
+
         """
         super().__init__(env, init_state, horizon, color)
         self.cost_weights = cost_weights
@@ -127,11 +130,12 @@ class OptimalControlCar(Car):
         self._features_fn = self.env.features_fn
 
     def build_cost_fn(self):
-        """ Return two types of cost functions
-        ```
-        cost = cost_fn(state, action)
-        cost = cost_runtime(state, action, weights)
-        ```
+        """Return two types of cost functions.
+
+        Example:
+            >>> cost = cost_fn(state, action)
+            >>> cost = cost_runtime(state, action, weights)
+
         """
         env_feats_dict = self.env.features_dict
         # Pre-defined & runtime costs

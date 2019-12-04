@@ -117,7 +117,7 @@ class Entrance(Driveway):
     NAME = "Entrance"
 
     def __init__(self, state, pt1, pt2, width, length):
-        """Entrance Constructor
+        """Entrance Constructor.
 
         Attributes:
             state (nd.array(2)): the point where entrance connects with road, angle and speed (0)

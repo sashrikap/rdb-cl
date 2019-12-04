@@ -94,14 +94,25 @@ class Runner(object):
         frame = imresize(frame, (width, width))
         imsave(path, frame)
 
+    def compute_cost(self, xs, actions, weights=None):
+        if weights is not None:
+            cost_fn = partial(self._cost_runtime, weights=weights)
+        else:
+            cost_fn = self._cost_fn
+        costs = []
+        for t in range(len(actions)):
+            costs.append(cost_fn(xs[t], actions[t]))
+        return np.sum(costs), costs
+
     def __call__(self, x0, actions, weights=None):
-        """
-        Param
-        : x0      :
-        : actions : array(T, u_dim), actions
+        """Run optimization.
+
+        Args:
+            x0 (ndarray(xdim)):
+            actions array(T, u_dim): actions
+
         """
         # TODO: action space shape checking
-        length = len(actions)
         if weights is not None:
             assert self._cost_runtime is not None, "Cost function improperly defined"
             cost_fn = partial(self._cost_runtime, weights=weights)
@@ -110,18 +121,12 @@ class Runner(object):
             cost_fn = self._cost_fn
 
         x = x0
-        xs = [x]
-        total_cost = 0.0
+        xs = []
         info = dict(costs=[], feats={}, feats_sum={})
+        for t in range(len(actions)):
+            xs.append(x)
+            x += self._dynamics_fn(x, actions[t]) * self._dt
 
-        cost = 0.0
-        for t in range(length):
-            next_x = x + self._dynamics_fn(x, actions[t]) * self._dt
-            cost += cost_fn(x, actions[t])
-            total_cost += cost
-            info["costs"].append(x)
-            xs.append(next_x)
-            x = next_x
-
+        cost, info["costs"] = self.compute_cost(xs, actions, weights)
         info["feats"], info["feats_sum"] = self._collect_features(xs, actions)
         return np.array(xs), cost, info

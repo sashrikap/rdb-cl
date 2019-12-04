@@ -1,5 +1,5 @@
 from jax import random
-from numpyro.infer import MCMC, NUTS
+from numpyro.infer import MCMC, NUTS, MCMCKernel
 import numpyro
 
 """Approximate Inference Algorithms.
@@ -26,23 +26,23 @@ Credits:
 class Inference(object):
     """ Generic Inference Class
 
+    Args:
+        prior (fn): `prior = f()`
+
     Notes:
-        prior: p(theta), `kernel.prior`
-        likelihood: p(obs | theta), `kernel.likelihood`
+        prior: p(theta)
+        likelihood: p(obs | theta)
 
     """
 
-    def __init__(self, kernel, num_samples, num_warmups):
-        """ Construct Inference Object
-
-        Args:
-            kernel (fn): log_prob ~ Kernel(theta)
-
-        """
-        self._kernel = kernel
+    def __init__(self, prior, likelihood, num_samples, num_warmups, jit_args=True):
+        self._prior = prior
+        self._likelihood = likelihood
         self._num_samples = num_samples
         self._num_warmups = num_warmups
         self._key = random.PRNGKey(1)
+        self._jit_args = jit_args
+        self._kernel = self._create_kernel()
 
     @property
     def num_samples(self):
@@ -59,6 +59,14 @@ class Inference(object):
         """
         raise NotImplementedError
 
+    def _create_kernel(self):
+        """ Create sampling kernel function.
+
+        Example:
+            >>> data = kernel_fn() # p(obs | theta) p(theta)
+        """
+        raise NotImplementedError
+
     def marginal(self):
         """ Estimate p(obs) = sum_{theta} [p(obs | theta) p(theta)].
 
@@ -70,16 +78,86 @@ class Inference(object):
         raise NotImplementedError
 
 
-class NUTSMonteCarlo(Inference):
-    def __init__(self, kernel, num_samples, num_warmups, step_size=1.0):
-        super().__init__(kernel, num_samples, num_warmups)
+class MHMonteCarlo(Inference):
+    """Metropolis-Hasting Algorithm.
+
+    Note:
+        * Basic Implementation.
+
+    """
+
+    def __init__(
+        self,
+        prior,
+        likelihood,
+        num_samples,
+        num_warmups,
+        jit_model_args=True,
+        step_size=1.0,
+    ):
+        super().__init__(prior, likelihood, num_samples, num_warmups)
         self._step_size = step_size
+
+    def _create_kernel(self):
+        """Numpyro-based kernel."""
+
+        def kernel_fn(data, *args, **kargs):
+            prior = self._prior_fn()
+            log_prob = self._likelihood_fn(prior, data, *args, **kargs)
+            return log_prob
+
+        return kernel_fn
+
+    def _mh_step(self):
+        pass
+
+    def posterior(self, obs, *args, **kwargs):
+        for i in range(self._num_warmups):
+            pass
+
+        samples = []
+        for i in range(self._num_samples):
+            pass
+        return posterior, samples
+
+
+class NUTSMonteCarlo(Inference):
+    """No-U-Turn Monte Carlo Sampling.
+
+    Note:
+        * Backed by numpyro implementation
+        * Requires kernel to provide gradient information
+
+    """
+
+    def __init__(
+        self,
+        prior,
+        likelihood,
+        num_samples,
+        num_warmups,
+        jit_model_args=True,
+        step_size=1.0,
+    ):
+        super().__init__(prior, likelihood, num_samples, num_warmups)
+        self._step_size = step_size
+
+    def _create_kernel(self):
+        """Numpyro-based kernel."""
+
+        def kernel_fn(data, *args, **kargs):
+            prior = self._prior_fn()
+            log_prob = self._likelihood_fn(prior, data, *args, **kargs)
+            numpyro.factor("log_prob", log_prob)
+
+        return kernel_fn
 
     def posterior(self, obs, *args, **kwargs):
         mcmc = MCMC(
             NUTS(self._kernel, step_size=self._step_size),
             num_warmup=self._num_warmups,
             num_samples=self._num_samples,
+            jit_model_args=self._jit_args,
         )
         mcmc.run(self._key, obs, *args, **kwargs)
         samples = mcmc.get_samples()
@@ -88,15 +166,36 @@ class NUTSMonteCarlo(Inference):
 
 
 class HMCMonteCarlo(Inference):
-    def __init__(self, kernel, num_samples, num_warmups, step_size=1.0):
+    """Hamiltonion Monte Carlo Sampling.
+
+    Note:
+        * Backed by numpyro implementation
+        * Requires kernel to provide gradient information
+
+    """
+
+    def __init__(
+        self, kernel, num_samples, num_warmups, jit_model_args=True, step_size=1.0
+    ):
         super().__init__(kernel, num_samples, num_warmups)
         self._step_size = step_size
+
+    def _create_kernel(self):
+        """Numpyro-based kernel."""
+
+        def kernel_fn(data, *args, **kargs):
+            prior = self._prior_fn()
+            log_prob = self._likelihood_fn(prior, data, *args, **kargs)
+            numpyro.factor("log_prob", log_prob)
+
+        return kernel_fn
 
     def posterior(self, obs, *args, **kwargs):
         mcmc = MCMC(
             HMC(self._kernel, step_size=self._step_size),
             num_warmup=self._num_warmups,
             num_samples=self._num_samples,
+            jit_model_args=self._jit_args,
         )
         mcmc.run(self._key, obs, *args, **kwargs)
         samples = mcmc.get_samples()

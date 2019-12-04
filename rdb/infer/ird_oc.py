@@ -1,12 +1,14 @@
 """Inverse Reward Design Module for Optimal Control.
 
-Include:
+Includes:
     [1] Pyro Implementation
     [2] Custon Implementation
 Todo:
 """
 
 import numpyro
+import jax
+from numpyro.util import control_flow_prims_disabled, fori_loop, optional
 from rdb.infer.algos import *
 
 
@@ -14,8 +16,9 @@ class PGM(object):
     """Generic Probabilisitc Graphical Model Class.
 
     Attributes:
-        prior (fn) : p(theta)
-        likelihood (fn) : p(obs | theta)
+        prior (fn): p(theta)
+        likelihood (fn): p(obs | theta)
+        sampler (object): MCMC Sampler specified by `method` (NUTS, etc.)
 
     """
 
@@ -70,13 +73,15 @@ class PGM(object):
     def _create_kernel(self):
         def kernel_fn(data, *args, **kargs):
             prior = self.prior_fn()
-            likelihood = self.likelihood_fn(prior, data, *args, **kargs)
-            numpyro.factor("log_prob", likelihood)
+            log_prob = self.likelihood_fn(prior, data, *args, **kargs)
+            numpyro.factor("log_prob", log_prob)
 
         return kernel_fn
 
     def _create_sampler(self, sampler_args):
-        if self._method == "NUTS":
+        if self._method == "MH":
+            return MHMonteCarlo(self.kernel, **sampler_args)
+        elif self._method == "NUTS":
             return NUTSMonteCarlo(self.kernel, **sampler_args)
         elif self._method == "HMC":
             return HMCMonteCarlo(self.kernel, **sampler_args)
@@ -90,7 +95,10 @@ class IRDOptimalControl(PGM):
     """Inverse Reward Design for Optimal Control.
 
     Given environment `env`, `planner`, user input w
-    infer p(w* | w)
+    infer p(w* | w).
+
+    Notes:
+        * Bayesian Terminology: theta -> true weights, obs -> proxy weights
 
     Methods:
         update : user select w
@@ -127,6 +135,9 @@ class IRDOptimalControl(PGM):
         self._env = env
         self._beta = beta
         likelihood_fn = self._build_likelihood(beta)
+        # Avoid numpyro's default jit arguments
+        sampler_args["jit_model_args"] = False
+
         super().__init__(prior_fn, likelihood_fn, method, sampler_args)
 
     def update(self, w_select):
@@ -152,14 +163,17 @@ class IRDOptimalControl(PGM):
         """
 
         def likelihood_fn(prior_weights, user_weights, init_state):
+            print(f"prior weights {prior_weights}")
             actions = self._controller(init_state, weights=prior_weights)
-            _, _, info = self._runner(init_state, actions)
+            xs, user_cost, info = self._runner(
+                init_state, actions, weights=prior_weights
+            )
             feats_sum = info["feats_sum"]
-            import pdb
-
-            pdb.set_trace()
-            reward = -1 * cost
-            return beta * reward
+            prior_cost, prior_costs = self._runner.compute_cost(
+                xs, actions, weights=prior_weights
+            )
+            prior_rew = -1 * prior_cost
+            return beta * prior_rew
 
         return likelihood_fn
 

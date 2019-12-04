@@ -5,7 +5,7 @@ import numpyro
 import numpyro.distributions as dist
 
 
-def test_PGM_kernel():
+def ttest_PGM_kernel():
     prior_fn = lambda: numpyro.sample("s", dist.Uniform(0.0, 10.0))
 
     def likelihood(prior, obs, std):
@@ -21,7 +21,7 @@ def test_PGM_kernel():
     # import pdb; pdb.set_trace()
 
 
-def test_PGM_method():
+def ttest_PGM_method():
     def prior():
         return numpyro.sample("s", dist.Uniform(0.0, 10.0))
 
@@ -50,6 +50,7 @@ def test_IRD_OC():
     from rdb.visualize.preprocess import normalize_features
 
     env = gym.make("Week3_02-v0")
+    env.reset()
     cost_runtime = env.main_car.cost_runtime
     horizon = 10
     controller = shooting_optimizer(
@@ -61,17 +62,17 @@ def test_IRD_OC():
     state = copy.deepcopy(env.state)
 
     def prior():
-        w_dist_cars = 1.0
-        w_dist_lanes = numpyro.sample("dist_lanes", dist.Uniform(0, 10))
-        w_dist_fences = numpyro.sample("dist_fences", dist.Uniform(0, 10))
-        w_speed = numpyro.sample("speed", dist.Uniform(0, 10))
-        w_control = numpyro.sample("control", dist.Uniform(0, 10))
+        w_log_dist_cars = 0.0
+        w_log_dist_lanes = numpyro.sample("dist_lanes", dist.Uniform(0, 10))
+        w_log_dist_fences = numpyro.sample("dist_fences", dist.Uniform(0, 10))
+        w_log_speed = numpyro.sample("speed", dist.Uniform(0, 10))
+        w_log_control = numpyro.sample("control", dist.Uniform(0, 10))
         return {
-            "dist_cars": np.exp(w_dist_cars),
-            "dist_fences": np.exp(w_dist_fences),
-            "dist_fences": np.exp(w_dist_fences),
-            "speed": np.exp(w_speed),
-            "control": np.exp(w_control),
+            "dist_cars": np.exp(w_log_dist_cars),
+            "dist_fences": np.exp(w_log_dist_fences),
+            "dist_fences": np.exp(w_log_dist_fences),
+            "speed": np.exp(w_log_speed),
+            "control": np.exp(w_log_control),
         }
 
     pgm = IRDOptimalControl(
@@ -90,6 +91,8 @@ def test_IRD_OC():
         "speed": 1000.0,
         "control": 20.0,
     }
+
+    actions = controller(state, weights=user_weights)
     _, samples = pgm.posterior(user_weights, state)
     import pdb
 

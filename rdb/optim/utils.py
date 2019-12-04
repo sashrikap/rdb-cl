@@ -7,10 +7,12 @@ from operator import mul, add
 
 
 def compose(*functions):
-    """Compose list of functions
+    """Compose list of functions.
+
+    To replace `toolz.functoolz.compose`, which causes error in jax>=0.1.50.
 
     Example:
-    >>> f(g(h(x))) == compose(f, g, h)(x)
+        >>> f(g(h(x))) == compose(f, g, h)(x)
 
     """
     return functools.reduce(
@@ -19,22 +21,20 @@ def compose(*functions):
 
 
 def sum_funcs(funcs):
-    """
-    Sum up multiple functions, used in reward computation, etc
+    """Sum up multiple functions, used in reward computation, etc.
 
-    Usage:
-    ```
-    fn = sum_funcs([sum, mul])
-    fn([1, 2]) = 5
-    ```
+    Example:
+        >>> fn = sum_funcs([sum, mul])
+        >>> fn([1, 2]) = 5
+
     """
     add_op = partial(reduce, add)
     return compose(add_op, juxt(funcs))
 
 
 def weigh_funcs(funcs_dict, weights_dict):
-    """
-    Weigh multiple functions by predefined weights
+    """Weigh multiple functions by predefined weights.
+
     """
     # pairs = [(fn, weights_dict[key]) for key, fn in funcs_dict.items()]
     fns = []
@@ -49,15 +49,19 @@ def weigh_funcs(funcs_dict, weights_dict):
 
 
 def weigh_funcs_runtime(funcs_dict):
-    """
-    Weigh multiple functions by runtime weights
+    """Weigh multiple functions by runtime weights.
+
+    Example:
+        >>> cost_fn = weigh_funcs_runtime(funcs_dict)
+        >>> cost = cost_fn(xs, weights)
+
     """
 
-    def func(*args, weights_dict):
+    def func(*args, weights):
         output = 0.0
         for key, fn in funcs_dict.items():
-            if key in weights_dict.keys():
-                w = weights_dict[key]
+            if key in weights.keys():
+                w = weights[key]
                 # w * fn(args)
                 output += w * fn(*args)
         return output
@@ -66,8 +70,8 @@ def weigh_funcs_runtime(funcs_dict):
 
 
 def merge_dict_funcs(funcs_dict):
-    """
-    Execute a dictionary of functions individually
+    """Execute a dictionary of functions individually.
+
     """
 
     def func(*args):
@@ -80,10 +84,11 @@ def merge_dict_funcs(funcs_dict):
 
 
 def chain_funcs(outer_dict, inner_dict):
-    """
-    Chain dictionaries of functions
+    """Chain dictionaries of functions.
 
-    output[key] = outer[key](inner[key](data))
+    Example:
+        >>> output[key] = outer[key](inner[key](data))
+
     """
     output = OrderedDict()
     for key, outer in outer_dict.items():
@@ -93,45 +98,49 @@ def chain_funcs(outer_dict, inner_dict):
 
 
 def concat_funcs(funcs, axis=-1):
-    """
-    Concatenate output values of list of functions into a list
+    """Concatenate output values of list of functions into a list.
 
-    Useful for:
-    [1] Dynamics function [next_x1, next_x2] = f([x1, x2])
+    Example:
+        >>> [next_x1, next_x2] = f([x1, x2])
+
+    Note:
+        * Useful for Dynamics function
+
     """
     concat = partial(np.concatenate, axis=axis)
     return compose(concat, juxt(funcs))
 
 
 def stack_funcs(funcs, axis=0):
-    """
-    Concatenate output values of list of functions into a list
+    """Concatenate output values of list of functions into a list.
 
-    Useful for:
-    [1] Dynamics function [next_x1, next_x2] = f([x1, x2])
+    Example:
+        >>> [next_x1, next_x2] = f([x1, x2])
+    Note:
+        * Useful for Dynamics function
+
     """
     stack = partial(np.stack, axis=0)
     return compose(stack, juxt(funcs))
 
 
 def combine_funcs(funcs):
-    """
-    Append output values of list of functions into a list
+    """Append output values of list of functions into a list.
 
-    Usage: `[output1, output2] = f(data)`
+    Example:
+        >>> [output1, output2] = f(data)
+
     """
     return compose(np.asarray, juxt(funcs))
 
 
 def index_func(fn, idx_pair=(0, -1)):
-    """
-    Register a function with index pair
+    """Register a function with index pair.
 
-    Usage:
-    ```
-    fn = make_func(np.sum, (1, 3))
-    fn([1, 2, 2, 3]) = 4
-    ```
+    Example:
+        >>> fn = make_func(np.sum, (1, 3))
+        >>> fn([1, 2, 2, 3]) = 4
+
     """
     assert type(idx_pair) == tuple and len(idx_pair) == 2
 

@@ -37,20 +37,21 @@ class EntranceDriveWorld_Week4(EntranceDriveWorld):
         super().__init__(main_car, cars, driveway_dist=driveway_dist, dt=dt)
 
     def set_init_state(self, y0, y1):
-        """
-        Setting initial state
-        """
+        """Setting initial state."""
         # y0_idx, y1_idx = 1, 5
         self.cars[0].init_state = jax.ops.index_update(self.cars[0].init_state, 1, y0)
         self.cars[1].init_state = jax.ops.index_update(self.cars[1].init_state, 1, y1)
 
     def get_nonlinear_features_dict(self, feats_dict):
-        """
-        Params
-        : feats_dict : dict of environment feature functions
-        Types
-        : Gaussian   : exp(-dist^2/sigma^2)
-        : Exponent   : exp(run_over)
+        """Given raw features dict, make nonlinear features.
+
+        Args:
+            feats_dict: dict of environment feature functions
+
+        Notes:
+            * Gaussian feature: exp(-dist^2/sigma^2)
+            * Exponential feature: exp(run_over)
+
         """
         nonlinear_dict = {}
         sum_keep = partial(np.sum, keepdims=True)
