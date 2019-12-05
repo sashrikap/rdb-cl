@@ -4,7 +4,9 @@ import time, copy
 import jax.numpy as np
 import rdb.envs.drive2d
 import numpyro.distributions as dist
+import matplotlib.pyplot as plt
 
+from tqdm.notebook import tqdm
 from jax import random, vmap
 from rdb.infer.ird_oc import *
 from rdb.infer.algos import *
@@ -15,7 +17,10 @@ from rdb.visualize.render import render_env
 from rdb.visualize.preprocess import normalize_features
 
 REPLAN = False
-
+RANDOM_KEYS = [1, 2, 3, 4, 5, 6]
+NUM_SAMPLES = 1000
+PLOT_BINS = 100
+NUM_DESIGNER_SAMPLES = 20
 
 env = gym.make("Week3_02-v0")
 env.reset()
@@ -62,7 +67,7 @@ def prior_log_prob(state):
 
 
 def proposal(weight):
-    std_dict = {"dist_lanes": 0.2, "dist_fences": 0.2, "speed": 0.2, "control": 0.2}
+    std_dict = {"dist_lanes": 0.1, "dist_fences": 0.1, "speed": 0.1, "control": 0.1}
     next_weight = copy.deepcopy(weight)
     for key, val in next_weight.items():
         log_val = np.log(val)
@@ -82,40 +87,78 @@ user_weights = {
 }
 
 
-key = random.PRNGKey(1)
-pgm = IRDOptimalControl(
-    key, env, controller, runner, beta, prior_log_prob=prior_log_prob
-)
-sampler = MetropolisHasting(
-    key, pgm, num_warmups=5, num_samples=20, proposal_fn=proposal
-)
-sampler.init(user_weights)
-
-
-## Sample training environments
-samples_train_dict = sampler.sample(user_weights, init_state=state_train)
-samples_train = stack_dict_values(samples_train_dict)
-# Remove 'dist_cars' (constant)
-entropy = pgm.entropy(samples_train[:, 1:])
-
-
 def infogain(samples_train_dict, state_test):
     # Sample testing environments 1
     h = 0.0
-    for w_i, w_train in enumerate(samples_train_dict):
-        print(f"Info {w_i + 1}/{len(samples_train_dict)}")
+    range_ = tqdm(samples_train_dict, desc="InfoGain envs")
+    for w_i, w_train in enumerate(range_):
         sampler.init(w_train)
-        samples_test = sampler.sample(w_train, init_state=state_test, verbose=True)
+        samples_test = sampler.sample(
+            w_train,
+            init_state=state_test,
+            verbose=False,
+            num_samples=NUM_DESIGNER_SAMPLES,
+        )
         h += pgm.entropy(stack_dict_values(samples_test)[:, 1:])
     h /= float(len(samples_train_dict) * len(samples_test))
     return -h
 
 
-print("Sampling infogain: test 1")
-gain1 = infogain(samples_train_dict, state_test1)
-print(f"Test 1 gain {gain1:.3f} (should suck)")
+def plot_samples(samples_dicts):
+    plt.figure()
+    n_values = len(samples_dicts[0].values())
+    for i, key in enumerate(samples_dicts[0].keys()):
+        values = [s[key] for s in samples_dicts]
+        plt.subplot(n_values, 1, i + 1)
+        n, bins, patches = plt.hist(
+            values, PLOT_BINS, density=True, facecolor="b", alpha=0.75
+        )
+        plt.title(key)
+    plt.tight_layout()
+    plt.show()
 
-print()
-print("Sampling infogain: test 2")
-gain2 = infogain(samples_train_dict, state_test2)
-print(f"Test 2 gain {gain2:.3f} (should be better)")
+
+key = random.PRNGKey(1)
+pgm = IRDOptimalControl(
+    key, env, controller, runner, beta, prior_log_prob=prior_log_prob
+)
+sampler = MetropolisHasting(
+    key, pgm, num_warmups=5, num_samples=NUM_SAMPLES, proposal_fn=proposal
+)
+
+
+all_gain1 = []
+all_gain2 = []
+for ki, keyi in enumerate(RANDOM_KEYS):
+    ## Reset random key
+    key = random.PRNGKey(keyi)
+    pgm.update_key(key)
+    sampler.update_key(key)
+    sampler.init(user_weights)
+
+    ## Sample training environments
+    samples_train_dict = sampler.sample(user_weights, init_state=state_train)
+    plot_samples(samples_train_dict)
+    samples_train = stack_dict_values(samples_train_dict)
+    # Remove 'dist_cars' (constant)
+    entropy = pgm.entropy(samples_train[:, 1:])
+
+    print("Sampling infogain: test 1")
+    gain1 = infogain(samples_train_dict, state_test1)
+    all_gain1.append(gain1)
+    print(f"Test 1 gain {gain1:.3f} (should suck)")
+    print("Sampling infogain: test 2")
+    gain2 = infogain(samples_train_dict, state_test2)
+    all_gain2.append(gain2)
+    print(f"Test 2 gain {gain2:.3f} (should be better)")
+    print()
+
+    print(f"Key {ki}/{len(RANDOM_KEYS)}")
+    print(
+        f"Gain 1 mean {np.array(all_gain1).mean():.3f} std {np.array(all_gain1).std():.3f}"
+    )
+    print(
+        f"Gain 2 mean {np.array(all_gain2).mean():.3f} std {np.array(all_gain2).std():.3f}"
+    )
+
+    print()

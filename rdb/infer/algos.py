@@ -1,7 +1,7 @@
 from jax import random
 from numpyro.handlers import scale, condition, seed
 from numpyro.infer import MCMC, NUTS
-from tqdm import tqdm, trange
+from tqdm.notebook import tqdm, trange
 import numpyro
 import numpyro.distributions as dist
 import jax.numpy as np
@@ -56,6 +56,9 @@ class Inference(object):
     @property
     def model(self):
         return self._model
+
+    def update_key(self, rng_key):
+        self._rng_key = rng_key
 
     def init(self, state):
         self._init_state = state
@@ -114,6 +117,11 @@ class MetropolisHasting(Inference):
 
         return seed(fn, self._rng_key)
 
+    def update_key(self, rng_key):
+        self._rng_key = rng_key
+        self._proposal = seed(self._proposal, rng_seed=rng_key)
+        self._coin_flip = self._create_coin_flip()
+
     def init(self, state):
         self._init_state = state
 
@@ -139,9 +147,9 @@ class MetropolisHasting(Inference):
         accepts = []
         ratio = 0.0
         num_steps = 0
-        range_ = range(self._num_samples)
+        range_ = range(num_samples)
         if verbose:
-            range_ = trange(self._num_samples, desc="MH Sampling")
+            range_ = trange(num_samples, desc="MH Sampling")
         for i in range_:
             accept = False
             while not accept:

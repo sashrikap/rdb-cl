@@ -28,6 +28,9 @@ class PGM(object):
         self._kernel = kernel
         self._rng_key = rng_key
 
+    def update_key(self, rng_key):
+        self._rng_key = rng_key
+
     def __call__(self, *args, **kwargs):
         """Likelihood method.
 
@@ -85,6 +88,10 @@ class IRDOptimalControl(PGM):
     # def infogain(self, env):
     #    pass
 
+    def update_key(self, rng_key):
+        self._rng_key = rng_key
+        self._prior_log_prob = seed(self._prior_log_prob, rng_key)
+
     def _build_kernel(self, beta):
         """Likelihood for Optimal Control.
 
@@ -100,13 +107,13 @@ class IRDOptimalControl(PGM):
 
         def likelihood_fn(user_weights, sample_weights, init_state):
             t1 = time()
-            actions = self._controller(init_state, weights=user_weights)
-            print(f"Controller {time() - t1}")
-            t1 = time()
+            actions = self._controller(init_state, weights=sample_weights)
+            # print(f"Controller {time() - t1}")
+            # t1 = time()
             xs, sample_cost, info = self._runner(
-                init_state, actions, weights=sample_weights
+                init_state, actions, weights=user_weights
             )
-            print(f"Runner {time() - t1}")
+            # print(f"Runner {time() - t1}")
             # feats_sum = info["feats_sum"]
             # prior_cost, prior_costs = self._runner.compute_cost(
             #    xs, actions, weights=sample_weights
