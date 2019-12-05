@@ -117,9 +117,17 @@ class MetropolisHasting(Inference):
     def init(self, state):
         self._init_state = state
 
-    def sample(self, obs, verbose=True, *args, **kwargs):
+    def sample(
+        self, obs, verbose=True, num_warmups=None, num_samples=None, *args, **kwargs
+    ):
         assert self._init_state is not None, "Need to initialize"
         state = self._init_state
+
+        if num_warmups is None:
+            num_warmups = self._num_warmups
+        if num_samples is None:
+            num_samples = self._num_samples
+
         log_prob = self._model(obs, state, **kwargs)
         range_ = range(self._num_warmups)
         if verbose:
@@ -145,7 +153,7 @@ class MetropolisHasting(Inference):
                 range_.set_description(f"MH Sampling; Accept {100 * ratio:.1f}%")
             samples.append(state)
         if verbose:
-            print(f"Acceptance ratio {ratio}")
+            print(f"Acceptance ratio {ratio:.3f}")
         self._init_state = None
         return samples
 

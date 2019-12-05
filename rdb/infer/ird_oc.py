@@ -11,6 +11,7 @@ import jax
 from numpyro.util import control_flow_prims_disabled, fori_loop, optional
 from numpyro.handlers import scale, condition, seed
 from rdb.infer.algos import *
+from scipy.stats import gaussian_kde
 
 
 class PGM(object):
@@ -110,3 +111,13 @@ class IRDOptimalControl(PGM):
             return beta * log_prob
 
         return likelihood_fn
+
+    def entropy(self, data, method="gaussian", num_bins=100):
+        if method == "gaussian":
+            # scipy gaussian kde requires transpose
+            kernel = gaussian_kde(dataset=data.T)
+            N = data.shape[0]
+            entropy = -(1.0 / N) * np.sum(np.log(kernel(data.T)))
+        elif method == "histogram":
+            raise NotImplementedError
+        return entropy

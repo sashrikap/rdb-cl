@@ -1,5 +1,6 @@
 from rdb.infer.ird_oc import *
 from rdb.infer.algos import *
+from rdb.infer.utils import *
 import jax.numpy as np
 import numpyro
 from jax import random, vmap
@@ -61,6 +62,9 @@ def test_IRD_OC():
     beta = 5.0
     env.reset()
     state = copy.deepcopy(env.state)
+    y0_idx, y1_idx = 1, 5
+    state[y0_idx] = -0.5
+    state[y1_idx] = 0.2
 
     def prior_log_prob(state):
         w_log_dist_cars = 0.0
@@ -101,18 +105,19 @@ def test_IRD_OC():
         key, env, controller, runner, beta, prior_log_prob=prior_log_prob
     )
     user_weights = {
-        "dist_cars": 50,
-        "dist_lanes": 30.0,
-        "dist_fences": 5000.0,
-        "speed": 1000.0,
-        "control": 20.0,
+        "dist_cars": 100.0,
+        "dist_lanes": 10.0,
+        "dist_fences": 300.0,
+        "speed": 20.0,
+        "control": 80.0,
     }
 
     sampler = MetropolisHasting(
-        key, pgm, num_warmups=10, num_samples=10, proposal_fn=proposal
+        key, pgm, num_warmups=5, num_samples=10, proposal_fn=proposal
     )
     sampler.init(user_weights)
     samples = sampler.sample(user_weights, init_state=state)
-    import pdb
-
-    pdb.set_trace()
+    list_samples = stack_dict_values(samples)
+    # Remove 'dist_cars' (constant)
+    list_samples = list_samples[:, 1:]
+    entropy = pgm.entropy(list_samples)

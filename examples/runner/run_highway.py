@@ -37,12 +37,10 @@ if not DUMMY_ACTION:
 
     y0_idx, y1_idx = 1, 5
     state = copy.deepcopy(env.state)
-    # state[y0_idx] = 0.4
-    # state[y1_idx] = -0.2
-    state[y0_idx] = -0.5
-    state[y1_idx] = 0.2
-    # state[y0_idx] = 0.5
-    # state[y1_idx] = 0.0
+    # state[y0_idx] = -0.4
+    # state[y1_idx] = 0.3
+    state[y0_idx] = -0.4
+    state[y1_idx] = -0.7
     env.state = state
 
     weights = {
