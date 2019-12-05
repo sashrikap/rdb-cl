@@ -1,6 +1,7 @@
 import jax
 from scipy.optimize import fmin_l_bfgs_b
 from functools import partial
+from rdb.optim.runner import Runner
 import jax.numpy as np
 import jax.random as random
 import numpy as onp
@@ -54,6 +55,7 @@ class Optimizer(object):
             h_grad_u (fn): func(us, x0, weights), horizon gradient
             h_cost_u (fn): func(us, x0, weights), horizon cost
             replan (bool): True if replan at every step
+            T (int): only in replan mode, plan for longer length than horizon
 
         Example:
             >>> # No initialization
@@ -159,11 +161,11 @@ class Optimizer(object):
             return opt_u
 
 
-def shooting_optimizer(f_dyn, f_cost, udim, horizon, dt, replan=True, T=None):
+def shooting_optimizer(env, f_cost, udim, horizon, dt, replan=True, T=None):
     """Create shooting optimizer.
 
     Args:
-        f_dyn (fn): 1 step dynamics function
+        env (object): has `env.dynamics_fn`
         f_cost (fn): 1 step cost function
                     `f_cost(state, act)`, use pre-specified weight
                     `f_cost(state, act, weight)`, use weight at runtime
@@ -176,30 +178,39 @@ def shooting_optimizer(f_dyn, f_cost, udim, horizon, dt, replan=True, T=None):
     Note:
         * The following functions are moved outside of Optimizer class definition as standalone functions to speed up jax complication
         >> h_forward: full horizon forward function
-                    `array((T, xdim)) = h_forward(xu, length)`
+                    `array((horizon, xdim)) = h_forward(xu)`
+        >> t_forward: full T forward function
+                    `array((T, xdim)) = t_forward(xu)`
         >> h_costs_xu: full horizon cost function, per timestep
-                     `cost = h_cost_xu(xu, length)`
+                     `array(horizon,) = h_cost_xu(xu)`
+        >> t_costs_xu: full T cost function, per timestep
+                     `array(T,) = h_cost_xu(xu)`
         >> h_cost_u: full horizon cost function, total
+                   `cost = h_cost_u(x0, u, weights)`
+        >> t_cost_u: full T cost function, total
                    `cost = h_cost_u(x0, u, weights)`
         >> h_grad_u: d(full horizon cost)/du,
                    `grad = h_grad_u(x0, u, weights)`
 
     """
 
-    @jax.jit
-    def h_forward(xu):
-        """Forward `horizon` steps. """
-        x, u = divide_xu(xu, udim * horizon)
+    # Forward dynamics
+    f_dyn = env.dynamics_fn
+    if T is None:
+        T = horizon
+
+    def f_forward(xu, length):
+        """Forward `length` steps. """
+        x, u = divide_xu(xu, udim * length)
         xs = [x]
-        u = u.reshape(horizon, udim)
-        for t in range(horizon):
+        u = u.reshape(length, udim)
+        for t in range(length):
             next_x = x + f_dyn(x, u[t]) * dt
             xs.append(next_x)
             x = next_x
         return np.array(xs)
 
-    @jax.jit
-    def h_costs_xu(xu, weights):
+    def f_costs_xu(xu, weights, length):
         """Compute cost given start state & actions.
 
         Args:
@@ -213,29 +224,41 @@ def shooting_optimizer(f_dyn, f_cost, udim, horizon, dt, replan=True, T=None):
             # Runime cost function weights
             f_cost_ = partial(f_cost, weights=weights)
         costs = np.array([])
-        xs = h_forward(xu)
-        _, u = divide_xu(xu, udim * horizon)
-        u = u.reshape(horizon, udim)
-        for t in range(horizon):
+        xs = f_forward(xu, length)
+        _, u = divide_xu(xu, udim * length)
+        u = u.reshape(length, udim)
+        for t in range(length):
             costs = np.append(costs, f_cost_(xs[t], u[t]))
         return costs
 
+    h_forward = jax.jit(partial(f_forward, length=horizon))
+    h_costs_xu = jax.jit(partial(f_costs_xu, length=horizon))
+    if T == horizon:
+        # Avoid repeated jit
+        t_forward = h_forward
+        t_costs_xu = h_costs_xu
+    else:
+        t_forward = jax.jit(partial(f_forward, length=T))
+        t_costs_xu = jax.jit(partial(f_costs_xu, length=T))
+
     h_cost_xu = jax.jit(lambda *args: np.sum(h_costs_xu(*args)))
     h_grad_xu = jax.jit(jax.grad(h_cost_xu))
-    # cost_xu = lambda xu: np.sum(h_costs_xu(xu))
-    # grad_xu = jax.grad(h_cost_xu)
+    t_cost_xu = jax.jit(lambda *args: np.sum(t_costs_xu(*args)))
 
-    # Numpy-based utility for Optimizer
-    def h_traj_u(x0, u):
-        xu = concate_xu(x0, u)
-        return to_numpy(h_forward(xu))
+    """Forward/cost/grad functions for Horizon, used in optimizer"""
+    h_traj_u = lambda x0, u: to_numpy(h_forward(concate_xu(x0, u)))
+    h_grad_u = lambda x0, u, weights: to_numpy(h_grad_xu(concate_xu(x0, u), weights))[
+        -udim * horizon :
+    ]
+    h_cost_u = lambda x0, u, weights: float(h_cost_xu(concate_xu(x0, u), weights))
+    h_costs_u = lambda x0, u, weights: np.array(h_costs_xu(concate_xu(x0, u), weights))
 
-    def h_grad_u(x0, u, weights):
-        xu = concate_xu(x0, u)
-        return to_numpy(h_grad_xu(xu, weights))[-udim * horizon :]
+    """Forward/cost functions for T, used in runner"""
+    t_traj_u = lambda x0, u: to_numpy(t_forward(concate_xu(x0, u)))
+    t_cost_u = lambda x0, u, weights: float(t_cost_xu(concate_xu(x0, u), weights))
+    t_costs_u = lambda x0, u, weights: np.array(t_costs_xu(concate_xu(x0, u), weights))
 
-    def h_cost_u(x0, u, weights):
-        xu = concate_xu(x0, u)
-        return float(h_cost_xu(xu, weights))
+    optimizer = Optimizer(h_traj_u, h_grad_u, h_cost_u, udim, horizon, replan, T)
+    runner = Runner(env, dynamics_fn=t_traj_u, cost_runtime=t_costs_u)
 
-    return Optimizer(h_traj_u, h_grad_u, h_cost_u, udim, horizon, replan, T)
+    return optimizer, runner

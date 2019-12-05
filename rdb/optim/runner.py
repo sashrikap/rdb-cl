@@ -17,20 +17,28 @@ TODO:
 
 
 class Runner(object):
-    """
-    Basic Runner, collects
-    : xs    : raw trajectory
-    : feats : features
+    """Basic Runner, collects trajectory, features and cost.
+
+    Args:
+        env (object): environment
+        dynamcis_fn (fn): can pass in jit-accelerated function
+        cost_runtime (fn): can pass in jit-accelerated function
+
+    Examples:
+        >>> xs = dynamics_fn(x0, us)
+        >>> costs = cost_runtime(x0, us, weights)
+
     """
 
-    def __init__(self, env, cost_runtime=None, cost_fn=None):
+    def __init__(self, env, dynamics_fn=None, cost_runtime=None):
         self._env = env
         self._dt = env.dt
-        self._dynamics_fn = env.dynamics_fn
-
+        # Dynamics function
+        self._dynamics_fn = dynamics_fn
+        if dynamics_fn is None:
+            self.dynamics_fn = env.dynamics_fn
         # Define cost function
         self._cost_runtime = cost_runtime
-        self._cost_fn = cost_fn
 
     @property
     def env(self):
@@ -94,17 +102,7 @@ class Runner(object):
         frame = imresize(frame, (width, width))
         imsave(path, frame)
 
-    def compute_cost(self, xs, actions, weights=None):
-        if weights is not None:
-            cost_fn = partial(self._cost_runtime, weights=weights)
-        else:
-            cost_fn = self._cost_fn
-        costs = []
-        for t in range(len(actions)):
-            costs.append(cost_fn(xs[t], actions[t]))
-        return np.sum(costs), costs
-
-    def __call__(self, x0, actions, weights=None):
+    def __call__(self, x0, actions, weights=None, collect_features=False):
         """Run optimization.
 
         Args:
@@ -113,20 +111,14 @@ class Runner(object):
 
         """
         # TODO: action space shape checking
-        if weights is not None:
-            assert self._cost_runtime is not None, "Cost function improperly defined"
-            cost_fn = partial(self._cost_runtime, weights=weights)
-        else:
-            assert self._cost_fn is not None, "Cost function improperly defined"
-            cost_fn = self._cost_fn
+        assert self._cost_runtime is not None, "Cost function improperly defined"
+        cost_fn = partial(self._cost_runtime, weights=weights)
 
         x = x0
-        xs = []
         info = dict(costs=[], feats={}, feats_sum={})
-        for t in range(len(actions)):
-            xs.append(x)
-            x += self._dynamics_fn(x, actions[t]) * self._dt
-
-        cost, info["costs"] = self.compute_cost(xs, actions, weights)
-        info["feats"], info["feats_sum"] = self._collect_features(xs, actions)
+        xs = self._dynamics_fn(x0, actions)
+        info["costs"] = self._cost_runtime(x0, actions, weights)
+        cost = np.sum(info["costs"])
+        if collect_features:
+            info["feats"], info["feats_sum"] = self._collect_features(xs, actions)
         return np.array(xs), cost, info

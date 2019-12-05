@@ -12,6 +12,7 @@ from numpyro.util import control_flow_prims_disabled, fori_loop, optional
 from numpyro.handlers import scale, condition, seed
 from rdb.infer.algos import *
 from scipy.stats import gaussian_kde
+from time import time
 
 
 class PGM(object):
@@ -98,10 +99,14 @@ class IRDOptimalControl(PGM):
         """
 
         def likelihood_fn(user_weights, sample_weights, init_state):
+            t1 = time()
             actions = self._controller(init_state, weights=user_weights)
+            print(f"Controller {time() - t1}")
+            t1 = time()
             xs, sample_cost, info = self._runner(
                 init_state, actions, weights=sample_weights
             )
+            print(f"Runner {time() - t1}")
             # feats_sum = info["feats_sum"]
             # prior_cost, prior_costs = self._runner.compute_cost(
             #    xs, actions, weights=sample_weights

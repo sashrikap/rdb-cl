@@ -20,20 +20,14 @@ udim = 2
 horizon = 10
 
 T = 30
+# T = 10
 
 if not DUMMY_ACTION:
     if not REPLAN:
         T = horizon
-    optimizer = shooting_optimizer(
-        env.dynamics_fn,
-        main_car.cost_runtime,
-        udim,
-        horizon,
-        env.dt,
-        replan=REPLAN,
-        T=T,
+    optimizer, runner = shooting_optimizer(
+        env, main_car.cost_runtime, udim, horizon, env.dt, replan=REPLAN, T=T
     )
-    runner = Runner(env, main_car.cost_runtime, main_car.cost_fn)
 
     y0_idx, y1_idx = 1, 5
     state = copy.deepcopy(env.state)
@@ -51,8 +45,22 @@ if not DUMMY_ACTION:
         "control": 80.0,
     }
 
+    """
+    N = 20
+    t1 = time.time()
+    for _ in range(N):
+        actions = optimizer(env.state, weights=weights)
+    print(f"Replan {N} times {time.time() - t1}")
+
+    optimizer._replan = False
+    t1 = time.time()
+    for _ in range(N):
+        actions = optimizer(env.state, weights=weights)
+    print(f"No Replan {N} times {time.time() - t1}")
+    import pdb; pdb.set_trace()
+    """
     actions = optimizer(env.state, weights=weights)
-    traj, cost, info = runner(env.state, actions)
+    traj, cost, info = runner(env.state, actions, weights=weights)
     print(f"Total cost {cost}")
 else:
     actions = np.zeros((T, udim))

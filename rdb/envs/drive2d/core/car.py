@@ -1,4 +1,5 @@
 import jax.numpy as np
+import jax
 import pyglet
 import numpy as onp
 from rdb.envs.drive2d.core.dynamics import *

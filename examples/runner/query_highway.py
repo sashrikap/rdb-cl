@@ -22,10 +22,9 @@ weights = {
 }
 T = 20
 REPLAN = True
-optimizer = shooting_optimizer(
-    env.dynamics_fn, main_car.cost_runtime, udim, horizon, env.dt, T=T, replan=REPLAN
+optimizer, runner = shooting_optimizer(
+    env, main_car.cost_runtime, udim, horizon, env.dt, T=T, replan=REPLAN
 )
-runner = Runner(env, main_car.cost_runtime, main_car.cost_fn)
 state = copy.deepcopy(env.state)
 state[y0_idx] = 0.4
 state[y1_idx] = -0.2

@@ -20,10 +20,9 @@ T = 30
 main_car = env.main_car
 
 if not DUMMY_ACTION:
-    optimizer = shooting_optimizer(
-        env.dynamics_fn, main_car.cost_runtime, udim, horizon, env.dt, T=T
+    optimizer, runner = shooting_optimizer(
+        env, main_car.cost_runtime, udim, horizon, env.dt, T=T
     )
-    runner = Runner(env, main_car.cost_runtime, main_car.cost_fn)
 
     weights = {
         "dist_cars": 1.0,

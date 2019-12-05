@@ -18,8 +18,7 @@ obs = env.reset()
 main_car = env.main_car
 udim = 2
 horizon = 10
-optimizer = shooting_optimizer(env.dynamics_fn, main_car.cost_fn, udim, horizon, env.dt)
-runner = Runner(env, main_car.cost_runtime, main_car.cost_fn)
+optimizer, runner = shooting_optimizer(env, main_car.cost_fn, udim, horizon, env.dt)
 
 state = copy.deepcopy(env.state)
 y0_idx = 1

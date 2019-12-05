@@ -14,14 +14,16 @@ from rdb.optim.runner import Runner
 from rdb.visualize.render import render_env
 from rdb.visualize.preprocess import normalize_features
 
+REPLAN = False
+
+
 env = gym.make("Week3_02-v0")
 env.reset()
 cost_runtime = env.main_car.cost_runtime
 horizon = 10
-controller = shooting_optimizer(
-    env.dynamics_fn, cost_runtime, env.udim, horizon, env.dt
+controller, runner = shooting_optimizer(
+    env, cost_runtime, env.udim, horizon, env.dt, replan=REPLAN
 )
-runner = Runner(env, cost_runtime=cost_runtime)
 beta = 5.0
 env.reset()
 y0_idx, y1_idx = 1, 5

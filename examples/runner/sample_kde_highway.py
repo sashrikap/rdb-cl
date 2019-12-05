@@ -38,8 +38,7 @@ udim = 2
 horizon = 10
 
 cost_runtime = main_car.cost_runtime
-optimizer = shooting_optimizer(env.dynamics_fn, cost_runtime, udim, horizon, env.dt)
-runner = Runner(env, main_car.cost_runtime, main_car.cost_fn)
+optimizer, runner = shooting_optimizer(env, cost_runtime, udim, horizon, env.dt)
 
 y0_idx, y1_idx = 1, 5
 y0_range = np.arange(-1.0, 1.01, 0.9)

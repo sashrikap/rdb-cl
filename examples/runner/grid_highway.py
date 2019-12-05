@@ -20,10 +20,9 @@ main_car = env.main_car
 udim = 2
 horizon = 10
 T = 30
-optimizer = shooting_optimizer(
-    env.dynamics_fn, main_car.cost_runtime, udim, horizon, env.dt, replan=REPLAN, T=T
+optimizer, runner = shooting_optimizer(
+    env, main_car.cost_runtime, udim, horizon, env.dt, replan=REPLAN, T=T
 )
-runner = Runner(env, main_car.cost_runtime, main_car.cost_fn)
 
 state0 = copy.deepcopy(env.state)
 y0_idx = 1

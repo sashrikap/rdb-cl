@@ -17,7 +17,6 @@ env = gym.make("Week3_02-v0")
 env.reset()
 
 cost_runtime = env.main_car.cost_runtime
-optimizer = shooting_optimizer(
-    env.dynamics_fn, cost_runtime, env.udim, env.horizon, env.dt, replan=REPLAN, T=T
+optimizer, runner = shooting_optimizer(
+    env, cost_runtime, env.udim, env.horizon, env.dt, replan=REPLAN, T=T
 )
-runner = Runner(env, cost_runtime=cost_runtime)
