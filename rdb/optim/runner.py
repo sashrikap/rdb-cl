@@ -30,37 +30,31 @@ class Runner(object):
 
     """
 
-    def __init__(self, env, dynamics_fn=None, cost_runtime=None):
+    def __init__(self, env, dynamics_fn=None, cost_runtime=None, features_fn=None):
         self._env = env
         self._dt = env.dt
         # Dynamics function
         self._dynamics_fn = dynamics_fn
         if dynamics_fn is None:
-            self.dynamics_fn = env.dynamics_fn
+            self._dynamics_fn = env.dynamics_fn
         # Define cost function
         self._cost_runtime = cost_runtime
+        assert cost_runtime is not None
+        self._features_fn = features_fn
+        if features_fn is None:
+            self._features_fn = env.features_fn
 
     @property
     def env(self):
         return self._env
 
-    def _collect_features(self, xs, actions):
+    def _collect_features(self, x0, actions):
         """
         Return
         : feats     : dict(key, [f_t0, f_t1, ..., f_tn]), time series
         : feats_sum : dict(key, sum([f_t0, f_t1, ..., f_tn])), sum
         """
-        feats = None
-        for x, act in zip(xs, actions):
-            feats_x = self._env.features_fn(x, act)
-            if feats is None:
-                feats = OrderedDict()
-                for key in feats_x:
-                    feats[key] = []
-            for key in feats_x:
-                feats[key].append(feats_x[key])
-        # Sum up each feature
-        feats = OrderedDict({key: np.array(val) for (key, val) in feats.items()})
+        feats = self._features_fn(x0, actions)
         feats_sum = OrderedDict(
             {key: np.sum(val, axis=0) for (key, val) in feats.items()}
         )
@@ -88,6 +82,7 @@ class Runner(object):
     def collect_mp4(self, state, actions, width=450, path=None, text=None):
         if path is None:
             path = join(dirname(rdb.__file__), "..", "data", "recording.mp4")
+        self._env.set_init_state(state)
         self._env.reset()
         self._env.state = state
         render_env(self._env, state, actions, fps=3, path=path, text=text)
@@ -102,7 +97,7 @@ class Runner(object):
         frame = imresize(frame, (width, width))
         imsave(path, frame)
 
-    def __call__(self, x0, actions, weights=None, collect_features=False):
+    def __call__(self, x0, actions, weights=None):
         """Run optimization.
 
         Args:
@@ -119,6 +114,5 @@ class Runner(object):
         xs = self._dynamics_fn(x0, actions)
         info["costs"] = self._cost_runtime(x0, actions, weights)
         cost = np.sum(info["costs"])
-        if collect_features:
-            info["feats"], info["feats_sum"] = self._collect_features(xs, actions)
+        info["feats"], info["feats_sum"] = self._collect_features(x0, actions)
         return np.array(xs), cost, info

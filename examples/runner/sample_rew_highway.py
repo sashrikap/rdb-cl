@@ -44,7 +44,7 @@ env.state = state
 
 # Optimize for control
 actions = optimizer(env.state, weights=weights)
-traj, cost, info = runner(env.state, actions)
+traj, cost, info = runner(env.state, actions, weights=weights)
 
 rew = -1 * cost
 env.render("human")

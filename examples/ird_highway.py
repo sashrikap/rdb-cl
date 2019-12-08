@@ -42,4 +42,4 @@ for idx, (y0, y1) in enumerate(train_pairs):
     state = env.state
 
     actions = optimizer(state, weights=weights)
-    traj, cost, info = runner(state, actions)
+    traj, cost, info = runner(state, actions, weights=weights)

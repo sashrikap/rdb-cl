@@ -10,9 +10,9 @@ from rdb.visualize.preprocess import normalize_features
 
 DRAW_HEAT = False
 DUMMY_ACTION = False
-COLLECT_MP4 = True
+COLLECT_MP4 = False
 
-env = gym.make("Week4_01-v0")
+env = gym.make("Week5_01-v0")
 obs = env.reset()
 udim = 2
 horizon = 10
@@ -34,17 +34,12 @@ if not DUMMY_ACTION:
         "speed": 0.0,
         "control": 0.4,
     }
-    y0_idx, y1_idx = 1, 5
-    state = copy.deepcopy(env.state)
-    state[y0_idx] = -0.2
-    state[y1_idx] = 0.0
-    env.state = state
 
     actions = optimizer(env.state, weights=weights)
     traj, cost, info = runner(env.state, actions, weights=weights)
     print(f"Total cost {cost}")
     if COLLECT_MP4:
-        runner.collect_mp4(env.state, actions, path="data/driveway_sanity3.mp4")
+        runner.collect_mp4(env.state, actions, path="data/driveway_sanity.mp4")
 else:
     actions = np.zeros((T, udim))
 

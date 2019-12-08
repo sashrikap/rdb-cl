@@ -6,6 +6,24 @@ from toolz.functoolz import juxt
 from operator import mul, add
 
 
+def concate_dict_by_keys(dicts):
+    """Stack key-value pairs for list of dictionaries
+
+    Example:
+        >>> concate([{'a': [1], 'b': [2]}, {'a': [2], 'b': [3]}])
+        >>> # get {'a': [[1], [2]], 'b': [[2], [3]]}
+
+    """
+    if len(dicts) == 0:
+        return {}
+    else:
+        keys = dicts[0].keys()
+        out_dict = {}
+        for key in keys:
+            out_dict[key] = np.array([d[key] for d in dicts])
+        return out_dict
+
+
 def compose(*functions):
     """Compose list of functions.
 

@@ -55,7 +55,7 @@ for y0 in tqdm(y0_range):
     for y1 in y1_range:
         env.set_init_state(y0, y1)
         actions = optimizer(env.state, weights=weights)
-        traj, cost, info = runner(env.state, actions)
+        traj, cost, info = runner(env.state, actions, weights=weights)
 
         list_trajs.append(traj)
         list_costs.apoend(cost)

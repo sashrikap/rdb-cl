@@ -1,7 +1,8 @@
 from jax import random
 from numpyro.handlers import scale, condition, seed
 from numpyro.infer import MCMC, NUTS
-from tqdm.notebook import tqdm, trange
+from tqdm.auto import tqdm, trange
+import copy
 import numpyro
 import numpyro.distributions as dist
 import jax.numpy as np
@@ -18,9 +19,6 @@ Includes:
 
 Used for:
     * Inverse Reward Design
-
-References:
-    * Intro to Bayesisan stats: https://www.youtube.com/watch?v=OTO1DygELpY
 
 Credits:
     * Jerry Z. He 2019
@@ -104,6 +102,14 @@ class MetropolisHasting(Inference):
     def _mh_step(self, obs, state, log_prob, *args, **kwargs):
         next_state = self._proposal(state)
         next_log_prob = self._model(obs, next_state, **kwargs)
+        """next_state2 = copy.deepcopy(next_state)
+        next_state2["dist_lanes"] *= 10
+        next_log_prob2 = self._model(obs, next_state2, **kwargs)
+        next_state3 = copy.deepcopy(next_state2)
+        next_state3["dist_lanes"] *= 10
+        next_log_prob3 = self._model(obs, next_state3, **kwargs)
+        print(f"lp1. {log_prob} lp 10. {next_log_prob2} lp 100. {next_log_prob3}")
+        import pdb; pdb.set_trace()"""
         log_ratio = next_log_prob - log_prob
         accept = self._coin_flip() < np.exp(log_ratio)
         if not accept:
@@ -138,10 +144,10 @@ class MetropolisHasting(Inference):
 
         log_prob = self._model(obs, state, **kwargs)
         range_ = range(self._num_warmups)
-        if verbose:
-            range_ = trange(self._num_warmups, desc="MH Warmup")
+        # if verbose:
+        #    range_ = trange(self._num_warmups, desc="MH Warmup")
         for i in range_:
-            _, state, log_prob = self._mh_step(obs, state, log_prob, **kwargs)
+            _, state, log_prob = self._mh_step(obs, state, log_prob, *args, **kwargs)
 
         samples = []
         accepts = []
@@ -160,8 +166,8 @@ class MetropolisHasting(Inference):
             if verbose:
                 range_.set_description(f"MH Sampling; Accept {100 * ratio:.1f}%")
             samples.append(state)
-        if verbose:
-            print(f"Acceptance ratio {ratio:.3f}")
+        # if verbose:
+        #    print(f"Acceptance ratio {ratio:.3f}")
         self._init_state = None
         return samples
 

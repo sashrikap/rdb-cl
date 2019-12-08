@@ -56,9 +56,9 @@ for y0 in tqdm(y0_range):
         state[y0_idx] = y0
         state[y1_idx] = y1
         actions1 = optimizer(state, weights=weights1)
-        traj1, cost1, info1 = runner(state, actions1)
+        traj1, cost1, info1 = runner(state, actions1, weights=weights1)
         actions2 = optimizer(state, weights=weights2)
-        traj2, cost2, info2 = runner(state, actions2)
+        traj2, cost2, info2 = runner(state, actions2, weights=weights2)
 
         trajs1.append(traj1)
         trajs2.append(traj2)

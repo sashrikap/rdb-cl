@@ -26,7 +26,7 @@ y1_idx = 5
 
 
 actions = optimizer(env.state)
-traj, cost, info = runner(env.state, actions)
+traj, cost, info = runner(env.state, actions, weights=main_car.cost_weights)
 y0_y1_pairs = [(0.4, -0.2), (-0.5, 0.05), (0.5, 0.0)]
 
 best_rews = []
@@ -38,7 +38,7 @@ for (y0, y1) in y0_y1_pairs:
     state[y0_idx] = y0
     state[y1_idx] = y1
     actions = optimizer(state)
-    traj, cost, info = runner(state, actions)
+    traj, cost, info = runner(state, actions, weights=main_car.cost_weights)
     rew = -1.0 * cost
     best_rews.append(rew)
     best_rews_std.append(np.std(info["costs"]))

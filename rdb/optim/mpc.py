@@ -1,22 +1,29 @@
+"""Model Predictive Controllers.
+
+Includes:
+    * Shooting method optimizer
+
+Optional TODO:
+    * Bounded control in l-bfgs(bounds={}) or SOCP
+    * Differentiating environment
+    * CEM-Method
+
+"""
+
 import jax
 from scipy.optimize import fmin_l_bfgs_b
 from functools import partial
 from rdb.optim.runner import Runner
+from rdb.optim.utils import *
 import jax.numpy as np
 import jax.random as random
 import numpy as onp
 
-"""
-Model Predictive Controllers
-
-Includes:
-[1] Shooting method optimizer
-TODO:
-[0] Bounded control in l-bfgs(bounds={}) or SOCP
-[1] Differentiating environment
-[2] CEM-Method
-"""
 key = random.PRNGKey(0)
+
+"""
+Utility functions for rollout
+"""
 
 
 def concate_xu(x, u):
@@ -33,6 +40,89 @@ def divide_xu(xu, udim):
 def to_numpy(arr):
     """ f(x) = onp.array(x) """
     return onp.array(arr).astype(onp.float64)
+
+
+"""
+Rollout functions
+"""
+
+
+def f_forward(xu, f_dyn, udim, dt, length):
+    """Forward `length` steps.
+
+    Args:
+        xu (ndarray): concatenate([x, us])
+        f_dyn (fn): one step forward function, `x_next = f_dyn(x, u)`
+        udim (int): action dimension
+        length (int): trajectory length
+
+    """
+    x, u = divide_xu(xu, udim * length)
+    xs = []
+    u = u.reshape(length, udim)
+    for t in range(length):
+        next_x = x + f_dyn(x, u[t]) * dt
+        xs.append(next_x)
+        x = next_x
+    xs.append(x)
+    return np.array(xs)
+
+
+def f_features(xu, f_forward, f_feat, udim, length):
+    """Collect trajectory features
+
+    Args:
+        xu (ndarray): concatenate([x, us])
+        f_forward (fn): full-trajectory forward function, `x_next = f_dyn(x, u)`
+        f_feat (fn): one step feature function `feats = f_feat(x, u)`
+        udim (int): action dimension
+        length (int): trajectory length
+
+    Note:
+        * IMPORTANT: f_forward is jitted with `length, udim, dt` arguments
+
+    Output:
+        feats (dict): `feat_key[dist_car] = array(T, feat_dim)`
+
+    """
+
+    xs = f_forward(xu)
+    x, u = divide_xu(xu, udim * length)
+    u = u.reshape(length, udim)
+    feats = []
+    for t in range(length):
+        feat_t = f_feat(xs[t], u[t])
+        feats.append(feat_t)
+    return concate_dict_by_keys(feats)
+
+
+def f_costs_xu(xu, weights, f_forward, f_cost, udim, length):
+    """Compute cost given start state & actions.
+
+    Args:
+        xu (ndarray): `concatenate([x, us])`
+        f_forward (fn): full trajectory forward function, `f_forward(xu, length)`
+        f_cost (fn): one step cost function, `f_cost(x, u, weights)`
+        udim (int): action dimension
+        length (int): number of timesteps
+
+    Note:
+        * IMPORTANT: f_forward is jitted with `length, udim, dt` arguments
+
+    """
+    if weights is None:
+        # Pre-specified weights
+        f_cost_ = f_cost
+    else:
+        # Runime cost function weights
+        f_cost_ = partial(f_cost, weights=weights)
+    costs = np.array([])
+    xs = f_forward(xu)
+    _, u = divide_xu(xu, udim * length)
+    u = u.reshape(length, udim)
+    for t in range(length):
+        costs = np.append(costs, f_cost_(xs[t], u[t]))
+    return costs
 
 
 # Optimize
@@ -129,7 +219,7 @@ class Optimizer(object):
                 opt_u.append(opt_u_t[0])
                 xs_t = self.h_traj_u(x_t, opt_u_t)
                 du.append(info_t["grad"][0])
-                # Forward 1 timestep, record 1st action
+                ## Forward 1 timestep, record 1st action
                 x_t = xs_t[1]
                 u0 = opt_u_t
             xs.append(x_t)
@@ -186,79 +276,65 @@ def shooting_optimizer(env, f_cost, udim, horizon, dt, replan=True, T=None):
         >> t_costs_xu: full T cost function, per timestep
                      `array(T,) = h_cost_xu(xu)`
         >> h_cost_u: full horizon cost function, total
-                   `cost = h_cost_u(x0, u, weights)`
+                   `cost = h_cost_u(x0, us, weights)`
         >> t_cost_u: full T cost function, total
-                   `cost = h_cost_u(x0, u, weights)`
+                   `cost = h_cost_u(x0, us, weights)`
         >> h_grad_u: d(full horizon cost)/du,
-                   `grad = h_grad_u(x0, u, weights)`
+                   `grad = h_grad_u(x0, us, weights)`
 
     """
 
-    # Forward dynamics
+    ## Forward dynamics
     f_dyn = env.dynamics_fn
+    f_feat = env.features_fn
+
     if T is None:
         T = horizon
 
-    def f_forward(xu, length):
-        """Forward `length` steps. """
-        x, u = divide_xu(xu, udim * length)
-        xs = [x]
-        u = u.reshape(length, udim)
-        for t in range(length):
-            next_x = x + f_dyn(x, u[t]) * dt
-            xs.append(next_x)
-            x = next_x
-        return np.array(xs)
-
-    def f_costs_xu(xu, weights, length):
-        """Compute cost given start state & actions.
-
-        Args:
-            xu (ndarray): concatenate([x, u])
-
-        """
-        if weights is None:
-            # Pre-specified weights
-            f_cost_ = f_cost
-        else:
-            # Runime cost function weights
-            f_cost_ = partial(f_cost, weights=weights)
-        costs = np.array([])
-        xs = f_forward(xu, length)
-        _, u = divide_xu(xu, udim * length)
-        u = u.reshape(length, udim)
-        for t in range(length):
-            costs = np.append(costs, f_cost_(xs[t], u[t]))
-        return costs
-
-    h_forward = jax.jit(partial(f_forward, length=horizon))
-    h_costs_xu = jax.jit(partial(f_costs_xu, length=horizon))
+    h_forward = jax.jit(
+        partial(f_forward, f_dyn=f_dyn, udim=udim, dt=dt, length=horizon)
+    )
+    h_costs_xu = jax.jit(
+        partial(
+            f_costs_xu, f_forward=h_forward, f_cost=f_cost, udim=udim, length=horizon
+        )
+    )
     if T == horizon:
         # Avoid repeated jit
         t_forward = h_forward
         t_costs_xu = h_costs_xu
     else:
-        t_forward = jax.jit(partial(f_forward, length=T))
-        t_costs_xu = jax.jit(partial(f_costs_xu, length=T))
-
-    h_cost_xu = jax.jit(lambda *args: np.sum(h_costs_xu(*args)))
-    h_grad_xu = jax.jit(jax.grad(h_cost_xu))
-    t_cost_xu = jax.jit(lambda *args: np.sum(t_costs_xu(*args)))
+        t_forward = jax.jit(partial(f_forward, f_dyn=f_dyn, udim=udim, dt=dt, length=T))
+        t_costs_xu = jax.jit(
+            partial(f_costs_xu, f_forward=t_forward, f_cost=f_cost, udim=udim, length=T)
+        )
 
     """Forward/cost/grad functions for Horizon, used in optimizer"""
-    h_traj_u = lambda x0, u: to_numpy(h_forward(concate_xu(x0, u)))
-    h_grad_u = lambda x0, u, weights: to_numpy(h_grad_xu(concate_xu(x0, u), weights))[
+    h_cost_xu = jax.jit(lambda *args: np.sum(h_costs_xu(*args)))
+    h_grad_xu = jax.jit(jax.grad(h_cost_xu))
+    h_traj_u = lambda x0, us: to_numpy(h_forward(concate_xu(x0, us)))
+    h_grad_u = lambda x0, us, weights: to_numpy(h_grad_xu(concate_xu(x0, us), weights))[
         -udim * horizon :
     ]
-    h_cost_u = lambda x0, u, weights: float(h_cost_xu(concate_xu(x0, u), weights))
-    h_costs_u = lambda x0, u, weights: np.array(h_costs_xu(concate_xu(x0, u), weights))
+    h_cost_u = lambda x0, us, weights: float(h_cost_xu(concate_xu(x0, us), weights))
+    h_costs_u = lambda x0, us, weights: np.array(
+        h_costs_xu(concate_xu(x0, us), weights)
+    )
 
     """Forward/cost functions for T, used in runner"""
-    t_traj_u = lambda x0, u: to_numpy(t_forward(concate_xu(x0, u)))
-    t_cost_u = lambda x0, u, weights: float(t_cost_xu(concate_xu(x0, u), weights))
-    t_costs_u = lambda x0, u, weights: np.array(t_costs_xu(concate_xu(x0, u), weights))
+    t_traj_u = lambda x0, us: to_numpy(t_forward(concate_xu(x0, us)))
+    t_cost_xu = jax.jit(lambda *args: np.sum(t_costs_xu(*args)))
+    t_cost_u = lambda x0, us, weights: float(t_cost_xu(concate_xu(x0, us), weights))
+    t_costs_u = lambda x0, us, weights: np.array(
+        t_costs_xu(concate_xu(x0, us), weights)
+    )
+    t_feat_u = lambda x0, us: f_features(
+        concate_xu(x0, us), f_forward=t_forward, f_feat=f_feat, udim=udim, length=T
+    )
 
     optimizer = Optimizer(h_traj_u, h_grad_u, h_cost_u, udim, horizon, replan, T)
-    runner = Runner(env, dynamics_fn=t_traj_u, cost_runtime=t_costs_u)
+    runner = Runner(
+        env, dynamics_fn=t_traj_u, cost_runtime=t_costs_u, features_fn=t_feat_u
+    )
 
     return optimizer, runner

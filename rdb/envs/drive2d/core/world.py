@@ -1,5 +1,6 @@
 import abc
 import gym
+import jax
 import jax.numpy as np
 import numpy as onp
 from pathlib import Path
@@ -76,6 +77,7 @@ class DriveWorld(gym.Env):
         self.xdim = onp.prod(self.state.shape)
         self._dynamics_fn, self._indices = self.get_dynamics_fn()
         self._features_dict, self._features_fn = self.get_features_fn()
+        self._compile()
 
     @property
     def subframes(self):
@@ -105,6 +107,13 @@ class DriveWorld(gym.Env):
             car.state = state[last_idx : last_idx + len(car.state)]
             last_idx += len(car.state)
 
+    def set_init_state(self, state):
+        cars = self._cars + [self.main_car]
+        last_idx = 0
+        for car in cars:
+            car.init_state = state[last_idx : last_idx + len(car.state)]
+            last_idx += len(car.state)
+
     @property
     def features_dict(self):
         return self._features_dict
@@ -124,6 +133,10 @@ class DriveWorld(gym.Env):
     @property
     def main_car(self):
         return self._main_car
+
+    def _compile(self):
+        self._dynamics_fn = jax.jit(self._dynamics_fn)
+        self._features_fn = jax.jit(self._features_fn)
 
     def get_dynamics_fn(self):
         """Build Dict(key: dynamics_fn) mapping.
@@ -218,7 +231,13 @@ class DriveWorld(gym.Env):
     def get_features_fn(self):
         raw_feats_dict = self.get_raw_features_dict()
         nlr_feats_dict = self.get_nonlinear_features_dict(raw_feats_dict)
+        # Pre-compile individual feature functions, for speed up
+        for key, fn in nlr_feats_dict.items():
+            nlr_feats_dict[key] = jax.jit(fn)
+
+        # One-input-multi-output
         merged_feats_fn = merge_dict_funcs(nlr_feats_dict)
+
         return nlr_feats_dict, merged_feats_fn
 
     def get_nonlinear_features_dict(self, feats_dict):
