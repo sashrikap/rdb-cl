@@ -56,6 +56,10 @@ class EntranceDriveWorld(DriveWorld):
     def fences(self):
         return self._fences
 
+    @property
+    def lane_width(self):
+        return self._lane_width
+
     def build_lanes(self, lane_width):
         min_shift = -(self.NUM_LANES - 1) / 2.0
         max_shift = (self.NUM_LANES - 1) / 2.0 + 0.001

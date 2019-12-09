@@ -83,11 +83,12 @@ class DriveWorld(gym.Env):
         self._heat_fn = None
 
         self.xdim = onp.prod(self.state.shape)
-        self._dynamics_fn, self._indices = self.get_dynamics_fn()
+        self._dynamics_fn, self._indices = self._get_dynamics_fn()
         self._raw_features_dict, self._features_dict, self._features_fn = (
-            self.get_features_fn()
+            self._get_features_fn()
         )
         self._compile()
+        self._constraints_dict, self._constraints_fn = self._get_constraints_fn()
 
     @property
     def subframes(self):
@@ -135,6 +136,14 @@ class DriveWorld(gym.Env):
         return self._features_fn
 
     @property
+    def constraints_fn(self):
+        return self._constraints_fn
+
+    @property
+    def constraints_dict(self):
+        return self._constraints_dict
+
+    @property
     def raw_features_dict(self):
         return self._raw_features_dict
 
@@ -162,11 +171,19 @@ class DriveWorld(gym.Env):
     def car_length(self):
         return self._car_length
 
+    @property
+    def features_keys(self):
+        return ["dist_cars", "dist_lanes", "speed", "control"]
+
+    @property
+    def constraints_keys(self):
+        return ["collision", "overspeed", "underspeed", "uncomfortable"]
+
     def _compile(self):
         self._dynamics_fn = jax.jit(self._dynamics_fn)
         self._features_fn = jax.jit(self._features_fn)
 
-    def get_dynamics_fn(self):
+    def _get_dynamics_fn(self):
         """Build Dict(key: dynamics_fn) mapping.
 
         Example:
@@ -194,7 +211,7 @@ class DriveWorld(gym.Env):
         dynamics_fn = concat_funcs(fns.values())
         return dynamics_fn, indices
 
-    def get_raw_features_dict(self):
+    def _get_raw_features_dict(self):
         """Build Dict(key: feature_fn) mapping.
 
         Example:
@@ -253,12 +270,9 @@ class DriveWorld(gym.Env):
         feats_dict["control"] = control_fn
         return feats_dict
 
-    def get_features_keys(self):
-        return ["dist_cars", "dist_lanes", "speed", "control"]
-
-    def get_features_fn(self):
-        raw_feats_dict = self.get_raw_features_dict()
-        nlr_feats_dict = self.get_nonlinear_features_dict(raw_feats_dict)
+    def _get_features_fn(self):
+        raw_feats_dict = self._get_raw_features_dict()
+        nlr_feats_dict = self._get_nonlinear_features_dict(raw_feats_dict)
         # Pre-compile individual feature functions, for speed up
         for key, fn in nlr_feats_dict.items():
             nlr_feats_dict[key] = jax.jit(fn)
@@ -268,7 +282,10 @@ class DriveWorld(gym.Env):
 
         return raw_feats_dict, nlr_feats_dict, merged_feats_fn
 
-    def get_nonlinear_features_dict(self, feats_dict):
+    def _get_nonlinear_features_dict(self, feats_dict):
+        raise NotImplementedError
+
+    def _get_constraints_fn(self):
         raise NotImplementedError
 
     def reset(self):

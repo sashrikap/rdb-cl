@@ -49,16 +49,40 @@ class Runner(object):
         return self._env
 
     def _collect_features(self, x0, actions):
-        """
-        Return
-        : feats     : dict(key, [f_t0, f_t1, ..., f_tn]), time series
-        : feats_sum : dict(key, sum([f_t0, f_t1, ..., f_tn])), sum
+        """Collect features from trajectory.
+
+        Args:
+            x0 (ndarray): initial state
+            actions (ndarray): (T, udim), list of actions
+
+        Return:
+            feats (dict): feats['dist_lanes'] = (T, feat_dims)
+            feats_sum (dict): feats_sum['dist_lanes'] = (T, 1)
+
         """
         feats = self._features_fn(x0, actions)
         feats_sum = OrderedDict(
             {key: np.sum(val, axis=0) for (key, val) in feats.items()}
         )
         return feats, feats_sum
+
+    def _collect_violations(self, xs, actions):
+        """Collect constraint violations from trajectory.
+
+        Args:
+            x0 (ndarray): (T, xdim), list of states
+            actions (ndarray): (T, udim), list of actions
+
+        Return:
+            violations (dict): feats['offtrack']
+
+        Keys:
+            `offtrack`, `collision`, `uncomfortable`, `overspeed`, `underspeed`,
+            `wronglane`
+
+        """
+        constraints_fn = self._env.constraints_fn
+        return constraints_fn(xs, actions)
 
     def collect_frames(self, actions, width=450, mode="rgb_array", text=""):
         self._env.reset()
@@ -115,4 +139,5 @@ class Runner(object):
         info["costs"] = self._cost_runtime(x0, actions, weights)
         cost = np.sum(info["costs"])
         info["feats"], info["feats_sum"] = self._collect_features(x0, actions)
+        info["violations"] = self._collect_violations(xs, actions)
         return np.array(xs), cost, info

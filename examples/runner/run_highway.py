@@ -39,32 +39,21 @@ if not DUMMY_ACTION:
 
     weights = {
         "dist_cars": 100.0,
-        "dist_lanes": 10.0,
+        "dist_lanes": 50.0,
         "dist_fences": 300.0,
         "speed": 20.0,
         "control": 80.0,
     }
-
-    """
-    N = 20
-    t1 = time.time()
-    for _ in range(N):
-        actions = optimizer(env.state, weights=weights)
-    print(f"Replan {N} times {time.time() - t1}")
-
-    optimizer._replan = False
-    t1 = time.time()
-    for _ in range(N):
-        actions = optimizer(env.state, weights=weights)
-    print(f"No Replan {N} times {time.time() - t1}")
-    import pdb; pdb.set_trace()
-    """
     actions = optimizer(env.state, weights=weights)
     traj, cost, info = runner(env.state, actions, weights=weights)
     print(f"Total cost {cost}")
+    violations = info["violations"]
+    for k, v in violations.items():
+        print(f"Violations {k}: {v.sum()}")
 else:
     actions = np.zeros((T, udim))
 
+env.reset()
 env.render("human", draw_heat=DRAW_HEAT)
 
 for t in range(T):

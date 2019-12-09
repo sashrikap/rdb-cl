@@ -44,7 +44,7 @@ class HighwayDriveWorld_Week5(HighwayDriveWorld):
         self.cars[0].init_state = jax.ops.index_update(self.cars[0].init_state, 1, y0)
         self.cars[1].init_state = jax.ops.index_update(self.cars[1].init_state, 1, y1)
 
-    def get_nonlinear_features_dict(self, feats_dict):
+    def _get_nonlinear_features_dict(self, feats_dict):
         """
         Params
         : feats_dict : dict of environment feature functions
@@ -86,6 +86,12 @@ class HighwayDriveWorld_Week5(HighwayDriveWorld):
 
         feats_dict = chain_funcs(nonlinear_dict, feats_dict)
         return feats_dict
+
+    def _get_constraints_fn(self):
+        constraints_dict = {}
+        constraints_fn = merge_dict_funcs(constraints_dict)
+
+        return constraints_dict, constraints_fn
 
 
 class Week5_01(HighwayDriveWorld_Week5):

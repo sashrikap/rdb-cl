@@ -2,6 +2,7 @@ import jax
 import jax.numpy as np
 from rdb.optim.utils import *
 from rdb.envs.drive2d.core.car import *
+from rdb.envs.drive2d.core.constraints import *
 from rdb.envs.drive2d.core.feature import *
 from rdb.envs.drive2d.worlds.driveway import *
 from functools import partial
@@ -33,7 +34,7 @@ class EntranceDriveWorld_Week4(EntranceDriveWorld):
         main_car = OptimalControlCar(self, weights, main_state, horizon)
         self.goal_speed = goal_speed
         self.goal_lane = goal_lane
-        self.control_bound = control_bound
+        self._control_bound = control_bound
         super().__init__(main_car, cars, driveway_dist=driveway_dist, dt=dt)
 
     def set_init_state(self, y0, y1):
@@ -42,7 +43,7 @@ class EntranceDriveWorld_Week4(EntranceDriveWorld):
         self.cars[0].init_state = jax.ops.index_update(self.cars[0].init_state, 1, y0)
         self.cars[1].init_state = jax.ops.index_update(self.cars[1].init_state, 1, y1)
 
-    def get_nonlinear_features_dict(self, feats_dict):
+    def _get_nonlinear_features_dict(self, feats_dict):
         """Given raw features dict, make nonlinear features.
 
         Args:
@@ -75,7 +76,7 @@ class EntranceDriveWorld_Week4(EntranceDriveWorld):
             neg_relu_feat,
             lambda dist: dist - (self._lane_width + self._car_length) / 2,
         )
-        bound = self.control_bound
+        bound = self._control_bound
         nonlinear_dict["control"] = compose(np.sum, quadratic_feat)
         nonlinear_dict["speed"] = compose(
             np.sum, partial(quadratic_feat, goal=self.goal_speed)
@@ -90,6 +91,21 @@ class EntranceDriveWorld_Week4(EntranceDriveWorld):
         feats_dict = chain_funcs(nonlinear_dict, feats_dict)
         return feats_dict
 
+    def _get_constraints_fn(self):
+        constraints_dict = {}
+
+        constraints_dict["offtrack"] = partial(is_offtrack, env=self)
+        constraints_dict["overspeed"] = partial(is_overspeed, env=self, max_speed=1.0)
+        constraints_dict["underspeed"] = partial(is_underspeed, env=self, min_speed=0.2)
+        constraints_dict["uncomfortable"] = partial(
+            is_uncomfortable, env=self, max_actions=self._control_bound
+        )
+        constraints_dict["wronglane"] = partial(is_wronglane, env=self, lane_idx=2)
+        constraints_dict["collision"] = partial(is_collision, env=self)
+        constraints_fn = merge_dict_funcs(constraints_dict)
+
+        return constraints_dict, constraints_fn
+
 
 class Week4_01(EntranceDriveWorld_Week4):
     def __init__(self):
@@ -99,7 +115,7 @@ class Week4_01(EntranceDriveWorld_Week4):
         goal_lane = 0
         horizon = 10
         dt = 0.25
-        control_bound = 0.5
+        control_bound = [0.5, 1.0]
         lane_width = 0.13
         main_state = np.array([lane_width / 2, 0, np.pi / 2, main_speed])
         driveway_dist = 0.8

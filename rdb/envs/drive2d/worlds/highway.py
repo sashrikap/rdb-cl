@@ -54,8 +54,8 @@ class HighwayDriveWorld(DriveWorld):
         fences = [lanes[0].shifted(-1), lanes[-1].shifted(1)]
         return fences
 
-    def get_raw_features_dict(self):
-        feats_dict = super().get_raw_features_dict()
+    def _get_raw_features_dict(self):
+        feats_dict = super()._get_raw_features_dict()
 
         fence_fns = [None] * len(self._fences)
         normals = np.array([[1.0, 0.0], [-1.0, 0.0]])
@@ -73,7 +73,13 @@ class HighwayDriveWorld(DriveWorld):
 
         return feats_dict
 
-    def get_features_keys(self):
-        keys = super().get_features_keys()
-        keys.append("dist_fences")
+    @property
+    def features_keys(self):
+        keys = super().features_keys
+        keys += ["dist_fences"]
         return keys
+
+    @property
+    def constraints_keys(self):
+        keys = super().constraints_keys
+        keys += ["offtrack", "wronglane"]
