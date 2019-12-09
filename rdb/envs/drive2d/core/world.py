@@ -1,3 +1,11 @@
+"""Generic driving world.
+
+TODO:
+    * All cars are assumed same size (width, length), and width/length are env features
+
+"""
+
+
 import abc
 import gym
 import jax
@@ -45,7 +53,7 @@ class DriveWorld(gym.Env):
         objects=[],
         subframes=3,
         car_length=0.1,
-        car_width=0.08,
+        car_width=0.075,
         speed_factor=100,
     ):
         self._main_car = main_car
@@ -76,7 +84,9 @@ class DriveWorld(gym.Env):
 
         self.xdim = onp.prod(self.state.shape)
         self._dynamics_fn, self._indices = self.get_dynamics_fn()
-        self._features_dict, self._features_fn = self.get_features_fn()
+        self._raw_features_dict, self._features_dict, self._features_fn = (
+            self.get_features_fn()
+        )
         self._compile()
 
     @property
@@ -116,11 +126,17 @@ class DriveWorld(gym.Env):
 
     @property
     def features_dict(self):
+        """Nonlinear features dict."""
         return self._features_dict
 
     @property
     def features_fn(self):
+        """Nonlinear features function."""
         return self._features_fn
+
+    @property
+    def raw_features_dict(self):
+        return self._raw_features_dict
 
     @property
     def dynamics_fn(self):
@@ -133,6 +149,18 @@ class DriveWorld(gym.Env):
     @property
     def main_car(self):
         return self._main_car
+
+    @property
+    def indices(self):
+        return self._indices
+
+    @property
+    def car_width(self):
+        return self._car_width
+
+    @property
+    def car_length(self):
+        return self._car_length
 
     def _compile(self):
         self._dynamics_fn = jax.jit(self._dynamics_fn)
@@ -238,7 +266,7 @@ class DriveWorld(gym.Env):
         # One-input-multi-output
         merged_feats_fn = merge_dict_funcs(nlr_feats_dict)
 
-        return nlr_feats_dict, merged_feats_fn
+        return raw_feats_dict, nlr_feats_dict, merged_feats_fn
 
     def get_nonlinear_features_dict(self, feats_dict):
         raise NotImplementedError
@@ -278,7 +306,6 @@ class DriveWorld(gym.Env):
                 width=int(WINDOW_W / 2), height=int(WINDOW_H / 2)
             )
         self._window.switch_to()
-        # if mode == "human":
         # Bring up window
         self._window.dispatch_events()
         self._window.clear()
