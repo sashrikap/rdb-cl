@@ -61,10 +61,10 @@ def f_forward(xu, f_dyn, udim, dt, length):
     xs = []
     u = u.reshape(length, udim)
     for t in range(length):
+        xs.append(x)
         next_x = x + f_dyn(x, u[t]) * dt
-        xs.append(next_x)
         x = next_x
-    xs.append(x)
+    # Omitting last x
     return np.array(xs)
 
 
@@ -211,7 +211,6 @@ class Optimizer(object):
             x_t = x0
             for t in range(self._T):
                 u0 = u0.flatten()
-                xs.append(x_t)
                 cost_u_x0 = lambda u: self.h_cost_u(x_t, u, weights)
                 grad_u_x0 = lambda u: self.h_grad_u(x_t, u, weights)
                 opt_u_t, cmin_t, info_t = fmin_l_bfgs_b(cost_u_x0, u0, grad_u_x0)
@@ -220,12 +219,10 @@ class Optimizer(object):
                 xs_t = self.h_traj_u(x_t, opt_u_t)
                 du.append(info_t["grad"][0])
                 ## Forward 1 timestep, record 1st action
+                xs.append(x_t)
                 x_t = xs_t[1]
                 u0 = opt_u_t
-            xs.append(x_t)
-            # cmin = self.h_cost_u(opt_u, x0, weights)
-            # u_info = {"du": du, "xs": xs}
-            # return opt_u, cmin, u_info
+            # Omitting last x
             return opt_u
         else:
             """No Replan.
@@ -247,7 +244,6 @@ class Optimizer(object):
                 "cost_fn": cost_u_x0,
                 "costs": costs,
             }
-            # return opt_u, cmin, u_info
             return opt_u
 
 

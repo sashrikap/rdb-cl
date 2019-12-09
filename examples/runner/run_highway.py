@@ -31,11 +31,9 @@ if not DUMMY_ACTION:
 
     y0_idx, y1_idx = 1, 5
     state = copy.deepcopy(env.state)
-    # state[y0_idx] = -0.4
-    # state[y1_idx] = 0.3
     state[y0_idx] = -0.4
     state[y1_idx] = -0.7
-    env.state = state
+    env.set_init_state(state)
 
     weights = {
         "dist_cars": 100.0,
