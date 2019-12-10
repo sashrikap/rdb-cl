@@ -1,7 +1,7 @@
 """Model Predictive Controllers.
 
 Includes:
-    * Shooting method optimizer
+    * Shooting method optimizer (open-loop)
 
 Optional TODO:
     * Bounded control in l-bfgs(bounds={}) or SOCP
@@ -10,11 +10,11 @@ Optional TODO:
 
 """
 
-import jax
 from scipy.optimize import fmin_l_bfgs_b
 from functools import partial
 from rdb.optim.runner import Runner
 from rdb.optim.utils import *
+import jax
 import jax.numpy as np
 import jax.random as random
 import numpy as onp
@@ -247,7 +247,7 @@ class Optimizer(object):
             return opt_u
 
 
-def shooting_optimizer(env, f_cost, udim, horizon, dt, replan=True, T=None):
+def shooting_method(env, f_cost, udim, horizon, dt, replan=True, T=None):
     """Create shooting optimizer.
 
     Args:

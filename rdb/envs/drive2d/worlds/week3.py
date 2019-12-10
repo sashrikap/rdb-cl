@@ -1,16 +1,21 @@
+"""
+One autonomous car is merging with two other fix speed cars
+"""
+
+
 import jax
 import jax.numpy as np
+import numpyro
+import numpyro.distributions as dist
+import itertools
 from rdb.optim.utils import *
 from rdb.envs.drive2d.core.car import *
 from rdb.envs.drive2d.core.feature import *
 from rdb.envs.drive2d.core.constraints import *
 from rdb.envs.drive2d.worlds.highway import HighwayDriveWorld
 from functools import partial
-
-"""
-Sample adversarial scenarios where one autonomous car is merging
-with two other fix speed cars
-"""
+from numpyro.handlers import seed
+from rdb.infer.utils import random_choice
 
 
 class HighwayDriveWorld_Week3(HighwayDriveWorld):
@@ -27,6 +32,9 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
         horizon=10,
         num_lanes=3,
         lane_width=0.13,
+        car1_range=[-0.8, 0.8],
+        car2_range=[-0.8, 0.8],
+        car_delta=0.1,
     ):
         cars = []
         for state, speed in zip(car_states, car_speeds):
@@ -36,14 +44,11 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
         self._goal_lane = goal_lane
         self._control_bound = control_bound
         super().__init__(main_car, cars, num_lanes=num_lanes, dt=dt)
-
-    '''def set_init_state(self, y0, y1):
-        """
-        Setting initial state
-        """
-        # y0_idx, y1_idx = 1, 5
-        self.cars[0].init_state = jax.ops.index_update(self.cars[0].init_state, 1, y0)
-        self.cars[1].init_state = jax.ops.index_update(self.cars[1].init_state, 1, y1)'''
+        # Define all tasks to sample from
+        self._car1_range = np.arange(car1_range[0], car1_range[1], car_delta)
+        self._car2_range = np.arange(car2_range[0], car2_range[1], car_delta)
+        self._all_tasks = list(itertools.product(self._car1_range, self._car2_range))
+        self._task_sampler = None
 
     def _get_nonlinear_features_dict(self, feats_dict):
         """
@@ -119,6 +124,13 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
         constraints_fn = merge_dict_funcs(constraints_dict)
 
         return constraints_dict, constraints_fn
+
+    def update_key(self, rng_key):
+        super().update_key(rng_key)
+        self._task_sampler = seed(random_choice, rng_seed=rng_key)
+
+    def sample_tasks(self, num_tasks):
+        return self._task_sampler(self._all_tasks, num_tasks)
 
 
 class Week3_01(HighwayDriveWorld_Week3):

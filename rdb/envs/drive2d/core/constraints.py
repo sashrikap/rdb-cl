@@ -1,7 +1,8 @@
-"""Define constraints that indicate traffic violations.
+"""Constraints that indicate traffic violations.
 
-Note that drive2d controller (rdb.optim.mpc.py) utilizes unconstrained optimization.
-These constraints are only used post-hoc to examine optimized results.
+Note:
+    * Drive2d controller (rdb.optim.mpc.py) utilizes unconstrained optimization.
+      These constraints are only used post-hoc to examine optimized results.
 
 Use Cases:
     * For evaluating different acquisition function in active IRD.
@@ -19,6 +20,13 @@ import jax.numpy as np
 
 def is_offtrack(states, actions, env):
     """Detects when car nudges the edge of the track.
+
+    Args:
+        states (ndarray): (T, xdim)
+        actions (ndarray): (T, udim)
+
+    Return:
+        * offtrack (ndarray): (T, ) boolean
 
     Note:
         * Needs to know car shape a-priori
@@ -38,6 +46,13 @@ def is_offtrack(states, actions, env):
 def is_collision(states, actions, env):
     """Detects when car nudges another car.
 
+    Args:
+        states (ndarray): (T, xdim)
+        actions (ndarray): (T, udim)
+
+    Return:
+        * collision (ndarray): (T, ) boolean
+
     Note:
         * Needs to know car shape a-priori
 
@@ -55,7 +70,16 @@ def is_collision(states, actions, env):
 
 
 def is_uncomfortable(states, actions, env, max_actions):
-    """Detects if actions exceed max actions"""
+    """Detects if actions exceed max actions.
+
+    Args:
+        states (ndarray): (T, xdim)
+        actions (ndarray): (T, udim)
+
+    Return:
+        * uncomfortable (ndarray): (T, ) boolean
+
+    """
     actions = make_batch(actions)
     return np.any(np.abs(actions) > max_actions, axis=1)
 
@@ -64,6 +88,13 @@ def is_uncomfortable(states, actions, env, max_actions):
 def is_overspeed(states, actions, env, max_speed):
     """Detects when car runs overspeed.
 
+    Args:
+        states (ndarray): (T, xdim)
+        actions (ndarray): (T, udim)
+
+    Return:
+        * overspeed (ndarray): (T, ) boolean
+
     """
     fn = env.raw_features_dict["speed"]
     feats = []
@@ -71,13 +102,20 @@ def is_overspeed(states, actions, env, max_speed):
     for s, a in zip(states, actions):
         feats.append(fn(s, a))
     feats = np.array(feats)
-    return feats > max_speed
+    return np.any(feats > max_speed, axis=1)
 
 
 # @jax.jit
 def is_underspeed(states, actions, env, min_speed):
     """Detects when car runs underspeed.
 
+    Args:
+        states (ndarray): (T, xdim)
+        actions (ndarray): (T, udim)
+
+    Return:
+        * underspeed (ndarray): (T, ) boolean
+
     """
     fn = env.raw_features_dict["speed"]
     feats = []
@@ -85,7 +123,7 @@ def is_underspeed(states, actions, env, min_speed):
     for s, a in zip(states, actions):
         feats.append(fn(s, a))
     feats = np.array(feats)
-    return feats < min_speed
+    return np.any(feats < min_speed, axis=1)
 
 
 # @jax.jit
@@ -96,7 +134,12 @@ def is_wronglane(states, actions, env, lane_idx):
         * Needs to know lane shapes a-priori
 
     Args:
+        states (ndarray): (T, xdim)
+        actions (ndarray): (T, udim)
         lane_idx (tuple): wrong lane's index for `env.lanes[idx]`
+
+    Return:
+        * wronglane (ndarray): (T, ) boolean
 
     """
     fn = env.raw_features_dict["dist_lanes"]

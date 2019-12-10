@@ -145,6 +145,12 @@ class OptimalControlCar(Car):
         return cost_fn, cost_runtime
 
     def control(self, u, dt):
+        assert (
+            self._features_fn is not None
+            and self._cost_fn is not None
+            and self._cost_runtime is not None
+        ), "Need to initialize car by `env.reset()`"
+
         diff = self.dynamics_fn(self._state, u)
         self._state += self.dynamics_fn(self._state, u) * dt
 

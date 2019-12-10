@@ -2,7 +2,7 @@ import gym
 import time, copy
 import jax.numpy as np
 import rdb.envs.drive2d
-from rdb.optim.open import shooting_optimizer
+from rdb.optim.open import shooting_method
 from rdb.visualize.render import render_env
 
 REPLAN = True
@@ -13,7 +13,7 @@ udim = 2
 horizon = 10
 state = copy.deepcopy(env.state)
 
-optimizer, runner = shooting_optimizer(
+optimizer, runner = shooting_method(
     env, main_car.cost_fn, udim, horizon, env.dt, replan=REPLAN
 )
 

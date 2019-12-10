@@ -3,45 +3,45 @@
 Includes:
     [1] Pyro Implementation
     [2] Custon Implementation
-Todo:
+Note:
+    * We use `init_state/task` interchangably. In drive2d
+     `env.set_task(init_state)` specifies a task to run.
+
 """
 
 import numpyro
 import jax
-from numpyro.util import control_flow_prims_disabled, fori_loop, optional
 from numpyro.handlers import scale, condition, seed
 from rdb.infer.algos import *
 from rdb.optim.utils import concate_dict_by_keys
-from rdb.infer.utils import logsumexp
+from rdb.infer.utils import logsumexp, collect_features
 from tqdm.auto import tqdm, trange
-from scipy.stats import gaussian_kde
 from time import time
 
 
 class PGM(object):
     """Generic Probabilisitc Graphical Model Class.
 
-    Attributes:
+    Methods:
         likelihood (fn): p(obs | theta) p(theta)
 
     """
 
-    def __init__(self, rng_key, kernel):
+    def __init__(self, rng_key, kernel, sample_method, sample_args):
         # self._kernel = seed(kernel, rng_key)
         self._kernel = kernel
         self._rng_key = rng_key
+        self._sampler = self._build_sampler(sample_method, sample_args)
 
     def update_key(self, rng_key):
         self._rng_key = rng_key
+        self._sampler.update_key(rng_key)
 
-    def __call__(self, *args, **kwargs):
-        """Likelihood method.
-
-        Examples:
-            >>> log_prob = self.likelihood(obs, *args)
-
-        """
-        return self._kernel(*args, **kwargs)
+    def _build_sampler(self, sample_method, sample_args):
+        if sample_method == "mh":
+            return MetropolisHasting(self._rng_key, self._kernel, **sample_args)
+        else:
+            raise NotImplementedError
 
 
 class IRDOptimalControl(PGM):
@@ -51,12 +51,25 @@ class IRDOptimalControl(PGM):
     infer p(w* | w).
 
     Notes:
-        * Bayesian Terminology: theta -> true weights, obs -> proxy weights
+        * Bayesian Terminology: theta -> true w, obs -> proxy w
+        * Provides caching functions to avoid costly feature calcultions
+
+    Args:
+        controller (fn): controller function,
+            `actions = controller(task, w)`
+        runner (fn): runner function,
+            `traj, cost, info = runner(task, actions)`
+        beta (float): temperature param
+            `p ~ exp(beta * reward)`
+        prior_log_prob (fn): log probability of prior
+        normalizer_fn (fn): sample fixed number of normalizers
 
     Methods:
-        update : user select w
-        infer : infer p(w* | obs)
-        infogain : information gain (-entropy) in p(w* | obs)
+        sample (fn): sample b(w) given obs_w
+        get_samples (fn): get sample features on new task
+        update (fn): incorporate user's obs_w
+            next likelihood `p(w | obs_w1) p(w | obs_w2)...`
+        infer (fn): infer p`(w* | obs)`
 
     Example:
         >>> ird_oc = IRDOptimalControl(driving_env, runner, beta, prior_fn)
@@ -64,126 +77,169 @@ class IRDOptimalControl(PGM):
 
     """
 
-    def __init__(self, rng_key, env, controller, runner, beta, prior_log_prob):
-        """Construct IRD For optimal control.
-
-        Args:
-            controller: controller function, `actions = controller(state, weights)`
-            runner: runner function, `traj, cost, info = runner(state, actions)`
-            beta: temperature param: p ~ exp(beta * reward)
-
-        """
+    def __init__(
+        self,
+        rng_key,
+        env,
+        controller,
+        runner,
+        beta,
+        prior_log_prob,
+        normalizer_fn,
+        sample_method="mh",
+        sample_args={},
+    ):
         self._rng_key = rng_key
         self._controller = controller
         self._runner = runner
         self._env = env
         self._beta = beta
-        self._prior_log_prob = seed(prior_log_prob, rng_key)
-        self._normalizing_samples = {}
-        self._best_actions = {}
-        self._best_feats = {}
+        self._prior_log_prob = prior_log_prob
+        self._normalizer_fn = normalizer_fn
+        ## Caching normalizers, samples and features
+        self._norm_sample_weights = {}
+        self._norm_sample_feats = {}
+        self._sample_weights = {}
+        self._sample_feats = {}
+        self._user_actions = {}
+        self._user_feats = {}
         kernel = self._build_kernel(beta)
-        super().__init__(rng_key, kernel)
-
-    # def update(self, w_select):
-    #    pass
-
-    # def infer(self):
-    #    pass
-
-    # def infogain(self, env):
-    #    pass
-
-    def initialize(self, init_state, state_name, normalizer_weights):
-        if state_name not in self._normalizing_samples.keys():
-            self._normalizing_samples[state_name] = self._build_samples(
-                init_state, normalizer_weights
-            )
+        super().__init__(rng_key, kernel, sample_method, sample_args)
 
     def update_key(self, rng_key):
-        self._rng_key = rng_key
+        """ Update random key """
+        super().update_key(rng_key)
         self._prior_log_prob = seed(self._prior_log_prob, rng_key)
+        self._normalizer_fn = seed(self._normalizer_fn, rng_key)
 
-    def _build_samples(self, init_state, normalizer_weights):
-        sample_feats = []
-        for normalizer_w in tqdm(
-            normalizer_weights, desc="Collecting Normalizer Samples"
-        ):
-            actions = self._controller(init_state, weights=normalizer_w)
-            xs, sample_cost, info = self._runner(
-                init_state, actions, weights=normalizer_w
+    def get_samples(self, task, task_name):
+        """Sample features for belief weights on a task
+        """
+        assert task_name in self._sample_weights.keys(), f"{task_name} not found"
+        weights = self._sample_weights[task_name]
+
+        # Cache features
+        if task_name not in self.c.keys():
+            self._cache_samples(task, task_name)
+        feats = self._sample_feats[task_name]
+        return weights, feats
+
+    def update(self, obs):
+        """ Incorporate new observation """
+        pass
+
+    def sample(self, task, task_name, obs_w, verbose=True):
+        # Cache normalizer samples
+        self._cache_normalizer(task, task_name)
+        self._cache_user_feats(task, task_name, obs_w)
+
+        # Cache user actions
+        if task_name in self._sample_weights.keys():
+            norm_feats = self._norm_sample_feats[task_name]
+            user_feats = self._user_feats[task_name]
+            sample_ws = self._sampler.sample(
+                obs, norm_sample_feats=norm_feats, user_feats=user_feats
             )
-            sample_feats.append(info["feats"])
-        sample_feats = concate_dict_by_keys(sample_feats)
-        return sample_feats
+            self._sample_weights[task_name] = sample_ws
+        else:
+            sample_ws = self._sample_weights[task_name]
+
+        return sample_ws
+
+    def _cache_user_feats(self, task, task_name, user_w):
+        """For new observation, cache optimal features."""
+        if task_name in self._user_feats.keys():
+            return
+
+        actions = self._controller(task, weights=user_w)
+        _, _, info = self._runner(task, actions, weights=user_w)
+        feats = info["feats"]
+        self._user_actions[task_name] = actions
+        self._user_feats[task_name] = feats
+
+    def _cache_samples(self, task, task_name):
+        """For new tasks, see how previous samples do.
+        """
+        assert (
+            task_name in self._sample_weights.keys()
+        ), f"{task_name} weight samples missing"
+        sample_ws = self._sample_weights[task_name]
+        sample_feats = collect_features(
+            sample_ws,
+            task,
+            self._controller,
+            self._runner,
+            desc="Collecting Features for Belief Samples",
+        )
+        self._sample_feats[task_name] = sample_feats
+
+    def _cache_normalizer(self, task, task_name):
+        """For new tasks, need to build normalizer.
+
+        Normalizer cached in `self._norm_sample_weights` and
+        `self._norm_sample_feats`
+
+        """
+        if task_name in self._norm_sample_weights.keys():
+            return
+
+        norm_ws = self._normalizer_fn()
+        norm_feats = collect_features(
+            norm_ws,
+            task,
+            self._controller,
+            self._runner,
+            desc="Collecting Normalizer Samples",
+        )
+        norm_feats = concate_dict_by_keys(norm_feats)
+        self._norm_sample_weights[task_name] = norm_ws
+        self._norm_sample_feats[task_name] = norm_feats
 
     def _build_kernel(self, beta):
         """Likelihood for Optimal Control.
 
         Args:
-            prior_weights (dict): sampled from prior
-            user_weights (dict): user-specified reward weights
-            init_states (array): environment init state
-            normalizing_samples(array): samples used to normalize likelihood in
+            prior_w (dict): sampled from prior
+            user_w (dict): user-specified reward weight
+            tasks (array): environment init state
+            norm_sample_feats(array): samples used to normalize likelihood in
                 inverse reward design problem. Sampled before running `pgm.sample`.
 
         Example:
-            >>> log_prob = likelihood_fn(weight, init_state)
+            >>> log_prob = likelihood_fn(weight, task)
 
         """
 
         @jax.jit
-        def _likelihood(sample_weights, normalizing_samples, feats):
-            """IRD Likelihood p(w_obs | w) with JAX speed up."""
-            sample_cost = np.sum(
-                [feats[key] * sample_weights[key] for key in feats.keys()]
-            )
+        def _likelihood(sample_w, norm_sample_feats, feats):
+            """IRD likelihood backbone with JAX speed up.
+
+            Runs `p(w_obs | w)`
+
+            """
+            sample_cost = np.sum([feats[key] * sample_w[key] for key in feats.keys()])
             sample_rew = -1 * sample_cost
 
             normalizing_rews = []
-            for key in normalizing_samples.keys():
+            for key in norm_sample_feats.keys():
                 # sum over episode
-                w = sample_weights[key]
-                rew = -1 * np.sum(w * normalizing_samples[key], axis=1)
+                w = sample_w[key]
+                rew = -1 * np.sum(w * norm_sample_feats[key], axis=1)
                 normalizing_rews.append(rew)
 
             ## Normalizing constant
-            num_samples = len(normalizing_samples)
-            # (n_samples, )
-            log_norm_rew = logsumexp(np.sum(normalizing_rews, axis=0))
-            log_norm_rew -= np.log(num_samples)
+            N = len(norm_sample_feats)
+            log_norm_rew = -np.log(N) + logsumexp(np.sum(normalizing_rews, axis=0))
 
             log_prob = beta * (sample_rew - log_norm_rew)
             return log_prob
 
-        def likelihood_fn(user_weights, sample_weights, state_name, init_state):
-            assert (
-                state_name in self._normalizing_samples.keys()
-            ), "IRD model not initialized"
-            normalizing_samples = self._normalizing_samples[state_name]
-            if state_name in self._best_actions.keys():
-                actions = self._best_actions[state_name]
-                feats = self._best_feats[state_name]
-            else:
-                actions = self._controller(init_state, weights=user_weights)
-                xs, sample_cost, info = self._runner(
-                    init_state, actions, weights=sample_weights
-                )
-                feats = info["feats"]
-                self._best_actions[state_name] = actions
-                self._best_feats[state_name] = feats
-            log_prob = _likelihood(sample_weights, normalizing_samples, feats)
-            log_prob += self._prior_log_prob(sample_weights)
+        def likelihood_fn(user_w, sample_w, norm_sample_feats, user_feats):
+            """Main likelihood logic.
+
+            """
+            log_prob = _likelihood(sample_w, norm_feats, feats)
+            log_prob += self._prior_log_prob(sample_w)
             return log_prob
 
         return likelihood_fn
-
-    def entropy(self, data, method="gaussian", num_bins=100):
-        if method == "gaussian":
-            # scipy gaussian kde requires transpose
-            kernel = gaussian_kde(data.T)
-            N = data.shape[0]
-            entropy = -(1.0 / N) * np.sum(np.log(kernel(data.T)))
-        elif method == "histogram":
-            raise NotImplementedError
-        return entropy

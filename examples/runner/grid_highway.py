@@ -4,7 +4,7 @@ import copy
 import jax.numpy as np
 import numpy as onp
 import rdb.envs.drive2d
-from rdb.optim.mpc import shooting_optimizer
+from rdb.optim.mpc import shooting_method
 from rdb.optim.runner import Runner
 from tqdm import tqdm
 from rdb.visualize.render import render_env
@@ -20,7 +20,7 @@ main_car = env.main_car
 udim = 2
 horizon = 10
 T = 30
-optimizer, runner = shooting_optimizer(
+optimizer, runner = shooting_method(
     env, main_car.cost_runtime, udim, horizon, env.dt, replan=REPLAN, T=T
 )
 
@@ -53,7 +53,7 @@ list_trajs = []
 list_pairs = []
 for y0 in tqdm(y0_range):
     for y1 in y1_range:
-        env.set_init_state(y0, y1)
+        env.set_task(y0, y1)
         actions = optimizer(env.state, weights=weights)
         traj, cost, info = runner(env.state, actions, weights=weights)
 
@@ -72,7 +72,7 @@ if MAKE_MP4:
         zip(list_actions, list_rews, list_pairs), total=len(list_pairs)
     ):
         y0, y1 = pair
-        env.set_init_state(y0, y1)
+        env.set_task(y0, y1)
         env.reset()
         state = env.state
         text = f"Total cost: {-1 * rew:.3f}\nTesting\ny0({y0:.2f}) y1({y1:.2f})"

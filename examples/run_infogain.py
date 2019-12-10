@@ -13,7 +13,7 @@ from jax import random, vmap
 from rdb.infer.ird_oc import *
 from rdb.infer.algos import *
 from rdb.infer.utils import *
-from rdb.optim.mpc import shooting_optimizer
+from rdb.optim.mpc import shooting_method
 from rdb.optim.runner import Runner
 from rdb.visualize.render import render_env
 from numpyro.handlers import scale, condition, seed
@@ -24,17 +24,17 @@ RANDOM_KEYS = [1, 2, 3, 4, 5, 6]
 NUM_SAMPLES = 1000
 PLOT_BINS = 100
 NUM_DESIGNER_SAMPLES = 20
-NUM_NORMALIZING_SAMPLES = 100
-MAX_WEIGHT = 10.0
+NUM_NORMALIZERS = 100
+MAX_WEIGHT = 5.0
+BETA = 5.0
 
 env = gym.make("Week3_02-v0")
 env.reset()
 cost_runtime = env.main_car.cost_runtime
 horizon = 10
-controller, runner = shooting_optimizer(
+controller, runner = shooting_method(
     env, cost_runtime, env.udim, horizon, env.dt, replan=REPLAN
 )
-beta = 5.0
 env.reset()
 y0_idx, y1_idx = 1, 5
 
@@ -54,43 +54,20 @@ state_test2[y0_idx] = -0.2
 state_test2[y1_idx] = 0.6
 
 
-def prior_log_prob(state):
-    w_log_dist_cars = 0.0
-    log_dist_lanes = np.log(state["dist_lanes"])
-    if log_dist_lanes < 0 or log_dist_lanes > MAX_WEIGHT:
-        return -np.inf
-    log_dist_fences = np.log(state["dist_fences"])
-    if log_dist_fences < 0 or log_dist_fences > MAX_WEIGHT:
-        return -np.inf
-    log_speed = np.log(state["speed"])
-    if log_speed < 0 or log_speed > MAX_WEIGHT:
-        return -np.inf
-    log_control = np.log(state["control"])
-    if log_control < 0 or log_control > MAX_WEIGHT:
-        return -np.inf
-    return 0.0
+log_prior_dict = {
+    "dist_cars": dist.Uniform(0.0, 0.01),
+    "dist_lanes": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
+    "dist_fences": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
+    "speed": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
+    "control": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
+}
 
-
-def get_normalizing_samples(num_samples):
-    weights = []
-    for _ in range(num_samples):
-        w_log_dist_lanes = numpyro.sample(
-            "w_norm_dist_lanes", dist.Uniform(0.0, MAX_WEIGHT)
-        )
-        w_log_dist_fences = numpyro.sample(
-            "w_norm_dist_fences", dist.Uniform(0.0, MAX_WEIGHT)
-        )
-        w_log_speed = numpyro.sample("w_norm_speed", dist.Uniform(0.0, MAX_WEIGHT))
-        w_log_control = numpyro.sample("w_norm_control", dist.Uniform(0.0, MAX_WEIGHT))
-        w = {
-            "dist_cars": 1.0,
-            "dist_lanes": np.exp(w_log_dist_lanes),
-            "dist_fences": np.exp(w_log_dist_fences),
-            "speed": np.exp(w_log_speed),
-            "control": np.exp(w_log_control),
-        }
-        weights.append(w)
-    return weights
+""" Prior sampling & likelihood functions for PGM """
+prior_log_prob_fn = partial(prior_log_prob, prior_dict=log_prior_dict)
+prior_sample_fn = partial(prior_sample, prior_dict=log_prior_dict)
+norm_sample_fn = partial(
+    normalizer_sample, sample_fn=prior_sample_fn, num=NUM_NORMALIZERS
+)
 
 
 def proposal(weight, const=0.01):
@@ -122,14 +99,13 @@ user_weights = {
 def infogain(
     samples_train_dict,
     state_test,
-    normalizing_samples,
     state_name,
     num_samples=NUM_DESIGNER_SAMPLES,
     verbose=False,
 ):
     # Sample testing environments 1
     neg_ents = []
-    pgm.initialize(state_test, state_name, normalizing_samples)
+    pgm.initialize(state_test, state_name)
     range_ = tqdm(samples_train_dict, desc="InfoGain envs")
     for w_i, w_train in enumerate(range_):
         sampler.init(w_train)
@@ -166,16 +142,15 @@ def plot_samples(samples_dicts, highlight_dict=None):
 """ Plot 1 example """
 key = random.PRNGKey(1)
 pgm = IRDOptimalControl(
-    key, env, controller, runner, beta, prior_log_prob=prior_log_prob
+    key, env, controller, runner, BETA, prior_log_prob=prior_log_prob
 )
 proposal_fn = partial(proposal, const=0.01)
 sampler = MetropolisHasting(
     key, pgm, num_warmups=100, num_samples=NUM_SAMPLES, proposal_fn=proposal_fn
 )
 sampler.init(user_weights)
-get_normalizing_samples = seed(get_normalizing_samples, key)
-normalizing_samples = get_normalizing_samples(NUM_NORMALIZING_SAMPLES)
-pgm.initialize(state_train, "train", normalizing_samples)
+norm_sample_fn = seed(norm_sample_fn, key)
+pgm.initialize(state_train, "train", norm_sample_fn())
 ## Sample training environments
 samples_train_dict = sampler.sample(
     user_weights, init_state=state_train, state_name="train", num_samples=NUM_SAMPLES
@@ -195,11 +170,15 @@ for ki, keyi in enumerate(RANDOM_KEYS):
 
     ## Create PGM & Sampler
     pgm = IRDOptimalControl(
-        key, env, controller, runner, beta, prior_log_prob=prior_log_prob
+        key,
+        env,
+        controller,
+        runner,
+        BETA,
+        prior_log_prob=prior_log_prob,
+        normalizer_fn=norm_sample_fn,
     )
-    get_normalizing_samples = seed(get_normalizing_samples, key)
-    normalizing_samples = get_normalizing_samples(NUM_NORMALIZING_SAMPLES)
-    pgm.initialize(state_train, "train", normalizing_samples)
+    pgm.initialize(state_train, "train")
     proposal_fn = partial(proposal, const=0.01)
     sampler = MetropolisHasting(
         key,
@@ -222,23 +201,13 @@ for ki, keyi in enumerate(RANDOM_KEYS):
 
     print("Sampling infogain: test 1")
     gain1 = infogain(
-        samples_train_dict,
-        state_test1,
-        normalizing_samples,
-        "test1",
-        DEMO1_NUM_DESIGNER_SAMPLES,
-        False,
+        samples_train_dict, state_test1, "test1", DEMO1_NUM_DESIGNER_SAMPLES, False
     )
     all_gain1.append(gain1)
     print(f"Test 1 gain {gain1:.3f} (should suck)")
     print("Sampling infogain: test 2")
     gain2 = infogain(
-        samples_train_dict,
-        state_test2,
-        normalizing_samples,
-        "test2",
-        DEMO1_NUM_DESIGNER_SAMPLES,
-        False,
+        samples_train_dict, state_test2, "test2", DEMO1_NUM_DESIGNER_SAMPLES, False
     )
     all_gain2.append(gain2)
     print(f"Test 2 gain {gain2:.3f} (should be better)")

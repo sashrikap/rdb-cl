@@ -16,6 +16,7 @@ from os.path import join
 from copy import deepcopy
 from collections import OrderedDict
 from tqdm import tqdm
+from numpyro.handlers import seed
 
 import pyglet
 import matplotlib.cm
@@ -90,6 +91,10 @@ class DriveWorld(gym.Env):
         self._compile()
         self._constraints_dict, self._constraints_fn = self._get_constraints_fn()
 
+        # For sampling tasks
+        self._rng_key = None
+        self._all_tasks = None
+
     @property
     def subframes(self):
         return self._subframes
@@ -118,12 +123,14 @@ class DriveWorld(gym.Env):
             car.state = state[last_idx : last_idx + len(car.state)]
             last_idx += len(car.state)
 
-    def set_init_state(self, state):
+    def set_task(self, state):
+        """Set initial state."""
         cars = self._cars + [self.main_car]
         last_idx = 0
         for car in cars:
             car.init_state = state[last_idx : last_idx + len(car.state)]
             last_idx += len(car.state)
+        self.state = state
 
     @property
     def features_dict(self):
@@ -287,6 +294,16 @@ class DriveWorld(gym.Env):
 
     def _get_constraints_fn(self):
         raise NotImplementedError
+
+    def update_key(self, rng_key):
+        self._rng_key = rng_key
+
+    def sample_tasks(self, num_tasks):
+        raise NotImplementedError
+
+    @property
+    def all_tasks(self):
+        return self._all_tasks
 
     def reset(self):
         for car in self._cars:

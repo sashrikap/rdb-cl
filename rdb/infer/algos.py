@@ -29,20 +29,20 @@ class Inference(object):
     """ Generic Inference Class
 
     Args:
-        model (fn)
+        kernel (fn)
 
     Example:
-        >>> data = self.model() # p(obs | theta) p(theta)
+        >>> data = self.kernel() # p(obs | theta) p(theta)
 
     Notes:
-        model: p(theta) p(obs | theta)
+        kernel: p(theta) p(obs | theta)
 
     """
 
-    def __init__(self, rng_key, model, num_samples, num_warmups):
+    def __init__(self, rng_key, kernel, num_samples, num_warmups):
         self._rng_key = rng_key
-        # self._model = seed(model, rng_seed=rng_key)
-        self._model = model
+        # self._kernel = seed(kernel, rng_seed=rng_key)
+        self._kernel = kernel
         self._num_samples = num_samples
         self._num_warmups = num_warmups
         self._init_state = None
@@ -52,8 +52,8 @@ class Inference(object):
         return self._num_samples
 
     @property
-    def model(self):
-        return self._model
+    def kernel(self):
+        return self._kernel
 
     def update_key(self, rng_key):
         self._rng_key = rng_key
@@ -89,27 +89,22 @@ class MetropolisHasting(Inference):
     Note:
         * Basic Implementation.
 
+    Args:
+        num_samples (int): number of samples to return
+        num_warmups (int): number of warmup iterations
+        proposal_fn (fn): given one sample, return next
+
     """
 
-    def __init__(
-        self, rng_key, model, num_samples, num_warmups, proposal_fn, step_size=1.0
-    ):
-        super().__init__(rng_key, model, num_samples, num_warmups)
-        self._step_size = step_size
-        self._proposal = seed(proposal_fn, rng_seed=rng_key)
-        self._coin_flip = self._create_coin_flip()
+    def __init__(self, rng_key, kernel, num_samples, num_warmups, proposal_fn):
+        super().__init__(rng_key, kernel, num_samples, num_warmups)
+        self._proposal = proposal_fn
+        self._coin_flip = None
 
     def _mh_step(self, obs, state, log_prob, *args, **kwargs):
+        assert self._rng_key is not None, "Need to initialize with random key"
         next_state = self._proposal(state)
-        next_log_prob = self._model(obs, next_state, **kwargs)
-        """next_state2 = copy.deepcopy(next_state)
-        next_state2["dist_lanes"] *= 10
-        next_log_prob2 = self._model(obs, next_state2, **kwargs)
-        next_state3 = copy.deepcopy(next_state2)
-        next_state3["dist_lanes"] *= 10
-        next_log_prob3 = self._model(obs, next_state3, **kwargs)
-        print(f"lp1. {log_prob} lp 10. {next_log_prob2} lp 100. {next_log_prob3}")
-        import pdb; pdb.set_trace()"""
+        next_log_prob = self._kernel(obs, next_state, **kwargs)
         log_ratio = next_log_prob - log_prob
         accept = self._coin_flip() < np.exp(log_ratio)
         if not accept:
@@ -142,7 +137,7 @@ class MetropolisHasting(Inference):
         if num_samples is None:
             num_samples = self._num_samples
 
-        log_prob = self._model(obs, state, **kwargs)
+        log_prob = self._kernel(obs, state, **kwargs)
         range_ = range(self._num_warmups)
         # if verbose:
         #    range_ = trange(self._num_warmups, desc="MH Warmup")
@@ -181,8 +176,8 @@ class NUTSMonteCarlo(Inference):
 
     """
 
-    def __init__(self, rng_key, model, num_samples, num_warmups, step_size=1.0):
-        super().__init__(rng_key, model, num_samples, num_warmups)
+    def __init__(self, rng_key, kernel, num_samples, num_warmups, step_size=1.0):
+        super().__init__(rng_key, kernel, num_samples, num_warmups)
         self._step_size = step_size
 
     def sample(self, obs, *args, **kwargs):
@@ -201,17 +196,17 @@ class HamiltonionMonteCarlo(Inference):
 
     Note:
         * Backed by numpyro implementation
-        * Requires model to provide gradient information
+        * Requires kernel to provide gradient information
 
     """
 
-    def __init__(self, rng_key, model, num_samples, num_warmups, step_size=1.0):
-        super().__init__(rng_key, model, num_samples, num_warmups)
+    def __init__(self, rng_key, kernel, num_samples, num_warmups, step_size=1.0):
+        super().__init__(rng_key, kernel, num_samples, num_warmups)
         self._step_size = step_size
 
     def sample(self, obs, *args, **kwargs):
         mcmc = MCMC(
-            HMC(self._model, step_size=self._step_size),
+            HMC(self._kernel, step_size=self._step_size),
             num_warmup=self._num_warmups,
             num_samples=self._num_samples,
         )
@@ -221,8 +216,8 @@ class HamiltonionMonteCarlo(Inference):
 
 
 class RejectionSampling(Inference):
-    def __init__(self, rng_key, model, num_samples, num_warmups):
-        super().__init__(rng_key, model, num_samples, num_warmups)
+    def __init__(self, rng_key, kernel, num_samples, num_warmups):
+        super().__init__(rng_key, kernel, num_samples, num_warmups)
 
     def sample(self, obs, *args, **kargs):
         pass

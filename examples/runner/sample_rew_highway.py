@@ -3,7 +3,7 @@ import time, copy
 import jax.numpy as np
 import numpy as onp
 import rdb.envs.drive2d
-from rdb.optim.mpc import shooting_optimizer
+from rdb.optim.mpc import shooting_method
 from rdb.optim.runner import Runner
 from matplotlib import pyplot as plt
 from rdb.visualize.render import render_env
@@ -17,7 +17,7 @@ udim = 2
 horizon = 10
 T = horizon
 
-optimizer, runner = shooting_optimizer(
+optimizer, runner = shooting_method(
     env, main_car.cost_runtime, udim, horizon, env.dt, T=T
 )
 weights = {
