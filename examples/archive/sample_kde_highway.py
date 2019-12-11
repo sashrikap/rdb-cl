@@ -34,11 +34,10 @@ weights2 = {
 env = gym.make("Week3_01-v0")
 obs = env.reset()
 main_car = env.main_car
-udim = 2
 horizon = 10
 
 cost_runtime = main_car.cost_runtime
-optimizer, runner = shooting_method(env, cost_runtime, udim, horizon, env.dt)
+optimizer, runner = shooting_method(env, cost_runtime, horizon, env.dt)
 
 y0_idx, y1_idx = 1, 5
 y0_range = np.arange(-1.0, 1.01, 0.9)

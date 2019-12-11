@@ -25,11 +25,17 @@ PROPOSAL_VAR = 0.01
 env = gym.make("Week3_02-v0")
 env.reset()
 controller, runner = shooting_method(
-    env, env.main_car.cost_runtime, env.udim, HORIZON, env.dt, replan=False
+    env, env.main_car.cost_runtime, HORIZON, env.dt, replan=False
 )
 
 # TODO: find true w
-true_w = {}
+true_w = {
+    "dist_cars": 100.0,
+    "dist_lanes": 10.0,
+    "dist_fences": 300.0,
+    "speed": 20.0,
+    "control": 80.0,
+}
 
 """ Prior sampling & likelihood functions for PGM """
 log_prior_dict = {

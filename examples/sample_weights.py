@@ -18,5 +18,5 @@ env.reset()
 
 cost_runtime = env.main_car.cost_runtime
 optimizer, runner = shooting_method(
-    env, cost_runtime, env.udim, env.horizon, env.dt, replan=REPLAN, T=T
+    env, cost_runtime, env.horizon, env.dt, replan=REPLAN, T=T
 )

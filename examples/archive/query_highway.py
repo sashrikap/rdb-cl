@@ -8,7 +8,6 @@ from rdb.optim.runner import Runner
 env = gym.make("Week3_01-v0")
 obs = env.reset()
 main_car = env.main_car
-udim = 2
 horizon = 10
 y0_idx, y1_idx = 1, 5
 
@@ -23,7 +22,7 @@ weights = {
 T = 20
 REPLAN = True
 optimizer, runner = shooting_method(
-    env, main_car.cost_runtime, udim, horizon, env.dt, T=T, replan=REPLAN
+    env, main_car.cost_runtime, horizon, env.dt, T=T, replan=REPLAN
 )
 state = copy.deepcopy(env.state)
 state[y0_idx] = 0.4

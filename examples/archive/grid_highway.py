@@ -17,11 +17,10 @@ REPLAN = True
 env = gym.make("Week3_02-v0")
 obs = env.reset()
 main_car = env.main_car
-udim = 2
 horizon = 10
 T = 30
 optimizer, runner = shooting_method(
-    env, main_car.cost_runtime, udim, horizon, env.dt, replan=REPLAN, T=T
+    env, main_car.cost_runtime, horizon, env.dt, replan=REPLAN, T=T
 )
 
 state0 = copy.deepcopy(env.state)

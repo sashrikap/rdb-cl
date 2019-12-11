@@ -16,7 +16,6 @@ MAKE_MP4 = False
 env = gym.make("Week3_02-v0")
 obs = env.reset()
 main_car = env.main_car
-udim = 2
 horizon = 10
 
 T = 30
@@ -33,7 +32,7 @@ if not DUMMY_ACTION:
     if not REPLAN:
         T = horizon
     optimizer, runner = shooting_method(
-        env, main_car.cost_runtime, udim, horizon, env.dt, replan=REPLAN, T=T
+        env, main_car.cost_runtime, horizon, env.dt, replan=REPLAN, T=T
     )
 
     y0_idx, y1_idx = 1, 5
@@ -50,7 +49,7 @@ if not DUMMY_ACTION:
     for k, v in violations.items():
         print(f"Violations {k}: {v.sum()}")
 else:
-    actions = np.zeros((T, udim))
+    actions = np.zeros((T, env.udim))
 
 env.reset()
 env.render("human", draw_heat=DRAW_HEAT)

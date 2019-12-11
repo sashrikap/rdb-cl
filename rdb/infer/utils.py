@@ -82,15 +82,17 @@ def prior_sample(prior_dict):
     """Sample prior distribution.
 
     Args:
-        prior_dict (dict): maps keyword -> numpyro.dist
+        prior_dict (dict): maps keyword -> log probability
 
     Note:
+        * prior_dict is LOG VALUE
         * Need seed(prior_sample, rng_key) to run
 
     """
     output = {}
     for key, dist_ in prior_dict.items():
-        output[key] = numpyro.sample(key, dist_)
+        val = numpyro.sample(key, dist_)
+        output[key] = np.exp(val)
     return output
 
 
@@ -102,6 +104,8 @@ def prior_log_prob(sample_dict, log_prior_dict):
         log_prior_dict (dict): maps keyword -> numpyro.dist
 
     Note:
+        * Sample dict is RAW VALUE
+          log_prior_dict is LOG VALUE
         * Currently only supports uniform distribution
     """
 
@@ -124,7 +128,8 @@ def prior_log_prob(sample_dict, log_prior_dict):
     log_prob = 0.0
     for key, dist_ in log_prior_dict.items():
         val = sample_dict[key]
-        log_prob += check_range(val, dist_) * dist_.log_prob(val)
+        log_val = np.log(val)
+        log_prob += check_range(log_val, dist_) * dist_.log_prob(log_val)
 
     return log_prob
 

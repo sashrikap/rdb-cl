@@ -19,12 +19,9 @@ FRAME_WIDTH = 450
 env = gym.make("Week3_02-v0")
 env.reset()
 main_car = env.main_car
-udim = 2
 horizon = 10
 T = 20
-optimizer, runner = shooting_method(
-    env, main_car.cost_runtime, udim, horizon, env.dt, T=T
-)
+optimizer, runner = shooting_method(env, main_car.cost_runtime, horizon, env.dt, T=T)
 
 ## Training environments
 weights = {

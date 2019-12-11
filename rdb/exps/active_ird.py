@@ -83,21 +83,6 @@ class ExperimentActiveIRD(object):
                 fn_next_task = self._propose_task()
                 curr_tasks[fn_key] = fn_next_task
 
-    def _simulate_designer(self, sampler, itr):
-        """Sample 1 weight from belief samples.
-
-        Args:
-            sampler (object): probabilistic sampler for current task
-
-        Note:
-            * Practically only need to run batch sampling once
-            * Cache batch samples
-
-        TODO:
-            * random choice from `sampler.sample()`
-        """
-        pass
-
     def _propose_task(self):
         """Propose next task to designer.
 

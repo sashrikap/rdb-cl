@@ -14,7 +14,6 @@ COLLECT_MP4 = True
 
 env = gym.make("Week4_01-v0")
 obs = env.reset()
-udim = 2
 horizon = 10
 
 T = 30
@@ -22,7 +21,7 @@ main_car = env.main_car
 
 if not DUMMY_ACTION:
     optimizer, runner = shooting_method(
-        env, main_car.cost_runtime, udim, horizon, env.dt, T=T
+        env, main_car.cost_runtime, horizon, env.dt, T=T
     )
 
     weights = {
@@ -46,7 +45,7 @@ if not DUMMY_ACTION:
     if COLLECT_MP4:
         runner.collect_mp4(env.state, actions, path="data/driveway_sanity3.mp4")
 else:
-    actions = np.zeros((T, udim))
+    actions = np.zeros((T, env.udim))
 
 env.render("human", draw_heat=DRAW_HEAT)
 for t in range(T):

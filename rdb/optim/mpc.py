@@ -255,7 +255,6 @@ def shooting_method(env, f_cost, udim, horizon, dt, replan=True, T=None):
         f_cost (fn): 1 step cost function
                     `f_cost(state, act)`, use pre-specified weight
                     `f_cost(state, act, weight)`, use weight at runtime
-        udim (int): action dimension
         horizon (int): planning horizon
         dt (float): timestep size
         replan (bool): bool, plan once or replan at every step
@@ -283,6 +282,7 @@ def shooting_method(env, f_cost, udim, horizon, dt, replan=True, T=None):
     ## Forward dynamics
     f_dyn = env.dynamics_fn
     f_feat = env.features_fn
+    udim = env.udim
 
     if T is None:
         T = horizon

@@ -32,9 +32,7 @@ env = gym.make("Week3_02-v0")
 env.reset()
 cost_runtime = env.main_car.cost_runtime
 horizon = 10
-controller, runner = shooting_method(
-    env, cost_runtime, env.udim, horizon, env.dt, replan=REPLAN
-)
+controller, runner = shooting_method(env, cost_runtime, horizon, env.dt, replan=REPLAN)
 env.reset()
 y0_idx, y1_idx = 1, 5
 

@@ -13,13 +13,10 @@ MAKE_MP4 = True
 env = gym.make("Week3_01-v0")
 obs = env.reset()
 main_car = env.main_car
-udim = 2
 horizon = 10
 T = horizon
 
-optimizer, runner = shooting_method(
-    env, main_car.cost_runtime, udim, horizon, env.dt, T=T
-)
+optimizer, runner = shooting_method(env, main_car.cost_runtime, horizon, env.dt, T=T)
 weights = {
     "dist_cars": 50,
     "dist_lanes": 30.0,
