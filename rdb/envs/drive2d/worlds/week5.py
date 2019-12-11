@@ -28,9 +28,11 @@ class HighwayDriveWorld_Week5(HighwayDriveWorld):
         lane_width=0.13,
     ):
         cars = []
+        weights = sort_dict_based_on_keys(weights, self.features_keys)
+        weights_list = weights.values()
         for state, speed in zip(car_states, car_speeds):
             cars.append(FixSpeedCar(self, np.array(state), speed))
-        main_car = OptimalControlCar(self, weights, main_state, horizon)
+        main_car = OptimalControlCar(self, weights_list, main_state, horizon)
         self.goal_speed = goal_speed
         self.goal_lane = goal_lane
         self.control_bound = control_bound
@@ -44,13 +46,15 @@ class HighwayDriveWorld_Week5(HighwayDriveWorld):
         self.cars[0].init_state = jax.ops.index_update(self.cars[0].init_state, 1, y0)
         self.cars[1].init_state = jax.ops.index_update(self.cars[1].init_state, 1, y1)
 
-    def _get_nonlinear_features_dict(self, feats_dict):
+    def _get_nonlinear_features_list(self, feats_list):
         """
-        Params
-        : feats_dict : dict of environment feature functions
-        Types
-        : Gaussian   : exp(-dist^2/sigma^2)
-        : Exponent   : exp(run_over)
+        Args:
+            feats_list (list) : dict of environment feature functions
+
+        Notes:
+            * Gaussian : exp(-dist^2/sigma^2)
+            * Exponent : exp(run_over)
+
         """
         nonlinear_dict = {}
         sum_keep = partial(np.sum, keepdims=True)
@@ -84,8 +88,11 @@ class HighwayDriveWorld_Week5(HighwayDriveWorld):
         for key, fn in nonlinear_dict.items():
             nonlinear_dict[key] = jax.jit(fn)
 
-        feats_dict = chain_funcs(nonlinear_dict, feats_dict)
-        return feats_dict
+        nonlinear_list = list(
+            sort_dict_based_on_keys(nonlinear_dict, self.features_keys).values()
+        )
+        feats_list = chain_list_funcs(nonlinear_list, feats_list)
+        return feats_list
 
     def _get_constraints_fn(self):
         constraints_dict = {}

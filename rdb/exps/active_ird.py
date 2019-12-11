@@ -17,6 +17,8 @@ Note:
 
 """
 
+from rdb.infer.utils import random_choice
+from numpyro.handlers import seed
 import jax.numpy as np
 import copy
 
@@ -46,6 +48,9 @@ class ExperimentActiveIRD(object):
         self._model = model
         self._acquire_fns = acquire_fns
         self._eval_tasks = eval_tasks
+        # Random key & function
+        self._rng_key = None
+        self._random_choice = random_choice
         # Numerics
         self._iterations = iterations
         self._num_eval = num_eval
@@ -55,33 +60,44 @@ class ExperimentActiveIRD(object):
         for key in acquire_fns.keys():
             self._acquire_samples[key] = None
 
+    def update_key(self, rng_key):
+        self._rng_key = rng_key
+        self._model.update_key(rng_key)
+        self._random_choice = seed(self._random_choice, rng_key)
+
     def run(self, task):
         """Run main evaluation loop."""
         curr_tasks = {}
-        curr_models = {}
         for fn_key in self._acquire_fns.keys():
             # Build history for each acquisition function
-            curr_tasks[fn_key] = task
-            curr_models[fn_key] = copy.deepcopy(self._model)
+            curr_tasks[fn_key] = [task]
 
         for it in range(self._iterations):
-            print(f"Active IRD iteration {it}")
-            for fn_key, fn_task in curr_tasks.items():
+            print(f"\nActive IRD iteration {it}")
+            for fn_key, fn_tasks in curr_tasks.items():
+                """ Collect observation """
+                task = fn_tasks[-1]
+                obs_w = self._simulate_designer(task)
                 """ Collect features for task and cache """
-                model = curr_models[fn_key]
-                task_name = str(fn_task)
+                task_name = f"ird_{str(task)}"
+                print(f"Fn name: {fn_key}; Task name {task_name}")
                 if it > 0:
-                    model.sample_features(fn_task, task_name)
+                    self._model.sample_features(task, task_name)
                 """ Assign task """
-                self._env.set_task(fn_task)
-                model.initialize(fn_task, task_name)
-                """ Current belief """
-                b_w = model.sample()
+                belief_ws = self._model.sample(task, task_name, obs_w=obs_w)
+                _, belief_feats = self._model.get_samples(task, task_name)
                 """ Evaluate """
-                self._evaluate(b_w)
+                self._evaluate(belief_w)
                 """ Actively propose next task """
                 fn_next_task = self._propose_task()
                 curr_tasks[fn_key] = fn_next_task
+
+    def _simulate_designer(self, task):
+        """Sample one w from b(w) on task"""
+        task_name = f"designer_{str(task)}"
+        designer_ws = self._model.sample_designer(task, task_name, self._true_w)
+        designer_w = self._random_choice(designer_ws, 1)
+        return designer_w[0]
 
     def _propose_task(self):
         """Propose next task to designer.

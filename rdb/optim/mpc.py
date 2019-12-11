@@ -12,6 +12,7 @@ Optional TODO:
 
 from scipy.optimize import fmin_l_bfgs_b
 from functools import partial
+from time import time
 from rdb.optim.runner import Runner
 from rdb.optim.utils import *
 import jax
@@ -136,7 +137,15 @@ class Optimizer(object):
     """
 
     def __init__(
-        self, h_traj_u, h_grad_u, h_cost_u, udim, horizon, replan=True, T=None
+        self,
+        h_traj_u,
+        h_grad_u,
+        h_cost_u,
+        udim,
+        horizon,
+        replan=True,
+        T=None,
+        features_keys=[],
     ):
         """Construct Optimizer.
 
@@ -158,6 +167,7 @@ class Optimizer(object):
 
         """
         self._udim = udim
+        self._features_keys = features_keys
         self._replan = replan
         self._horizon = horizon
         self._T = T
@@ -189,6 +199,10 @@ class Optimizer(object):
         return self.h_traj_u(x0, u)
 
     def __call__(self, x0, u0=None, weights=None, init="zeros"):
+        # Turn dict into sorted list
+        weights_dict = sort_dict_based_on_keys(weights, self._features_keys)
+        weights = np.array(list(weights_dict.values()))
+
         if not self._compiled:
             print("First time running optimizer, compiling with jit...")
             self._compiled = True
@@ -199,7 +213,6 @@ class Optimizer(object):
                 u0 = np.random(key, (self._horizon, self._udim))
             else:
                 raise NotImplementedError(f"Initialization undefined for '{init}'")
-
         if self._replan:
             """Replan.
 
@@ -247,7 +260,7 @@ class Optimizer(object):
             return opt_u
 
 
-def shooting_method(env, f_cost, udim, horizon, dt, replan=True, T=None):
+def shooting_method(env, f_cost, horizon, dt, replan=True, T=None):
     """Create shooting optimizer.
 
     Args:
@@ -328,7 +341,9 @@ def shooting_method(env, f_cost, udim, horizon, dt, replan=True, T=None):
         concate_xu(x0, us), f_forward=t_forward, f_feat=f_feat, udim=udim, length=T
     )
 
-    optimizer = Optimizer(h_traj_u, h_grad_u, h_cost_u, udim, horizon, replan, T)
+    optimizer = Optimizer(
+        h_traj_u, h_grad_u, h_cost_u, udim, horizon, replan, T, env.features_keys
+    )
     runner = Runner(
         env, dynamics_fn=t_traj_u, cost_runtime=t_costs_u, features_fn=t_feat_u
     )

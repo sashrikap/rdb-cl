@@ -104,10 +104,11 @@ class OptimalControlCar(Car):
 
         Args:
             env: world
+            cost_weights (list): keys implicit in env.feature_keys
 
         """
         super().__init__(env, init_state, horizon, color)
-        self.cost_weights = cost_weights
+        self._cost_weights = cost_weights
         self._features_fn = None
         self._cost_fn = None
         self._cost_runtime = None
@@ -138,10 +139,10 @@ class OptimalControlCar(Car):
             >>> cost = cost_runtime(state, action, weights)
 
         """
-        env_feats_dict = self.env.features_dict
+        env_feats_list = self.env.features_list
         # Pre-defined & runtime costs
-        cost_fn = weigh_funcs(env_feats_dict, self.cost_weights)
-        cost_runtime = weigh_funcs_runtime(env_feats_dict)
+        cost_fn = weigh_funcs(env_feats_list, self._cost_weights)
+        cost_runtime = weigh_funcs_runtime(env_feats_list)
         return cost_fn, cost_runtime
 
     def control(self, u, dt):
@@ -155,12 +156,9 @@ class OptimalControlCar(Car):
         self._state += self.dynamics_fn(self._state, u) * dt
 
     def copy(self):
+        cost_weights = deepcopy(list(self._cost_weights))
         return OptimalControlCar(
-            self.env,
-            deepcopy(self.cost_weights),
-            deepcopy(self._init_state),
-            self.horizon,
-            self.color,
+            self.env, cost_weights, deepcopy(self._init_state), self.horizon, self.color
         )
 
 

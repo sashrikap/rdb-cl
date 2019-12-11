@@ -45,7 +45,6 @@ class Inference(object):
         self._kernel = kernel
         self._num_samples = num_samples
         self._num_warmups = num_warmups
-        self._init_state = None
 
     @property
     def num_samples(self):
@@ -57,9 +56,6 @@ class Inference(object):
 
     def update_key(self, rng_key):
         self._rng_key = rng_key
-
-    def init(self, state):
-        self._init_state = state
 
     def sample(self, obs, *args, **kwargs):
         """Estimate p(theta | obs).
@@ -88,6 +84,7 @@ class MetropolisHasting(Inference):
 
     Note:
         * Basic Implementation.
+        * When sampling, initialize from observation.
 
     Args:
         num_samples (int): number of samples to return
@@ -106,6 +103,7 @@ class MetropolisHasting(Inference):
         next_state = self._proposal(state)
         next_log_prob = self._kernel(obs, next_state, **kwargs)
         log_ratio = next_log_prob - log_prob
+        # print(f"log next {next_log_prob:.2f} log current {log_prob:.2f}")
         accept = self._coin_flip() < np.exp(log_ratio)
         if not accept:
             next_state = state
@@ -123,15 +121,10 @@ class MetropolisHasting(Inference):
         self._proposal = seed(self._proposal, rng_seed=rng_key)
         self._coin_flip = self._create_coin_flip()
 
-    def init(self, state):
-        self._init_state = state
-
     def sample(
         self, obs, verbose=True, num_warmups=None, num_samples=None, *args, **kwargs
     ):
-        assert self._init_state is not None, "Need to initialize"
-        state = self._init_state
-
+        state = obs
         if num_warmups is None:
             num_warmups = self._num_warmups
         if num_samples is None:
@@ -163,7 +156,6 @@ class MetropolisHasting(Inference):
             samples.append(state)
         # if verbose:
         #    print(f"Acceptance ratio {ratio:.3f}")
-        self._init_state = None
         return samples
 
 

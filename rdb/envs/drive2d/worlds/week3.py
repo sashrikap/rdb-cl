@@ -7,7 +7,8 @@ import jax
 import jax.numpy as np
 import numpyro
 import numpyro.distributions as dist
-import itertools
+import itertools, copy
+from collections import OrderedDict
 from rdb.optim.utils import *
 from rdb.envs.drive2d.core.car import *
 from rdb.envs.drive2d.core.feature import *
@@ -39,7 +40,9 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
         cars = []
         for state, speed in zip(car_states, car_speeds):
             cars.append(FixSpeedCar(self, np.array(state), speed))
-        main_car = OptimalControlCar(self, weights, main_state, horizon)
+        weights = sort_dict_based_on_keys(weights, self.features_keys)
+        weights_list = weights.values()
+        main_car = OptimalControlCar(self, weights_list, main_state, horizon)
         self._goal_speed = goal_speed
         self._goal_lane = goal_lane
         self._control_bound = control_bound
@@ -50,13 +53,22 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
         self._all_tasks = list(itertools.product(self._car1_range, self._car2_range))
         self._task_sampler = None
 
-    def _get_nonlinear_features_dict(self, feats_dict):
+    def set_task(self, task):
+        y0_idx, y1_idx = 1, 5
+        self.reset()
+        state = copy.deepcopy(self.state)
+        state[y0_idx] = task[0]
+        state[y1_idx] = task[1]
+
+    def _get_nonlinear_features_list(self, feats_list):
         """
-        Params
-        : feats_dict : dict of environment feature functions
-        Types
-        : Gaussian   : exp(-dist^2/sigma^2)
-        : Exponent   : exp(run_over)
+        Args:
+            feats_list (list): dict of environment feature functions
+
+        Note:
+            * Gaussian : exp(-dist^2/sigma^2)
+            * Exponent : exp(run_over)
+
         """
         nonlinear_dict = {}
         sum_keep = partial(np.sum, keepdims=True)
@@ -66,7 +78,7 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
             partial(
                 gaussian_feat, sigma=np.array([self._car_width / 2, self._car_length])
             ),
-            # debug_print
+            # debug_printwe
             # abs_feat,
         )
         # Gaussian
@@ -107,8 +119,11 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
         for key, fn in nonlinear_dict.items():
             nonlinear_dict[key] = jax.jit(fn)
 
-        feats_dict = chain_funcs(nonlinear_dict, feats_dict)
-        return feats_dict
+        nonlinear_list = list(
+            sort_dict_based_on_keys(nonlinear_dict, self.features_keys).values()
+        )
+        feats_list = chain_list_funcs(nonlinear_list, feats_list)
+        return feats_list
 
     def _get_constraints_fn(self):
         constraints_dict = {}

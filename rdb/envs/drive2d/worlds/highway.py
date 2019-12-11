@@ -70,7 +70,6 @@ class HighwayDriveWorld(DriveWorld):
             fence_fns[f_i] = fence_dist_fn
         feats_dict["dist_fences"] = concat_funcs(fence_fns, axis=0)
         feats_dict["dist_fences"] = jax.jit(feats_dict["dist_fences"])
-
         return feats_dict
 
     @property

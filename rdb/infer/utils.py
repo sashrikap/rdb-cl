@@ -7,7 +7,7 @@ import numpyro
 import numpyro.distributions as dist
 from numpyro.handlers import seed
 from scipy.stats import gaussian_kde
-from tqdm.auto import tqdm
+from tqdm.auto import tqdm, trange
 
 
 def stack_dict_values(dicts, normalize=False):
@@ -62,35 +62,36 @@ def random_choice(items, num):
     return [items[i] for i in arr]
 
 
-def collect_features(self, list_ws, task, controller, runner, desc=None):
+def collect_features(list_ws, state, controller, runner, desc=None):
     """Utility for collecting features.
 
     Args:
         list_ws (list)
+        state (ndarray): initial state for the task
     """
     feats = []
     if desc is not None:
         list_ws = tqdm(list_ws, desc=desc)
     for w in list_ws:
-        acs = controller(task, weights=w)
-        _, _, info = runner(task, acs, weights=w)
+        acs = controller(state, weights=w)
+        _, _, info = runner(state, acs, weights=w)
         feats.append(info["feats"])
     return feats
 
 
-def prior_sample(prior_dict):
+def prior_sample(log_prior_dict):
     """Sample prior distribution.
 
     Args:
-        prior_dict (dict): maps keyword -> log probability
+        log_prior_dict (dict): maps keyword -> log probability
 
     Note:
-        * prior_dict is LOG VALUE
+        * log_prior_dict is LOG VALUE
         * Need seed(prior_sample, rng_key) to run
 
     """
     output = {}
-    for key, dist_ in prior_dict.items():
+    for key, dist_ in log_prior_dict.items():
         val = numpyro.sample(key, dist_)
         output[key] = np.exp(val)
     return output
@@ -129,25 +130,35 @@ def prior_log_prob(sample_dict, log_prior_dict):
     for key, dist_ in log_prior_dict.items():
         val = sample_dict[key]
         log_val = np.log(val)
+        # print(f"{key} {log_val} range {check_range(log_val, dist_)}")
         log_prob += check_range(log_val, dist_) * dist_.log_prob(log_val)
 
     return log_prob
 
 
-def gaussian_proposal(state, std_dict):
+def gaussian_proposal(state, log_std_dict):
+    """Propose next state given current state, based on Gaussian dist.
+
+    Args:
+        log_std_dict (dict): std of log(var)
+
+    """
     next_state = copy.deepcopy(state)
     for key, val in next_state.items():
         log_val = np.log(val)
-        if key in std_dict.keys():
-            std = std_dict[key]
+        if key in log_std_dict.keys():
+            std = log_std_dict[key]
             next_log_val = numpyro.sample("next_log_val", dist.Normal(log_val, std))
             next_state[key] = np.exp(next_log_val)
     return next_state
 
 
 def normalizer_sample(sample_fn, num):
+    """Run sample function fixed number of times to generate samples.
+    """
     samples = []
     for _ in range(num):
+        # for _ in trange(num, desc="Normalizer weights"):
         samples.append(sample_fn())
     return samples
 

@@ -7,6 +7,7 @@ from rdb.envs.drive2d.core.feature import *
 from rdb.envs.drive2d.worlds.driveway import *
 from functools import partial
 
+
 """
 Sample adversarial scenarios where one autonomous car is merging
 with two other fix speed cars
@@ -29,6 +30,8 @@ class EntranceDriveWorld_Week4(EntranceDriveWorld):
         lane_width=0.13,
     ):
         cars = []
+        weights = sort_dict_based_on_keys(weights, self.features_keys)
+        weights_list = weights.values()
         for state, speed in zip(car_states, car_speeds):
             cars.append(FixSpeedCar(self, np.array(state), speed))
         main_car = OptimalControlCar(self, weights, main_state, horizon)
@@ -43,11 +46,11 @@ class EntranceDriveWorld_Week4(EntranceDriveWorld):
         self.cars[0].init_state = jax.ops.index_update(self.cars[0].init_state, 1, y0)
         self.cars[1].init_state = jax.ops.index_update(self.cars[1].init_state, 1, y1)
 
-    def _get_nonlinear_features_dict(self, feats_dict):
-        """Given raw features dict, make nonlinear features.
+    def _get_nonlinear_features_list(self, feats_list):
+        """Given raw features list, make nonlinear features.
 
         Args:
-            feats_dict: dict of environment feature functions
+            feats_list: list of environment feature functions
 
         Notes:
             * Gaussian feature: exp(-dist^2/sigma^2)
@@ -88,8 +91,11 @@ class EntranceDriveWorld_Week4(EntranceDriveWorld):
         for key, fn in nonlinear_dict.items():
             nonlinear_dict[key] = jax.jit(fn)
 
-        feats_dict = chain_funcs(nonlinear_dict, feats_dict)
-        return feats_dict
+        nonlinear_list = list(
+            sort_dict_based_on_keys(nonlinear_dict, self.features_keys).values()
+        )
+        feats_list = chain_list_funcs(nonlinear_list, feats_dict)
+        return feats_list
 
     def _get_constraints_fn(self):
         constraints_dict = {}

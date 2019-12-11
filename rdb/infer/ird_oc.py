@@ -27,19 +27,21 @@ class PGM(object):
 
     """
 
-    def __init__(self, rng_key, kernel, sample_method, sample_args):
-        # self._kernel = seed(kernel, rng_key)
-        self._kernel = kernel
+    def __init__(self, rng_key, kernel, proposal_fn, sample_method, sample_args):
         self._rng_key = rng_key
-        self._sampler = self._build_sampler(sample_method, sample_args)
+        self._sampler = self._build_sampler(
+            kernel, proposal_fn, sample_method, sample_args
+        )
 
     def update_key(self, rng_key):
         self._rng_key = rng_key
         self._sampler.update_key(rng_key)
 
-    def _build_sampler(self, sample_method, sample_args):
+    def _build_sampler(self, kernel, proposal_fn, sample_method, sample_args):
         if sample_method == "mh":
-            return MetropolisHasting(self._rng_key, self._kernel, **sample_args)
+            return MetropolisHasting(
+                self._rng_key, kernel, proposal_fn=proposal_fn, **sample_args
+            )
         else:
             raise NotImplementedError
 
@@ -56,9 +58,9 @@ class IRDOptimalControl(PGM):
 
     Args:
         controller (fn): controller function,
-            `actions = controller(task, w)`
+            `actions = controller(state, w)`
         runner (fn): runner function,
-            `traj, cost, info = runner(task, actions)`
+            `traj, cost, info = runner(state, actions)`
         beta (float): temperature param
             `p ~ exp(beta * reward)`
         prior_log_prob (fn): log probability of prior
@@ -86,8 +88,10 @@ class IRDOptimalControl(PGM):
         beta,
         prior_log_prob,
         normalizer_fn,
+        proposal_fn,
         sample_method="mh",
-        sample_args={},
+        sample_args={},  # "num_warmups": 100, "num_samples": 200
+        designer_args={},
     ):
         self._rng_key = rng_key
         self._controller = controller
@@ -99,16 +103,23 @@ class IRDOptimalControl(PGM):
         ## Caching normalizers, samples and features
         self._norm_sample_weights = {}
         self._norm_sample_feats = {}
+        self._designer_weights = {}
         self._sample_weights = {}
         self._sample_feats = {}
         self._user_actions = {}
         self._user_feats = {}
+        ## Likelihood models
+        designer_kernel = self._build_designer_kernel(beta)
+        self._designer = self._build_sampler(
+            designer_kernel, proposal_fn, sample_method, designer_args
+        )
         kernel = self._build_kernel(beta)
-        super().__init__(rng_key, kernel, sample_method, sample_args)
+        super().__init__(rng_key, kernel, proposal_fn, sample_method, sample_args)
 
     def update_key(self, rng_key):
         """ Update random key """
         super().update_key(rng_key)
+        self._designer.update_key(rng_key)
         self._prior_log_prob = seed(self._prior_log_prob, rng_key)
         self._normalizer_fn = seed(self._normalizer_fn, rng_key)
 
@@ -128,31 +139,50 @@ class IRDOptimalControl(PGM):
         """ Incorporate new observation """
         pass
 
+    def sample_designer(self, task, task_name, true_w, verbose=True):
+        """Sample b(obs_w) given true_w"""
+        if task_name not in self._sample_weights.keys():
+            sample_ws = self._designer.sample(true_w, task=task)
+            self._designer_weights[task_name] = sample_ws
+        else:
+            sample_ws = self._designer_weights[task_name]
+        return sample_ws
+
     def sample(self, task, task_name, obs_w, verbose=True):
+        """Sample b(w) for true weights given obs_w."""
         # Cache normalizer samples
         self._cache_normalizer(task, task_name)
         self._cache_user_feats(task, task_name, obs_w)
 
         # Cache user actions
-        if task_name in self._sample_weights.keys():
+        if task_name not in self._sample_weights.keys():
             norm_feats = self._norm_sample_feats[task_name]
             user_feats = self._user_feats[task_name]
             sample_ws = self._sampler.sample(
-                obs, norm_sample_feats=norm_feats, user_feats=user_feats
+                obs_w,
+                norm_sample_feats=norm_feats,
+                user_feats=user_feats,
+                verbose=verbose,
             )
             self._sample_weights[task_name] = sample_ws
         else:
             sample_ws = self._sample_weights[task_name]
-
         return sample_ws
+
+    def _get_init_state(self, task):
+        self._env.set_task(task)
+        self._env.reset()
+        state = self._env.state
+        return state
 
     def _cache_user_feats(self, task, task_name, user_w):
         """For new observation, cache optimal features."""
         if task_name in self._user_feats.keys():
             return
 
-        actions = self._controller(task, weights=user_w)
-        _, _, info = self._runner(task, actions, weights=user_w)
+        state = self._get_init_state(task)
+        actions = self._controller(state, weights=user_w)
+        _, _, info = self._runner(state, actions, weights=user_w)
         feats = info["feats"]
         self._user_actions[task_name] = actions
         self._user_feats[task_name] = feats
@@ -164,9 +194,10 @@ class IRDOptimalControl(PGM):
             task_name in self._sample_weights.keys()
         ), f"{task_name} weight samples missing"
         sample_ws = self._sample_weights[task_name]
+        state = self._get_init_state(task)
         sample_feats = collect_features(
             sample_ws,
-            task,
+            state,
             self._controller,
             self._runner,
             desc="Collecting Features for Belief Samples",
@@ -184,9 +215,10 @@ class IRDOptimalControl(PGM):
             return
 
         norm_ws = self._normalizer_fn()
+        state = self._get_init_state(task)
         norm_feats = collect_features(
             norm_ws,
-            task,
+            state,
             self._controller,
             self._runner,
             desc="Collecting Normalizer Samples",
@@ -195,8 +227,18 @@ class IRDOptimalControl(PGM):
         self._norm_sample_weights[task_name] = norm_ws
         self._norm_sample_feats[task_name] = norm_feats
 
+    def _build_designer_kernel(self, beta):
+        def likelihood_fn(true_w, sample_w, task):
+            state = self._get_init_state(task)
+            actions = self._controller(state, weights=sample_w)
+            _, cost, info = self._runner(state, actions, weights=true_w)
+            rew = -1 * cost
+            return beta * rew
+
+        return likelihood_fn
+
     def _build_kernel(self, beta):
-        """Likelihood for Optimal Control.
+        """Likelihood for observed data.
 
         Args:
             prior_w (dict): sampled from prior
@@ -238,7 +280,8 @@ class IRDOptimalControl(PGM):
             """Main likelihood logic.
 
             """
-            log_prob = _likelihood(sample_w, norm_feats, feats)
+            log_prob = _likelihood(sample_w, norm_sample_feats, user_feats)
+            # print(f"likelihood {log_prob} prior {self._prior_log_prob(sample_w)}")
             log_prob += self._prior_log_prob(sample_w)
             return log_prob
 

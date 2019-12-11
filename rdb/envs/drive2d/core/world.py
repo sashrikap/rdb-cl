@@ -85,7 +85,7 @@ class DriveWorld(gym.Env):
 
         self.xdim = onp.prod(self.state.shape)
         self._dynamics_fn, self._indices = self._get_dynamics_fn()
-        self._raw_features_dict, self._features_dict, self._features_fn = (
+        self._raw_features_dict, self._raw_features_list, self._features_list, self._features_fn = (
             self._get_features_fn()
         )
         self._compile()
@@ -124,6 +124,9 @@ class DriveWorld(gym.Env):
             last_idx += len(car.state)
 
     def set_task(self, state):
+        raise NotImplementedError
+
+    def set_init_state(self, state):
         """Set initial state."""
         cars = self._cars + [self.main_car]
         last_idx = 0
@@ -133,13 +136,13 @@ class DriveWorld(gym.Env):
         self.state = state
 
     @property
-    def features_dict(self):
+    def features_list(self):
         """Nonlinear features dict."""
-        return self._features_dict
+        return self._features_list
 
     @property
     def features_fn(self):
-        """Nonlinear features function."""
+        """Nonlinear dictionary features function."""
         return self._features_fn
 
     @property
@@ -149,6 +152,10 @@ class DriveWorld(gym.Env):
     @property
     def constraints_dict(self):
         return self._constraints_dict
+
+    @property
+    def raw_features_list(self):
+        return self._raw_features_list
 
     @property
     def raw_features_dict(self):
@@ -219,7 +226,7 @@ class DriveWorld(gym.Env):
         return dynamics_fn, indices
 
     def _get_raw_features_dict(self):
-        """Build Dict(key: feature_fn) mapping.
+        """Build dict(key: feature_fn) mapping.
 
         Example:
             >>> feat_1 = feature_fn_1(state)
@@ -275,21 +282,31 @@ class DriveWorld(gym.Env):
         feats_dict["dist_lanes"] = concat_funcs(lane_fns, axis=0)
         feats_dict["speed"] = speed_fn
         feats_dict["control"] = control_fn
+
         return feats_dict
 
+    def _get_raw_features(self):
+        feats_dict = self._get_raw_features_dict()
+        feats_list = list(
+            sort_dict_based_on_keys(feats_dict, self.features_keys).values()
+        )
+        return feats_dict, feats_list
+
     def _get_features_fn(self):
-        raw_feats_dict = self._get_raw_features_dict()
-        nlr_feats_dict = self._get_nonlinear_features_dict(raw_feats_dict)
+        raw_feats_dict, raw_feats_list = self._get_raw_features()
+        nlr_feats_list = self._get_nonlinear_features_list(raw_feats_list)
         # Pre-compile individual feature functions, for speed up
-        for key, fn in nlr_feats_dict.items():
-            nlr_feats_dict[key] = jax.jit(fn)
+        for idx, fn in enumerate(nlr_feats_list):
+            nlr_feats_list[idx] = jax.jit(fn)
 
         # One-input-multi-output
-        merged_feats_fn = merge_dict_funcs(nlr_feats_dict)
+        nlr_feats_dict = OrderedDict(zip(self.features_keys, nlr_feats_list))
+        merged_feats_dict_fn = merge_dict_funcs(nlr_feats_dict)
+        # merged_feats_list_fn = merge_list_funcs(nlr_feats_list)
 
-        return raw_feats_dict, nlr_feats_dict, merged_feats_fn
+        return raw_feats_dict, raw_feats_list, nlr_feats_list, merged_feats_dict_fn
 
-    def _get_nonlinear_features_dict(self, feats_dict):
+    def _get_nonlinear_features_list(self, feats_list):
         raise NotImplementedError
 
     def _get_constraints_fn(self):

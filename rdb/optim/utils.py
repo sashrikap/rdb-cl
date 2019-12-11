@@ -6,6 +6,14 @@ from toolz.functoolz import juxt
 from operator import mul, add
 
 
+def sort_dict_based_on_keys(dict_, keys):
+    d = OrderedDict()
+    for k in keys:
+        assert k in dict_.keys()
+        d[k] = dict_[k]
+    return d
+
+
 def concate_dict_by_keys(dicts):
     """Stack key-value pairs for list of dictionaries
 
@@ -50,8 +58,46 @@ def sum_funcs(funcs):
     return compose(add_op, juxt(funcs))
 
 
-def weigh_funcs(funcs_dict, weights_dict):
+def weigh_funcs(funcs_list, weights_list):
     """Weigh multiple functions by predefined weights.
+
+    Functions & weights are organized by list.
+
+    """
+    fns = []
+    assert len(funcs_list) == len(
+        weights_list
+    ), "Must keep funcs and weights the same length"
+    for fn, w in zip(funcs_list, weights_list):
+        fns.append(compose(partial(mul, w), fn))
+    add_op = partial(reduce, add)
+    return compose(add_op, juxt(fns))
+
+
+def weigh_funcs_runtime(funcs_list):
+    """Weigh multiple functions by runtime weights.
+
+    Functions and weights are organized by list.
+
+    Example:
+        >>> cost_fn = weigh_funcs_runtime(funcs_list)
+        >>> cost = cost_fn(xs, weights)
+
+    """
+
+    def func(*args, weights):
+        output = 0.0
+        for fn, w in zip(funcs_list, weights):
+            output += w * fn(*args)
+        return output
+
+    return func
+
+
+def weigh_funcs_dict(funcs_dict, weights_dict):
+    """Weigh multiple functions by predefined weights.
+
+    Functions & weights are organized by dictionary.
 
     """
     # pairs = [(fn, weights_dict[key]) for key, fn in funcs_dict.items()]
@@ -61,17 +107,18 @@ def weigh_funcs(funcs_dict, weights_dict):
             w = weights_dict[key]
             # w * fn(args)
             fns.append(compose(partial(mul, w), fn))
-
     add_op = partial(reduce, add)
     return compose(add_op, juxt(fns))
 
 
-def weigh_funcs_runtime(funcs_dict):
+def weigh_funcs_dict_runtime(funcs_dict):
     """Weigh multiple functions by runtime weights.
+
+    Functions and weights are organized by dictionary.
 
     Example:
         >>> cost_fn = weigh_funcs_runtime(funcs_dict)
-        >>> cost = cost_fn(xs, weights)
+        >>> cost = cost_fn(xs, weights_dict)
 
     """
 
@@ -82,6 +129,20 @@ def weigh_funcs_runtime(funcs_dict):
                 w = weights[key]
                 # w * fn(args)
                 output += w * fn(*args)
+        return output
+
+    return func
+
+
+def merge_list_funcs(funcs_list):
+    """Execute a list of functions individually.
+
+    """
+
+    def func(*args):
+        output = []
+        for fn in funcs_list:
+            output.append(fn(*args))
         return output
 
     return func
@@ -101,7 +162,20 @@ def merge_dict_funcs(funcs_dict):
     return func
 
 
-def chain_funcs(outer_dict, inner_dict):
+def chain_list_funcs(outer_list, inner_list):
+    """Chain lists of functions.
+
+    Example:
+        >>> output[i] = outer[i](inner[i](data))
+
+    """
+    output = []
+    for outer, inner in zip(outer_list, inner_list):
+        output.append(compose(outer, inner))
+    return output
+
+
+def chain_dict_funcs(outer_dict, inner_dict):
     """Chain dictionaries of functions.
 
     Example:
