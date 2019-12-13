@@ -130,10 +130,22 @@ class IRDOptimalControl(PGM):
         weights = self._sample_weights[task_name]
 
         # Cache features
-        if task_name not in self.c.keys():
+        if task_name not in self._sample_feats.keys():
             self._cache_samples(task, task_name)
         feats = self._sample_feats[task_name]
         return weights, feats
+
+    def get_features(self, task, task_name, sample_weights):
+        """Get features on new task, given weights
+        """
+        # assert task_name not in self._sample_weights.keys()
+        self._sample_weights[task_name] = sample_weights
+        if task_name not in self._sample_feats.keys():
+            self._cache_samples(task, task_name, verbose=False)
+        feats = self._sample_feats[task_name]
+        del self._sample_feats[task_name]
+        del self._sample_weights[task_name]
+        return feats
 
     def update(self, obs):
         """ Incorporate new observation """
@@ -169,6 +181,18 @@ class IRDOptimalControl(PGM):
             sample_ws = self._sample_weights[task_name]
         return sample_ws
 
+    def evaluate(self, task, task_name, sample_ws):
+        state = self._get_init_state(task)
+        num_violate = 0.0
+        for w in sample_ws:
+            actions = self._controller(state, weights=w)
+            traj, cost, info = self._runner(state, actions, weights=w)
+            violations = info["violations"]
+            num = sum([sum(v) for v in violations.values()])
+            # print(f"violate {num} acs {np.mean(actions):.3f} xs {np.mean(traj):.3f}")
+            num_violate += num
+        return float(num_violate) / len(sample_ws)
+
     def _get_init_state(self, task):
         self._env.set_task(task)
         self._env.reset()
@@ -187,7 +211,7 @@ class IRDOptimalControl(PGM):
         self._user_actions[task_name] = actions
         self._user_feats[task_name] = feats
 
-    def _cache_samples(self, task, task_name):
+    def _cache_samples(self, task, task_name, verbose=True):
         """For new tasks, see how previous samples do.
         """
         assert (
@@ -195,12 +219,11 @@ class IRDOptimalControl(PGM):
         ), f"{task_name} weight samples missing"
         sample_ws = self._sample_weights[task_name]
         state = self._get_init_state(task)
+        desc = "Collecting Features for Belief Samples"
+        if not verbose:
+            desc = None
         sample_feats = collect_features(
-            sample_ws,
-            state,
-            self._controller,
-            self._runner,
-            desc="Collecting Features for Belief Samples",
+            sample_ws, state, self._controller, self._runner, desc=desc
         )
         self._sample_feats[task_name] = sample_feats
 

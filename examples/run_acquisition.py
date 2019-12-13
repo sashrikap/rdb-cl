@@ -15,13 +15,18 @@ import gym, rdb.envs.drive2d
 import numpyro.distributions as dist
 
 RANDOM_KEYS = [1, 2, 3, 4, 5, 6]
-NUM_SAMPLES = 1000
-NUM_NORMALIZERS = 20
+NUM_WARMUPS = 20
+NUM_NORMALIZERS = 80
+# NUM_NORMALIZERS = 5
+# NUM_SAMPLES = 10
+NUM_SAMPLES = 500
+NUM_DESIGNERS = 20
+NUM_ACQUIRE_DESIGNERS = 3
 MAX_WEIGHT = 8.0
 BETA = 5.0
 HORIZON = 10
 EXP_ITERATIONS = 1
-PROPOSAL_VAR = 0.01
+PROPOSAL_VAR = 0.2
 
 env = gym.make("Week3_02-v0")
 env.reset()
@@ -33,16 +38,16 @@ controller, runner = shooting_method(
 true_w = {
     "dist_cars": 1.0,
     "dist_lanes": 0.1,
-    "dist_fences": 3.0,
-    "speed": 0.2,
-    "control": 0.8,
+    "dist_fences": 0.6,
+    "speed": 0.5,
+    "control": 0.16,
 }
 # Training Environment
 task = (-0.4, 0.3)
 
 """ Prior sampling & likelihood functions for PGM """
 log_prior_dict = {
-    "dist_cars": dist.Uniform(0.0, 0.05),
+    "dist_cars": dist.Uniform(0.0, 0.01),
     "dist_lanes": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
     "dist_fences": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
     "speed": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
@@ -70,15 +75,15 @@ ird_model = IRDOptimalControl(
     prior_log_prob=prior_log_prob_fn,
     normalizer_fn=norm_sample_fn,
     proposal_fn=proposal_fn,
-    sample_args={"num_warmups": 100, "num_samples": NUM_SAMPLES},
-    designer_args={"num_warmups": 5, "num_samples": 5},
+    sample_args={"num_warmups": NUM_WARMUPS, "num_samples": NUM_SAMPLES},
+    designer_args={"num_warmups": NUM_WARMUPS, "num_samples": NUM_DESIGNERS},
 )
 
 """ Active acquisition function for experiment """
 acquire_fns = {
-    "infogain": ActiveInfoGain(env, ird_model),
-    "ratiomax": ActiveRatioTest(env, ird_model, method="max"),
-    # "ratiomin": ActiveRatioTest(env, method="min"),
+    # "infogain": ActiveInfoGain(env, ird_model),
+    # "ratiomean": ActiveRatioTest(env, ird_model, method="mean", debug=True),
+    "ratiomin": ActiveRatioTest(env, ird_model, method="min", debug=True)
 }
 
 experiment = ExperimentActiveIRD(
@@ -88,6 +93,8 @@ experiment = ExperimentActiveIRD(
     acquire_fns,
     eval_tasks=env.all_tasks,
     iterations=EXP_ITERATIONS,
+    # Hard coded candidates
+    debug_candidates=[(-0.4, -0.7), (-0.2, 0.6)],
 )
 
 """ Experiment """

@@ -14,20 +14,25 @@ def save_video(frames, fps, width, path):
 
 def forward_env(env, actions, init_state=None, text=None):
     # Render and save environment given pre-specified actions
+    env.set_init_state(init_state)
     env.reset()
-    if init_state is not None:
-        env.state = init_state
     frames = []
     subframe_op = getattr(env, "sub_render", None)
     has_subframe = callable(subframe_op)
 
-    for act in actions:
-        env.step(act)
+    def render_frames():
         if has_subframe:
             for s_i in range(env.subframes):
                 frames.append(env.sub_render("rgb_array", s_i, text=text))
         else:
             frames.append(env.render("rgb_array", text=text))
+
+    for act in actions:
+        env.step(act)
+        render_frames()
+    # render_frames()
+    # TODO: a render bug, need to get rid of the first frame
+    frames = frames[1:]
     return frames
 
 

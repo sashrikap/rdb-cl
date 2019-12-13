@@ -57,9 +57,11 @@ def logsumexp(vs):
 
 def random_choice(items, num):
     assert num < len(items), f"Only has {len(items)} items"
-    arr = numpyro.sample("random_choice", dist.Uniform(0, 1), sample_shape=(num,))
-    arr = np.argsort(arr)
-    return [items[i] for i in arr]
+    arr = numpyro.sample(
+        "random_choice", dist.Uniform(0, 1), sample_shape=(len(items),)
+    )
+    arr = np.argsort(arr)[:num]
+    return [items[idx] for idx in arr]
 
 
 def collect_features(list_ws, state, controller, runner, desc=None):
@@ -124,14 +126,18 @@ def prior_log_prob(sample_dict, log_prior_dict):
         ), f"Type `{type(prior_dist)}` supported"
         low = prior_dist.low
         high = prior_dist.high
-        return np.where(sample_val < low or sample_val > high, -np.inf, 1.0)
+        return np.where(
+            sample_val < low or sample_val > high,
+            -np.inf,
+            prior_dist.log_prob(sample_val),
+        )
 
     log_prob = 0.0
     for key, dist_ in log_prior_dict.items():
         val = sample_dict[key]
         log_val = np.log(val)
         # print(f"{key} {log_val} range {check_range(log_val, dist_)}")
-        log_prob += check_range(log_val, dist_) * dist_.log_prob(log_val)
+        log_prob += check_range(log_val, dist_)
 
     return log_prob
 

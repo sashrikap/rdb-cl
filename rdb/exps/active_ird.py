@@ -18,7 +18,9 @@ Note:
 """
 
 from rdb.infer.utils import random_choice
+from rdb.exps.utils import plot_samples
 from numpyro.handlers import seed
+from tqdm.auto import tqdm
 import jax.numpy as np
 import copy
 
@@ -29,6 +31,9 @@ class ExperimentActiveIRD(object):
     Args:
         acquire_fns (dict): map name -> acquire function
         model (object): IRD model
+        iteration (int): algorithm iterations
+        num_eval_sample (int): # top samples for evaluating belief
+        num_task_sample (int): # task candidates for proposal
 
     """
 
@@ -40,8 +45,9 @@ class ExperimentActiveIRD(object):
         acquire_fns,
         eval_tasks,
         iterations=10,
-        num_eval=20,
+        num_eval_sample=5,
         num_task_sample=4,
+        debug_candidates=None,
     ):
         self._env = env
         self._true_w = true_w
@@ -53,8 +59,10 @@ class ExperimentActiveIRD(object):
         self._random_choice = random_choice
         # Numerics
         self._iterations = iterations
-        self._num_eval = num_eval
+        self._num_eval_sample = num_eval_sample
         self._num_task_sample = num_task_sample
+        # Task proposal
+        self._debug_candidates = debug_candidates
         # Cache data
         self._acquire_samples = {}
         for key in acquire_fns.keys():
@@ -73,6 +81,14 @@ class ExperimentActiveIRD(object):
             curr_tasks[fn_key] = [task]
 
         for it in range(self._iterations):
+            """ Candidates for next tasks """
+            if self._debug_candidates is not None:
+                candidates = self._debug_candidates
+            else:
+                candidates = self._random_choice(
+                    self._env.all_tasks, self._num_task_sample
+                )
+
             print(f"\nActive IRD iteration {it}")
             for fn_key, fn_tasks in curr_tasks.items():
                 """ Collect observation """
@@ -85,12 +101,15 @@ class ExperimentActiveIRD(object):
                     self._model.sample_features(task, task_name)
                 """ Assign task """
                 belief_ws = self._model.sample(task, task_name, obs_w=obs_w)
+                plot_samples(
+                    belief_ws, highlight_dict=obs_w, save_path="data/samples.png"
+                )
                 _, belief_feats = self._model.get_samples(task, task_name)
                 """ Evaluate """
-                self._evaluate(belief_w)
+                # self._evaluate(belief_ws)
                 """ Actively propose next task """
-                fn_next_task = self._propose_task()
-                curr_tasks[fn_key] = fn_next_task
+                next_task = self._propose_task(candidates, obs_w, task, task_name)
+                curr_tasks[fn_key] = next_task
 
     def _simulate_designer(self, task):
         """Sample one w from b(w) on task"""
@@ -99,8 +118,12 @@ class ExperimentActiveIRD(object):
         designer_w = self._random_choice(designer_ws, 1)
         return designer_w[0]
 
-    def _propose_task(self):
+    def _propose_task(self, candidates, obs_w, curr_task, curr_task_name):
         """Propose next task to designer.
+
+        Args:
+            candidates (list): potential next tasks
+            obs_w (dict): current observed weight
 
         Note:
             * Require `tasks = env.sample_task()`
@@ -109,18 +132,31 @@ class ExperimentActiveIRD(object):
         TODO:
             * `env.sample_task()`: small number of samples
         """
-        proposed_tasks = self._env.sample_task(self._num_task_sample)
         acquire_scores = {}
         acquire_tasks = {}
-        for task in proposed_tasks:
-            for key, ac_fn in self._acquire_fns.items():
-                acquire_scores[key] = ac_fn(task)
+        for key, ac_fn in self._acquire_fns.items():
+            acquire_scores[key] = []
+            for next_task in candidates:
+                next_task_name = f"acquire_{next_task}"
+                acquire_scores[key].append(
+                    ac_fn(
+                        next_task,
+                        next_task_name,
+                        curr_task,
+                        curr_task_name,
+                        obs_w,
+                        self._random_choice,
+                    )
+                )
 
+        import pdb
+
+        pdb.set_trace()
         """ Find best task for each acquire function """
         for key, scores in acquire_scores.items():
-            acquire_tasks[key] = proposed_tasks[np.argsort(scores)[0]]
+            acquire_tasks[key] = candidates[np.argsort(scores)[0]]
 
-    def _evaluate(self, belief_w):
+    def _evaluate(self, belief_ws):
         """Evaluate current sampled belief.
 
         Note:
@@ -131,12 +167,8 @@ class ExperimentActiveIRD(object):
         # violations =
         # Find the top M belief samples and average violations
         num_violate = 0.0
-        for task in self._eval_tasks:
-            self._env.set_task(task)
-            self._env.reset()
-            state = self._env.state
-            actions = self._controller(state, weights=weights)
-            traj, cost, info = self._runner(state, actions, weights=weights)
-            violations = info["violations"]
-            num_violate += sum([sum(v) for v in violations.values()])
+        eval_ws = self._random_choice(belief_ws, self._num_eval_sample)
+        for task in tqdm(self._eval_tasks, desc="Evaluating samples"):
+            task_name = f"eval_{task}"
+            num_violate += self._model.evaluate(task, task_name, eval_ws)
         print(f"Average Violation {num_violate / len(self._eval_tasks):.2f}")

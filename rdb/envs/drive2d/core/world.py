@@ -94,6 +94,7 @@ class DriveWorld(gym.Env):
         # For sampling tasks
         self._rng_key = None
         self._all_tasks = None
+        self._grid_tasks = None
 
     @property
     def subframes(self):
@@ -315,12 +316,14 @@ class DriveWorld(gym.Env):
     def update_key(self, rng_key):
         self._rng_key = rng_key
 
-    def sample_tasks(self, num_tasks):
-        raise NotImplementedError
-
     @property
     def all_tasks(self):
         return self._all_tasks
+
+    @property
+    def grid_tasks(self):
+        """ For plotting purpose, meshgrid version of all_tasks"""
+        return self._grid_tasks
 
     def reset(self):
         for car in self._cars:

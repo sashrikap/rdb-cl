@@ -35,7 +35,7 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
         lane_width=0.13,
         car1_range=[-0.8, 0.8],
         car2_range=[-0.8, 0.8],
-        car_delta=0.1,
+        car_delta=0.2,
     ):
         cars = []
         for state, speed in zip(car_states, car_speeds):
@@ -50,6 +50,7 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
         # Define all tasks to sample from
         self._car1_range = np.arange(car1_range[0], car1_range[1], car_delta)
         self._car2_range = np.arange(car2_range[0], car2_range[1], car_delta)
+        self._grid_tasks = (self._car1_range, self._car2_range)
         self._all_tasks = list(itertools.product(self._car1_range, self._car2_range))
         self._task_sampler = None
 
@@ -59,6 +60,7 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
         state = copy.deepcopy(self.state)
         state[y0_idx] = task[0]
         state[y1_idx] = task[1]
+        self.set_init_state(state)
 
     def _get_nonlinear_features_list(self, feats_list):
         """
@@ -143,9 +145,6 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
     def update_key(self, rng_key):
         super().update_key(rng_key)
         self._task_sampler = seed(random_choice, rng_seed=rng_key)
-
-    def sample_tasks(self, num_tasks):
-        return self._task_sampler(self._all_tasks, num_tasks)
 
 
 class Week3_01(HighwayDriveWorld_Week3):

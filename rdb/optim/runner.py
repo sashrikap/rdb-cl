@@ -51,9 +51,10 @@ class Runner(object):
 
     def _collect_features(self, x0, actions):
         """
-        Return
-        : feats     : dict(key, [f_t0, f_t1, ..., f_tn]), time series
-        : feats_sum : dict(key, sum([f_t0, f_t1, ..., f_tn])), sum
+        Return:
+            feats (dict): dict(key, [f_t0, f_t1, ..., f_tn]), time series
+            feats_sum (dict): dict(key, sum([f_t0, f_t1, ..., f_tn])), sum
+
         """
         feats = self._features_fn(x0, actions)
         feats_sum = OrderedDict(
@@ -63,14 +64,16 @@ class Runner(object):
 
     def _collect_violations(self, xs, actions):
         """Collect constraint violations from trajectory.
+
         Args:
             x0 (ndarray): (T, xdim), list of states
             actions (ndarray): (T, udim), list of actions
         Return:
             violations (dict): feats['offtrack']
         Keys:
-            `offtrack`, `collision`, `uncomfortable`, `overspeed`, `underspeed`,
-            `wronglane`
+            `offtrack`, `collision`, `uncomfortable`,
+            `overspeed`, `underspeed`, `wronglane`
+
         """
         constraints_fn = self._env.constraints_fn
         return constraints_fn(xs, actions)
@@ -101,6 +104,19 @@ class Runner(object):
         self._env.state = state
         render_env(self._env, state, actions, fps=3, path=path, text=text)
         return path
+
+    def nb_show_mp4(self, state, actions, path):
+        """ Visualize mp4 on Jupyter notebook """
+        import os
+        from ipywidgets import Output
+        from IPython.display import display, Image, Video, clear_output
+
+        if os.path.isfile(path):
+            os.remove(path)
+        FRAME_WIDTH = 450
+        mp4_path = self.collect_mp4(state, actions, path=path, width=FRAME_WIDTH)
+        clear_output()
+        display(Video(mp4_path, width=FRAME_WIDTH))
 
     def collect_thumbnail(self, state, actions, width=450, path=None, text=None):
         if path is None:
