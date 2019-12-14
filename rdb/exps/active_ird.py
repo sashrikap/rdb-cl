@@ -18,7 +18,6 @@ Note:
 """
 
 from rdb.infer.utils import random_choice
-from rdb.exps.utils import plot_samples
 from numpyro.handlers import seed
 from tqdm.auto import tqdm
 import jax.numpy as np
@@ -32,7 +31,8 @@ class ExperimentActiveIRD(object):
         acquire_fns (dict): map name -> acquire function
         model (object): IRD model
         iteration (int): algorithm iterations
-        num_eval_sample (int): # top samples for evaluating belief
+        num_eval_sample (int): evaluating belief samples is costly,
+            so subsample belief particles
         num_task_sample (int): # task candidates for proposal
 
     """
@@ -40,17 +40,16 @@ class ExperimentActiveIRD(object):
     def __init__(
         self,
         env,
-        true_w,
         model,
         acquire_fns,
         eval_tasks,
         iterations=10,
         num_eval_sample=5,
         num_task_sample=4,
-        debug_candidates=None,
+        fixed_candidates=None,
+        debug_belief_task=None,
     ):
         self._env = env
-        self._true_w = true_w
         self._model = model
         self._acquire_fns = acquire_fns
         self._eval_tasks = eval_tasks
@@ -62,11 +61,12 @@ class ExperimentActiveIRD(object):
         self._num_eval_sample = num_eval_sample
         self._num_task_sample = num_task_sample
         # Task proposal
-        self._debug_candidates = debug_candidates
+        self._fixed_candidates = fixed_candidates
+        self._debug_belief_task = debug_belief_task
         # Cache data
         self._acquire_samples = {}
         for key in acquire_fns.keys():
-            self._acquire_samples[key] = None
+            self._acquire_samples[key] = []
 
     def update_key(self, rng_key):
         self._rng_key = rng_key
@@ -82,48 +82,57 @@ class ExperimentActiveIRD(object):
 
         for it in range(self._iterations):
             """ Candidates for next tasks """
-            if self._debug_candidates is not None:
-                candidates = self._debug_candidates
+            if self._fixed_candidates is not None:
+                candidates = self._fixed_candidates
             else:
                 candidates = self._random_choice(
                     self._env.all_tasks, self._num_task_sample
                 )
 
+            """ Run Active IRD on Candidates """
             print(f"\nActive IRD iteration {it}")
             for fn_key, fn_tasks in curr_tasks.items():
-                """ Collect observation """
+                ## Collect observation
                 task = fn_tasks[-1]
-                obs_w = self._simulate_designer(task)
-                """ Collect features for task and cache """
                 task_name = f"ird_{str(task)}"
+                obs = self._model.simulate_designer(task, task_name)
                 print(f"Fn name: {fn_key}; Task name {task_name}")
-                if it > 0:
-                    self._model.sample_features(task, task_name)
-                """ Assign task """
-                belief_ws = self._model.sample(task, task_name, obs_w=obs_w)
-                plot_samples(
-                    belief_ws, highlight_dict=obs_w, save_path="data/samples.png"
-                )
-                _, belief_feats = self._model.get_samples(task, task_name)
-                """ Evaluate """
-                # self._evaluate(belief_ws)
-                """ Actively propose next task """
-                next_task = self._propose_task(candidates, obs_w, task, task_name)
-                curr_tasks[fn_key] = next_task
 
-    def _simulate_designer(self, task):
-        """Sample one w from b(w) on task"""
-        task_name = f"designer_{str(task)}"
-        designer_ws = self._model.sample_designer(task, task_name, self._true_w)
-        designer_w = self._random_choice(designer_ws, 1)
-        return designer_w[0]
+                ## Main IRD Sampling
+                belief = self._model.sample(task, task_name, obs=obs, visualize=True)
 
-    def _propose_task(self, candidates, obs_w, curr_task, curr_task_name):
+                ## Evaluate
+                if self._debug_belief_task is not None:
+                    self._debug_belief(belief, self._debug_belief_task, obs)
+                # self._evaluate_violation(belief)
+                # self._evaluate_reward(belief)
+
+                ## Actively propose & Record next task
+                next_task = self._propose_task(candidates, belief, obs, task, task_name)
+                curr_tasks[fn_key].append(next_task)
+
+    def _debug_belief(self, belief, task, obs):
+        print(f"Observed weights {obs.weights[0]}")
+        task_name = f"debug_{str(task)}"
+        feats = belief.get_features(task, task_name)
+        violations = belief.get_violations(task, task_name)
+        """self._env.set_task(task)
+        for idx, sample_w in enumerate(tqdm(samples.weights, desc="Debugging beliefs")):
+            self._env.reset()
+            state = self._env.state
+            actions = self._model._controller(state, weights=sample_w)
+            traj, cost, info = self._model._runner(state, actions, weights=sample_w)"""
+        # if np.sum(info["metadata"]["overtake1"]) > 0:
+        #    import pdb; pdb.set_trace()
+        # path = f"data/191213/belief_{idx}.mp4"
+        # self._model._runner.collect_mp4(state, actions, path=path)
+
+    def _propose_task(self, candidates, belief, obs, curr_task, curr_task_name):
         """Propose next task to designer.
 
         Args:
             candidates (list): potential next tasks
-            obs_w (dict): current observed weight
+            obs (Particle[1]): current observed weight
 
         Note:
             * Require `tasks = env.sample_task()`
@@ -139,14 +148,7 @@ class ExperimentActiveIRD(object):
             for next_task in candidates:
                 next_task_name = f"acquire_{next_task}"
                 acquire_scores[key].append(
-                    ac_fn(
-                        next_task,
-                        next_task_name,
-                        curr_task,
-                        curr_task_name,
-                        obs_w,
-                        self._random_choice,
-                    )
+                    ac_fn(next_task, next_task_name, belief, obs)
                 )
 
         import pdb
@@ -156,19 +158,29 @@ class ExperimentActiveIRD(object):
         for key, scores in acquire_scores.items():
             acquire_tasks[key] = candidates[np.argsort(scores)[0]]
 
-    def _evaluate(self, belief_ws):
-        """Evaluate current sampled belief.
+    def _evaluate_violation(self, belief):
+        """Evaluate current sampled belief based on violations.
 
         Note:
             * Require `runner` to collect constraint violations.
             * The fewer violations, the better.
 
         """
-        # violations =
-        # Find the top M belief samples and average violations
         num_violate = 0.0
-        eval_ws = self._random_choice(belief_ws, self._num_eval_sample)
         for task in tqdm(self._eval_tasks, desc="Evaluating samples"):
             task_name = f"eval_{task}"
-            num_violate += self._model.evaluate(task, task_name, eval_ws)
+            violations = belief.get_violations(task, task_name)
+            # num_violate += sum([sum(v) for v in vio.values()])
+        # print(f"Average Violation {num_violate / len(self._eval_tasks):.2f}")
+
+    def _evaluate_reward(self, belief, task, task_name):
+        """Evaluate current sampled belief.
+
+        Note:
+            * The higher the better.
+
+        """
+        for task in tqdm(self._eval_tasks, desc="Evaluating samples"):
+            task_name = f"eval_{task}"
+            comparison = belief.compare_with(task, task_name, eval_ws)
         print(f"Average Violation {num_violate / len(self._eval_tasks):.2f}")

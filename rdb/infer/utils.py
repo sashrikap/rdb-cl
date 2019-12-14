@@ -5,6 +5,7 @@ import jax.numpy as np
 import copy
 import numpyro
 import numpyro.distributions as dist
+from rdb.optim.utils import concate_dict_by_keys
 from numpyro.handlers import seed
 from scipy.stats import gaussian_kde
 from tqdm.auto import tqdm, trange
@@ -64,7 +65,7 @@ def random_choice(items, num):
     return [items[idx] for idx in arr]
 
 
-def collect_features(list_ws, state, controller, runner, desc=None):
+def collect_trajs(list_ws, state, controller, runner, desc=None):
     """Utility for collecting features.
 
     Args:
@@ -72,13 +73,21 @@ def collect_features(list_ws, state, controller, runner, desc=None):
         state (ndarray): initial state for the task
     """
     feats = []
+    feats_sum = []
+    violations = []
+    actions = []
     if desc is not None:
         list_ws = tqdm(list_ws, desc=desc)
     for w in list_ws:
         acs = controller(state, weights=w)
         _, _, info = runner(state, acs, weights=w)
+        actions.append(acs)
         feats.append(info["feats"])
-    return feats
+        feats_sum.append(info["feats_sum"])
+        violations.append(info["violations"])
+    feats = concate_dict_by_keys(feats)
+    feats_sum = concate_dict_by_keys(feats_sum)
+    return actions, feats, feats_sum, violations
 
 
 def prior_sample(log_prior_dict):
@@ -96,6 +105,7 @@ def prior_sample(log_prior_dict):
     for key, dist_ in log_prior_dict.items():
         val = numpyro.sample(key, dist_)
         output[key] = np.exp(val)
+        # print(key, val)
     return output
 
 

@@ -19,7 +19,7 @@ import jax.numpy as np
 
 
 def is_offtrack(states, actions, env):
-    """Detects when car nudges the edge of the track.
+    """Detects when main_car nudges the edge of the track.
 
     Args:
         states (ndarray): (T, xdim)
@@ -44,7 +44,7 @@ def is_offtrack(states, actions, env):
 
 
 def is_collision(states, actions, env):
-    """Detects when car nudges another car.
+    """Detects when main_car nudges another car.
 
     Args:
         states (ndarray): (T, xdim)
@@ -86,7 +86,7 @@ def is_uncomfortable(states, actions, env, max_actions):
 
 # @jax.jit
 def is_overspeed(states, actions, env, max_speed):
-    """Detects when car runs overspeed.
+    """Detects when main_car runs overspeed.
 
     Args:
         states (ndarray): (T, xdim)
@@ -107,7 +107,7 @@ def is_overspeed(states, actions, env, max_speed):
 
 # @jax.jit
 def is_underspeed(states, actions, env, min_speed):
-    """Detects when car runs underspeed.
+    """Detects when main_car runs underspeed.
 
     Args:
         states (ndarray): (T, xdim)
@@ -128,7 +128,7 @@ def is_underspeed(states, actions, env, min_speed):
 
 # @jax.jit
 def is_wronglane(states, actions, env, lane_idx):
-    """Detects when car (center) runs onto different lane.
+    """Detects when main_car (center) runs onto different lane.
 
     Note:
         * Needs to know lane shapes a-priori
@@ -149,3 +149,19 @@ def is_wronglane(states, actions, env, lane_idx):
         feats.append(fn(s, a))
     feats = np.array(feats)
     return feats[:, lane_idx] < env.lane_width / 2
+
+
+def is_overtake(states, actions, env, car_idx):
+    """Detects when main_car overtakes the car_idx-th car.
+    """
+    main_y_idx = 9
+    car_y_idx = 4 * car_idx + 1
+
+    def overtake_fn(state, actions):
+        return state[main_y_idx] > state[car_y_idx]
+
+    feats = []
+    for s, a in zip(states, actions):
+        feats.append(overtake_fn(s, a))
+    feats = np.array(feats)
+    return feats

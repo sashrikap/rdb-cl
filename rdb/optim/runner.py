@@ -62,6 +62,13 @@ class Runner(object):
         )
         return feats, feats_sum
 
+    def _collect_metadata(self, xs, actions):
+        """Collect extra data, such as overtaking.
+
+        """
+        metadata_fn = self._env.metadata_fn
+        return metadata_fn(xs, actions)
+
     def _collect_violations(self, xs, actions):
         """Collect constraint violations from trajectory.
 
@@ -149,4 +156,5 @@ class Runner(object):
 
         info["feats"], info["feats_sum"] = self._collect_features(x0, actions)
         info["violations"] = self._collect_violations(xs, actions)
+        info["metadata"] = self._collect_metadata(xs, actions)
         return np.array(xs), cost, info

@@ -12,9 +12,10 @@ Note:
 import numpyro
 import jax
 from numpyro.handlers import scale, condition, seed
+from rdb.exps.utils import plot_samples
 from rdb.infer.algos import *
-from rdb.optim.utils import concate_dict_by_keys
-from rdb.infer.utils import logsumexp, collect_features
+from rdb.infer.particles import Particles
+from rdb.infer.utils import logsumexp
 from tqdm.auto import tqdm, trange
 from time import time
 
@@ -86,6 +87,7 @@ class IRDOptimalControl(PGM):
         controller,
         runner,
         beta,
+        true_w,
         prior_log_prob,
         normalizer_fn,
         proposal_fn,
@@ -101,17 +103,21 @@ class IRDOptimalControl(PGM):
         self._prior_log_prob = prior_log_prob
         self._normalizer_fn = normalizer_fn
         ## Caching normalizers, samples and features
-        self._norm_sample_weights = {}
-        self._norm_sample_feats = {}
-        self._designer_weights = {}
-        self._sample_weights = {}
-        self._sample_feats = {}
+        self._normalizer = None
+        self._samples = {}
         self._user_actions = {}
         self._user_feats = {}
-        ## Likelihood models
-        designer_kernel = self._build_designer_kernel(beta)
-        self._designer = self._build_sampler(
-            designer_kernel, proposal_fn, sample_method, designer_args
+        # assume designer uses the same beta
+        self._designer = Designer(
+            rng_key,
+            env,
+            controller,
+            runner,
+            beta,
+            true_w,
+            proposal_fn,
+            sample_method,
+            designer_args,
         )
         kernel = self._build_kernel(beta)
         super().__init__(rng_key, kernel, proposal_fn, sample_method, sample_args)
@@ -126,72 +132,50 @@ class IRDOptimalControl(PGM):
     def get_samples(self, task, task_name):
         """Sample features for belief weights on a task
         """
-        assert task_name in self._sample_weights.keys(), f"{task_name} not found"
-        weights = self._sample_weights[task_name]
-
-        # Cache features
-        if task_name not in self._sample_feats.keys():
-            self._cache_samples(task, task_name)
-        feats = self._sample_feats[task_name]
-        return weights, feats
-
-    def get_features(self, task, task_name, sample_weights):
-        """Get features on new task, given weights
-        """
-        # assert task_name not in self._sample_weights.keys()
-        self._sample_weights[task_name] = sample_weights
-        if task_name not in self._sample_feats.keys():
-            self._cache_samples(task, task_name, verbose=False)
-        feats = self._sample_feats[task_name]
-        del self._sample_feats[task_name]
-        del self._sample_weights[task_name]
-        return feats
+        assert task_name in self._samples.keys(), f"{task_name} not found"
+        return self._samples[task_name]
 
     def update(self, obs):
         """ Incorporate new observation """
         pass
 
-    def sample_designer(self, task, task_name, true_w, verbose=True):
-        """Sample b(obs_w) given true_w"""
-        if task_name not in self._sample_weights.keys():
-            sample_ws = self._designer.sample(true_w, task=task)
-            self._designer_weights[task_name] = sample_ws
-        else:
-            sample_ws = self._designer_weights[task_name]
-        return sample_ws
+    def simulate_designer(self, task, task_name):
+        """Sample one w from b(w) on task"""
+        particles = self._designer.sample(task, task_name)
+        return particles.subsample(1)
 
-    def sample(self, task, task_name, obs_w, verbose=True):
-        """Sample b(w) for true weights given obs_w."""
-        # Cache normalizer samples
-        self._cache_normalizer(task, task_name)
-        self._cache_user_feats(task, task_name, obs_w)
+    def sample(self, task, task_name, obs, verbose=True, visualize=False):
+        """Sample b(w) for true weights given obs.weights.
 
-        # Cache user actions
-        if task_name not in self._sample_weights.keys():
-            norm_feats = self._norm_sample_feats[task_name]
-            user_feats = self._user_feats[task_name]
-            sample_ws = self._sampler.sample(
-                obs_w,
-                norm_sample_feats=norm_feats,
-                user_feats=user_feats,
-                verbose=verbose,
+        Args:
+            obs (Particle): 1 observation particle
+
+        """
+        if self._normalizer is None:
+            self._normalizer = self._build_normalizer(task, task_name)
+        user_feats_sum = obs.get_features_sum(task, task_name)
+        norm_feats_sum = self._normalizer.get_features_sum(
+            task, task_name, "Computing Normalizers"
+        )
+        print("Sampling IRD")
+        sample_ws = self._sampler.sample(
+            obs.weights[0],
+            norm_feats_sum=norm_feats_sum,
+            user_feats_sum=user_feats_sum,
+            verbose=verbose,
+        )
+        samples = Particles(
+            self._rng_key, self._env, self._controller, self._runner, sample_ws
+        )
+        self._samples[task_name] = samples
+        if visualize:
+            plot_samples(
+                samples.weights,
+                highlight_dict=obs.weights[0],
+                save_path="data/samples.png",
             )
-            self._sample_weights[task_name] = sample_ws
-        else:
-            sample_ws = self._sample_weights[task_name]
-        return sample_ws
 
-    def evaluate(self, task, task_name, sample_ws):
-        state = self._get_init_state(task)
-        num_violate = 0.0
-        for w in sample_ws:
-            actions = self._controller(state, weights=w)
-            traj, cost, info = self._runner(state, actions, weights=w)
-            violations = info["violations"]
-            num = sum([sum(v) for v in violations.values()])
-            # print(f"violate {num} acs {np.mean(actions):.3f} xs {np.mean(traj):.3f}")
-            num_violate += num
-        return float(num_violate) / len(sample_ws)
+        return self._samples[task_name]
 
     def _get_init_state(self, task):
         self._env.set_task(task)
@@ -199,66 +183,17 @@ class IRDOptimalControl(PGM):
         state = self._env.state
         return state
 
-    def _cache_user_feats(self, task, task_name, user_w):
-        """For new observation, cache optimal features."""
-        if task_name in self._user_feats.keys():
-            return
-
-        state = self._get_init_state(task)
-        actions = self._controller(state, weights=user_w)
-        _, _, info = self._runner(state, actions, weights=user_w)
-        feats = info["feats"]
-        self._user_actions[task_name] = actions
-        self._user_feats[task_name] = feats
-
-    def _cache_samples(self, task, task_name, verbose=True):
-        """For new tasks, see how previous samples do.
-        """
-        assert (
-            task_name in self._sample_weights.keys()
-        ), f"{task_name} weight samples missing"
-        sample_ws = self._sample_weights[task_name]
-        state = self._get_init_state(task)
-        desc = "Collecting Features for Belief Samples"
-        if not verbose:
-            desc = None
-        sample_feats = collect_features(
-            sample_ws, state, self._controller, self._runner, desc=desc
-        )
-        self._sample_feats[task_name] = sample_feats
-
-    def _cache_normalizer(self, task, task_name):
-        """For new tasks, need to build normalizer.
-
-        Normalizer cached in `self._norm_sample_weights` and
-        `self._norm_sample_feats`
-
-        """
-        if task_name in self._norm_sample_weights.keys():
-            return
-
+    def _build_normalizer(self, task, task_name):
+        """For new tasks, need to build normalizer."""
         norm_ws = self._normalizer_fn()
         state = self._get_init_state(task)
-        norm_feats = collect_features(
-            norm_ws,
-            state,
-            self._controller,
-            self._runner,
-            desc="Collecting Normalizer Samples",
+        normalizer = Particles(
+            self._rng_key, self._env, self._controller, self._runner, norm_ws
         )
-        norm_feats = concate_dict_by_keys(norm_feats)
-        self._norm_sample_weights[task_name] = norm_ws
-        self._norm_sample_feats[task_name] = norm_feats
-
-    def _build_designer_kernel(self, beta):
-        def likelihood_fn(true_w, sample_w, task):
-            state = self._get_init_state(task)
-            actions = self._controller(state, weights=sample_w)
-            _, cost, info = self._runner(state, actions, weights=true_w)
-            rew = -1 * cost
-            return beta * rew
-
-        return likelihood_fn
+        norm_feats = normalizer.get_features(
+            task, task_name, desc="Collecting Normalizer Samples"
+        )
+        return normalizer
 
     def _build_kernel(self, beta):
         """Likelihood for observed data.
@@ -267,7 +202,7 @@ class IRDOptimalControl(PGM):
             prior_w (dict): sampled from prior
             user_w (dict): user-specified reward weight
             tasks (array): environment init state
-            norm_sample_feats(array): samples used to normalize likelihood in
+            norm_feats_sum(array): samples used to normalize likelihood in
                 inverse reward design problem. Sampled before running `pgm.sample`.
 
         Example:
@@ -275,37 +210,91 @@ class IRDOptimalControl(PGM):
 
         """
 
-        @jax.jit
-        def _likelihood(sample_w, norm_sample_feats, feats):
-            """IRD likelihood backbone with JAX speed up.
+        def likelihood_fn(user_w, sample_w, norm_feats_sum, user_feats_sum):
+            """Main likelihood logic.
 
             Runs `p(w_obs | w)`
 
             """
-            sample_cost = np.sum([feats[key] * sample_w[key] for key in feats.keys()])
-            sample_rew = -1 * sample_cost
-
-            normalizing_rews = []
-            for key in norm_sample_feats.keys():
-                # sum over episode
-                w = sample_w[key]
-                rew = -1 * np.sum(w * norm_sample_feats[key], axis=1)
-                normalizing_rews.append(rew)
-
+            sample_rew = (
+                -1
+                * np.array(
+                    [sample_w[key] * user_feats_sum[key] for key in sample_w.keys()]
+                ).sum()
+            )
             ## Normalizing constant
-            N = len(norm_sample_feats)
-            log_norm_rew = -np.log(N) + logsumexp(np.sum(normalizing_rews, axis=0))
+            normal_rews = -1 * np.array(
+                [sample_w[key] * norm_feats_sum[key] for key in sample_w.keys()]
+            ).sum(axis=0)
+            N = len(normal_rews)
+            sum_normal_rew = -np.log(N) + logsumexp(normal_rews)
 
-            log_prob = beta * (sample_rew - log_norm_rew)
-            return log_prob
-
-        def likelihood_fn(user_w, sample_w, norm_sample_feats, user_feats):
-            """Main likelihood logic.
-
-            """
-            log_prob = _likelihood(sample_w, norm_sample_feats, user_feats)
-            # print(f"likelihood {log_prob} prior {self._prior_log_prob(sample_w)}")
+            log_prob = beta * (sample_rew - sum_normal_rew)
             log_prob += self._prior_log_prob(sample_w)
             return log_prob
+
+        return likelihood_fn
+
+
+class Designer(PGM):
+    """Simulated designer module. Given true weights, sample noisy rational design weights.
+
+    Note:
+        * Currently assumes same beta, proposal as IRD module, although
+          doesn't have to be.
+    """
+
+    def __init__(
+        self,
+        rng_key,
+        env,
+        controller,
+        runner,
+        beta,
+        true_w,
+        proposal_fn,
+        sample_method,
+        sampler_args,
+    ):
+        self._rng_key = rng_key
+        self._env = env
+        self._controller = controller
+        self._runner = runner
+        self._true_w = true_w
+        kernel = self._build_kernel(beta)
+        self._samples = {}
+        super().__init__(rng_key, kernel, proposal_fn, sample_method, sampler_args)
+
+    def sample(self, task, task_name, verbose=True):
+        """Sample 1 set of weights from b(design_w) given true_w"""
+        if task_name not in self._samples.keys():
+            print("Sampling Designer")
+            sample_ws = self._sampler.sample(self._true_w, task=task)
+            samples = Particles(
+                self._rng_key, self._env, self._controller, self._runner, sample_ws
+            )
+            self._samples[task_name] = samples
+        return self._samples[task_name]
+
+    def _get_init_state(self, task):
+        self._env.set_task(task)
+        self._env.reset()
+        state = self._env.state
+        return state
+
+    @property
+    def true_w(self):
+        return self._true_w
+
+    def update_key(self, rng_key):
+        super().update_key(rng_key)
+
+    def _build_kernel(self, beta):
+        def likelihood_fn(true_w, sample_w, task):
+            state = self._get_init_state(task)
+            actions = self._controller(state, weights=sample_w)
+            _, cost, info = self._runner(state, actions, weights=true_w)
+            rew = -1 * cost
+            return beta * rew
 
         return likelihood_fn

@@ -90,6 +90,7 @@ class DriveWorld(gym.Env):
         )
         self._compile()
         self._constraints_dict, self._constraints_fn = self._get_constraints_fn()
+        self._metadata_dict, self._metadata_fn = self._get_metadata_fn()
 
         # For sampling tasks
         self._rng_key = None
@@ -153,6 +154,10 @@ class DriveWorld(gym.Env):
     @property
     def constraints_dict(self):
         return self._constraints_dict
+
+    @property
+    def metadata_fn(self):
+        return self._metadata_fn
 
     @property
     def raw_features_list(self):
@@ -312,6 +317,9 @@ class DriveWorld(gym.Env):
 
     def _get_constraints_fn(self):
         raise NotImplementedError
+
+    def _get_metadata_fn(self):
+        return {}, lambda x: x
 
     def update_key(self, rng_key):
         self._rng_key = rng_key

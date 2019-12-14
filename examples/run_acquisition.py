@@ -17,16 +17,18 @@ import numpyro.distributions as dist
 RANDOM_KEYS = [1, 2, 3, 4, 5, 6]
 NUM_WARMUPS = 20
 NUM_NORMALIZERS = 80
+# NUM_SAMPLES = 500
+# NUM_ACQUIRE_SAMPLES = 100
 # NUM_NORMALIZERS = 5
-# NUM_SAMPLES = 10
-NUM_SAMPLES = 500
+NUM_SAMPLES = 10
+NUM_ACQUIRE_SAMPLES = 5
 NUM_DESIGNERS = 20
 NUM_ACQUIRE_DESIGNERS = 3
 MAX_WEIGHT = 8.0
 BETA = 5.0
 HORIZON = 10
 EXP_ITERATIONS = 1
-PROPOSAL_VAR = 0.2
+PROPOSAL_VAR = 0.5
 
 env = gym.make("Week3_02-v0")
 env.reset()
@@ -72,6 +74,7 @@ ird_model = IRDOptimalControl(
     controller=controller,
     runner=runner,
     beta=BETA,
+    true_w=true_w,
     prior_log_prob=prior_log_prob_fn,
     normalizer_fn=norm_sample_fn,
     proposal_fn=proposal_fn,
@@ -82,19 +85,23 @@ ird_model = IRDOptimalControl(
 """ Active acquisition function for experiment """
 acquire_fns = {
     # "infogain": ActiveInfoGain(env, ird_model),
-    # "ratiomean": ActiveRatioTest(env, ird_model, method="mean", debug=True),
-    "ratiomin": ActiveRatioTest(env, ird_model, method="min", debug=True)
+    # "ratiomean": ActiveRatioTest(env, ird_model, method="mean", num_acquire_sample=NUM_ACQUIRE_SAMPLES, debug=True),
+    "ratiomin": ActiveRatioTest(
+        env, ird_model, method="min", num_acquire_sample=NUM_ACQUIRE_SAMPLES, debug=True
+    )
 }
 
 experiment = ExperimentActiveIRD(
     env,
-    true_w,
     ird_model,
     acquire_fns,
     eval_tasks=env.all_tasks,
     iterations=EXP_ITERATIONS,
     # Hard coded candidates
-    debug_candidates=[(-0.4, -0.7), (-0.2, 0.6)],
+    fixed_candidates=[(-0.4, -0.7), (-0.2, 0.5)],
+    # fixed_candidates=[(-0.2, 0.5)],
+    debug_belief_task=(-0.2, 0.5),
+    # debug_belief_task=None,
 )
 
 """ Experiment """

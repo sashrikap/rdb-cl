@@ -10,7 +10,20 @@ from numpyro.handlers import scale, condition, seed, trace
 from numpyro.infer import MCMC, NUTS
 
 
-def test_condition():
+def test_sample():
+    rng_key = random.PRNGKey(0)
+
+    def sample():
+        return numpyro.sample("a", ndist.Uniform(0, 10))
+
+    sample_fn = seed(sample, rng_key)
+    print(sample_fn())
+    print(sample_fn())
+    print(sample_fn())
+    print(sample_fn())
+
+
+def ttest_condition():
     def model(rng_key=None, sample_shape=(1,)):
         s = numpyro.sample("s", ndist.Uniform(0.0, 10.0), rng_key=rng_key)
         z = numpyro.sample(
@@ -23,7 +36,7 @@ def test_condition():
     tr["s"]["value"]
 
 
-def test_factor_nuts():
+def ttest_factor_nuts():
     def kernel(rng_key=None, sample_shape=(1,)):
         s = numpyro.sample("s", ndist.Uniform(0.0, 10.0), rng_key=rng_key)
         z = numpyro.sample(
@@ -37,15 +50,15 @@ def test_factor_nuts():
     key = random.PRNGKey(1)
     obs = 1.0
     shape = (100,)
-    import pdb
+    # import pdb
 
-    pdb.set_trace()
+    # pdb.set_trace()
     kernel = NUTS(kernel)
     mcmc = MCMC(kernel, num_warmup=100, num_samples=1000)
     mcmc.run(key)
 
 
-def test_condition_nuts():
+def ttest_condition_nuts():
     def kernel(rng_key=None, sample_shape=(1,)):
         s = numpyro.sample("s", ndist.Uniform(0.0, 10.0), rng_key=rng_key)
         z = numpyro.sample(
