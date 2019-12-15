@@ -33,7 +33,7 @@ class ExperimentActiveIRD(object):
         iteration (int): algorithm iterations
         num_eval_sample (int): evaluating belief samples is costly,
             so subsample belief particles
-        num_task_sample (int): # task candidates for proposal
+        num_proposal_tasks (int): # task candidates for proposal
 
     """
 
@@ -45,7 +45,7 @@ class ExperimentActiveIRD(object):
         iterations=10,
         num_eval_tasks=4,
         num_eval_sample=5,
-        num_task_sample=4,
+        num_proposal_tasks=4,
         fixed_candidates=None,
         debug_belief_task=None,
     ):
@@ -59,7 +59,7 @@ class ExperimentActiveIRD(object):
         self._iterations = iterations
         self._num_eval_tasks = num_eval_tasks
         self._num_eval_sample = num_eval_sample
-        self._num_task_sample = num_task_sample
+        self._num_proposal_tasks = num_proposal_tasks
         # Task proposal
         self._fixed_candidates = fixed_candidates
         self._debug_belief_task = debug_belief_task
@@ -91,7 +91,7 @@ class ExperimentActiveIRD(object):
                 candidates = self._fixed_candidates
             else:
                 candidates = self._random_choice(
-                    self._env.all_tasks, self._num_task_sample
+                    self._env.all_tasks, self._num_proposal_tasks
                 )
             """ Run Active IRD on Candidates """
             print(f"\nActive IRD iteration {it}")
@@ -117,14 +117,13 @@ class ExperimentActiveIRD(object):
 
                 ## Actively propose & Record next task
                 next_task = self._propose_task(candidates, belief, obs, key)
-                import pdb
-
-                pdb.set_trace()
                 curr_tasks[key].append(next_task)
                 curr_task_names[key].append(f"ird_{str(next_task)}")
 
     def _debug_belief(self, belief, task, obs):
-        print(f"Observed weights {obs.weights[0]}")
+        print(f"Observed weights")
+        for key, val in obs.weights[0].items():
+            print(f"-> {key}: {val:.3f}")
         task_name = f"debug_{str(task)}"
         feats = belief.get_features(task, task_name)
         violations = belief.get_violations(task, task_name)
@@ -145,10 +144,14 @@ class ExperimentActiveIRD(object):
 
         """
         scores = []
-        for next_task in candidates:
+        desc = "Evaluaitng candidate tasks"
+        for ni, next_task in enumerate(tqdm(candidates, desc=desc)):
+            # print(f"Task candidate {ni+1}/{len(candidates)}")
             next_task_name = f"acquire_{next_task}"
             scores.append(
-                self._acquire_fns[fn_key](next_task, next_task_name, belief, obs)
+                self._acquire_fns[fn_key](
+                    next_task, next_task_name, belief, obs, verbose=False
+                )
             )
 
         scores = np.array(scores)
@@ -174,5 +177,5 @@ class ExperimentActiveIRD(object):
             performance += perf
             num_violate += np.sum(list(vios.values()))
 
-        print(f"Average Violation {num_violate / len(eval_tasks):.2f}")
-        print(f"Average Performance diff {performance / len(eval_tasks):.2f}")
+        print(f">>> Average Violation {num_violate / len(eval_tasks):.2f}")
+        print(f">>> Average Performance diff {performance / len(eval_tasks):.2f}")

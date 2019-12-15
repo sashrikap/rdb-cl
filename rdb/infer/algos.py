@@ -143,8 +143,6 @@ class MetropolisHasting(Inference):
 
         log_prob = self._kernel(obs, state, **kwargs)
         range_ = range(self._num_warmups)
-        # if verbose:
-        #    range_ = trange(self._num_warmups, desc="MH Warmup")
         for i in range_:
             _, state, log_prob = self._mh_step(obs, state, log_prob, *args, **kwargs)
 

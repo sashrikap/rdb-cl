@@ -16,22 +16,34 @@ import numpyro.distributions as dist
 
 RANDOM_KEYS = [1, 2, 3, 4, 5, 6]
 NUM_WARMUPS = 20
+## Full scale sampling
 # NUM_NORMALIZERS = 80
 # NUM_SAMPLES = 500
 # NUM_ACQUIRE_SAMPLES = 100
 # NUM_EVAL_SAMPLES = 100
-NUM_NORMALIZERS = 5
-NUM_SAMPLES = 10
-NUM_ACQUIRE_SAMPLES = 5
-NUM_EVAL_SAMPLES = 5
+# NUM_EVAL_TASKS = 8
+
+## Faster sampling
+NUM_NORMALIZERS = 50
+NUM_SAMPLES = 100
+NUM_ACQUIRE_SAMPLES = 25
+NUM_EVAL_SAMPLES = 20
 NUM_EVAL_TASKS = 8
+NUM_PROPOSAL_TASKS = 8
+
+## Testing
+# NUM_EVAL_TASKS = 8
+# NUM_NORMALIZERS = 5
+# NUM_SAMPLES = 10
+# NUM_ACQUIRE_SAMPLES = 5
+# NUM_EVAL_SAMPLES = 5
 
 NUM_DESIGNERS = 20
 NUM_ACQUIRE_DESIGNERS = 3
 MAX_WEIGHT = 8.0
 BETA = 5.0
 HORIZON = 10
-EXP_ITERATIONS = 3
+EXP_ITERATIONS = 8
 PROPOSAL_VAR = 0.5
 
 env = gym.make("Week3_02-v0")
@@ -91,7 +103,11 @@ acquire_fns = {
     # "infogain": ActiveInfoGain(env, ird_model),
     # "ratiomean": ActiveRatioTest(env, ird_model, method="mean", num_acquire_sample=NUM_ACQUIRE_SAMPLES, debug=True),
     "ratiomin": ActiveRatioTest(
-        env, ird_model, method="min", num_acquire_sample=NUM_ACQUIRE_SAMPLES, debug=True
+        env,
+        ird_model,
+        method="min",
+        num_acquire_sample=NUM_ACQUIRE_SAMPLES,
+        debug=False,
     )
 }
 
@@ -102,8 +118,9 @@ experiment = ExperimentActiveIRD(
     iterations=EXP_ITERATIONS,
     num_eval_tasks=NUM_EVAL_TASKS,
     num_eval_sample=NUM_EVAL_SAMPLES,
+    num_proposal_tasks=NUM_PROPOSAL_TASKS,
     # Hard coded candidates
-    fixed_candidates=[(-0.4, -0.7), (-0.2, 0.5)],
+    # fixed_candidates=[(-0.4, -0.7), (-0.2, 0.5)],
     # fixed_candidates=[(-0.2, 0.5)],
     debug_belief_task=(-0.2, 0.5),
     # debug_belief_task=None,

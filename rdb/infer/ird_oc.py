@@ -108,7 +108,7 @@ class IRDOptimalControl(PGM):
         self._samples = {}
         self._user_actions = {}
         self._user_feats = {}
-        # assume designer uses the same beta
+        # assume designer uses the same beta and prior
         self._designer = Designer(
             rng_key,
             env,
@@ -116,6 +116,7 @@ class IRDOptimalControl(PGM):
             runner,
             beta,
             true_w,
+            prior_log_prob,
             proposal_fn,
             sample_method,
             designer_args,
@@ -263,6 +264,7 @@ class Designer(PGM):
         runner,
         beta,
         true_w,
+        prior_log_prob,
         proposal_fn,
         sample_method,
         sampler_args,
@@ -272,6 +274,7 @@ class Designer(PGM):
         self._controller = controller
         self._runner = runner
         self._true_w = true_w
+        self._prior_log_prob = prior_log_prob
         kernel = self._build_kernel(beta)
         self._samples = {}
         super().__init__(rng_key, kernel, proposal_fn, sample_method, sampler_args)
@@ -306,6 +309,8 @@ class Designer(PGM):
             actions = self._controller(state, weights=sample_w)
             _, cost, info = self._runner(state, actions, weights=true_w)
             rew = -1 * cost
-            return beta * rew
+            log_prob = beta * rew
+            log_prob += self._prior_log_prob(sample_w)
+            return log_prob
 
         return likelihood_fn

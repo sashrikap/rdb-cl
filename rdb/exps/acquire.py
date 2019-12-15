@@ -91,7 +91,7 @@ class ActiveRatioTest(ActiveInfoGain):
         log_ratios = -1 * np.sum(list(diff_costs.values()), axis=0)
         return np.array(log_ratios)
 
-    def __call__(self, next_task, next_task_name, belief, obs):
+    def __call__(self, next_task, next_task_name, belief, obs, verbose=True):
         """Disagreement criteria.
 
         Score = -1 * rew(sample_w, traj_user)/rew(sample_w, traj_sample).
@@ -102,25 +102,26 @@ class ActiveRatioTest(ActiveInfoGain):
         """
         belief = belief.subsample(self._num_acquire_sample)
 
-        next_feats_sum = belief.get_features_sum(
-            next_task, next_task_name, f"Computing {self._method} acquisition features"
-        )
+        desc = f"Computing {self._method} acquisition features"
+        if not verbose:
+            desc = None
+        next_feats_sum = belief.get_features_sum(next_task, next_task_name, desc=None)
         user_feats_sum = obs.get_features_sum(next_task, next_task_name)
         weights = concate_dict_by_keys(belief.weights)
         log_ratios = self._compute_log_ratios(weights, next_feats_sum, user_feats_sum)
 
+        if self._debug:
+            min_idx = np.argmin(log_ratios)
+            print(f"Acquire method {self._method}")
+            print(f"\tMin weight")
+            for key, val in belief.weights[min_idx].items():
+                print(f"\t-> {key}: {val:.3f}")
+            print(
+                f"\tRatios mean {np.mean(log_ratios):.3f} std {np.std(log_ratios):.3f}"
+            )
         if self._method == "mean":
             return -1 * np.mean(log_ratios)
         elif self._method == "min":
-            if self._debug:
-                min_idx = np.argmin(log_ratios)
-                # import pdb
-
-                # pdb.set_trace()
-                print(f"Min weight {belief.weights[min_idx]}")
-                print(
-                    f"ratios mean {np.mean(log_ratios):.3f} std {np.std(log_ratios):.3f}"
-                )
             return -1 * np.min(log_ratios)
         else:
             raise NotImplementedError
