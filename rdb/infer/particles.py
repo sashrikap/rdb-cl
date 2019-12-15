@@ -2,7 +2,9 @@
 
 """
 from rdb.infer.utils import collect_trajs, random_choice
+from rdb.optim.utils import multiply_dict_by_keys, subtract_dict_by_keys
 from numpyro.handlers import scale, condition, seed
+import jax.numpy as np
 
 
 class Particles(object):
@@ -119,7 +121,18 @@ class Particles(object):
             * compute_features
 
         """
-        pass
+        this_feats_sum = self.get_features_sum(task, task_name)
+        this_cost = multiply_dict_by_keys(target_w, this_feats_sum)
+
+        target = Particles(
+            self._rng_key, self._env, self._controller, self._runner, [target_w]
+        )
+        target_feats_sum = target.get_features_sum(task, task_name)
+        target_cost = multiply_dict_by_keys(target_w, target_feats_sum)
+
+        diff_cost = subtract_dict_by_keys(this_cost, target_cost)
+        diff_rew = -1 * np.sum(list(diff_cost.values()), axis=0).mean()
+        return diff_rew
 
     def _get_init_state(self, task):
         self._env.set_task(task)

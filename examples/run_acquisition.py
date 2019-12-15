@@ -19,15 +19,19 @@ NUM_WARMUPS = 20
 # NUM_NORMALIZERS = 80
 # NUM_SAMPLES = 500
 # NUM_ACQUIRE_SAMPLES = 100
+# NUM_EVAL_SAMPLES = 100
 NUM_NORMALIZERS = 5
 NUM_SAMPLES = 10
 NUM_ACQUIRE_SAMPLES = 5
+NUM_EVAL_SAMPLES = 5
+NUM_EVAL_TASKS = 8
+
 NUM_DESIGNERS = 20
 NUM_ACQUIRE_DESIGNERS = 3
 MAX_WEIGHT = 8.0
 BETA = 5.0
 HORIZON = 10
-EXP_ITERATIONS = 1
+EXP_ITERATIONS = 3
 PROPOSAL_VAR = 0.5
 
 env = gym.make("Week3_02-v0")
@@ -95,8 +99,9 @@ experiment = ExperimentActiveIRD(
     env,
     ird_model,
     acquire_fns,
-    eval_tasks=env.all_tasks,
     iterations=EXP_ITERATIONS,
+    num_eval_tasks=NUM_EVAL_TASKS,
+    num_eval_sample=NUM_EVAL_SAMPLES,
     # Hard coded candidates
     fixed_candidates=[(-0.4, -0.7), (-0.2, 0.5)],
     # fixed_candidates=[(-0.2, 0.5)],

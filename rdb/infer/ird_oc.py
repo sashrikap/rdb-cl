@@ -123,6 +123,10 @@ class IRDOptimalControl(PGM):
         kernel = self._build_kernel(beta)
         super().__init__(rng_key, kernel, proposal_fn, sample_method, sample_args)
 
+    @property
+    def designer(self):
+        return self._designer
+
     def update_key(self, rng_key):
         """ Update random key """
         super().update_key(rng_key)

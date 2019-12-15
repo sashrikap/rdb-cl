@@ -42,8 +42,8 @@ class ExperimentActiveIRD(object):
         env,
         model,
         acquire_fns,
-        eval_tasks,
         iterations=10,
+        num_eval_tasks=4,
         num_eval_sample=5,
         num_task_sample=4,
         fixed_candidates=None,
@@ -52,21 +52,21 @@ class ExperimentActiveIRD(object):
         self._env = env
         self._model = model
         self._acquire_fns = acquire_fns
-        self._eval_tasks = eval_tasks
         # Random key & function
         self._rng_key = None
         self._random_choice = random_choice
         # Numerics
         self._iterations = iterations
+        self._num_eval_tasks = num_eval_tasks
         self._num_eval_sample = num_eval_sample
         self._num_task_sample = num_task_sample
         # Task proposal
         self._fixed_candidates = fixed_candidates
         self._debug_belief_task = debug_belief_task
         # Cache data
-        self._acquire_samples = {}
+        self._acquire_sample_hist = {}
         for key in acquire_fns.keys():
-            self._acquire_samples[key] = []
+            self._acquire_sample_hist[key] = []
 
     def update_key(self, rng_key):
         self._rng_key = rng_key
@@ -74,23 +74,25 @@ class ExperimentActiveIRD(object):
         self._random_choice = seed(self._random_choice, rng_key)
 
     def run(self, task):
-        """Run main evaluation loop."""
+        print(f"============= Main Experiment ({self._rng_key}) =============")
+        """Run main algorithmic loop."""
         curr_tasks, curr_task_names, curr_obs = {}, {}, {}
+        eval_tasks = self._random_choice(self._env.all_tasks, self._num_eval_tasks)
+
+        """Build history for each acquisition function"""
         for key in self._acquire_fns.keys():
-            # Build history for each acquisition function
             curr_obs[key] = []
             curr_tasks[key] = [task]
-            curr_task_names[key] = f"ird_{str(task)}"
+            curr_task_names[key] = [f"ird_{str(task)}"]
 
         for it in range(self._iterations):
-            """ Candidates for next tasks """
+            """Candidates for next tasks """
             if self._fixed_candidates is not None:
                 candidates = self._fixed_candidates
             else:
                 candidates = self._random_choice(
                     self._env.all_tasks, self._num_task_sample
                 )
-
             """ Run Active IRD on Candidates """
             print(f"\nActive IRD iteration {it}")
             for key in curr_tasks.keys():
@@ -111,12 +113,15 @@ class ExperimentActiveIRD(object):
                 ## Evaluate
                 if self._debug_belief_task is not None:
                     self._debug_belief(belief, self._debug_belief_task, obs)
-                # self._evaluate_violation(belief)
-                # self._evaluate_reward(belief)
+                self._evaluate(belief, eval_tasks)
 
                 ## Actively propose & Record next task
-                next_task = self._propose_task(candidates, belief, obs, task, task_name)
+                next_task = self._propose_task(candidates, belief, obs, key)
+                import pdb
+
+                pdb.set_trace()
                 curr_tasks[key].append(next_task)
+                curr_task_names[key].append(f"ird_{str(next_task)}")
 
     def _debug_belief(self, belief, task, obs):
         print(f"Observed weights {obs.weights[0]}")
@@ -126,60 +131,48 @@ class ExperimentActiveIRD(object):
         # if np.sum(info["metadata"]["overtake1"]) > 0:
         #    import pdb; pdb.set_trace()
 
-    def _propose_task(self, candidates, belief, obs, curr_task, curr_task_name):
-        """Propose next task to designer.
+    def _propose_task(self, candidates, belief, obs, fn_key):
+        """Find best next task for this acquire function.
 
         Args:
             candidates (list): potential next tasks
             obs (Particle[1]): current observed weight
+            fn_key (str): acquisition function key
 
         Note:
             * Require `tasks = env.sample_task()`
             * Use small task space to avoid being too slow.
 
-        TODO:
-            * `env.sample_task()`: small number of samples
         """
-        acquire_scores = {}
-        acquire_tasks = {}
-        for key, ac_fn in self._acquire_fns.items():
-            acquire_scores[key] = []
-            for next_task in candidates:
-                next_task_name = f"acquire_{next_task}"
-                acquire_scores[key].append(
-                    ac_fn(next_task, next_task_name, belief, obs)
-                )
+        scores = []
+        for next_task in candidates:
+            next_task_name = f"acquire_{next_task}"
+            scores.append(
+                self._acquire_fns[fn_key](next_task, next_task_name, belief, obs)
+            )
 
-        import pdb
+        scores = np.array(scores)
+        next_task = candidates[np.argmax(scores)]
+        return next_task
 
-        pdb.set_trace()
-        """ Find best task for each acquire function """
-        for key, scores in acquire_scores.items():
-            acquire_tasks[key] = candidates[np.argsort(scores)[0]]
+    def _evaluate(self, belief, eval_tasks):
+        """Evaluate current sampled belief on eval task.
 
-    def _evaluate_violation(self, belief):
-        """Evaluate current sampled belief based on violations.
-
-        Note:
-            * Require `runner` to collect constraint violations.
-            * The fewer violations, the better.
+        Criteria:
+            * Relative Reward.
+            * Violations.
 
         """
+        belief = belief.subsample(self._num_eval_sample)
         num_violate = 0.0
-        for task in tqdm(self._eval_tasks, desc="Evaluating samples"):
+        performance = 0.0
+        for task in tqdm(eval_tasks, desc="Evaluating samples"):
             task_name = f"eval_{task}"
-            violations = belief.get_violations(task, task_name)
-            # num_violate += sum([sum(v) for v in vio.values()])
-        # print(f"Average Violation {num_violate / len(self._eval_tasks):.2f}")
+            vios = belief.get_violations(task, task_name)
+            perf = belief.compare_with(task, task_name, self._model.designer.true_w)
 
-    def _evaluate_reward(self, belief, task, task_name):
-        """Evaluate current sampled belief.
+            performance += perf
+            num_violate += np.sum(list(vios.values()))
 
-        Note:
-            * The higher the better.
-
-        """
-        for task in tqdm(self._eval_tasks, desc="Evaluating samples"):
-            task_name = f"eval_{task}"
-            comparison = belief.compare_with(task, task_name, eval_ws)
-        print(f"Average Violation {num_violate / len(self._eval_tasks):.2f}")
+        print(f"Average Violation {num_violate / len(eval_tasks):.2f}")
+        print(f"Average Performance diff {performance / len(eval_tasks):.2f}")

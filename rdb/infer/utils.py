@@ -87,6 +87,7 @@ def collect_trajs(list_ws, state, controller, runner, desc=None):
         violations.append(info["violations"])
     feats = concate_dict_by_keys(feats)
     feats_sum = concate_dict_by_keys(feats_sum)
+    violations = concate_dict_by_keys(violations)
     return actions, feats, feats_sum, violations
 
 

@@ -114,9 +114,9 @@ class ActiveRatioTest(ActiveInfoGain):
         elif self._method == "min":
             if self._debug:
                 min_idx = np.argmin(log_ratios)
-                import pdb
+                # import pdb
 
-                pdb.set_trace()
+                # pdb.set_trace()
                 print(f"Min weight {belief.weights[min_idx]}")
                 print(
                     f"ratios mean {np.mean(log_ratios):.3f} std {np.std(log_ratios):.3f}"
