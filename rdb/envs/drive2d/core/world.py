@@ -293,9 +293,7 @@ class DriveWorld(gym.Env):
 
     def _get_raw_features(self):
         feats_dict = self._get_raw_features_dict()
-        feats_list = list(
-            sort_dict_based_on_keys(feats_dict, self.features_keys).values()
-        )
+        feats_list = list(sort_dict_by_keys(feats_dict, self.features_keys).values())
         return feats_dict, feats_list
 
     def _get_features_fn(self):

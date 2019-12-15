@@ -30,7 +30,7 @@ class EntranceDriveWorld_Week4(EntranceDriveWorld):
         lane_width=0.13,
     ):
         cars = []
-        weights = sort_dict_based_on_keys(weights, self.features_keys)
+        weights = sort_dict_by_keys(weights, self.features_keys)
         weights_list = weights.values()
         for state, speed in zip(car_states, car_speeds):
             cars.append(FixSpeedCar(self, np.array(state), speed))
@@ -92,7 +92,7 @@ class EntranceDriveWorld_Week4(EntranceDriveWorld):
             nonlinear_dict[key] = jax.jit(fn)
 
         nonlinear_list = list(
-            sort_dict_based_on_keys(nonlinear_dict, self.features_keys).values()
+            sort_dict_by_keys(nonlinear_dict, self.features_keys).values()
         )
         feats_list = chain_list_funcs(nonlinear_list, feats_dict)
         return feats_list

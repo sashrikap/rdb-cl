@@ -75,10 +75,12 @@ class ExperimentActiveIRD(object):
 
     def run(self, task):
         """Run main evaluation loop."""
-        curr_tasks = {}
-        for fn_key in self._acquire_fns.keys():
+        curr_tasks, curr_task_names, curr_obs = {}, {}, {}
+        for key in self._acquire_fns.keys():
             # Build history for each acquisition function
-            curr_tasks[fn_key] = [task]
+            curr_obs[key] = []
+            curr_tasks[key] = [task]
+            curr_task_names[key] = f"ird_{str(task)}"
 
         for it in range(self._iterations):
             """ Candidates for next tasks """
@@ -91,16 +93,21 @@ class ExperimentActiveIRD(object):
 
             """ Run Active IRD on Candidates """
             print(f"\nActive IRD iteration {it}")
-            for fn_key, fn_tasks in curr_tasks.items():
+            for key in curr_tasks.keys():
                 ## Collect observation
-                task = fn_tasks[-1]
-                task_name = f"ird_{str(task)}"
+                task = curr_tasks[key][-1]
+                task_name = curr_task_names[key][-1]
                 obs = self._model.simulate_designer(task, task_name)
-                print(f"Fn name: {fn_key}; Task name {task_name}")
+                curr_obs[key].append(obs)
+                print(f"Fn name: {key}; Task name {task_name}")
 
                 ## Main IRD Sampling
-                belief = self._model.sample(task, task_name, obs=obs, visualize=True)
-
+                belief = self._model.sample(
+                    curr_tasks[key],
+                    curr_task_names[key],
+                    obs=curr_obs[key],
+                    visualize=True,
+                )
                 ## Evaluate
                 if self._debug_belief_task is not None:
                     self._debug_belief(belief, self._debug_belief_task, obs)
@@ -109,23 +116,15 @@ class ExperimentActiveIRD(object):
 
                 ## Actively propose & Record next task
                 next_task = self._propose_task(candidates, belief, obs, task, task_name)
-                curr_tasks[fn_key].append(next_task)
+                curr_tasks[key].append(next_task)
 
     def _debug_belief(self, belief, task, obs):
         print(f"Observed weights {obs.weights[0]}")
         task_name = f"debug_{str(task)}"
         feats = belief.get_features(task, task_name)
         violations = belief.get_violations(task, task_name)
-        """self._env.set_task(task)
-        for idx, sample_w in enumerate(tqdm(samples.weights, desc="Debugging beliefs")):
-            self._env.reset()
-            state = self._env.state
-            actions = self._model._controller(state, weights=sample_w)
-            traj, cost, info = self._model._runner(state, actions, weights=sample_w)"""
         # if np.sum(info["metadata"]["overtake1"]) > 0:
         #    import pdb; pdb.set_trace()
-        # path = f"data/191213/belief_{idx}.mp4"
-        # self._model._runner.collect_mp4(state, actions, path=path)
 
     def _propose_task(self, candidates, belief, obs, curr_task, curr_task_name):
         """Propose next task to designer.

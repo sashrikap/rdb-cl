@@ -144,7 +144,7 @@ class Runner(object):
         """
         # TODO: action space shape checking
         assert self._cost_runtime is not None, "Cost function improperly defined"
-        weights_dict = sort_dict_based_on_keys(weights, self._env.features_keys)
+        weights_dict = sort_dict_by_keys(weights, self._env.features_keys)
         weights = np.array(list(weights_dict.values()))
         cost_fn = partial(self._cost_runtime, weights=weights)
 

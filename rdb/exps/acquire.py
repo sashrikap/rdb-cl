@@ -8,6 +8,11 @@ Include:
 """
 
 import jax.numpy as np
+from rdb.optim.utils import (
+    multiply_dict_by_keys,
+    subtract_dict_by_keys,
+    concate_dict_by_keys,
+)
 
 
 class ActiveInfoGain(object):
@@ -25,10 +30,13 @@ class ActiveInfoGain(object):
         self._tasks = []
         self._debug = debug
 
-    def __call__(
-        self, next_task, next_task_name, curr_task, curr_task_name, random_choice_fn
-    ):
-        """
+    def __call__(self, next_task, next_task_name, belief, obs):
+        """Information gain (negative entropy) criteria.
+
+        Note:
+            * Equivalent to ranking by negative post-obs entropy -H(X|Y)
+              [H(X) - H(X|Y)] - [H(X) - H(X|Y')] = H(X|Y') - H(X|Y)
+
         Pseudocode:
         ```
         self._tasks.append(task)
@@ -70,23 +78,17 @@ class ActiveRatioTest(ActiveInfoGain):
     def _compute_log_ratios(self, weights, next_feats_sum, user_feats_sum):
         """Compares user features with belief sample features (from samplw_ws).
 
+        Ratio = exp(next_w @ user_feats) / exp(next_w @ next_feats)
+
         TODO:
             * Ugly API, assumes next_feats is 1 designer sample
 
         """
 
-        log_ratios = []
-        for w_i, ws in enumerate(weights):
-            diff_rew = (
-                -1
-                * np.array(
-                    [
-                        ws[key] * (user_feats_sum[key][0] - next_feats_sum[key][w_i])
-                        for key in ws.keys()
-                    ]
-                ).sum()
-            )
-            log_ratios.append(diff_rew)
+        next_costs = multiply_dict_by_keys(weights, next_feats_sum)
+        user_costs = multiply_dict_by_keys(weights, user_feats_sum)
+        diff_costs = subtract_dict_by_keys(user_costs, next_costs)
+        log_ratios = -1 * np.sum(list(diff_costs.values()), axis=0)
         return np.array(log_ratios)
 
     def __call__(self, next_task, next_task_name, belief, obs):
@@ -98,27 +100,27 @@ class ActiveRatioTest(ActiveInfoGain):
             * The higher the better.
 
         """
-        # Get current cached belief samples (TODO: may be error prone)
-        # curr_ws, curr_feats = self._model.get_samples(curr_task, curr_task_name)
         belief = belief.subsample(self._num_acquire_sample)
 
-        next_feats_sum = belief.get_features_sum(next_task, next_task_name)
-        user_feats_sum = obs.get_features_sum(next_task, next_task_name)
-        log_ratios = self._compute_log_ratios(
-            belief.weights, next_feats_sum, user_feats_sum
+        next_feats_sum = belief.get_features_sum(
+            next_task, next_task_name, f"Computing {self._method} acquisition features"
         )
+        user_feats_sum = obs.get_features_sum(next_task, next_task_name)
+        weights = concate_dict_by_keys(belief.weights)
+        log_ratios = self._compute_log_ratios(weights, next_feats_sum, user_feats_sum)
+
         if self._method == "mean":
             return -1 * np.mean(log_ratios)
         elif self._method == "min":
             if self._debug:
                 min_idx = np.argmin(log_ratios)
+                import pdb
+
+                pdb.set_trace()
                 print(f"Min weight {belief.weights[min_idx]}")
                 print(
                     f"ratios mean {np.mean(log_ratios):.3f} std {np.std(log_ratios):.3f}"
                 )
-            import pdb
-
-            pdb.set_trace()
             return -1 * np.min(log_ratios)
         else:
             raise NotImplementedError

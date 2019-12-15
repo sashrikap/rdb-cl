@@ -6,7 +6,14 @@ from toolz.functoolz import juxt
 from operator import mul, add
 
 
-def sort_dict_based_on_keys(dict_, keys):
+"""
+    ==================================================
+    ================ Dictionary Tools ================
+    ==================================================
+"""
+
+
+def sort_dict_by_keys(dict_, keys):
     d = OrderedDict()
     for k in keys:
         assert k in dict_.keys()
@@ -30,6 +37,41 @@ def concate_dict_by_keys(dicts):
         for key in keys:
             out_dict[key] = np.array([d[key] for d in dicts])
         return out_dict
+
+
+def multiply_dict_by_keys(da, db):
+    """Multiply key-value pairs.
+
+    Usage:
+        * Trajectory cost computation
+
+    """
+    newd = OrderedDict()
+    for k, va in da.items():
+        assert k in db.keys()
+        newd[k] = va * db[k]
+    return newd
+
+
+def subtract_dict_by_keys(da, db):
+    """Subtract key-value pairs.
+
+    Usage:
+        * Trajectory cost comparisons
+
+    """
+    newd = OrderedDict()
+    for k, va in da.items():
+        assert k in db.keys()
+        newd[k] = va - db[k]
+    return newd
+
+
+"""
+    ==================================================
+    ================ Functional Tools ================
+    ==================================================
+"""
 
 
 def compose(*functions):

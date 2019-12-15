@@ -200,7 +200,7 @@ class Optimizer(object):
 
     def __call__(self, x0, u0=None, weights=None, init="zeros"):
         # Turn dict into sorted list
-        weights_dict = sort_dict_based_on_keys(weights, self._features_keys)
+        weights_dict = sort_dict_by_keys(weights, self._features_keys)
         weights = np.array(list(weights_dict.values()))
 
         if not self._compiled:

@@ -13,6 +13,7 @@ import numpyro
 import jax
 from numpyro.handlers import scale, condition, seed
 from rdb.exps.utils import plot_samples
+from rdb.optim.utils import multiply_dict_by_keys
 from rdb.infer.algos import *
 from rdb.infer.particles import Particles
 from rdb.infer.utils import logsumexp
@@ -144,38 +145,49 @@ class IRDOptimalControl(PGM):
         particles = self._designer.sample(task, task_name)
         return particles.subsample(1)
 
-    def sample(self, task, task_name, obs, verbose=True, visualize=False):
+    def sample(self, tasks, task_names, obs, verbose=True, visualize=False):
         """Sample b(w) for true weights given obs.weights.
 
         Args:
-            obs (Particle): 1 observation particle
+            tasks (list): list of tasks so far
+            task_names (list): list of task names so far
+            obs (list): list of observation particles, each for 1 task
+
+        Note:
+            * Samples are cached by the last task name to date (`task_names[-1]`)
 
         """
         if self._normalizer is None:
-            self._normalizer = self._build_normalizer(task, task_name)
-        user_feats_sum = obs.get_features_sum(task, task_name)
-        norm_feats_sum = self._normalizer.get_features_sum(
-            task, task_name, "Computing Normalizers"
-        )
+            self._normalizer = self._build_normalizer(tasks[0], task_names[0])
+        user_feats_sums, norm_feats_sums = [], []
+        for task_i, name_i, obs_i in zip(tasks, task_names, obs):
+            user_feats_sums.append(obs_i.get_features_sum(task_i, name_i))
+            norm_feats_sums.append(
+                self._normalizer.get_features_sum(
+                    task_i, name_i, "Computing Normalizers"
+                )
+            )
+        all_obs_ws = [obs_i.weights[0] for obs_i in obs]
+        last_obs_w = obs[-1].weights[0]
+        last_name = task_names[-1]
+
         print("Sampling IRD")
         sample_ws = self._sampler.sample(
-            obs.weights[0],
-            norm_feats_sum=norm_feats_sum,
-            user_feats_sum=user_feats_sum,
+            obs=all_obs_ws,  # all obs so far
+            init_state=last_obs_w,  # initialize with last obs
+            norm_feats_sums=norm_feats_sums,
+            user_feats_sums=user_feats_sums,
             verbose=verbose,
         )
         samples = Particles(
             self._rng_key, self._env, self._controller, self._runner, sample_ws
         )
-        self._samples[task_name] = samples
+        self._samples[last_name] = samples
         if visualize:
             plot_samples(
-                samples.weights,
-                highlight_dict=obs.weights[0],
-                save_path="data/samples.png",
+                samples.weights, highlight_dict=last_obs_w, save_path="data/samples.png"
             )
-
-        return self._samples[task_name]
+        return self._samples[last_name]
 
     def _get_init_state(self, task):
         self._env.set_task(task)
@@ -196,7 +208,7 @@ class IRDOptimalControl(PGM):
         return normalizer
 
     def _build_kernel(self, beta):
-        """Likelihood for observed data.
+        """Likelihood for observed data, used as `PGM._kernel`.
 
         Args:
             prior_w (dict): sampled from prior
@@ -205,31 +217,26 @@ class IRDOptimalControl(PGM):
             norm_feats_sum(array): samples used to normalize likelihood in
                 inverse reward design problem. Sampled before running `pgm.sample`.
 
-        Example:
-            >>> log_prob = likelihood_fn(weight, task)
-
         """
 
-        def likelihood_fn(user_w, sample_w, norm_feats_sum, user_feats_sum):
+        def likelihood_fn(user_ws, sample_w, norm_feats_sums, user_feats_sums):
             """Main likelihood logic.
 
             Runs `p(w_obs | w)`
 
             """
-            sample_rew = (
-                -1
-                * np.array(
-                    [sample_w[key] * user_feats_sum[key] for key in sample_w.keys()]
-                ).sum()
-            )
-            ## Normalizing constant
-            normal_rews = -1 * np.array(
-                [sample_w[key] * norm_feats_sum[key] for key in sample_w.keys()]
-            ).sum(axis=0)
-            N = len(normal_rews)
-            sum_normal_rew = -np.log(N) + logsumexp(normal_rews)
+            log_prob = 0.0
+            for n_feats_sum, u_feats_sum in zip(norm_feats_sums, user_feats_sums):
+                for val in u_feats_sum.values():
+                    assert len(val) == 1, "Only can take 1 user sample"
+                sample_costs = multiply_dict_by_keys(sample_w, u_feats_sum)
+                sample_rew = -1 * np.sum(list(sample_costs.values()))
+                ## Normalizing constant
+                normal_costs = multiply_dict_by_keys(sample_w, n_feats_sum)
+                normal_rews = -1 * np.sum(list(normal_costs.values()), axis=0)
+                sum_normal_rew = -np.log(len(normal_rews)) + logsumexp(normal_rews)
 
-            log_prob = beta * (sample_rew - sum_normal_rew)
+                log_prob += beta * (sample_rew - sum_normal_rew)
             log_prob += self._prior_log_prob(sample_w)
             return log_prob
 

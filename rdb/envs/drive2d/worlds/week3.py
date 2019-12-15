@@ -40,7 +40,7 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
         cars = []
         for state, speed in zip(car_states, car_speeds):
             cars.append(FixSpeedCar(self, np.array(state), speed))
-        weights = sort_dict_based_on_keys(weights, self.features_keys)
+        weights = sort_dict_by_keys(weights, self.features_keys)
         weights_list = weights.values()
         main_car = OptimalControlCar(self, weights_list, main_state, horizon)
         self._goal_speed = goal_speed
@@ -122,7 +122,7 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
             nonlinear_dict[key] = jax.jit(fn)
 
         nonlinear_list = list(
-            sort_dict_based_on_keys(nonlinear_dict, self.features_keys).values()
+            sort_dict_by_keys(nonlinear_dict, self.features_keys).values()
         )
         feats_list = chain_list_funcs(nonlinear_list, feats_list)
         return feats_list

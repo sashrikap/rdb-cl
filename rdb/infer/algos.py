@@ -123,9 +123,19 @@ class MetropolisHasting(Inference):
         self._coin_flip = self._create_coin_flip()
 
     def sample(
-        self, obs, verbose=True, num_warmups=None, num_samples=None, *args, **kwargs
+        self,
+        obs,
+        verbose=True,
+        init_state=None,
+        num_warmups=None,
+        num_samples=None,
+        *args,
+        **kwargs,
     ):
-        state = obs
+        if init_state is None:
+            state = obs
+        else:
+            state = init_state
         if num_warmups is None:
             num_warmups = self._num_warmups
         if num_samples is None:
