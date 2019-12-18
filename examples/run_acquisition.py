@@ -5,7 +5,7 @@ Note:
 
 """
 from rdb.exps.active_ird import ExperimentActiveIRD
-from rdb.exps.acquire import ActiveInfoGain, ActiveRatioTest
+from rdb.exps.acquire import ActiveInfoGain, ActiveRatioTest, ActiveRandom
 from rdb.optim.mpc import shooting_method
 from rdb.infer.ird_oc import IRDOptimalControl
 from rdb.infer.utils import *
@@ -14,8 +14,14 @@ from jax import random
 import gym, rdb.envs.drive2d
 import numpyro.distributions as dist
 
-RANDOM_KEYS = [1, 2, 3, 4, 5, 6]
+# RANDOM_KEYS = [1, 2, 3, 4]
+# RANDOM_KEYS = [5, 6, 7, 8]
+# RANDOM_KEYS = [9, 10, 11, 12]
+# RANDOM_KEYS = [13, 14, 15, 16]
+RANDOM_KEYS = [17, 18, 19, 20]
 NUM_WARMUPS = 20
+NUM_PROPOSAL_TASKS = 16
+
 ## Full scale sampling
 # NUM_NORMALIZERS = 80
 # NUM_SAMPLES = 500
@@ -24,27 +30,26 @@ NUM_WARMUPS = 20
 # NUM_EVAL_TASKS = 8
 
 ## Faster sampling
-NUM_NORMALIZERS = 50
-NUM_SAMPLES = 100
+NUM_NORMALIZERS = 100
+NUM_SAMPLES = 200
 NUM_ACQUIRE_SAMPLES = 25
-NUM_EVAL_SAMPLES = 20
+NUM_EVAL_SAMPLES = 50
 NUM_EVAL_TASKS = 8
-NUM_PROPOSAL_TASKS = 8
 
 ## Testing
-# NUM_EVAL_TASKS = 8
 # NUM_NORMALIZERS = 5
 # NUM_SAMPLES = 10
-# NUM_ACQUIRE_SAMPLES = 5
+# NUM_ACQUIRE_SAMPLES = 10
 # NUM_EVAL_SAMPLES = 5
+# NUM_EVAL_TASKS = 8
 
 NUM_DESIGNERS = 20
-NUM_ACQUIRE_DESIGNERS = 3
+NUM_ACQUIRE_DESIGNERS = 4
 MAX_WEIGHT = 8.0
 BETA = 5.0
 HORIZON = 10
 EXP_ITERATIONS = 8
-PROPOSAL_VAR = 0.5
+PROPOSAL_VAR = 0.2
 
 env = gym.make("Week3_02-v0")
 env.reset()
@@ -100,15 +105,32 @@ ird_model = IRDOptimalControl(
 
 """ Active acquisition function for experiment """
 acquire_fns = {
-    # "infogain": ActiveInfoGain(env, ird_model),
-    # "ratiomean": ActiveRatioTest(env, ird_model, method="mean", num_acquire_sample=NUM_ACQUIRE_SAMPLES, debug=True),
-    "ratiomin": ActiveRatioTest(
-        env,
-        ird_model,
-        method="min",
+    "infogain": ActiveInfoGain(
+        rng_key=None,
+        env=env,
+        model=ird_model,
+        beta=BETA,
+        num_designers=NUM_ACQUIRE_DESIGNERS,
         num_acquire_sample=NUM_ACQUIRE_SAMPLES,
         debug=False,
-    )
+    ),
+    # "ratiomean": ActiveRatioTest(
+    #     rng_key=None,
+    #     env=env,
+    #     model=ird_model,
+    #     method="mean",
+    #     num_acquire_sample=NUM_ACQUIRE_SAMPLES,
+    #     debug=False,
+    # ),
+    # "ratiomin": ActiveRatioTest(
+    #     rng_key=None,
+    #     env=env,
+    #     model=ird_model,
+    #     method="min",
+    #     num_acquire_sample=NUM_ACQUIRE_SAMPLES,
+    #     debug=False,
+    # ),
+    # "random": ActiveRandom(rng_key=None, env=env, model=ird_model),
 }
 
 experiment = ExperimentActiveIRD(
@@ -124,6 +146,7 @@ experiment = ExperimentActiveIRD(
     # fixed_candidates=[(-0.2, 0.5)],
     debug_belief_task=(-0.2, 0.5),
     # debug_belief_task=None,
+    save_path="data/191217/active_ird_exp1",
 )
 
 """ Experiment """

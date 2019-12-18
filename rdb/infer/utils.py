@@ -9,6 +9,7 @@ from rdb.optim.utils import concate_dict_by_keys
 from numpyro.handlers import seed
 from scipy.stats import gaussian_kde
 from tqdm.auto import tqdm, trange
+from itertools import accumulate
 
 
 def stack_dict_values(dicts, normalize=False):
@@ -56,13 +57,33 @@ def logsumexp(vs):
     return max_v + np.log(sum_exp)
 
 
-def random_choice(items, num):
-    assert num < len(items), f"Only has {len(items)} items"
-    arr = numpyro.sample(
-        "random_choice", dist.Uniform(0, 1), sample_shape=(len(items),)
-    )
-    arr = np.argsort(arr)[:num]
-    return [items[idx] for idx in arr]
+def random_choice(items, num, probs=None, replacement=True):
+    if not replacement:
+        # no replacement
+        assert probs is None, "Cannot use probs without replacement"
+        assert num < len(items), f"Only has {len(items)} items"
+        arr = numpyro.sample(
+            "random_choice", dist.Uniform(0, 1), sample_shape=(len(items),)
+        )
+        idxs = np.argsort(arr)[:num]
+        return [items[idx] for idx in idxs]
+    else:
+        # with replacement
+        if probs is None:
+            probs = np.ones(len(items)) / len(items)
+        else:
+            assert len(probs) == len(items)
+            probs = probs / np.sum(probs)
+        probs = np.array(list(accumulate(probs)))
+        arr = numpyro.sample("random_choice", dist.Uniform(0, 1), sample_shape=(num,))
+        arr = np.repeat(arr[:, None], len(items), axis=1)
+        diff = arr - probs
+        idxs = np.argmax(diff < 0, axis=1)
+        return [items[idx] for idx in idxs]
+
+
+def random_uniform():
+    return numpyro.sample("random", dist.Uniform(0, 1))
 
 
 def collect_trajs(list_ws, state, controller, runner, desc=None):
@@ -178,18 +199,3 @@ def normalizer_sample(sample_fn, num):
         # for _ in trange(num, desc="Normalizer weights"):
         samples.append(sample_fn())
     return samples
-
-
-def estimate_entropy(data, method="gaussian"):
-    """
-    Args:
-        data (ndarray): (N, dim)
-    """
-    if method == "gaussian":
-        # scipy gaussian kde requires transpose
-        kernel = gaussian_kde(data.T)
-        N = data.shape[0]
-        entropy = -(1.0 / N) * np.sum(np.log(kernel(data.T)))
-    elif method == "histogram":
-        raise NotImplementedError
-    return entropy

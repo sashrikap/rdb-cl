@@ -22,5 +22,6 @@ setup(
         "toolz",
         "funcy",
         "PyOpenGL",
+        "seaborn",
     ],
 )

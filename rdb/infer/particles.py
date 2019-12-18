@@ -2,9 +2,15 @@
 
 """
 from rdb.infer.utils import collect_trajs, random_choice
-from rdb.optim.utils import multiply_dict_by_keys, subtract_dict_by_keys
+from rdb.optim.utils import (
+    multiply_dict_by_keys,
+    subtract_dict_by_keys,
+    concate_dict_by_keys,
+)
 from numpyro.handlers import scale, condition, seed
+from scipy.stats import gaussian_kde
 import jax.numpy as np
+import numpy as onp
 
 
 class Particles(object):
@@ -48,9 +54,9 @@ class Particles(object):
             return self
         else:
             assert (
-                len(self._sample_ws) > num_samples
+                len(self._sample_ws) >= num_samples
             ), f"Not enough samples for {num_samples}."
-            sub_ws = self._random_choice(self._sample_ws, num_samples)
+            sub_ws = self._random_choice(self._sample_ws, num_samples, replacement=True)
             return Particles(
                 self._rng_key, self._env, self._controller, self._runner, sub_ws
             )
@@ -132,6 +138,8 @@ class Particles(object):
 
         diff_cost = subtract_dict_by_keys(this_cost, target_cost)
         diff_rew = -1 * np.sum(list(diff_cost.values()), axis=0).mean()
+        # if diff_rew > 0:
+        #    import pdb; pdb.set_trace()
         return diff_rew
 
     def _get_init_state(self, task):
@@ -141,16 +149,50 @@ class Particles(object):
         return state
 
     def resample(self, probs):
-        """Similar to particle filter update, resample from list of existing particles
-        using provided list of probabilities.
+        """Resample from particles using list of probs. Similar to particle filter update."""
+        new_ws = self._random_choice(
+            self.weights, len(self.weights), probs=probs, replacement=True
+        )
+        return Particles(
+            self._rng_key, self._env, self._controller, self._runner, new_ws
+        )
+
+    def entropy(self, method="histogram", bins=100, ranges=(-8.0, 8.0)):
+        """Estimate entropy
+
+        Note:
+            * Gaussian histogram may cause instability
+
+        TODO:
+            * assumes that first weight is unchanging
 
         """
-        raise NotImplementedError
-        # Clear cache
-        self._sample_feats = {}
-        self._sample_feats_sum = {}
-        self._sample_violations = {}
 
-    def entropy(self):
-        raise NotImplementedError
+        concate_weights = concate_dict_by_keys(self.weights)
+        data = np.array(list(concate_weights.values()))
+
+        # Omit first weight
+        data = np.log(data[1:, :])
+        if method == "gaussian":
+            # scipy gaussian kde requires transpose
+            kernel = gaussian_kde(data)
+            N = data.shape[1]
+            entropy = -(1.0 / N) * np.sum(np.log(kernel(data)))
+        elif method == "histogram":
+            entropy = 0.0
+            for row in data:
+                hist = onp.histogram(row, bins=bins, range=ranges, density=True)
+                data = hist[0]
+                ent = -(data * onp.ma.log(onp.abs(data))).sum()
+                entropy += ent
+        return entropy
+
+    def visualize(self, path):
+        # TODO
+        # path ../plots/seed_{}_iteration_{}_method.png
+        pass
+
+    def save(self, path):
+        # TODO
+        # path: ../particles/seed_{}_iteration_{}_method.npz
         pass

@@ -161,18 +161,22 @@ class IRDOptimalControl(PGM):
         Note:
             * Samples are cached by the last task name to date (`task_names[-1]`)
 
+        TODO:
+            * currently `tasks`, `task_names`, `obs` are ugly lists
+
         """
         if self._normalizer is None:
             self._normalizer = self._build_normalizer(tasks[0], task_names[0])
-        user_feats_sums, norm_feats_sums = [], []
+        all_obs_ws = []
+        all_user_feats_sum, all_norm_feats_sum = [], []
         for task_i, name_i, obs_i in zip(tasks, task_names, obs):
-            user_feats_sums.append(obs_i.get_features_sum(task_i, name_i))
-            norm_feats_sums.append(
+            all_obs_ws.append(obs_i.weights[0])
+            all_user_feats_sum.append(obs_i.get_features_sum(task_i, name_i))
+            all_norm_feats_sum.append(
                 self._normalizer.get_features_sum(
                     task_i, name_i, "Computing Normalizers"
                 )
             )
-        all_obs_ws = [obs_i.weights[0] for obs_i in obs]
         last_obs_w = obs[-1].weights[0]
         last_name = task_names[-1]
 
@@ -180,8 +184,8 @@ class IRDOptimalControl(PGM):
         sample_ws = self._sampler.sample(
             obs=all_obs_ws,  # all obs so far
             init_state=last_obs_w,  # initialize with last obs
-            norm_feats_sums=norm_feats_sums,
-            user_feats_sums=user_feats_sums,
+            norm_feats_sums=all_norm_feats_sum,
+            user_feats_sums=all_user_feats_sum,
             verbose=verbose,
         )
         samples = Particles(

@@ -13,6 +13,8 @@ from rdb.optim.utils import (
     subtract_dict_by_keys,
     concate_dict_by_keys,
 )
+from rdb.infer.utils import logsumexp, random_uniform
+from numpyro.handlers import seed
 
 
 class ActiveInfoGain(object):
@@ -20,40 +22,78 @@ class ActiveInfoGain(object):
 
     Args:
         model (object): IRD Model
+
     """
 
-    def __init__(self, env, model, num_designers=5, num_acquire_sample=5, debug=False):
+    def __init__(
+        self,
+        rng_key,
+        env,
+        model,
+        beta,
+        num_designers=5,
+        num_acquire_sample=5,
+        debug=False,
+    ):
+        self._rng_key = rng_key
         self._env = env
         self._model = model
+        self._beta = beta
         self._num_designers = 5
         self._num_acquire_sample = num_acquire_sample
         self._tasks = []
         self._debug = debug
+        self._method = "InfoGain"
 
-    def __call__(self, next_task, next_task_name, belief, obs):
+    def update_key(self, rng_key):
+        self._rng_key = rng_key
+
+    def _compute_probs(self, new_weights, next_feats_sum):
+        """Computes prob of features (from original w) given new w.
+        """
+        new_costs = multiply_dict_by_keys(new_weights, next_feats_sum)
+        log_probs = -1 * self._beta * np.sum(list(new_costs.values()), axis=0)
+        denom = logsumexp(log_probs)
+        probs = np.exp(log_probs - denom)
+        return probs
+
+    def __call__(self, next_task, next_task_name, belief, obs, verbose=True):
         """Information gain (negative entropy) criteria.
 
         Note:
             * Equivalent to ranking by negative post-obs entropy -H(X|Y)
               [H(X) - H(X|Y)] - [H(X) - H(X|Y')] = H(X|Y') - H(X|Y)
 
-        Pseudocode:
-        ```
-        self._tasks.append(task)
-        curr_sample_ws, curr_sample_feats = self._model.get_samples(curr_task_name)
-        user_w, user_feat = random.choice(curr_sample_ws, curr_sample_feats)
-        # Collect featurs on new task
-        task_feats = self._model.collect_feats(curr_sample_ws, task)
-        for feats in task_feats:
-            new_log_prob = user_w.dot(feats)
-        new_sample_ws = resample(curr_sample_ws, new_log_prob + log_prob)
-        return entropy(curr_sample_ws) - entropy(new_sample_ws)
-        ```
         """
-        curr_ws, curr_feats = self._model.get_samples(next_task, next_task_name)
-        # sample one user
-        user_ws, user_feats = random_choice_fn(zip(curr_ws, curr_feats), 1)
-        task_feats = self._model.collect_feats
+        belief = belief.subsample(self._num_acquire_sample)
+
+        desc = f"Computing {self._method} acquisition features"
+        if not verbose:
+            desc = None
+        next_feats_sum = belief.get_features_sum(next_task, next_task_name, desc=desc)
+
+        entropies = []
+        for _ in range(self._num_designers):
+            next_designer = belief.subsample(1)
+            next_probs = self._compute_probs(next_designer.weights[0], next_feats_sum)
+            next_belief = belief.resample(next_probs)
+            # avoid gaussian entropy (causes NonSingular Matrix issue)
+            ent = next_belief.entropy("histogram")
+            if np.isnan(ent):
+                ent = 1000
+                print("WARNING: Entropy has NaN entropy value")
+            entropies.append(ent)
+
+        entropies = np.array(entropies)
+        infogain = -1 * np.mean(entropies)
+
+        if self._debug:
+            print(f"Acquire method {self._method}")
+            print(
+                f"\tEntropies mean {np.mean(entropies):.3f} std {np.std(entropies):.3f}"
+            )
+
+        return infogain / self._num_designers
 
 
 class ActiveRatioTest(ActiveInfoGain):
@@ -65,10 +105,14 @@ class ActiveRatioTest(ActiveInfoGain):
 
     """
 
-    def __init__(self, env, model, method="mean", num_acquire_sample=5, debug=False):
+    def __init__(
+        self, rng_key, env, model, method="mean", num_acquire_sample=5, debug=False
+    ):
         super().__init__(
+            rng_key,
             env,
             model,
+            beta=0.0,
             num_acquire_sample=num_acquire_sample,
             num_designers=-1,
             debug=debug,
@@ -79,9 +123,6 @@ class ActiveRatioTest(ActiveInfoGain):
         """Compares user features with belief sample features (from samplw_ws).
 
         Ratio = exp(next_w @ user_feats) / exp(next_w @ next_feats)
-
-        TODO:
-            * Ugly API, assumes next_feats is 1 designer sample
 
         """
 
@@ -105,7 +146,7 @@ class ActiveRatioTest(ActiveInfoGain):
         desc = f"Computing {self._method} acquisition features"
         if not verbose:
             desc = None
-        next_feats_sum = belief.get_features_sum(next_task, next_task_name, desc=None)
+        next_feats_sum = belief.get_features_sum(next_task, next_task_name, desc=desc)
         user_feats_sum = obs.get_features_sum(next_task, next_task_name)
         weights = concate_dict_by_keys(belief.weights)
         log_ratios = self._compute_log_ratios(weights, next_feats_sum, user_feats_sum)
@@ -125,3 +166,36 @@ class ActiveRatioTest(ActiveInfoGain):
             return -1 * np.min(log_ratios)
         else:
             raise NotImplementedError
+
+
+class ActiveRandom(ActiveInfoGain):
+    """Random baseline
+
+    Args:
+        num_acquire_sample (int): running acquisition function on belief
+            samples is costly, so subsample belief particles
+
+    """
+
+    def __init__(self, rng_key, env, model, method="random", debug=False):
+        super().__init__(
+            rng_key,
+            env,
+            model,
+            beta=0.0,
+            num_acquire_sample=0.0,
+            num_designers=-1,
+            debug=debug,
+        )
+        self._method = method
+        self._random_uniform = random_uniform
+
+    def update_key(self, rng_key):
+        self._rng_key = rng_key
+        self._random_uniform = seed(self._random_uniform, self._rng_key)
+
+    def __call__(self, next_task, next_task_name, belief, obs, verbose=True):
+        """Random score
+
+        """
+        return self._random_uniform()
