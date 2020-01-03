@@ -1,12 +1,3 @@
-from jax import random
-from numpyro.handlers import scale, condition, seed
-from numpyro.infer import MCMC, NUTS
-from tqdm.auto import tqdm, trange
-import copy
-import numpyro
-import numpyro.distributions as dist
-import jax.numpy as np
-
 """MCMC Inference Algorithms.
 
 Given p(y | theta), estimate p(theta | y)
@@ -24,6 +15,15 @@ Credits:
     * Jerry Z. He 2019
 
 """
+
+from jax import random
+from numpyro.handlers import scale, condition, seed
+from numpyro.infer import MCMC, NUTS
+from tqdm.auto import tqdm, trange
+import copy
+import numpyro
+import numpyro.distributions as dist
+import jax.numpy as np
 
 
 class Inference(object):

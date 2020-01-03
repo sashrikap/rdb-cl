@@ -13,6 +13,7 @@ import numpy as onp
 import pyglet
 from rdb.envs.drive2d.core.car import centered_image
 from rdb.envs.drive2d.core.lane import StraightLane
+from rdb.envs.drive2d.core.dynamics import identity_dynamics_fn
 from pyglet import gl, graphics
 
 
@@ -32,6 +33,7 @@ class Object(object):
         self._sprite = None
         self._scale = scale
         self._opacity = opacity
+        self.dynamics_fn = identity_dynamics_fn()
 
     @property
     def name(self):
@@ -40,6 +42,10 @@ class Object(object):
     @property
     def state(self):
         return self._state
+
+    @state.setter
+    def state(self, s):
+        self._state = s
 
     def render(self):
         if self._sprite is None:
@@ -54,6 +60,13 @@ class Object(object):
         self._sprite.rotation = rotation
         self._sprite.opacity = self._opacity
         self._sprite.draw()
+
+
+class Obstacle(Object):
+    NAME = "cone"
+
+    def __init__(self, state, scale=1.0):
+        super().__init__(state, self.NAME, scale)
 
 
 class Garage(Object):

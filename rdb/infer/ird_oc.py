@@ -12,10 +12,10 @@ Note:
 import numpyro
 import jax
 from numpyro.handlers import scale, condition, seed
-from rdb.exps.utils import plot_samples
 from rdb.optim.utils import multiply_dict_by_keys
 from rdb.infer.algos import *
 from rdb.infer.particles import Particles
+from rdb.exps.utils import plot_weights
 from rdb.infer.utils import logsumexp
 from tqdm.auto import tqdm, trange
 from time import time
@@ -67,6 +67,7 @@ class IRDOptimalControl(PGM):
             `p ~ exp(beta * reward)`
         prior_log_prob (fn): log probability of prior
         normalizer_fn (fn): sample fixed number of normalizers
+        use_true_w (bool): debug designer with true w
 
     Methods:
         sample (fn): sample b(w) given obs_w
@@ -95,6 +96,8 @@ class IRDOptimalControl(PGM):
         sample_method="mh",
         sample_args={},  # "num_warmups": 100, "num_samples": 200
         designer_args={},
+        use_true_w=False,
+        debug_true_w=False,
     ):
         self._rng_key = rng_key
         self._controller = controller
@@ -120,7 +123,9 @@ class IRDOptimalControl(PGM):
             proposal_fn,
             sample_method,
             designer_args,
+            use_true_w=use_true_w,
         )
+        self._debug_true_w = debug_true_w
         kernel = self._build_kernel(beta)
         super().__init__(rng_key, kernel, proposal_fn, sample_method, sample_args)
 
@@ -148,7 +153,8 @@ class IRDOptimalControl(PGM):
     def simulate_designer(self, task, task_name):
         """Sample one w from b(w) on task"""
         particles = self._designer.sample(task, task_name)
-        return particles.subsample(1)
+        sub_sample = particles.subsample(1)
+        return sub_sample
 
     def sample(self, tasks, task_names, obs, verbose=True, visualize=False):
         """Sample b(w) for true weights given obs.weights.
@@ -184,18 +190,18 @@ class IRDOptimalControl(PGM):
         sample_ws = self._sampler.sample(
             obs=all_obs_ws,  # all obs so far
             init_state=last_obs_w,  # initialize with last obs
-            norm_feats_sums=all_norm_feats_sum,
             user_feats_sums=all_user_feats_sum,
+            norm_feats_sums=all_norm_feats_sum,
             verbose=verbose,
         )
         samples = Particles(
             self._rng_key, self._env, self._controller, self._runner, sample_ws
         )
         self._samples[last_name] = samples
-        if visualize:
-            plot_samples(
-                samples.weights, highlight_dict=last_obs_w, save_path="data/samples.png"
-            )
+        # if visualize:
+        #     plot_weights(
+        #         samples.weights, highlight_dict=last_obs_w, save_path="data/samples.png"
+        #     )
         return self._samples[last_name]
 
     def _get_init_state(self, task):
@@ -219,12 +225,19 @@ class IRDOptimalControl(PGM):
     def _build_kernel(self, beta):
         """Likelihood for observed data, used as `PGM._kernel`.
 
+        Builds IRD-specific kernel, which takes specialized
+        arguments: `init_state`, `norm_feats_sums`, `user_feats_sums`.
+
         Args:
             prior_w (dict): sampled from prior
             user_w (dict): user-specified reward weight
             tasks (array): environment init state
             norm_feats_sum(array): samples used to normalize likelihood in
                 inverse reward design problem. Sampled before running `pgm.sample`.
+
+        TODO:
+            * `user_ws` (represented as `obs` in generic sampling class) is not used in
+            kernel, causing some slight confusion
 
         """
 
@@ -234,20 +247,43 @@ class IRDOptimalControl(PGM):
             Runs `p(w_obs | w)`
 
             """
-            log_prob = 0.0
+            log_probs = []
+            # Iterate over list of previous tasks
             for n_feats_sum, u_feats_sum in zip(norm_feats_sums, user_feats_sums):
                 for val in u_feats_sum.values():
                     assert len(val) == 1, "Only can take 1 user sample"
                 sample_costs = multiply_dict_by_keys(sample_w, u_feats_sum)
-                sample_rew = -1 * np.sum(list(sample_costs.values()))
+                ## Numerator
+                sample_rew = -beta * np.sum(list(sample_costs.values()))
                 ## Normalizing constant
                 normal_costs = multiply_dict_by_keys(sample_w, n_feats_sum)
-                normal_rews = -1 * np.sum(list(normal_costs.values()), axis=0)
+                normal_rews = -beta * np.sum(list(normal_costs.values()), axis=0)
                 sum_normal_rew = -np.log(len(normal_rews)) + logsumexp(normal_rews)
 
-                log_prob += beta * (sample_rew - sum_normal_rew)
-            log_prob += self._prior_log_prob(sample_w)
-            return log_prob
+                if self._debug_true_w:
+                    true_costs = multiply_dict_by_keys(
+                        self._designer.true_w, u_feats_sum
+                    )
+                    true_rew = -beta * np.sum(list(true_costs.values()))
+                    true_normal_costs = multiply_dict_by_keys(
+                        self._designer.true_w, n_feats_sum
+                    )
+                    true_normal_rews = -beta * np.sum(
+                        list(true_normal_costs.values()), axis=0
+                    )
+                    true_sum_normal_rew = -np.log(len(true_normal_rews)) + logsumexp(
+                        true_normal_rews
+                    )
+                    print(
+                        f"Sample rew {sample_rew - sum_normal_rew:.3f} true rew {true_rew - true_sum_normal_rew:.3f}"
+                    )
+                    # import pdb; pdb.set_trace()
+
+                log_probs.append(sample_rew - sum_normal_rew)
+            log_probs.append(self._prior_log_prob(sample_w))
+            if len(log_probs) > 2:
+                print([f"{p:.3f}" for p in log_probs])
+            return sum(log_probs)
 
         return likelihood_fn
 
@@ -272,6 +308,7 @@ class Designer(PGM):
         proposal_fn,
         sample_method,
         sampler_args,
+        use_true_w=False,
     ):
         self._rng_key = rng_key
         self._env = env
@@ -279,6 +316,7 @@ class Designer(PGM):
         self._runner = runner
         self._true_w = true_w
         self._prior_log_prob = prior_log_prob
+        self._use_true_w = use_true_w
         kernel = self._build_kernel(beta)
         self._samples = {}
         super().__init__(rng_key, kernel, proposal_fn, sample_method, sampler_args)
@@ -287,7 +325,10 @@ class Designer(PGM):
         """Sample 1 set of weights from b(design_w) given true_w"""
         if task_name not in self._samples.keys():
             print("Sampling Designer")
-            sample_ws = self._sampler.sample(self._true_w, task=task)
+            if self._use_true_w:
+                sample_ws = [self._true_w]
+            else:
+                sample_ws = self._sampler.sample(self._true_w, task=task)
             samples = Particles(
                 self._rng_key, self._env, self._controller, self._runner, sample_ws
             )

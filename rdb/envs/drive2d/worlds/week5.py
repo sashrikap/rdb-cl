@@ -1,3 +1,7 @@
+"""
+TODO: not sure what this is
+"""
+
 import jax
 import jax.numpy as np
 from rdb.optim.utils import *
@@ -5,11 +9,6 @@ from rdb.envs.drive2d.core.car import *
 from rdb.envs.drive2d.core.feature import *
 from rdb.envs.drive2d.worlds.highway import HighwayDriveWorld
 from functools import partial
-
-"""
-Sample adversarial scenarios where one autonomous car is merging
-with two other fix speed cars
-"""
 
 
 class HighwayDriveWorld_Week5(HighwayDriveWorld):
@@ -19,7 +18,6 @@ class HighwayDriveWorld_Week5(HighwayDriveWorld):
         goal_speed,
         goal_lane,
         control_bound,
-        weights,
         car_states=[],
         car_speeds=[],
         dt=0.1,
@@ -28,11 +26,9 @@ class HighwayDriveWorld_Week5(HighwayDriveWorld):
         lane_width=0.13,
     ):
         cars = []
-        weights = sort_dict_by_keys(weights, self.features_keys)
-        weights_list = weights.values()
         for state, speed in zip(car_states, car_speeds):
             cars.append(FixSpeedCar(self, np.array(state), speed))
-        main_car = OptimalControlCar(self, weights_list, main_state, horizon)
+        main_car = OptimalControlCar(self, main_state, horizon)
         self.goal_speed = goal_speed
         self.goal_lane = goal_lane
         self.control_bound = control_bound
@@ -117,19 +113,11 @@ class Week5_01(HighwayDriveWorld_Week5):
         car2 = np.array([-1.5 * lane_width, 0.9, np.pi / 2, 0])
         car_states = np.array([car1, car2])
         car_speeds = np.array([car_speed, car_speed])
-        weights = {
-            "dist_cars": 50,
-            "dist_lanes": 30.0,
-            "dist_fences": 5000.0,
-            "speed": 1000.0,
-            "control": 20.0,
-        }
         super().__init__(
             main_state,
             goal_speed,
             goal_lane,
             control_bound,
-            weights,
             car_states,
             car_speeds,
             dt,

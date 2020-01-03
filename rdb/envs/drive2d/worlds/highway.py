@@ -22,15 +22,13 @@ class HighwayDriveWorld(DriveWorld):
 
     """
 
-    def __init__(self, main_car, cars=[], num_lanes=3, lane_width=0.13, dt=0.1):
+    def __init__(
+        self, main_car, cars=[], num_lanes=3, objects=[], lane_width=0.13, dt=0.1
+    ):
         self._lanes = self.build_lanes(num_lanes, lane_width)
         self._fences = self.build_fences(self._lanes)
         self._lane_width = lane_width
-        super().__init__(main_car, cars, self._lanes, dt)
-
-    @property
-    def lanes(self):
-        return self._lanes
+        super().__init__(main_car, cars, self._lanes, dt, objects=objects)
 
     @property
     def fences(self):

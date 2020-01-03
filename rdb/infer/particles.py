@@ -8,6 +8,7 @@ from rdb.optim.utils import (
     concate_dict_by_keys,
 )
 from numpyro.handlers import scale, condition, seed
+from rdb.exps.utils import plot_weights
 from scipy.stats import gaussian_kde
 import jax.numpy as np
 import numpy as onp
@@ -60,6 +61,15 @@ class Particles(object):
             return Particles(
                 self._rng_key, self._env, self._controller, self._runner, sub_ws
             )
+
+    def log_samples(self, num_samples=None):
+        """Print samples to terminal for inspection.
+        """
+        samples = self.subsample(num_samples)
+        for iw, ws in enumerate(samples.weights):
+            print(f"Sample {iw}")
+            for key, val in ws.items():
+                print(f"  {key}: {val:.3f}")
 
     def get_features(self, task, task_name, desc=None):
         """Compute expected features for sample weights on task.
@@ -187,12 +197,15 @@ class Particles(object):
                 entropy += ent
         return entropy
 
-    def visualize(self, path):
-        # TODO
-        # path ../plots/seed_{}_iteration_{}_method.png
-        pass
+    def visualize(self, path, true_w):
+        """Visualize weight belief distribution in histogram."""
+        plot_weights(self.weights, highlight_dict=true_w, path=path)
 
     def save(self, path):
-        # TODO
+        """Save weight belief particles as npz file."""
         # path: ../particles/seed_{}_iteration_{}_method.npz
-        pass
+        with open(path, "wb+") as f:
+            np.savez(f, weights=self.weights)
+
+    def load(self, path):
+        self._sample_ws = np.load(path, allow_pickle=True)["weights"]

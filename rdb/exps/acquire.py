@@ -31,16 +31,16 @@ class ActiveInfoGain(object):
         env,
         model,
         beta,
-        num_designers=5,
-        num_acquire_sample=5,
+        num_active_designers=5,
+        num_active_sample=5,
         debug=False,
     ):
         self._rng_key = rng_key
         self._env = env
         self._model = model
         self._beta = beta
-        self._num_designers = 5
-        self._num_acquire_sample = num_acquire_sample
+        self._num_active_designers = 5
+        self._num_active_sample = num_active_sample
         self._tasks = []
         self._debug = debug
         self._method = "InfoGain"
@@ -65,7 +65,7 @@ class ActiveInfoGain(object):
               [H(X) - H(X|Y)] - [H(X) - H(X|Y')] = H(X|Y') - H(X|Y)
 
         """
-        belief = belief.subsample(self._num_acquire_sample)
+        belief = belief.subsample(self._num_active_sample)
 
         desc = f"Computing {self._method} acquisition features"
         if not verbose:
@@ -73,7 +73,7 @@ class ActiveInfoGain(object):
         next_feats_sum = belief.get_features_sum(next_task, next_task_name, desc=desc)
 
         entropies = []
-        for _ in range(self._num_designers):
+        for _ in range(self._num_active_designers):
             next_designer = belief.subsample(1)
             next_probs = self._compute_probs(next_designer.weights[0], next_feats_sum)
             next_belief = belief.resample(next_probs)
@@ -93,28 +93,28 @@ class ActiveInfoGain(object):
                 f"\tEntropies mean {np.mean(entropies):.3f} std {np.std(entropies):.3f}"
             )
 
-        return infogain / self._num_designers
+        return infogain / self._num_active_designers
 
 
 class ActiveRatioTest(ActiveInfoGain):
     """Using performance ratio for acquisition.
 
     Args:
-        num_acquire_sample (int): running acquisition function on belief
+        num_active_sample (int): running acquisition function on belief
             samples is costly, so subsample belief particles
 
     """
 
     def __init__(
-        self, rng_key, env, model, method="mean", num_acquire_sample=5, debug=False
+        self, rng_key, env, model, method="mean", num_active_sample=5, debug=False
     ):
         super().__init__(
             rng_key,
             env,
             model,
             beta=0.0,
-            num_acquire_sample=num_acquire_sample,
-            num_designers=-1,
+            num_active_sample=num_active_sample,
+            num_active_designers=-1,
             debug=debug,
         )
         self._method = method
@@ -141,7 +141,7 @@ class ActiveRatioTest(ActiveInfoGain):
             * The higher the better.
 
         """
-        belief = belief.subsample(self._num_acquire_sample)
+        belief = belief.subsample(self._num_active_sample)
 
         desc = f"Computing {self._method} acquisition features"
         if not verbose:
@@ -172,7 +172,7 @@ class ActiveRandom(ActiveInfoGain):
     """Random baseline
 
     Args:
-        num_acquire_sample (int): running acquisition function on belief
+        num_active_sample (int): running acquisition function on belief
             samples is costly, so subsample belief particles
 
     """
@@ -183,8 +183,8 @@ class ActiveRandom(ActiveInfoGain):
             env,
             model,
             beta=0.0,
-            num_acquire_sample=0.0,
-            num_designers=-1,
+            num_active_sample=0.0,
+            num_active_designers=-1,
             debug=debug,
         )
         self._method = method

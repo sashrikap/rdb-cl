@@ -115,6 +115,8 @@ class DriveWorld(gym.Env):
         state = []
         for car in cars:
             state.append(car.state)
+        for obj in self._objects:
+            state.append(obj.state)
         return np.concatenate(state)
 
     @state.setter
@@ -124,6 +126,9 @@ class DriveWorld(gym.Env):
         for car in cars:
             car.state = state[last_idx : last_idx + len(car.state)]
             last_idx += len(car.state)
+        for obj in self._objects:
+            obj.state = state[last_idx : last_idx + len(obj.state)]
+            last_idx += len(obj.state)
 
     def set_task(self, state):
         raise NotImplementedError
@@ -192,6 +197,10 @@ class DriveWorld(gym.Env):
         return self._car_length
 
     @property
+    def objects(self):
+        return self._objects
+
+    @property
     def features_keys(self):
         return ["dist_cars", "dist_lanes", "speed", "control"]
 
@@ -226,6 +235,13 @@ class DriveWorld(gym.Env):
             curr_idx = next_idx
             # dynamics funcion
             fn = index_func(car.dynamics_fn, idx)
+            fns[key] = fn
+            indices[key] = idx
+        for oi, obj in enumerate(self._objects):
+            next_idx += np.prod(obj.state.shape)
+            idx = (curr_idx, next_idx)
+            key = f"{obj.name}_{oi:02d}"
+            fn = index_func(obj.dynamics_fn, idx)
             fns[key] = fn
             indices[key] = idx
         dynamics_fn = concat_funcs(fns.values())

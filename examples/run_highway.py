@@ -12,12 +12,15 @@ DUMMY_ACTION = False
 DRAW_HEAT = False
 REPLAN = False
 MAKE_MP4 = False
+# ENV_NAME = "Week3_02-v0"  # Highway
+# TASK = (0.2, -0.7)
+ENV_NAME = "Week3_03-v0"  # Blockway
+TASK = (0.2, -0.7, 0.0, 0.1)
 
-env = gym.make("Week3_02-v0")
+env = gym.make(ENV_NAME)
 obs = env.reset()
 main_car = env.main_car
 horizon = 10
-
 T = 30
 # T = 10
 weights = {
@@ -34,13 +37,8 @@ if not DUMMY_ACTION:
     optimizer, runner = shooting_method(
         env, main_car.cost_runtime, horizon, env.dt, replan=REPLAN, T=T
     )
-
-    y0_idx, y1_idx = 1, 5
     state = copy.deepcopy(env.state)
-    state[y0_idx] = 0.2
-    state[y1_idx] = -0.7
-    env.set_task(state)
-
+    env.set_task(TASK)
     env.reset()
     actions = optimizer(env.state, weights=weights)
     traj, cost, info = runner(env.state, actions, weights=weights)
@@ -60,5 +58,5 @@ for t in range(T):
     time.sleep(0.2)
 
 if MAKE_MP4:
-    pathname = f"data/y0({state[y0_idx]:.2f})_y1({state[y1_idx]:.2f}) theta 2.mp4"
+    pathname = f"data/run_highway.mp4"
     render_env(env, state, actions, 10, pathname)

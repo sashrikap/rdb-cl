@@ -6,45 +6,51 @@ Note:
 """
 from rdb.exps.active_ird import ExperimentActiveIRD
 from rdb.exps.acquire import ActiveInfoGain, ActiveRatioTest, ActiveRandom
-from rdb.optim.mpc import shooting_method
 from rdb.infer.ird_oc import IRDOptimalControl
+from rdb.optim.mpc import shooting_method
 from rdb.infer.utils import *
 from functools import partial
 from jax import random
-import gym, rdb.envs.drive2d
 import numpyro.distributions as dist
+import gym, rdb.envs.drive2d
 
 # RANDOM_KEYS = [1, 2, 3, 4]
 # RANDOM_KEYS = [5, 6, 7, 8]
 # RANDOM_KEYS = [9, 10, 11, 12]
-# RANDOM_KEYS = [13, 14, 15, 16]
-RANDOM_KEYS = [17, 18, 19, 20]
-NUM_WARMUPS = 20
+RANDOM_KEYS = [13, 14, 15, 16]
+# RANDOM_KEYS = [17, 18, 19, 20]
+NUM_WARMUPS = 100
 NUM_PROPOSAL_TASKS = 16
 
 ## Full scale sampling
-# NUM_NORMALIZERS = 80
-# NUM_SAMPLES = 500
-# NUM_ACQUIRE_SAMPLES = 100
-# NUM_EVAL_SAMPLES = 100
+NUM_NORMALIZERS = 200
+# NUM_SAMPLES = 800
+NUM_SAMPLES = 2000
+NUM_ACTIVE_SAMPLES = 100
+NUM_EVAL_SAMPLES = 100
 # NUM_EVAL_TASKS = 8
+NUM_EVAL_TASKS = 1
+
+## Debug set True
+USER_TRUE_W = True
 
 ## Faster sampling
-NUM_NORMALIZERS = 100
-NUM_SAMPLES = 200
-NUM_ACQUIRE_SAMPLES = 25
-NUM_EVAL_SAMPLES = 50
-NUM_EVAL_TASKS = 8
-
-## Testing
-# NUM_NORMALIZERS = 5
-# NUM_SAMPLES = 10
-# NUM_ACQUIRE_SAMPLES = 10
-# NUM_EVAL_SAMPLES = 5
+# NUM_NORMALIZERS = 100
+# NUM_SAMPLES = 200
+# NUM_ACTIVE_SAMPLES = 25
+# NUM_EVAL_SAMPLES = 50
 # NUM_EVAL_TASKS = 8
 
+## Testing
+# NUM_NORMALIZERS = 3
+# NUM_SAMPLES = 10
+# NUM_ACTIVE_SAMPLES = 10
+# NUM_EVAL_SAMPLES = 7
+# NUM_EVAL_TASKS = 2
+
+
 NUM_DESIGNERS = 20
-NUM_ACQUIRE_DESIGNERS = 4
+NUM_ACTIVE_DESIGNERS = 4
 MAX_WEIGHT = 8.0
 BETA = 5.0
 HORIZON = 10
@@ -101,33 +107,34 @@ ird_model = IRDOptimalControl(
     proposal_fn=proposal_fn,
     sample_args={"num_warmups": NUM_WARMUPS, "num_samples": NUM_SAMPLES},
     designer_args={"num_warmups": NUM_WARMUPS, "num_samples": NUM_DESIGNERS},
+    use_true_w=USER_TRUE_W,
 )
 
 """ Active acquisition function for experiment """
 acquire_fns = {
-    "infogain": ActiveInfoGain(
-        rng_key=None,
-        env=env,
-        model=ird_model,
-        beta=BETA,
-        num_designers=NUM_ACQUIRE_DESIGNERS,
-        num_acquire_sample=NUM_ACQUIRE_SAMPLES,
-        debug=False,
-    ),
-    # "ratiomean": ActiveRatioTest(
+    # "infogain": ActiveInfoGain(
     #     rng_key=None,
     #     env=env,
     #     model=ird_model,
-    #     method="mean",
-    #     num_acquire_sample=NUM_ACQUIRE_SAMPLES,
+    #     beta=BETA,
+    #     num_active_designers=NUM_ACTIVE_DESIGNERS,
+    #     num_active_sample=NUM_ACTIVE_SAMPLES,
     #     debug=False,
     # ),
+    "ratiomean": ActiveRatioTest(
+        rng_key=None,
+        env=env,
+        model=ird_model,
+        method="mean",
+        num_active_sample=NUM_ACTIVE_SAMPLES,
+        debug=False,
+    ),
     # "ratiomin": ActiveRatioTest(
     #     rng_key=None,
     #     env=env,
     #     model=ird_model,
     #     method="min",
-    #     num_acquire_sample=NUM_ACQUIRE_SAMPLES,
+    #     num_active_sample=NUM_ACTIVE_SAMPLES,
     #     debug=False,
     # ),
     # "random": ActiveRandom(rng_key=None, env=env, model=ird_model),
@@ -143,10 +150,12 @@ experiment = ExperimentActiveIRD(
     num_proposal_tasks=NUM_PROPOSAL_TASKS,
     # Hard coded candidates
     # fixed_candidates=[(-0.4, -0.7), (-0.2, 0.5)],
-    # fixed_candidates=[(-0.2, 0.5)],
-    debug_belief_task=(-0.2, 0.5),
+    fixed_candidates=[(-0.2, 0.5)],
+    # debug_belief_task=(-0.2, 0.5),
     # debug_belief_task=None,
-    save_path="data/191217/active_ird_exp1",
+    # save_dir="data/191221_true",
+    save_dir="data/191231_test",
+    exp_name="active_ird_exp1",
 )
 
 """ Experiment """

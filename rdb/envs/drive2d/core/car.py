@@ -99,27 +99,20 @@ class FixSpeedCar(Car):
 
 
 class OptimalControlCar(Car):
-    def __init__(self, env, cost_weights, init_state, horizon=10, color="yellow"):
+    def __init__(self, env, init_state, horizon=10, color="yellow"):
         """Autonomous car with optimal controller.
 
         Args:
             env: world
-            cost_weights (list): keys implicit in env.feature_keys
 
         """
         super().__init__(env, init_state, horizon, color)
-        self._cost_weights = cost_weights
         self._features_fn = None
-        self._cost_fn = None
         self._cost_runtime = None
 
     @property
     def features_fn(self):
         return self._features_fn
-
-    @property
-    def cost_fn(self):
-        return self._cost_fn
 
     @property
     def cost_runtime(self):
@@ -128,7 +121,7 @@ class OptimalControlCar(Car):
     def reset(self):
         super().reset()
         # Cost & feature funcs defined post initialization
-        self._cost_fn, self._cost_runtime = self.build_cost_fn()
+        self._cost_runtime = self.build_cost_fn()
         self._features_fn = self.env.features_fn
 
     def build_cost_fn(self):
@@ -140,25 +133,21 @@ class OptimalControlCar(Car):
 
         """
         env_feats_list = self.env.features_list
-        # Pre-defined & runtime costs
-        cost_fn = weigh_funcs(env_feats_list, self._cost_weights)
+        # Runtime costs
         cost_runtime = weigh_funcs_runtime(env_feats_list)
-        return cost_fn, cost_runtime
+        return cost_runtime
 
     def control(self, u, dt):
         assert (
-            self._features_fn is not None
-            and self._cost_fn is not None
-            and self._cost_runtime is not None
+            self._features_fn is not None and self._cost_runtime is not None
         ), "Need to initialize car by `env.reset()`"
 
         diff = self.dynamics_fn(self._state, u)
         self._state += self.dynamics_fn(self._state, u) * dt
 
     def copy(self):
-        cost_weights = deepcopy(list(self._cost_weights))
         return OptimalControlCar(
-            self.env, cost_weights, deepcopy(self._init_state), self.horizon, self.color
+            self.env, deepcopy(self._init_state), self.horizon, self.color
         )
 
 

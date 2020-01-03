@@ -10,9 +10,7 @@ import numpyro.distributions as dist
 import itertools, copy
 from collections import OrderedDict
 from rdb.optim.utils import *
-from rdb.envs.drive2d.core.car import *
-from rdb.envs.drive2d.core.feature import *
-from rdb.envs.drive2d.core.constraints import *
+from rdb.envs.drive2d.core import car, objects, feature, constraints
 from rdb.envs.drive2d.worlds.highway import HighwayDriveWorld
 from functools import partial
 from numpyro.handlers import seed
@@ -26,7 +24,6 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
         goal_speed,
         goal_lane,
         control_bound,
-        weights,
         car_states=[],
         car_speeds=[],
         dt=0.1,
@@ -36,17 +33,21 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
         car1_range=[-0.8, 0.8],
         car2_range=[-0.8, 0.8],
         car_delta=0.2,
+        obstacle_states=[],
     ):
+        # Define cars
         cars = []
         for state, speed in zip(car_states, car_speeds):
-            cars.append(FixSpeedCar(self, np.array(state), speed))
-        weights = sort_dict_by_keys(weights, self.features_keys)
-        weights_list = weights.values()
-        main_car = OptimalControlCar(self, weights_list, main_state, horizon)
+            cars.append(car.FixSpeedCar(self, np.array(state), speed))
+        main_car = car.OptimalControlCar(self, main_state, horizon)
         self._goal_speed = goal_speed
         self._goal_lane = goal_lane
         self._control_bound = control_bound
-        super().__init__(main_car, cars, num_lanes=num_lanes, dt=dt)
+        # Define objects
+        objs = []
+        for state in obstacle_states:
+            objs.append(objects.Obstacle(np.array(state)))
+        super().__init__(main_car, cars, num_lanes=num_lanes, objects=objs, dt=dt)
         # Define all tasks to sample from
         self._car1_range = np.arange(car1_range[0], car1_range[1], car_delta)
         self._car2_range = np.arange(car2_range[0], car2_range[1], car_delta)
@@ -55,6 +56,7 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
         self._task_sampler = None
 
     def set_task(self, task):
+        assert len(task) == 2
         y0_idx, y1_idx = 1, 5
         self.reset()
         state = copy.deepcopy(self.state)
@@ -78,7 +80,8 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
         nonlinear_dict["dist_cars"] = compose(
             np.sum,
             partial(
-                gaussian_feat, sigma=np.array([self._car_width / 2, self._car_length])
+                feature.gaussian_feat,
+                sigma=np.array([self._car_width / 2, self._car_length]),
             ),
             # debug_printwe
             # abs_feat,
@@ -86,9 +89,9 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
         # Gaussian
         nonlinear_dict["dist_lanes"] = compose(
             np.sum,
-            neg_feat,
-            partial(gaussian_feat, sigma=self._car_length),
-            partial(index_feat, index=self._goal_lane),
+            feature.neg_feat,
+            partial(feature.gaussian_feat, sigma=self._car_length),
+            partial(feature.index_feat, index=self._goal_lane),
         )
         """nonlinear_dict["dist_lanes"] = compose(
             np.sum, quadratic_feat, partial(index_feat, index=self._goal_lane)
@@ -99,22 +102,22 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
         )"""
         nonlinear_dict["dist_fences"] = compose(
             np.sum,
-            quadratic_feat,
-            neg_relu_feat,
+            feature.quadratic_feat,
+            feature.neg_relu_feat,
             lambda dist: dist - (self._lane_width + self._car_length) / 2,
         )
         """nonlinear_dict["dist_fences"] = compose(
             np.sum,
             partial(
-                gaussian_feat,
+                feature.gaussian_feat,
                 sigma=np.array([self._car_width / 3, self._car_length / 3]),
             ),
             # debug_print
         )"""
         bound = self._control_bound
-        nonlinear_dict["control"] = compose(np.sum, quadratic_feat)
+        nonlinear_dict["control"] = compose(np.sum, feature.quadratic_feat)
         nonlinear_dict["speed"] = compose(
-            np.sum, partial(quadratic_feat, goal=self._goal_speed)
+            np.sum, partial(feature.quadratic_feat, goal=self._goal_speed)
         )
 
         # Speed up
@@ -130,22 +133,32 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
     def _get_constraints_fn(self):
         constraints_dict = {}
 
-        constraints_dict["offtrack"] = partial(is_offtrack, env=self)
-        constraints_dict["overspeed"] = partial(is_overspeed, env=self, max_speed=1.0)
-        constraints_dict["underspeed"] = partial(is_underspeed, env=self, min_speed=0.2)
-        constraints_dict["uncomfortable"] = partial(
-            is_uncomfortable, env=self, max_actions=self._control_bound
+        constraints_dict["offtrack"] = partial(constraints.is_offtrack, env=self)
+        constraints_dict["overspeed"] = partial(
+            constraints.is_overspeed, env=self, max_speed=1.0
         )
-        constraints_dict["wronglane"] = partial(is_wronglane, env=self, lane_idx=2)
-        constraints_dict["collision"] = partial(is_collision, env=self)
+        constraints_dict["underspeed"] = partial(
+            constraints.is_underspeed, env=self, min_speed=0.2
+        )
+        constraints_dict["uncomfortable"] = partial(
+            constraints.is_uncomfortable, env=self, max_actions=self._control_bound
+        )
+        constraints_dict["wronglane"] = partial(
+            constraints.is_wronglane, env=self, lane_idx=2
+        )
+        constraints_dict["collision"] = partial(constraints.is_collision, env=self)
         constraints_fn = merge_dict_funcs(constraints_dict)
 
         return constraints_dict, constraints_fn
 
     def _get_metadata_fn(self):
         metadata_dict = {}
-        metadata_dict["overtake0"] = partial(is_overtake, env=self, car_idx=0)
-        metadata_dict["overtake1"] = partial(is_overtake, env=self, car_idx=1)
+        metadata_dict["overtake0"] = partial(
+            constraints.is_overtake, env=self, car_idx=0
+        )
+        metadata_dict["overtake1"] = partial(
+            constraints.is_overtake, env=self, car_idx=1
+        )
         metadata_fn = merge_dict_funcs(metadata_dict)
         return metadata_dict, metadata_fn
 
@@ -176,53 +189,17 @@ class Week3_01(HighwayDriveWorld_Week3):
         car2 = np.array([-lane_width, 0.9, np.pi / 2, 0])
         car_states = np.array([car1, car2])
         car_speeds = np.array([car_speed, car_speed])
-        weights_191023 = {
-            "dist_cars": 100.0,
-            "dist_lanes": 10.0,
-            "dist_fences": 200.0,
-            "speed": 4.0,
-            "control": 80.0,
-        }
-        weights_191030 = {
-            "dist_cars": 1,
-            "dist_lanes": 50.0,
-            "dist_fences": 1200.0,
-            "speed": 500.0,
-            "control": 50.0,
-        }
-        weights_191101 = {
-            "dist_cars": 10,
-            "dist_lanes": 50.0,
-            "dist_fences": 1200.0,
-            "speed": 500.0,
-            "control": 50.0,
-        }
-        weights = {
-            "dist_cars": 50,
-            "dist_lanes": 30.0,
-            "dist_fences": 5000.0,
-            "speed": 1000.0,
-            "control": 20.0,
-        }
-        # weights = {
-        #     "dist_cars": 1,
-        #     "dist_lanes": 10.0,
-        #     "dist_fences": 1200.0,
-        #     "speed": 1000.0,
-        #     "control": 50.0,
-        # }
         super().__init__(
             main_state,
-            goal_speed,
-            goal_lane,
-            control_bound,
-            weights,
-            car_states,
-            car_speeds,
-            dt,
-            horizon,
-            num_lanes,
-            lane_width,
+            goal_speed=goal_speed,
+            goal_lane=goal_lane,
+            control_bound=control_bound,
+            car_states=car_states,
+            car_speeds=car_speeds,
+            dt=dt,
+            horizon=horizon,
+            num_lanes=num_lanes,
+            lane_width=lane_width,
         )
 
 
@@ -242,23 +219,69 @@ class Week3_02(HighwayDriveWorld_Week3):
         car2 = np.array([-lane_width, 0.9, np.pi / 2, 0])
         car_states = np.array([car1, car2])
         car_speeds = np.array([car_speed, car_speed])
-        weights = {
-            "dist_cars": 0.0,
-            "dist_lanes": 0.0,
-            "dist_fences": 50.0,
-            "speed": 1000.0,
-            "control": 20.0,
-        }
+
         super().__init__(
             main_state,
-            goal_speed,
-            goal_lane,
-            control_bound,
-            weights,
-            car_states,
-            car_speeds,
-            dt,
-            horizon,
-            num_lanes,
-            lane_width,
+            goal_speed=goal_speed,
+            goal_lane=goal_lane,
+            control_bound=control_bound,
+            car_states=car_states,
+            car_speeds=car_speeds,
+            dt=dt,
+            horizon=horizon,
+            num_lanes=num_lanes,
+            lane_width=lane_width,
         )
+
+
+class Week3_03(HighwayDriveWorld_Week3):
+    """Highway merging scenario, now with obstacles
+    """
+
+    def __init__(self):
+        ## Boilerplate
+        main_speed = 0.7
+        car_speed = 0.5
+        main_state = np.array([0, 0, np.pi / 2, main_speed])
+        goal_speed = 0.8
+        goal_lane = 0
+        horizon = 10
+        dt = 0.25
+        control_bound = 0.5
+        lane_width = 0.13
+        num_lanes = 3
+        # Car states
+        car1 = np.array([0.0, 0.3, np.pi / 2, 0])
+        car2 = np.array([-lane_width, 0.9, np.pi / 2, 0])
+        car_states = np.array([car1, car2])
+        car_speeds = np.array([car_speed, car_speed])
+        # Obstacle states
+        obstacle_states = np.array([[0.0, 0.3]])
+
+        super().__init__(
+            main_state,
+            goal_speed=goal_speed,
+            goal_lane=goal_lane,
+            control_bound=control_bound,
+            car_states=car_states,
+            car_speeds=car_speeds,
+            dt=dt,
+            horizon=horizon,
+            num_lanes=num_lanes,
+            lane_width=lane_width,
+            obstacle_states=obstacle_states,
+        )
+
+    def set_task(self, task):
+        assert len(task) == 2 + 2 * len(self._objects), "Task format incorrect"
+        car_y0_idx, car_y1_idx = 1, 5
+        obs_idx = 12
+        self.reset()
+        state = copy.deepcopy(self.state)
+        # Car state
+        state[car_y0_idx] = task[0]
+        state[car_y1_idx] = task[1]
+        # Object state
+        for oi in range(len(self._objects)):
+            state[obs_idx : obs_idx + 2] = task[2 + 2 * oi : 2 + 2 * (oi + 1)]
+        self.set_init_state(state)

@@ -53,6 +53,15 @@ def speed_dynamics_fn():
     return delta_x
 
 
+def identity_dynamics_fn():
+    @jax.jit
+    def delta_x(x, u):
+        dx = np.zeros_like(x)
+        return dx
+
+    return delta_x
+
+
 def fixspeed_dynamics_fn(fix_speed):
     @jax.jit
     def delta_x(x, u):

@@ -10,8 +10,7 @@ N = -1
 
 
 def read_seed(path):
-    with open(path, "rb") as f:
-        data = onp.load(f, allow_pickle=True)["data"].item()
+    data = np.load(path, allow_pickle=True)["data"].item()
     return data
 
 
@@ -53,9 +52,10 @@ def plot_data(path):
     dir_path = os.path.dirname(path)
     filename = os.path.basename(path)
     for file in sorted(os.listdir(dir_path)):
-        print(file)
         if filename in file:
-            seedpaths.append(os.path.join(dir_path, file))
+            filepath = os.path.join(dir_path, file)
+            if os.path.isfile(filepath):
+                seedpaths.append(filepath)
 
     for path in seedpaths:
         seeddata.append(read_seed(path))

@@ -1,8 +1,7 @@
 from jax import random, vmap
-import jax.numpy as np
-
 import pyro
 import pyro.distributions as pdist
+import jax.numpy as np
 import torch
 import numpyro
 import numpyro.distributions as ndist

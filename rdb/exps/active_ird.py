@@ -23,6 +23,7 @@ from tqdm.auto import tqdm
 import jax.numpy as np
 import numpy as onp
 import copy
+import os
 
 
 class ExperimentActiveIRD(object):
@@ -49,9 +50,11 @@ class ExperimentActiveIRD(object):
         num_proposal_tasks=4,
         fixed_candidates=None,
         debug_belief_task=None,
-        save_path="data/active_ird_exp1",
+        save_dir="data/active_ird_exp1",
+        exp_name="active_ird_exp1",
     ):
         self._env = env
+        # Inverse Reward Design Model
         self._model = model
         self._acquire_fns = acquire_fns
         # Random key & function
@@ -66,13 +69,15 @@ class ExperimentActiveIRD(object):
         self._fixed_candidates = fixed_candidates
         self._debug_belief_task = debug_belief_task
         # Save path
-        self._save_path = save_path
+        self._save_dir = save_dir
+        self._exp_name = exp_name
 
     def _build_cache(self):
         """ Build cache data """
         self._acquire_eval_hist = {}
         self._all_tasks, self._all_task_names = {}, {}
-        self._all_obs, self._curr_belief = {}, {}
+        self._all_obs, self._all_beliefs = {}, {}
+        self._curr_belief = {}
         for key in self._acquire_fns.keys():
             self._acquire_eval_hist[key] = []
 
@@ -106,7 +111,10 @@ class ExperimentActiveIRD(object):
             self._all_obs[key] = [obs]
             self._all_tasks[key] = [task]
             self._all_task_names[key] = [task_name]
+            self._all_beliefs[key] = [belief]
             self._curr_belief[key] = belief
+            self._evaluate(key, belief, eval_tasks)
+            self._save(itr=0)
 
         for it in range(1, self._iterations + 1):
             """ Candidates for next tasks """
@@ -126,26 +134,33 @@ class ExperimentActiveIRD(object):
                 obs = self._all_obs[key][-1]
                 task_name = self._all_task_names[key][-1]
                 print(f"Method: {key}; Task name {task_name}")
-                self._evaluate(key, belief, eval_tasks)
 
                 ## Actively propose & Record next task
                 next_task = self._propose_task(candidates, belief, obs, key)
                 next_task_name = f"ird_{str(next_task)}"
-
-                ## Collect observation
-                obs = self._model.simulate_designer(next_task, next_task_name)
-                self._all_obs[key].append(obs)
                 self._all_tasks[key].append(next_task)
                 self._all_task_names[key].append(next_task_name)
+
                 ## Main IRD Sampling
-                self._curr_belief[key] = self._model.sample(
+                next_obs = self._model.simulate_designer(next_task, next_task_name)
+                next_belief = self._model.sample(
                     self._all_tasks[key],
                     self._all_task_names[key],
                     obs=self._all_obs[key],
                     visualize=True,
                 )
-                ## Save data
-                self._save()
+                self._all_obs[key].append(next_obs)
+                self._all_beliefs[key].append(next_belief)
+                self._curr_belief[key] = next_belief
+                # Evaluate and Save
+                self._evaluate(key, belief, eval_tasks)
+                self._save(it)
+
+        # Evaluate and save last round
+        for key in self._acquire_fns.keys():
+            belief = self._curr_belief[key]
+            self._evaluate(key, belief, eval_tasks)
+        self._save(self._iterations)
 
     def _debug_belief(self, belief, task, obs):
         print(f"Observed weights")
@@ -212,15 +227,31 @@ class ExperimentActiveIRD(object):
             {"violation": avg_violate, "perform": avg_perform}
         )
 
-    def _save(self):
-        filepath = f"{self._save_path}_seed{str(self._rng_key)}.npz"
+    def _save(self, itr):
+        expdir = f"{self._save_dir}/{self._exp_name}"
+        os.makedirs(expdir, exist_ok=True)
+        ## Save evaluation history
         np_obs = {}
-        for key, val in self._all_obs.items():
-            np_obs[key] = [ob.weights[0] for ob in val]
+        for key in self._all_obs.keys():
+            np_obs[key] = [ob.weights[0] for ob in self._all_obs[key]]
         data = dict(
             curr_obs=np_obs,
             curr_tasks=self._all_tasks,
             eval_hist=self._acquire_eval_hist,
         )
-        with open(filepath, "wb+") as f:
-            np.savez(f, data=data)
+        path = f"{self._save_dir}/{self._exp_name}_seed_{str(self._rng_key)}.npz"
+        with open(path, "wb+") as f:
+            np.savez(f, **data)
+
+        ## Save belief sample information
+        figdir = f"{self._save_dir}/{self._exp_name}/plots"
+        savedir = f"{self._save_dir}/{self._exp_name}/save"
+        os.makedirs(figdir, exist_ok=True)
+        os.makedirs(savedir, exist_ok=True)
+        for key in self._all_beliefs.keys():
+            for itr, belief in enumerate(self._all_beliefs[key]):
+                fname = f"weights_seed_{str(self._rng_key)}_method_{key}_itr_{itr:02d}"
+                savepath = f"{savedir}/{fname}.npz"
+                figpath = f"{figdir}/{fname}.png"
+                belief.save(savepath)
+                belief.visualize(figpath, self._model.designer.true_w)
