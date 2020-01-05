@@ -6,10 +6,12 @@ from rdb.optim.utils import (
     multiply_dict_by_keys,
     subtract_dict_by_keys,
     concate_dict_by_keys,
+    divide_dict_by_keys,
 )
 from numpyro.handlers import scale, condition, seed
 from rdb.exps.utils import plot_weights
 from scipy.stats import gaussian_kde
+from fast_histogram import histogram1d
 import jax.numpy as np
 import numpy as onp
 
@@ -22,11 +24,17 @@ class Particles(object):
 
     """
 
-    def __init__(self, rng_key, env, controller, runner, sample_ws):
+    def __init__(
+        self, rng_key, env, controller, runner, sample_ws=None, sample_concate_ws=None
+    ):
         self._env = env
         self._controller = controller
         self._runner = runner
         self._sample_ws = sample_ws
+        self._sample_concate_ws = sample_concate_ws
+        assert (
+            self._sample_ws is not None or self._sample_concate_ws is not None
+        ), "Must initialize with proper weights"
         self._rng_key = rng_key
         ## Cache data
         self._sample_feats = {}
@@ -38,7 +46,15 @@ class Particles(object):
 
     @property
     def weights(self):
+        if self._sample_ws is None:
+            self._sample_ws = divide_dict_by_keys(self.concate_weights)
         return self._sample_ws
+
+    @property
+    def concate_weights(self):
+        if self._sample_concate_ws is None:
+            self._sample_concate_ws = concate_dict_by_keys(self.weights)
+        return self._sample_concate_ws
 
     @property
     def cached_tasks(self):
@@ -51,7 +67,7 @@ class Particles(object):
             * Simulate designer.
 
         """
-        if num_samples is None:
+        if num_samples is None or num_samples < 0:
             return self
         else:
             assert (
@@ -129,7 +145,7 @@ class Particles(object):
             num_violate += num
         return float(num_violate) / len(self.weights)
 
-    def compare_with(self, task, task_name, target_w):
+    def compare_with(self, task, task_name, target_w, verbose=False):
         """Compare with a set of target weights (usually true weights). Returns log
         prob ratio of reward, measured by target w.
 
@@ -147,10 +163,14 @@ class Particles(object):
         target_cost = multiply_dict_by_keys(target_w, target_feats_sum)
 
         diff_cost = subtract_dict_by_keys(this_cost, target_cost)
-        diff_rew = -1 * np.sum(list(diff_cost.values()), axis=0).mean()
+        diff_rews = -1 * np.sum(list(diff_cost.values()), axis=0)
         # if diff_rew > 0:
         #    import pdb; pdb.set_trace()
-        return diff_rew
+        if verbose:
+            print(
+                f"Diff rew {len(diff_rews)} items: mean {diff_rews.mean():.3f} std {diff_rews.std():.3f} max {diff_rews.max():.3f} min {diff_rews.min():.3f}"
+            )
+        return diff_rews.mean()
 
     def _get_init_state(self, task):
         self._env.set_task(task)
@@ -160,14 +180,20 @@ class Particles(object):
 
     def resample(self, probs):
         """Resample from particles using list of probs. Similar to particle filter update."""
-        new_ws = self._random_choice(
-            self.weights, len(self.weights), probs=probs, replacement=True
-        )
+        N = len(self.weights)
+        idxs = self._random_choice(np.arange(N), num=N, probs=probs, replacement=True)
+        new_concate_ws = dict()
+        for key, value in self.concate_weights.items():
+            new_concate_ws[key] = value[idxs]
         return Particles(
-            self._rng_key, self._env, self._controller, self._runner, new_ws
+            self._rng_key,
+            self._env,
+            self._controller,
+            self._runner,
+            sample_concate_ws=new_concate_ws,
         )
 
-    def entropy(self, method="histogram", bins=100, ranges=(-8.0, 8.0)):
+    def entropy(self, method="histogram", bins=50, ranges=(-5.0, 5.0)):
         """Estimate entropy
 
         Note:
@@ -175,25 +201,26 @@ class Particles(object):
 
         TODO:
             * assumes that first weight is unchanging
+            * may be sensitive to histogram params (bins, ranges)
 
         """
 
-        concate_weights = concate_dict_by_keys(self.weights)
-        data = np.array(list(concate_weights.values()))
+        data = onp.array(list(self.concate_weights.values()))
 
         # Omit first weight
-        data = np.log(data[1:, :])
+        data = onp.log(data[1:, :])
         if method == "gaussian":
             # scipy gaussian kde requires transpose
             kernel = gaussian_kde(data)
             N = data.shape[1]
-            entropy = -(1.0 / N) * np.sum(np.log(kernel(data)))
+            entropy = -(1.0 / N) * onp.sum(onp.log(kernel(data)))
         elif method == "histogram":
             entropy = 0.0
             for row in data:
                 hist = onp.histogram(row, bins=bins, range=ranges, density=True)
-                data = hist[0]
-                ent = -(data * onp.ma.log(onp.abs(data))).sum()
+                # hist = histogram1d(row, bins=bins, range=ranges)
+                h_data = hist[0]
+                ent = -(h_data * onp.ma.log(onp.abs(h_data))).sum()
                 entropy += ent
         return entropy
 

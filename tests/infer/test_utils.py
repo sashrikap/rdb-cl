@@ -3,6 +3,7 @@ from jax import random
 from numpyro.handlers import seed
 from rdb.infer.utils import stack_dict_values, random_choice
 from rdb.optim.utils import concate_dict_by_keys
+from rdb.exps.utils import Profiler
 
 
 def test_stack_values():
@@ -37,3 +38,15 @@ def test_random_probs():
     for _ in range(1000):
         results.append(random_choice_fn(arr, 4, probs, replacement=True))
     assert np.isclose(np.array(results).mean(), 1.606)
+
+
+def test_random_speed():
+    key = random.PRNGKey(0)
+    random_choice_fn = seed(random_choice, key)
+    probs = np.ones(500)
+    arr = np.random.random(500)
+    results = []
+    for _ in range(10):
+        with Profiler("Random choice"):
+            res = random_choice_fn(arr, 500, probs, replacement=True)
+            assert len(res) == 500

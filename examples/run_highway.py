@@ -14,8 +14,9 @@ REPLAN = False
 MAKE_MP4 = False
 # ENV_NAME = "Week3_02-v0"  # Highway
 # TASK = (0.2, -0.7)
-ENV_NAME = "Week3_03-v0"  # Blockway
-TASK = (0.2, -0.7, 0.0, 0.1)
+ENV_NAME = "Week6_01-v0"  # Blockway
+TASK = (0.2, -0.7, 0.0, 0.4)
+# TASK = (0.2, -0.7, 0.0, 0.4, -0.13, 0.3, -0.13, 0.5)
 
 env = gym.make(ENV_NAME)
 obs = env.reset()
@@ -27,6 +28,7 @@ weights = {
     "dist_cars": 100.0,
     "dist_lanes": 50.0,
     "dist_fences": 300.0,
+    "dist_objects": 300.0,
     "speed": 20.0,
     "control": 80.0,
 }
@@ -50,11 +52,11 @@ else:
     actions = np.zeros((T, env.udim))
 
 env.reset()
-env.render("human", draw_heat=DRAW_HEAT)
+env.render("human", draw_heat=DRAW_HEAT, weights=weights)
 
 for t in range(T):
     env.step(actions[t])
-    env.render("human", draw_heat=DRAW_HEAT)
+    env.render("human", draw_heat=DRAW_HEAT, weights=weights)
     time.sleep(0.2)
 
 if MAKE_MP4:

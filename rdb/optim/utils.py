@@ -28,15 +28,28 @@ def concate_dict_by_keys(dicts):
         >>> concate([{'a': [1], 'b': [2]}, {'a': [2], 'b': [3]}])
         >>> # get {'a': [[1], [2]], 'b': [[2], [3]]}
 
+    Note:
+        * Can be slow: 0.25s for 500 items, do not use in heavy iterations
+
     """
     if len(dicts) == 0:
         return {}
     else:
+        # Crude check of keys
         keys = dicts[0].keys()
         out_dict = {}
         for key in keys:
             out_dict[key] = np.array([d[key] for d in dicts])
         return out_dict
+
+
+def divide_dict_by_keys(dict_):
+    keys = list(dict_.keys())
+    values = list(dict_.values())
+    out_dicts = []
+    for i in range(len(dict_[keys[0]])):
+        out_dicts.append(dict(zip(keys, [v[i] for v in values])))
+    return out_dicts
 
 
 def multiply_dict_by_keys(da, db):

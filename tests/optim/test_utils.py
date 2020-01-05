@@ -2,6 +2,7 @@ from rdb.optim.utils import *
 from time import time
 import jax.numpy as np
 import jax
+import numpy as onp
 
 
 def test_sum():
@@ -107,3 +108,15 @@ def test_chain():
 def test_index():
     fn = index_func(np.sum, (1, 3))
     assert np.allclose(fn([1, 2, 2, 3]), 4)
+
+
+def test_concate_dict_speed():
+    from rdb.exps.utils import Profiler
+
+    keys = ["a", "b", "c", "d", "e"]
+    dicts = []
+    for _ in range(500):
+        dicts.append(dict(zip(keys, onp.random.random(5))))
+    for _ in range(10):
+        with Profiler("Concate dict"):
+            concate_dict_by_keys(dicts)

@@ -80,3 +80,4 @@ class HighwayDriveWorld(DriveWorld):
     def constraints_keys(self):
         keys = super().constraints_keys
         keys += ["offtrack", "wronglane"]
+        return keys

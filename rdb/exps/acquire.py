@@ -14,7 +14,9 @@ from rdb.optim.utils import (
     concate_dict_by_keys,
 )
 from rdb.infer.utils import logsumexp, random_uniform
+from rdb.exps.utils import Profiler
 from numpyro.handlers import seed
+from tqdm.auto import tqdm
 
 
 class ActiveInfoGain(object):
@@ -25,21 +27,11 @@ class ActiveInfoGain(object):
 
     """
 
-    def __init__(
-        self,
-        rng_key,
-        env,
-        model,
-        beta,
-        num_active_designers=5,
-        num_active_sample=5,
-        debug=False,
-    ):
+    def __init__(self, rng_key, env, model, beta, num_active_sample=5, debug=False):
         self._rng_key = rng_key
         self._env = env
         self._model = model
         self._beta = beta
-        self._num_active_designers = 5
         self._num_active_sample = num_active_sample
         self._tasks = []
         self._debug = debug
@@ -73,12 +65,14 @@ class ActiveInfoGain(object):
         next_feats_sum = belief.get_features_sum(next_task, next_task_name, desc=desc)
 
         entropies = []
-        for _ in range(self._num_active_designers):
-            next_designer = belief.subsample(1)
-            next_probs = self._compute_probs(next_designer.weights[0], next_feats_sum)
-            next_belief = belief.resample(next_probs)
+        for next_designer_w in tqdm(belief.weights, desc="Computing acquisition"):
+            with Profiler("compute probs"):
+                next_probs = self._compute_probs(next_designer_w, next_feats_sum)
+            with Profiler("sample belief"):
+                next_belief = belief.resample(next_probs)
             # avoid gaussian entropy (causes NonSingular Matrix issue)
-            ent = next_belief.entropy("histogram")
+            with Profiler("compute entropy"):
+                ent = next_belief.entropy("histogram")
             if np.isnan(ent):
                 ent = 1000
                 print("WARNING: Entropy has NaN entropy value")

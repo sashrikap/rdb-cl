@@ -35,7 +35,7 @@ class ExperimentActiveIRD(object):
         iteration (int): algorithm iterations
         num_eval_sample (int): evaluating belief samples is costly,
             so subsample belief particles
-        num_proposal_tasks (int): # task candidates for proposal
+        num_active_tasks (int): # task candidates for active selection
 
     """
 
@@ -47,7 +47,7 @@ class ExperimentActiveIRD(object):
         iterations=10,
         num_eval_tasks=4,
         num_eval_sample=5,
-        num_proposal_tasks=4,
+        num_active_tasks=4,
         fixed_candidates=None,
         debug_belief_task=None,
         save_dir="data/active_ird_exp1",
@@ -60,12 +60,12 @@ class ExperimentActiveIRD(object):
         # Random key & function
         self._rng_key = None
         self._random_choice = random_choice
-        # Numerics
         self._iterations = iterations
+        # Evaluation
         self._num_eval_tasks = num_eval_tasks
         self._num_eval_sample = num_eval_sample
-        self._num_proposal_tasks = num_proposal_tasks
-        # Task proposal
+        # Active Task proposal
+        self._num_active_tasks = num_active_tasks
         self._fixed_candidates = fixed_candidates
         self._debug_belief_task = debug_belief_task
         # Save path
@@ -122,7 +122,7 @@ class ExperimentActiveIRD(object):
                 candidates = self._fixed_candidates
             else:
                 candidates = self._random_choice(
-                    self._env.all_tasks, self._num_proposal_tasks
+                    self._env.all_tasks, self._num_active_tasks
                 )
             """ Run Active IRD on Candidates """
             print(f"\nActive IRD iteration {it}")
@@ -217,7 +217,7 @@ class ExperimentActiveIRD(object):
             perf = belief.compare_with(task, task_name, self._model.designer.true_w)
 
             performance += perf
-            num_violate += np.sum(list(vios.values()))
+            num_violate += np.array(list(vios.values())).mean()
 
         avg_violate = float(num_violate / len(eval_tasks))
         avg_perform = float(performance / len(eval_tasks))

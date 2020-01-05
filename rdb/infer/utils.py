@@ -9,7 +9,7 @@ from rdb.optim.utils import concate_dict_by_keys
 from numpyro.handlers import seed
 from scipy.stats import gaussian_kde
 from tqdm.auto import tqdm, trange
-from itertools import accumulate
+from rdb.exps.utils import Profiler
 
 
 def stack_dict_values(dicts, normalize=False):
@@ -74,12 +74,13 @@ def random_choice(items, num, probs=None, replacement=True):
         else:
             assert len(probs) == len(items)
             probs = probs / np.sum(probs)
-        probs = np.array(list(accumulate(probs)))
+        probs = np.cumsum(probs)
         arr = numpyro.sample("random_choice", dist.Uniform(0, 1), sample_shape=(num,))
         arr = np.repeat(arr[:, None], len(items), axis=1)
         diff = arr - probs
         idxs = np.argmax(diff < 0, axis=1)
-        return [items[idx] for idx in idxs]
+        output = [items[idx] for idx in idxs]
+        return output
 
 
 def random_uniform():
@@ -184,10 +185,12 @@ def gaussian_proposal(state, log_std_dict):
     """
     next_state = copy.deepcopy(state)
     for key, val in next_state.items():
-        log_val = np.log(val)
         if key in log_std_dict.keys():
+            # Convert to log val
+            log_val = np.log(val)
             std = log_std_dict[key]
             next_log_val = numpyro.sample("next_log_val", dist.Normal(log_val, std))
+            # Convert back to normal val
             next_state[key] = np.exp(next_log_val)
     return next_state
 

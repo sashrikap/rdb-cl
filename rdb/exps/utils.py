@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import jax.numpy as np
+import logging, time
 
 PLOT_BINS = 100
 MAX_WEIGHT = 8.0
@@ -34,3 +35,32 @@ def plot_weights(weights_dicts, highlight_dict=None, path=None):
         plt.close()
     else:
         plt.show()
+
+
+class Profiler(object):
+    def __init__(self, name, level=logging.INFO):
+        self.name = name
+        self.level = level
+
+    def step(self, name):
+        """ Returns the duration and stepname since last step/start """
+        self.summarize_step(start=self.step_start, step_name=name, level=self.level)
+        now = time.time()
+        self.step_start = now
+
+    def __enter__(self):
+        self.start = time.time()
+        self.step_start = time.time()
+        return self
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        self.summarize_step(self.start)
+
+    def summarize_step(self, start, step_name="", level=None):
+        duration = time.time() - start
+        step_semicolon = ":" if step_name else ""
+        # level = level or self.level
+        print(
+            f"{self.name}{step_semicolon + step_name}: {duration:.3f} seconds {1/duration:.3f} fps"
+        )
+        return duration

@@ -115,8 +115,8 @@ class DriveWorld(gym.Env):
         state = []
         for car in cars:
             state.append(car.state)
-        for obj in self._objects:
-            state.append(obj.state)
+        # for obj in self._objects:
+        #    state.append(obj.state)
         return np.concatenate(state)
 
     @state.setter
@@ -126,9 +126,9 @@ class DriveWorld(gym.Env):
         for car in cars:
             car.state = state[last_idx : last_idx + len(car.state)]
             last_idx += len(car.state)
-        for obj in self._objects:
+        """for obj in self._objects:
             obj.state = state[last_idx : last_idx + len(obj.state)]
-            last_idx += len(obj.state)
+            last_idx += len(obj.state)"""
 
     def set_task(self, state):
         raise NotImplementedError
@@ -140,6 +140,9 @@ class DriveWorld(gym.Env):
         for car in cars:
             car.init_state = state[last_idx : last_idx + len(car.state)]
             last_idx += len(car.state)
+        """for obj in self._objects:
+            obj.state = state[last_idx : last_idx + len(obj.state)]
+            last_idx += len(obj.state)"""
         self.state = state
 
     @property
@@ -237,13 +240,14 @@ class DriveWorld(gym.Env):
             fn = index_func(car.dynamics_fn, idx)
             fns[key] = fn
             indices[key] = idx
-        for oi, obj in enumerate(self._objects):
-            next_idx += np.prod(obj.state.shape)
-            idx = (curr_idx, next_idx)
-            key = f"{obj.name}_{oi:02d}"
-            fn = index_func(obj.dynamics_fn, idx)
-            fns[key] = fn
-            indices[key] = idx
+        # for o_i, obj in enumerate(self._objects):
+        #     next_idx += np.prod(obj.state.shape)
+        #     idx = (curr_idx, next_idx)
+        #     curr_idx = next_idx
+        #     key = f"{obj.name}_{o_i:02d}"
+        #     fn = index_func(obj.dynamics_fn, idx)
+        #     fns[key] = fn
+        #     indices[key] = idx
         dynamics_fn = concat_funcs(fns.values())
         return dynamics_fn, indices
 
@@ -294,14 +298,29 @@ class DriveWorld(gym.Env):
 
             lane_fns[l_i] = lane_dist_fn
 
+        # Object feature functions
+        obj_fns = [None] * len(self._objects)
+        for o_i, obj in enumerate(self._objects):
+            main_idx = self._indices["main_car"]
+
+            def obj_dist_fn(state, actions):
+                main_pos = state[..., np.arange(*main_idx)]
+                obj_pos = obj.state
+                return feature.diff_to(main_pos, obj_pos)
+
+            obj_fns[o_i] = obj_dist_fn
+
+        # Speed feature function
         def speed_fn(state, actions):
             return feature.speed_size(state[..., np.arange(*main_idx)])
 
+        # Control feature function
         def control_fn(state, actions):
             return feature.control_magnitude(actions)
 
         feats_dict["dist_cars"] = concat_funcs(car_fns, axis=0)
         feats_dict["dist_lanes"] = concat_funcs(lane_fns, axis=0)
+        feats_dict["dist_objects"] = concat_funcs(obj_fns, axis=0)
         feats_dict["speed"] = speed_fn
         feats_dict["control"] = control_fn
 
@@ -402,12 +421,13 @@ class DriveWorld(gym.Env):
         self.draw_background()
         for lane in self._lanes:
             lane.render()
-        for obj in self._objects:
+        for oi, obj in enumerate(self._objects):
             obj.render()
         for car in cars:
             car.render()
         main_car.render()
         if draw_heat:
+            assert weights is not None
             self.set_heat(weights)
             self.draw_heatmap()
 
@@ -511,12 +531,10 @@ class DriveWorld(gym.Env):
         )
         graphics.draw(4, gl.GL_LINES, ("v2f", line_strip))
 
-    def set_heat(self, weights=None):
+    def set_heat(self, weights):
         def val(x, y):
-            if weights is None:
-                cost_fn = self._main_car.cost_fn
-            else:
-                cost_fn = partial(self._main_car.cost_runtime, weights=weights)
+            ws = np.array(list(weights.values()))
+            cost_fn = partial(self._main_car.cost_runtime, weights=ws)
             state = deepcopy(self.state)
             main_idx = self._indices["main_car"]
             state[main_idx[0] : main_idx[0] + 3] = [x, y, onp.pi / 3]

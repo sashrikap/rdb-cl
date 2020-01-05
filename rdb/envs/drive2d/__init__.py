@@ -10,7 +10,7 @@ register(
 
 
 # Drive world
-from .worlds import week3, week4, week5
+from .worlds import week3, week4, week5, week6
 
 # Automatically register all Week3_xx environmnts
 for k, c in week3.__dict__.items():
@@ -26,4 +26,9 @@ for k, c in week4.__dict__.items():
 # Automatically register all Week5_xx environmnts
 for k, c in week5.__dict__.items():
     if "Week5_" in k:
+        register(id=f"{k}-v0", entry_point=f"{c.__module__}:{c.__name__}")
+
+# Automatically register all Week6_xx environmnts
+for k, c in week6.__dict__.items():
+    if "Week6_" in k:
         register(id=f"{k}-v0", entry_point=f"{c.__module__}:{c.__name__}")

@@ -111,7 +111,7 @@ class IRDOptimalControl(PGM):
         self._samples = {}
         self._user_actions = {}
         self._user_feats = {}
-        # assume designer uses the same beta and prior
+        # assume designer uses the same beta, prior and prior proposal
         self._designer = Designer(
             rng_key,
             env,
@@ -218,7 +218,7 @@ class IRDOptimalControl(PGM):
             self._rng_key, self._env, self._controller, self._runner, norm_ws
         )
         norm_feats = normalizer.get_features(
-            task, task_name, desc="Collecting Normalizer Samples"
+            task, task_name, desc="Collecting Normalizer Features"
         )
         return normalizer
 
@@ -347,6 +347,7 @@ class Designer(PGM):
 
     def update_key(self, rng_key):
         super().update_key(rng_key)
+        self._prior_log_prob = seed(self._prior_log_prob, rng_key)
 
     def _build_kernel(self, beta):
         def likelihood_fn(true_w, sample_w, task):
