@@ -1,5 +1,6 @@
 import jax.numpy as np
 import functools
+import numpy as onp
 from collections import OrderedDict
 from functools import partial, reduce
 from toolz.functoolz import juxt
@@ -39,7 +40,7 @@ def concate_dict_by_keys(dicts):
         keys = dicts[0].keys()
         out_dict = {}
         for key in keys:
-            out_dict[key] = np.array([d[key] for d in dicts])
+            out_dict[key] = onp.array([d[key] for d in dicts])
         return out_dict
 
 

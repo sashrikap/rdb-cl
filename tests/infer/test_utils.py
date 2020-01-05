@@ -43,10 +43,10 @@ def test_random_probs():
 def test_random_speed():
     key = random.PRNGKey(0)
     random_choice_fn = seed(random_choice, key)
-    probs = np.ones(500)
+    probs = np.random.random(500)
     arr = np.random.random(500)
     results = []
     for _ in range(10):
         with Profiler("Random choice"):
-            res = random_choice_fn(arr, 500, probs, replacement=True)
+            res = random_choice_fn(np.arange(500), 500, probs, replacement=True)
             assert len(res) == 500

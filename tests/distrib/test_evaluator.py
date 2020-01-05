@@ -79,16 +79,51 @@ designer = Designer(
 )
 
 
-def ttest_evaluator():
+def env_fn():
+    import gym, rdb.envs.drive2d
+
+    env = gym.make(ENV_NAME)
+    env.reset()
+    return env
+
+
+def controller_fn(env_):
+    controller, runner = shooting_method(
+        env_, env_.main_car.cost_runtime, HORIZON, env_.dt, replan=False
+    )
+    return controller, runner
+
+
+# def run_evaluator():
+#     key = random.PRNGKey(0)
+#     designer.update_key(key)
+#     ps = []
+#     num_workers = 1
+#     ps = designer.sample(task, str(task))
+#     evaluator = EvaluatorParticle(env_fn, controller_fn)
+#     evaluator.evaluate(key, ps.weights, true_w, task, str(task))
+
+# run_evaluator()
+
+
+def test_evaluator():
     key = random.PRNGKey(0)
     designer.update_key(key)
     ps = []
     num_workers = 1
     for _ in range(num_workers):
         ps.append(designer.sample(task, str(task)))
-    evals = [EvaluatorParticle.remote() for _ in range(num_workers)]
-    [e.evaluate.remote(p, true_w) for e, p in zip(evals, ps)]
+    evals = [
+        EvaluatorParticle.remote(env_fn, controller_fn) for _ in range(num_workers)
+    ]
+    [
+        e.evaluate.remote(key, p.weights, true_w, task, str(task))
+        for e, p in zip(evals, ps)
+    ]
     [print(ray.get(e.get_result.remote())) for e in evals]
+
+
+test_evaluator()
 
 
 def ttest_ray1():

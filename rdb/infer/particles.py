@@ -12,6 +12,7 @@ from numpyro.handlers import scale, condition, seed
 from rdb.exps.utils import plot_weights
 from scipy.stats import gaussian_kde
 from fast_histogram import histogram1d
+from rdb.exps.utils import Profiler
 import jax.numpy as np
 import numpy as onp
 
@@ -141,7 +142,7 @@ class Particles(object):
             traj, cost, info = self._runner(state, actions, weights=w)
             violations = info["violations"]
             num = sum([sum(v) for v in violations.values()])
-            # print(f"violate {num} acs {np.mean(actions):.3f} xs {np.mean(traj):.3f}")
+            # print(f"violate {num} acs {onp.mean(actions):.3f} xs {onp.mean(traj):.3f}")
             num_violate += num
         return float(num_violate) / len(self.weights)
 
@@ -163,7 +164,7 @@ class Particles(object):
         target_cost = multiply_dict_by_keys(target_w, target_feats_sum)
 
         diff_cost = subtract_dict_by_keys(this_cost, target_cost)
-        diff_rews = -1 * np.sum(list(diff_cost.values()), axis=0)
+        diff_rews = -1 * onp.sum(list(diff_cost.values()), axis=0)
         # if diff_rew > 0:
         #    import pdb; pdb.set_trace()
         if verbose:
@@ -181,17 +182,18 @@ class Particles(object):
     def resample(self, probs):
         """Resample from particles using list of probs. Similar to particle filter update."""
         N = len(self.weights)
-        idxs = self._random_choice(np.arange(N), num=N, probs=probs, replacement=True)
+        idxs = self._random_choice(onp.arange(N), num=N, probs=probs, replacement=True)
         new_concate_ws = dict()
         for key, value in self.concate_weights.items():
             new_concate_ws[key] = value[idxs]
-        return Particles(
+        new_ps = Particles(
             self._rng_key,
             self._env,
             self._controller,
             self._runner,
             sample_concate_ws=new_concate_ws,
         )
+        return new_ps
 
     def entropy(self, method="histogram", bins=50, ranges=(-5.0, 5.0)):
         """Estimate entropy

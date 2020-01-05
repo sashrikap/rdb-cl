@@ -21,8 +21,8 @@ def stack_dict_values(dicts, normalize=False):
     """
     lists = []
     for dict_ in dicts:
-        lists.append(np.array(list(dict_.values())))
-    output = np.stack(lists)
+        lists.append(onp.array(list(dict_.values())))
+    output = onp.stack(lists)
     if normalize:
         max_ = output.max(axis=0)
         min_ = output.min(axis=0)
@@ -35,8 +35,10 @@ def stack_dict_values_ratio(dicts, original):
     """
     lists = []
     for dict_ in dicts:
-        lists.append(np.array(list(dict_.values())) / np.array(list(original.values())))
-    return np.stack(lists)
+        lists.append(
+            onp.array(list(dict_.values())) / onp.array(list(original.values()))
+        )
+    return onp.stack(lists)
 
 
 def stack_dict_log_values(dicts):
@@ -45,16 +47,16 @@ def stack_dict_log_values(dicts):
     """
     lists = []
     for dict_ in dicts:
-        lists.append(np.array(list(dict_.values())))
-    output = np.log(np.stack(lists))
+        lists.append(onp.array(list(dict_.values())))
+    output = onp.log(onp.stack(lists))
     return output
 
 
 def logsumexp(vs):
-    max_v = np.max(vs)
+    max_v = onp.max(vs)
     ds = vs - max_v
-    sum_exp = np.exp(ds).sum()
-    return max_v + np.log(sum_exp)
+    sum_exp = onp.exp(ds).sum()
+    return max_v + onp.log(sum_exp)
 
 
 def random_choice(items, num, probs=None, replacement=True):
@@ -65,20 +67,20 @@ def random_choice(items, num, probs=None, replacement=True):
         arr = numpyro.sample(
             "random_choice", dist.Uniform(0, 1), sample_shape=(len(items),)
         )
-        idxs = np.argsort(arr)[:num]
+        idxs = onp.argsort(arr)[:num]
         return [items[idx] for idx in idxs]
     else:
         # with replacement
         if probs is None:
-            probs = np.ones(len(items)) / len(items)
+            probs = onp.ones(len(items)) / len(items)
         else:
             assert len(probs) == len(items)
-            probs = probs / np.sum(probs)
-        probs = np.cumsum(probs)
+            probs = probs / onp.sum(probs)
+        probs = onp.cumsum(probs)
         arr = numpyro.sample("random_choice", dist.Uniform(0, 1), sample_shape=(num,))
-        arr = np.repeat(arr[:, None], len(items), axis=1)
+        arr = onp.repeat(arr[:, None], len(items), axis=1)
         diff = arr - probs
-        idxs = np.argmax(diff < 0, axis=1)
+        idxs = onp.argmax(diff < 0, axis=1)
         output = [items[idx] for idx in idxs]
         return output
 
@@ -127,7 +129,7 @@ def prior_sample(log_prior_dict):
     output = {}
     for key, dist_ in log_prior_dict.items():
         val = numpyro.sample(key, dist_)
-        output[key] = np.exp(val)
+        output[key] = onp.exp(val)
         # print(key, val)
     return output
 
@@ -160,16 +162,16 @@ def prior_log_prob(sample_dict, log_prior_dict):
         ), f"Type `{type(prior_dist)}` supported"
         low = prior_dist.low
         high = prior_dist.high
-        return np.where(
+        return onp.where(
             sample_val < low or sample_val > high,
-            -np.inf,
+            -onp.inf,
             prior_dist.log_prob(sample_val),
         )
 
     log_prob = 0.0
     for key, dist_ in log_prior_dict.items():
         val = sample_dict[key]
-        log_val = np.log(val)
+        log_val = onp.log(val)
         # print(f"{key} {log_val} range {check_range(log_val, dist_)}")
         log_prob += check_range(log_val, dist_)
 
@@ -187,11 +189,11 @@ def gaussian_proposal(state, log_std_dict):
     for key, val in next_state.items():
         if key in log_std_dict.keys():
             # Convert to log val
-            log_val = np.log(val)
+            log_val = onp.log(val)
             std = log_std_dict[key]
             next_log_val = numpyro.sample("next_log_val", dist.Normal(log_val, std))
             # Convert back to normal val
-            next_state[key] = np.exp(next_log_val)
+            next_state[key] = onp.exp(next_log_val)
     return next_state
 
 

@@ -40,15 +40,14 @@ NUM_NORMALIZERS = 200
 NUM_SAMPLES = 500
 NUM_ACTIVE_SAMPLES = -1
 NUM_EVAL_SAMPLES = -1
-# NUM_EVAL_TASKS = 8
-NUM_EVAL_TASKS = 1
+NUM_EVAL_TASKS = 8
 
 ## Testing
-# NUM_NORMALIZERS = 3
-# NUM_SAMPLES = 10
-# NUM_ACTIVE_SAMPLES = 10
-# NUM_EVAL_SAMPLES = 7
-# NUM_EVAL_TASKS = 2
+NUM_NORMALIZERS = 3
+NUM_SAMPLES = 100
+NUM_ACTIVE_SAMPLES = 100
+NUM_EVAL_SAMPLES = 7
+NUM_EVAL_TASKS = 2
 
 
 NUM_DESIGNERS = 50
@@ -144,22 +143,22 @@ ird_model = IRDOptimalControl(
 
 """ Active acquisition function for experiment """
 acquire_fns = {
-    "infogain": ActiveInfoGain(
-        rng_key=None,
-        env=env,
-        model=ird_model,
-        beta=BETA,
-        num_active_sample=NUM_ACTIVE_SAMPLES,
-        debug=False,
-    ),
-    # "ratiomean": ActiveRatioTest(
+    # "infogain": ActiveInfoGain(
     #     rng_key=None,
     #     env=env,
     #     model=ird_model,
-    #     method="mean",
+    #     beta=BETA,
     #     num_active_sample=NUM_ACTIVE_SAMPLES,
     #     debug=False,
     # ),
+    "ratiomean": ActiveRatioTest(
+        rng_key=None,
+        env=env,
+        model=ird_model,
+        method="mean",
+        num_active_sample=NUM_ACTIVE_SAMPLES,
+        debug=False,
+    ),
     # "ratiomin": ActiveRatioTest(
     #     rng_key=None,
     #     env=env,

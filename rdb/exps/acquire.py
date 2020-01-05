@@ -57,37 +57,37 @@ class ActiveInfoGain(object):
               [H(X) - H(X|Y)] - [H(X) - H(X|Y')] = H(X|Y') - H(X|Y)
 
         """
-        belief = belief.subsample(self._num_active_sample)
+        with Profiler("InfoGain"):
+            belief = belief.subsample(self._num_active_sample)
 
-        desc = f"Computing {self._method} acquisition features"
-        if not verbose:
-            desc = None
-        next_feats_sum = belief.get_features_sum(next_task, next_task_name, desc=desc)
-
-        entropies = []
-        for next_designer_w in tqdm(belief.weights, desc="Computing acquisition"):
-            with Profiler("compute probs"):
-                next_probs = self._compute_probs(next_designer_w, next_feats_sum)
-            with Profiler("sample belief"):
-                next_belief = belief.resample(next_probs)
-            # avoid gaussian entropy (causes NonSingular Matrix issue)
-            with Profiler("compute entropy"):
-                ent = next_belief.entropy("histogram")
-            if np.isnan(ent):
-                ent = 1000
-                print("WARNING: Entropy has NaN entropy value")
-            entropies.append(ent)
-
-        entropies = np.array(entropies)
-        infogain = -1 * np.mean(entropies)
-
-        if self._debug:
-            print(f"Acquire method {self._method}")
-            print(
-                f"\tEntropies mean {np.mean(entropies):.3f} std {np.std(entropies):.3f}"
+            desc = f"Computing {self._method} acquisition features"
+            if not verbose:
+                desc = None
+            next_feats_sum = belief.get_features_sum(
+                next_task, next_task_name, desc=desc
             )
 
-        return infogain / self._num_active_designers
+            entropies = []
+            for next_designer_w in belief.weights:
+                next_probs = self._compute_probs(next_designer_w, next_feats_sum)
+                next_belief = belief.resample(next_probs)
+                # avoid gaussian entropy (causes NonSingular Matrix issue)
+                ent = next_belief.entropy("histogram")
+                if np.isnan(ent):
+                    ent = 1000
+                    print("WARNING: Entropy has NaN entropy value")
+                entropies.append(ent)
+
+            entropies = np.array(entropies)
+            infogain = -1 * np.mean(entropies)
+
+            if self._debug:
+                print(f"Acquire method {self._method}")
+                print(
+                    f"\tEntropies mean {np.mean(entropies):.3f} std {np.std(entropies):.3f}"
+                )
+
+        return infogain
 
 
 class ActiveRatioTest(ActiveInfoGain):
@@ -108,7 +108,6 @@ class ActiveRatioTest(ActiveInfoGain):
             model,
             beta=0.0,
             num_active_sample=num_active_sample,
-            num_active_designers=-1,
             debug=debug,
         )
         self._method = method
@@ -136,24 +135,26 @@ class ActiveRatioTest(ActiveInfoGain):
 
         """
         belief = belief.subsample(self._num_active_sample)
-
         desc = f"Computing {self._method} acquisition features"
         if not verbose:
             desc = None
         next_feats_sum = belief.get_features_sum(next_task, next_task_name, desc=desc)
-        user_feats_sum = obs.get_features_sum(next_task, next_task_name)
-        weights = concate_dict_by_keys(belief.weights)
-        log_ratios = self._compute_log_ratios(weights, next_feats_sum, user_feats_sum)
-
-        if self._debug:
-            min_idx = np.argmin(log_ratios)
-            print(f"Acquire method {self._method}")
-            print(f"\tMin weight")
-            for key, val in belief.weights[min_idx].items():
-                print(f"\t-> {key}: {val:.3f}")
-            print(
-                f"\tRatios mean {np.mean(log_ratios):.3f} std {np.std(log_ratios):.3f}"
+        with Profiler("Ratio Test"):
+            user_feats_sum = obs.get_features_sum(next_task, next_task_name)
+            weights = belief.concate_weights
+            log_ratios = self._compute_log_ratios(
+                weights, next_feats_sum, user_feats_sum
             )
+
+            if self._debug:
+                min_idx = np.argmin(log_ratios)
+                print(f"Acquire method {self._method}")
+                print(f"\tMin weight")
+                for key, val in belief.weights[min_idx].items():
+                    print(f"\t-> {key}: {val:.3f}")
+                print(
+                    f"\tRatios mean {np.mean(log_ratios):.3f} std {np.std(log_ratios):.3f}"
+                )
         if self._method == "mean":
             return -1 * np.mean(log_ratios)
         elif self._method == "min":
@@ -173,13 +174,7 @@ class ActiveRandom(ActiveInfoGain):
 
     def __init__(self, rng_key, env, model, method="random", debug=False):
         super().__init__(
-            rng_key,
-            env,
-            model,
-            beta=0.0,
-            num_active_sample=0.0,
-            num_active_designers=-1,
-            debug=debug,
+            rng_key, env, model, beta=0.0, num_active_sample=0.0, debug=debug
         )
         self._method = method
         self._random_uniform = random_uniform
