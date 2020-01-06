@@ -7,8 +7,9 @@ sns.set()
 import matplotlib.pyplot as plt
 
 N = -1
-seed = "[0 9]"
-MAX_LEN = 7
+seed = "[ 0 13]"
+# seed = None
+MAX_LEN = -1
 # MAX_LEN = 4
 
 
@@ -19,7 +20,7 @@ def read_seed(path):
 
 def cleanup(arr):
     if len(arr) == 1:
-        return arr
+        return np.array(arr)
     else:
         max_len = max([len(a) for a in arr])
         # print([len(a) for a in arr])
@@ -77,8 +78,8 @@ def plot_data(path):
                 data[method]["perform"][-1].append(h["perform"])
             # import pdb; pdb.set_trace()
     for method, mdict in data.items():
-        print(len(mdict["perform"]))
         mdict["perform"] = cleanup(mdict["perform"])
+        print(mdict["perform"].shape)
 
     plot_perform(data)
 
@@ -87,5 +88,5 @@ if __name__ == "__main__":
     # data_path = "data/191216/active_ird_exp1"
     # data_path = "data/191217/active_ird_exp1"
     # data_path = "data/200103/active_ird_exp_mid"
-    data_path = "data/200103/active_ird_exp_full"
+    data_path = "data/200105/active_ird_exp_mid"
     plot_data(data_path)

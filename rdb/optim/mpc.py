@@ -15,6 +15,7 @@ from functools import partial
 from time import time
 from rdb.optim.runner import Runner
 from rdb.optim.utils import *
+from jax.lax import fori_loop
 import jax
 import jax.numpy as np
 import jax.random as random

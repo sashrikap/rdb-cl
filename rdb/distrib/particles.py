@@ -1,6 +1,7 @@
 """Distributed evaluator class. Used for parallel evaluation.
 """
 import ray
+import math
 from rdb.infer.particles import Particles
 from tqdm.auto import tqdm
 
@@ -71,8 +72,16 @@ class ParticleServer(object):
                 worker.initialize()
 
     def compute_tasks(self, particles, tasks, task_names, verbose=True):
+        # Filter existing tasks
+        new_tasks, new_task_names = [], []
+        for task, task_name in zip(tasks, task_names):
+            if task_name not in particles.cached_tasks:
+                new_tasks.append(task)
+                new_task_names.append(task_name)
+        tasks, task_names = new_tasks, new_task_names
+
         num_tasks = len(tasks)
-        iterations = num_tasks // self._num_workers + 1
+        iterations = math.ceil(num_tasks / self._num_workers)
 
         if verbose:
             pbar = tqdm(total=num_tasks, desc="Particle Server")

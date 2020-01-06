@@ -18,12 +18,13 @@ import numpyro.distributions as dist
 ENV_NAME = "Week6_01-v0"
 # RANDOM_KEYS = [1, 2, 3, 4]
 # RANDOM_KEYS = [5, 6, 7, 8]
-# RANDOM_KEYS = [9, 10, 11, 12]
-RANDOM_KEYS = [13, 14, 15, 16]
+RANDOM_KEYS = [9, 10, 11, 12]
+# RANDOM_KEYS = [13, 14, 15, 16]
 # RANDOM_KEYS = [17, 18, 19, 20]
-NUM_EVAL_WORKERS = 4
+NUM_EVAL_WORKERS = 2
 NUM_WARMUPS = 100
-NUM_ACTIVE_TASKS = 16
+NUM_ACTIVE_TASKS = 24
+PARALLEL = True
 
 ## Full scale sampling
 # NUM_NORMALIZERS = 500
@@ -41,15 +42,16 @@ NUM_NORMALIZERS = 500
 NUM_SAMPLES = 500
 NUM_ACTIVE_SAMPLES = -1
 NUM_EVAL_SAMPLES = -1
-NUM_EVAL_TASKS = 16
+NUM_EVAL_TASKS = 24
 
 ## Testing
-# NUM_NORMALIZERS = 3
-# NUM_SAMPLES = 100
-# NUM_ACTIVE_SAMPLES = 100
-# NUM_EVAL_SAMPLES = 7
-# NUM_EVAL_TASKS = 2
-
+NUM_NORMALIZERS = 50
+NUM_SAMPLES = 10
+NUM_ACTIVE_SAMPLES = 10
+NUM_EVAL_SAMPLES = 7
+NUM_EVAL_TASKS = 2
+NUM_EVAL_WORKERS = 1
+PARALLEL = False
 
 NUM_DESIGNERS = 50
 MAX_WEIGHT = 5.0
@@ -137,7 +139,9 @@ norm_sample_fn = partial(
     normalizer_sample, sample_fn=prior_sample_fn, num=NUM_NORMALIZERS
 )
 proposal_fn = partial(gaussian_proposal, log_std_dict=proposal_std_dict)
-eval_server = ParticleServer(env_fn, controller_fn, num_workers=NUM_EVAL_WORKERS)
+eval_server = ParticleServer(
+    env_fn, controller_fn, num_workers=NUM_EVAL_WORKERS, parallel=PARALLEL
+)
 
 ird_model = IRDOptimalControl(
     rng_key=None,
@@ -181,8 +185,8 @@ experiment = ExperimentActiveIRD(
     # debug_belief_task=(-0.2, 0.5),
     # debug_belief_task=None,
     # save_dir="data/191221_true",
-    save_dir="data/200104",
-    exp_name="active_ird_exp_mid",
+    save_dir="data/200106",
+    exp_name="active_ird_exp_test",
 )
 
 """ Experiment """

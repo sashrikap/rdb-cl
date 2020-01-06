@@ -157,14 +157,8 @@ class ExperimentActiveIRD(object):
                 self._all_beliefs[key].append(next_belief)
                 self._curr_belief[key] = next_belief
                 # Evaluate and Save
-                self._evaluate(key, belief, eval_tasks)
+                self._evaluate(key, next_belief, eval_tasks)
                 self._save(it)
-
-        # Evaluate and save last round
-        for key in self._acquire_fns.keys():
-            belief = self._curr_belief[key]
-            self._evaluate(key, belief, eval_tasks)
-        self._save(self._iterations)
 
     def _debug_belief(self, belief, task, obs):
         print(f"Observed weights")
@@ -236,7 +230,7 @@ class ExperimentActiveIRD(object):
             perf = belief.compare_with(task, task_name, self._model.designer.true_w)
 
             performance += perf
-            num_violate += np.array(list(vios.values())).mean()
+            num_violate += np.array(list(vios.values())).sum(axis=0).mean()
 
         avg_violate = float(num_violate / len(eval_tasks))
         avg_perform = float(performance / len(eval_tasks))

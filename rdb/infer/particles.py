@@ -11,7 +11,6 @@ from rdb.optim.utils import (
 from numpyro.handlers import scale, condition, seed
 from rdb.exps.utils import plot_weights
 from scipy.stats import gaussian_kde
-from fast_histogram import histogram1d
 from rdb.exps.utils import Profiler
 import jax.numpy as np
 import numpy as onp
@@ -191,6 +190,9 @@ class Particles(object):
         target_feats_sum = target.get_features_sum(task, task_name)
         target_cost = multiply_dict_by_keys(target_w, target_feats_sum)
 
+        import pdb
+
+        pdb.set_trace()
         diff_cost = subtract_dict_by_keys(this_cost, target_cost)
         diff_rews = -1 * onp.sum(list(diff_cost.values()), axis=0)
         # if diff_rew > 0:

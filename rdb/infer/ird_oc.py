@@ -289,8 +289,8 @@ class IRDOptimalControl(PGM):
 
                 log_probs.append(sample_rew - sum_normal_rew)
             log_probs.append(self._prior_log_prob(sample_w))
-            if len(log_probs) > 2:
-                print([f"{p:.3f}" for p in log_probs])
+            # if len(log_probs) > 2:
+            #     print([f"{p:.3f}" for p in log_probs])
             return sum(log_probs)
 
         return likelihood_fn
