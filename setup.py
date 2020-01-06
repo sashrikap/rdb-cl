@@ -23,5 +23,8 @@ setup(
         "funcy",
         "PyOpenGL",
         "seaborn",
+        "ray",
+        "psutil",
+        "tqdm",
     ],
 )

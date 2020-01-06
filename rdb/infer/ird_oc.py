@@ -59,10 +59,9 @@ class IRDOptimalControl(PGM):
         * Provides caching functions to avoid costly feature calcultions
 
     Args:
-        controller (fn): controller function,
-            `actions = controller(state, w)`
-        runner (fn): runner function,
-            `traj, cost, info = runner(state, actions)`
+        controller_fn (fn): returns controller and runner
+            controller: `actions = controller(state, w)`
+            runner: `traj, cost, info = runner(state, actions)`
         beta (float): temperature param
             `p ~ exp(beta * reward)`
         prior_log_prob (fn): log probability of prior
@@ -85,9 +84,9 @@ class IRDOptimalControl(PGM):
     def __init__(
         self,
         rng_key,
-        env,
-        controller,
-        runner,
+        env_fn,
+        controller_fn,
+        eval_server,
         beta,
         true_w,
         prior_log_prob,
@@ -100,9 +99,10 @@ class IRDOptimalControl(PGM):
         debug_true_w=False,
     ):
         self._rng_key = rng_key
-        self._controller = controller
-        self._runner = runner
-        self._env = env
+        self._env = env_fn()
+        self._controller, self._runner = controller_fn(self._env)
+        self._eval_server = eval_server
+        # Parameters & distributions
         self._beta = beta
         self._prior_log_prob = prior_log_prob
         self._normalizer_fn = normalizer_fn
@@ -114,9 +114,9 @@ class IRDOptimalControl(PGM):
         # assume designer uses the same beta, prior and prior proposal
         self._designer = Designer(
             rng_key,
-            env,
-            controller,
-            runner,
+            self._env,
+            self._controller,
+            self._runner,
             beta,
             true_w,
             prior_log_prob,
@@ -130,8 +130,16 @@ class IRDOptimalControl(PGM):
         super().__init__(rng_key, kernel, proposal_fn, sample_method, sample_args)
 
     @property
+    def env(self):
+        return self._env
+
+    @property
     def designer(self):
         return self._designer
+
+    @property
+    def eval_server(self):
+        return self._eval_server
 
     def update_key(self, rng_key):
         """ Update random key """

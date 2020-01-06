@@ -1,16 +1,15 @@
 """Test designer module.
 """
 from rdb.infer.ird_oc import IRDOptimalControl, Designer
-from rdb.distrib.evaluator import EvaluatorParticle
+from rdb.distrib.particles import ParticleServer
 from rdb.optim.mpc import shooting_method
 from rdb.infer.utils import *
 from functools import partial
 from jax import random
+from time import time
 import numpyro.distributions as dist
 import gym, rdb.envs.drive2d
 import ray
-
-ray.init()
 
 ENV_NAME = "Week6_01-v0"
 NUM_WARMUPS = 100
@@ -24,7 +23,7 @@ NUM_ACTIVE_SAMPLES = -1
 NUM_EVAL_SAMPLES = -1
 NUM_EVAL_TASKS = 8
 
-NUM_DESIGNERS = 10
+NUM_DESIGNERS = 40
 MAX_WEIGHT = 8.0
 BETA = 1.0
 HORIZON = 10
@@ -94,36 +93,46 @@ def controller_fn(env_):
     return controller, runner
 
 
-# def run_evaluator():
-#     key = random.PRNGKey(0)
-#     designer.update_key(key)
-#     ps = []
-#     num_workers = 1
-#     ps = designer.sample(task, str(task))
-#     evaluator = EvaluatorParticle(env_fn, controller_fn)
-#     evaluator.evaluate(key, ps.weights, true_w, task, str(task))
-
-# run_evaluator()
+key = random.PRNGKey(0)
+designer.update_key(key)
+num_tasks = 36
 
 
-def test_evaluator():
-    key = random.PRNGKey(0)
-    designer.update_key(key)
-    ps = []
+def test_single_evaluator():
+    particles = designer.sample(task, str(task))
     num_workers = 1
-    for _ in range(num_workers):
-        ps.append(designer.sample(task, str(task)))
-    evals = [
-        EvaluatorParticle.remote(env_fn, controller_fn) for _ in range(num_workers)
-    ]
-    [
-        e.evaluate.remote(key, p.weights, true_w, task, str(task))
-        for e, p in zip(evals, ps)
-    ]
-    [print(ray.get(e.get_result.remote())) for e in evals]
+    server = ParticleServer(
+        env_fn,
+        controller_fn,
+        num_workers=num_workers,
+        parallel=False,
+        initialize_wait=True,
+    )
+    t1 = time()
+    particles = server.compute_tasks(
+        particles, [task] * num_tasks, [str(task)] * num_tasks, verbose=True
+    )
+    print(f"Single worker time {time() - t1:.3f}")
 
 
-test_evaluator()
+test_single_evaluator()
+
+
+def test_parallel_evaluator():
+    ps = []
+    particles = designer.sample(task, str(task))
+    num_workers = 4
+    server = ParticleServer(
+        env_fn, controller_fn, num_workers=num_workers, initialize_wait=True
+    )
+    t1 = time()
+    particles = server.compute_tasks(
+        particles, [task] * num_tasks, [str(task)] * num_tasks, verbose=True
+    )
+    print(f"Parallel worker time {time() - t1:.3f}")
+
+
+test_parallel_evaluator()
 
 
 def ttest_ray1():

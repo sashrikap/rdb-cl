@@ -8,11 +8,11 @@ from rdb.exps.active_ird import ExperimentActiveIRD
 from rdb.exps.acquire import ActiveInfoGain, ActiveRatioTest, ActiveRandom
 from rdb.infer.ird_oc import IRDOptimalControl
 from rdb.optim.mpc import shooting_method
+from rdb.distrib.particles import ParticleServer
 from rdb.infer.utils import *
 from functools import partial
 from jax import random
 import numpyro.distributions as dist
-import gym, rdb.envs.drive2d
 
 # ENV_NAME = "Week3_02-v0"
 ENV_NAME = "Week6_01-v0"
@@ -21,6 +21,7 @@ ENV_NAME = "Week6_01-v0"
 # RANDOM_KEYS = [9, 10, 11, 12]
 RANDOM_KEYS = [13, 14, 15, 16]
 # RANDOM_KEYS = [17, 18, 19, 20]
+NUM_EVAL_WORKERS = 4
 NUM_WARMUPS = 100
 NUM_ACTIVE_TASKS = 16
 
@@ -36,18 +37,18 @@ NUM_ACTIVE_TASKS = 16
 USER_TRUE_W = False
 
 ## Faster sampling
-NUM_NORMALIZERS = 200
+NUM_NORMALIZERS = 500
 NUM_SAMPLES = 500
 NUM_ACTIVE_SAMPLES = -1
 NUM_EVAL_SAMPLES = -1
-NUM_EVAL_TASKS = 8
+NUM_EVAL_TASKS = 16
 
 ## Testing
-NUM_NORMALIZERS = 3
-NUM_SAMPLES = 100
-NUM_ACTIVE_SAMPLES = 100
-NUM_EVAL_SAMPLES = 7
-NUM_EVAL_TASKS = 2
+# NUM_NORMALIZERS = 3
+# NUM_SAMPLES = 100
+# NUM_ACTIVE_SAMPLES = 100
+# NUM_EVAL_SAMPLES = 7
+# NUM_EVAL_TASKS = 2
 
 
 NUM_DESIGNERS = 50
@@ -57,11 +58,21 @@ HORIZON = 10
 EXP_ITERATIONS = 8
 PROPOSAL_VAR = 0.25
 
-env = gym.make(ENV_NAME)
-env.reset()
-controller, runner = shooting_method(
-    env, env.main_car.cost_runtime, HORIZON, env.dt, replan=False
-)
+
+def env_fn():
+    import gym, rdb.envs.drive2d
+
+    env = gym.make(ENV_NAME)
+    env.reset()
+    return env
+
+
+def controller_fn(env):
+    controller, runner = shooting_method(
+        env, env.main_car.cost_runtime, HORIZON, env.dt, replan=False
+    )
+    return controller, runner
+
 
 # # TODO: find true w
 # true_w = {
@@ -126,11 +137,13 @@ norm_sample_fn = partial(
     normalizer_sample, sample_fn=prior_sample_fn, num=NUM_NORMALIZERS
 )
 proposal_fn = partial(gaussian_proposal, log_std_dict=proposal_std_dict)
+eval_server = ParticleServer(env_fn, controller_fn, num_workers=NUM_EVAL_WORKERS)
+
 ird_model = IRDOptimalControl(
     rng_key=None,
-    env=env,
-    controller=controller,
-    runner=runner,
+    env_fn=env_fn,
+    controller_fn=controller_fn,
+    eval_server=eval_server,
     beta=BETA,
     true_w=true_w,
     prior_log_prob=prior_log_prob_fn,
@@ -143,41 +156,25 @@ ird_model = IRDOptimalControl(
 
 """ Active acquisition function for experiment """
 acquire_fns = {
-    # "infogain": ActiveInfoGain(
-    #     rng_key=None,
-    #     env=env,
-    #     model=ird_model,
-    #     beta=BETA,
-    #     num_active_sample=NUM_ACTIVE_SAMPLES,
-    #     debug=False,
-    # ),
+    "infogain": ActiveInfoGain(rng_key=None, model=ird_model, beta=BETA, debug=False),
     "ratiomean": ActiveRatioTest(
-        rng_key=None,
-        env=env,
-        model=ird_model,
-        method="mean",
-        num_active_sample=NUM_ACTIVE_SAMPLES,
-        debug=False,
+        rng_key=None, model=ird_model, method="mean", debug=False
     ),
-    # "ratiomin": ActiveRatioTest(
-    #     rng_key=None,
-    #     env=env,
-    #     model=ird_model,
-    #     method="min",
-    #     num_active_sample=NUM_ACTIVE_SAMPLES,
-    #     debug=False,
-    # ),
-    # "random": ActiveRandom(rng_key=None, env=env, model=ird_model),
+    "ratiomin": ActiveRatioTest(
+        rng_key=None, model=ird_model, method="min", debug=False
+    ),
+    "random": ActiveRandom(rng_key=None, model=ird_model),
 }
 
 experiment = ExperimentActiveIRD(
-    env,
     ird_model,
     acquire_fns,
+    eval_server=eval_server,
     iterations=EXP_ITERATIONS,
     num_eval_tasks=NUM_EVAL_TASKS,
     num_eval_sample=NUM_EVAL_SAMPLES,
     num_active_tasks=NUM_ACTIVE_TASKS,
+    num_active_sample=NUM_ACTIVE_SAMPLES,
     # Hard coded candidates
     # fixed_candidates=[(-0.4, -0.7), (-0.2, 0.5)],
     # fixed_candidates=[(-0.2, 0.5)],

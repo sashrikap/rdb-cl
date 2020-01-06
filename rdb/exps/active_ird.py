@@ -36,27 +36,30 @@ class ExperimentActiveIRD(object):
         num_eval_sample (int): evaluating belief samples is costly,
             so subsample belief particles
         num_active_tasks (int): # task candidates for active selection
+        num_active_sample (int): running acquisition function on belief
+            samples is costly, so subsample belief particles
 
     """
 
     def __init__(
         self,
-        env,
         model,
         acquire_fns,
+        eval_server,
         iterations=10,
         num_eval_tasks=4,
         num_eval_sample=5,
         num_active_tasks=4,
+        num_active_sample=-1,
         fixed_candidates=None,
         debug_belief_task=None,
         save_dir="data/active_ird_exp1",
         exp_name="active_ird_exp1",
     ):
-        self._env = env
         # Inverse Reward Design Model
         self._model = model
         self._acquire_fns = acquire_fns
+        self._eval_server = eval_server
         # Random key & function
         self._rng_key = None
         self._random_choice = random_choice
@@ -66,6 +69,7 @@ class ExperimentActiveIRD(object):
         self._num_eval_sample = num_eval_sample
         # Active Task proposal
         self._num_active_tasks = num_active_tasks
+        self._num_active_sample = num_active_sample
         self._fixed_candidates = fixed_candidates
         self._debug_belief_task = debug_belief_task
         # Save path
@@ -99,7 +103,7 @@ class ExperimentActiveIRD(object):
         """Run main algorithmic loop."""
         self._build_cache()
         eval_tasks = self._random_choice(
-            self._env.all_tasks, self._num_eval_tasks, replacement=True
+            self._model.env.all_tasks, self._num_eval_tasks, replacement=True
         )
         """ First iteration """
         task_name = f"ird_{str(task)}"
@@ -122,7 +126,7 @@ class ExperimentActiveIRD(object):
                 candidates = self._fixed_candidates
             else:
                 candidates = self._random_choice(
-                    self._env.all_tasks, self._num_active_tasks
+                    self._model.env.all_tasks, self._num_active_tasks
                 )
             """ Run Active IRD on Candidates """
             print(f"\nActive IRD iteration {it}")
@@ -186,16 +190,23 @@ class ExperimentActiveIRD(object):
 
         """
         scores = []
+        # Compute belief features
+        cand_names = [f"acquire_{task}" for task in candidates]
+        belief = belief.subsample(self._num_active_sample)
+        belief = self._eval_server.compute_tasks(
+            belief, candidates, cand_names, verbose=True
+        )
+
         desc = "Evaluaitng candidate tasks"
-        for ni, next_task in enumerate(tqdm(candidates, desc=desc)):
+        for next_task, next_task_name in tqdm(
+            zip(candidates, cand_names), total=len(candidates), desc=desc
+        ):
             # print(f"Task candidate {ni+1}/{len(candidates)}")
-            next_task_name = f"acquire_{next_task}"
             scores.append(
                 self._acquire_fns[fn_key](
                     next_task, next_task_name, belief, obs, verbose=False
                 )
             )
-
         scores = np.array(scores)
         next_task = candidates[np.argmax(scores)]
         return next_task
@@ -208,11 +219,19 @@ class ExperimentActiveIRD(object):
             * Violations.
 
         """
+        # COmpute belief features
+        eval_names = [f"eval_{task}" for task in eval_tasks]
         belief = belief.subsample(self._num_eval_sample)
+        belief = self._eval_server.compute_tasks(
+            belief, eval_tasks, eval_names, verbose=True
+        )
+
         num_violate = 0.0
         performance = 0.0
-        for task in tqdm(eval_tasks, desc=f"Evaluating method {fn_name}"):
-            task_name = f"eval_{task}"
+        desc = f"Evaluating method {fn_name}"
+        for task, task_name in tqdm(
+            zip(eval_tasks, eval_names), total=len(eval_tasks), desc=desc
+        ):
             vios = belief.get_violations(task, task_name)
             perf = belief.compare_with(task, task_name, self._model.designer.true_w)
 

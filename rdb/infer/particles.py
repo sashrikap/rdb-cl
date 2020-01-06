@@ -46,6 +46,10 @@ class Particles(object):
         self._random_choice = seed(random_choice, rng_key)
 
     @property
+    def rng_key(self):
+        return self._rng_key
+
+    @property
     def weights(self):
         if self._sample_ws is None:
             self._sample_ws = divide_dict_by_keys(self.concate_weights)
@@ -127,6 +131,30 @@ class Particles(object):
         self._sample_feats[task_name] = feats
         self._sample_feats_sum[task_name] = feats_sum
         self._sample_violations[task_name] = violations
+
+    def dump_task(self, task, task_name):
+        """Dump data from current Particles instance.
+
+        Usage:
+            >>> particles2.merge(particles1.dump_task(task, task_name))
+        """
+        return dict(
+            task=task,
+            task_name=task_name,
+            actions=self._sample_actions[task_name],
+            feats=self._sample_feats[task_name],
+            feats_sum=self._sample_feats_sum[task_name],
+            violations=self._sample_violations[task_name],
+        )
+
+    def merge(self, data):
+        """Merge dumped data from another Particles instance."""
+        task_name = data["task_name"]
+        if task_name not in self._sample_actions.keys():
+            self._sample_actions[task_name] = data["actions"]
+            self._sample_feats[task_name] = data["feats"]
+            self._sample_feats_sum[task_name] = data["feats_sum"]
+            self._sample_violations[task_name] = data["violations"]
 
     def count_violations(self, task, task_name):
         """Roll out features under task.
