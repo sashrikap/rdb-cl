@@ -83,7 +83,7 @@ class DriveWorld(gym.Env):
         self._cm = matplotlib.cm.coolwarm
         self._heat_fn = None
 
-        self.xdim = onp.prod(self.state.shape)
+        self._xdim = onp.prod(self.state.shape)
         self._dynamics_fn, self._indices = self._get_dynamics_fn()
         self._raw_features_dict, self._raw_features_list, self._features_list, self._features_fn = (
             self._get_features_fn()
@@ -108,6 +108,10 @@ class DriveWorld(gym.Env):
     @property
     def udim(self):
         return self._udim
+
+    @property
+    def xdim(self):
+        return self._xdim
 
     @property
     def state(self):

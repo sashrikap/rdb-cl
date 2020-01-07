@@ -22,8 +22,8 @@ env = gym.make(ENV_NAME)
 obs = env.reset()
 main_car = env.main_car
 horizon = 10
-T = 30
-# T = 10
+# T = 30
+T = 10
 weights = {
     "dist_cars": 100.0,
     "dist_lanes": 50.0,

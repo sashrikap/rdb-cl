@@ -23,15 +23,15 @@ class Runner(object):
     Args:
         env (object): environment
         dynamcis_fn (fn): can pass in jit-accelerated function
-        cost_runtime (fn): can pass in jit-accelerated function
+        costs_runtime (fn): can pass in jit-accelerated function
 
     Examples:
         >>> xs = dynamics_fn(x0, us)
-        >>> costs = cost_runtime(x0, us, weights)
+        >>> costs = costs_runtime(x0, us, weights)
 
     """
 
-    def __init__(self, env, dynamics_fn=None, cost_runtime=None, features_fn=None):
+    def __init__(self, env, dynamics_fn=None, costs_runtime=None, features_fn=None):
         self._env = env
         self._dt = env.dt
         # Dynamics function
@@ -39,8 +39,8 @@ class Runner(object):
         if dynamics_fn is None:
             self._dynamics_fn = env.dynamics_fn
         # Define cost function
-        self._cost_runtime = cost_runtime
-        assert cost_runtime is not None
+        self._costs_runtime = costs_runtime
+        assert costs_runtime is not None
         self._features_fn = features_fn
         if features_fn is None:
             self._features_fn = env.features_fn
@@ -143,18 +143,18 @@ class Runner(object):
 
         """
         # TODO: action space shape checking
-        assert self._cost_runtime is not None, "Cost function improperly defined"
+        assert self._costs_runtime is not None, "Cost function improperly defined"
         weights_dict = sort_dict_by_keys(weights, self._env.features_keys)
         weights = np.array(list(weights_dict.values()))
-        cost_fn = partial(self._cost_runtime, weights=weights)
+        costs_fn = partial(self._costs_runtime, weights=weights)
 
         x = x0
         info = dict(costs=[], feats={}, feats_sum={}, violations={})
         xs = self._dynamics_fn(x0, actions)
-        info["costs"] = self._cost_runtime(x0, actions, weights)
-        cost = np.sum(info["costs"])
+        info["costs"] = self._costs_runtime(x0, actions, weights)
+        cost_sum = np.sum(info["costs"])
 
         info["feats"], info["feats_sum"] = self._collect_features(x0, actions)
         info["violations"] = self._collect_violations(xs, actions)
         info["metadata"] = self._collect_metadata(xs, actions)
-        return np.array(xs), cost, info
+        return np.array(xs), cost_sum, info

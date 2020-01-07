@@ -12,6 +12,19 @@ def test_multi_arguments():
     assert np.allclose(grad1(*args), result)
 
 
+def test_multi_arguments2():
+    def func(arg1, arg2):
+        return np.sum(arg1 * arg2)
+
+    grad1 = jax.grad(func, argnums=(0, 1))
+    args = (np.array([1.0, 2.0]), np.array([3.0, 4.0]))
+    g1 = np.array([3.0, 4.0])
+    g2 = np.array([1.0, 2.0])
+    grads = grad1(*args)
+    assert np.allclose(grads[0], g1)
+    assert np.allclose(grads[1], g2)
+
+
 def test_index():
     """ Test some indexing operations and whether JAX preserves gradient"""
 
