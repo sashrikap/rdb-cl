@@ -32,7 +32,7 @@ def test_fori():
     # print(gout)
 
 
-test_fori()
+# test_fori()
 
 
 def test_scan():
@@ -57,4 +57,13 @@ def test_scan():
     print(gout)
 
 
-test_scan()
+# test_scan()
+
+
+def test_vmap():
+    def fun(a):
+        return a[0] + a[1]
+
+    vfun = jax.vmap(fun)
+    vals = np.ones((3, 3))
+    assert np.allclose(vfun(vals), [2, 2, 2])

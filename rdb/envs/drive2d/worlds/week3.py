@@ -131,32 +131,29 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
     def _get_constraints_fn(self):
         constraints_dict = {}
 
-        constraints_dict["offtrack"] = partial(constraints.is_offtrack, env=self)
-        constraints_dict["overspeed"] = partial(
-            constraints.is_overspeed, env=self, max_speed=1.0
+        constraints_dict = {}
+        constraints_dict["offtrack"] = constraints.build_offtrack(env=self)
+        constraints_dict["overspeed"] = constraints.build_overspeed(
+            env=self, max_speed=1.0
         )
-        constraints_dict["underspeed"] = partial(
-            constraints.is_underspeed, env=self, min_speed=0.2
+        constraints_dict["underspeed"] = constraints.build_underspeed(
+            env=self, min_speed=0.2
         )
-        constraints_dict["uncomfortable"] = partial(
-            constraints.is_uncomfortable, env=self, max_actions=self._control_bound
+        constraints_dict["uncomfortable"] = constraints.build_uncomfortable(
+            env=self, max_actions=self._control_bound
         )
-        constraints_dict["wronglane"] = partial(
-            constraints.is_wronglane, env=self, lane_idx=2
+        constraints_dict["wronglane"] = constraints.build_wronglane(
+            env=self, lane_idx=2
         )
-        constraints_dict["collision"] = partial(constraints.is_collision, env=self)
+        constraints_dict["collision"] = constraints.build_collision(env=self)
         constraints_fn = merge_dict_funcs(constraints_dict)
 
         return constraints_dict, constraints_fn
 
     def _get_metadata_fn(self):
         metadata_dict = {}
-        metadata_dict["overtake0"] = partial(
-            constraints.is_overtake, env=self, car_idx=0
-        )
-        metadata_dict["overtake1"] = partial(
-            constraints.is_overtake, env=self, car_idx=1
-        )
+        metadata_dict["overtake0"] = constraints.build_overtake(env=self, car_idx=0)
+        metadata_dict["overtake1"] = constraints.build_overtake(env=self, car_idx=1)
         metadata_fn = merge_dict_funcs(metadata_dict)
         return metadata_dict, metadata_fn
 

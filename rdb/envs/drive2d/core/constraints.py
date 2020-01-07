@@ -18,7 +18,7 @@ import jax
 import jax.numpy as np
 
 
-def is_offtrack(states, actions, env):
+def build_offtrack(env):
     """Detects when main_car nudges the edge of the track.
 
     Args:
@@ -34,16 +34,18 @@ def is_offtrack(states, actions, env):
     """
     num_cars = len(env.cars)
     threshold = 0.5 * env.car_width + 0.5 * env.lane_width
-    fn = env.raw_features_dict["dist_fences"]
-    feats = []
-    states, actions = make_batch(states), make_batch(actions)
-    for s, a in zip(states, actions):
-        feats.append(fn(s, a))
-    feats = np.array(feats)
-    return np.any(np.abs(feats) < threshold, axis=1)
+    vfn = jax.vmap(env.raw_features_dict["dist_fences"])
+
+    @jax.jit
+    def func(states, actions):
+        states, actions = make_batch(states), make_batch(actions)
+        feats = vfn(states, actions)
+        return np.any(np.abs(feats) < threshold, axis=1)
+
+    return func
 
 
-def is_collision(states, actions, env):
+def build_collision(env):
     """Detects when main_car nudges another car.
 
     Args:
@@ -59,17 +61,19 @@ def is_collision(states, actions, env):
     """
     num_cars = len(env.cars)
     threshold = np.array([env.car_width, env.car_length])
-    fn = env.raw_features_dict["dist_cars"]
-    feats = []
-    states, actions = make_batch(states), make_batch(actions)
-    for s, a in zip(states, actions):
-        feats.append(fn(s, a))
-    feats = np.array(feats)
-    per_car = np.all(np.abs(feats) < threshold, axis=-1)
-    return np.any(per_car, axis=1)
+    vfn = jax.vmap(env.raw_features_dict["dist_cars"])
+
+    @jax.jit
+    def func(states, actions):
+        states, actions = make_batch(states), make_batch(actions)
+        feats = vfn(states, actions)
+        per_car = np.all(np.abs(feats) < threshold, axis=-1)
+        return np.any(per_car, axis=1)
+
+    return func
 
 
-def is_uncomfortable(states, actions, env, max_actions):
+def build_uncomfortable(env, max_actions):
     """Detects if actions exceed max actions.
 
     Args:
@@ -80,12 +84,17 @@ def is_uncomfortable(states, actions, env, max_actions):
         * uncomfortable (ndarray): (T, ) boolean
 
     """
-    actions = make_batch(actions)
-    return np.any(np.abs(actions) > max_actions, axis=1)
+
+    @jax.jit
+    def func(states, actions):
+        actions = make_batch(actions)
+        return np.any(np.abs(actions) > max_actions, axis=1)
+
+    return func
 
 
 # @jax.jit
-def is_overspeed(states, actions, env, max_speed):
+def build_overspeed(env, max_speed):
     """Detects when main_car runs overspeed.
 
     Args:
@@ -96,17 +105,19 @@ def is_overspeed(states, actions, env, max_speed):
         * overspeed (ndarray): (T, ) boolean
 
     """
-    fn = env.raw_features_dict["speed"]
-    feats = []
-    states, actions = make_batch(states), make_batch(actions)
-    for s, a in zip(states, actions):
-        feats.append(fn(s, a))
-    feats = np.array(feats)
-    return np.any(feats > max_speed, axis=1)
+    vfn = jax.vmap(env.raw_features_dict["speed"])
+
+    @jax.jit
+    def func(states, actions):
+        states, actions = make_batch(states), make_batch(actions)
+        feats = vfn(states, actions)
+        return np.any(feats > max_speed, axis=1)
+
+    return func
 
 
 # @jax.jit
-def is_underspeed(states, actions, env, min_speed):
+def build_underspeed(env, min_speed):
     """Detects when main_car runs underspeed.
 
     Args:
@@ -117,17 +128,19 @@ def is_underspeed(states, actions, env, min_speed):
         * underspeed (ndarray): (T, ) boolean
 
     """
-    fn = env.raw_features_dict["speed"]
-    feats = []
-    states, actions = make_batch(states), make_batch(actions)
-    for s, a in zip(states, actions):
-        feats.append(fn(s, a))
-    feats = np.array(feats)
-    return np.any(feats < min_speed, axis=1)
+    vfn = jax.vmap(env.raw_features_dict["speed"])
+
+    @jax.jit
+    def func(states, actions):
+        states, actions = make_batch(states), make_batch(actions)
+        feats = vfn(states, actions)
+        return np.any(feats < min_speed, axis=1)
+
+    return func
 
 
 # @jax.jit
-def is_wronglane(states, actions, env, lane_idx):
+def build_wronglane(env, lane_idx):
     """Detects when main_car (center) runs onto different lane.
 
     Note:
@@ -142,16 +155,18 @@ def is_wronglane(states, actions, env, lane_idx):
         * wronglane (ndarray): (T, ) boolean
 
     """
-    fn = env.raw_features_dict["dist_lanes"]
-    feats = []
-    states, actions = make_batch(states), make_batch(actions)
-    for s, a in zip(states, actions):
-        feats.append(fn(s, a))
-    feats = np.array(feats)
-    return feats[:, lane_idx] < env.lane_width / 2
+    vfn = jax.vmap(env.raw_features_dict["dist_lanes"])
+
+    @jax.jit
+    def func(states, actions):
+        states, actions = make_batch(states), make_batch(actions)
+        feats = vfn(states, actions)
+        return feats[:, lane_idx] < env.lane_width / 2
+
+    return func
 
 
-def is_overtake(states, actions, env, car_idx):
+def build_overtake(env, car_idx):
     """Detects when main_car overtakes the car_idx-th car.
     """
     main_y_idx = 9
@@ -160,8 +175,12 @@ def is_overtake(states, actions, env, car_idx):
     def overtake_fn(state, actions):
         return state[main_y_idx] > state[car_y_idx]
 
-    feats = []
-    for s, a in zip(states, actions):
-        feats.append(overtake_fn(s, a))
-    feats = np.array(feats)
-    return feats
+    vfn = jax.vmap(overtake_fn)
+
+    @jax.jit
+    def func(states, actions):
+        states, actions = make_batch(states), make_batch(actions)
+        feats = vfn(states, actions)
+        return feats
+
+    return func

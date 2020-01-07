@@ -42,14 +42,34 @@ if not DUMMY_ACTION:
     state = copy.deepcopy(env.state)
     env.set_task(TASK)
     env.reset()
+    t1 = time.time()
     actions = optimizer(env.state, weights=weights)
     traj, cost, info = runner(env.state, actions, weights=weights)
+    t_compile = time.time() - t1
+    print(f"Compile time {t_compile:.3f}")
     print(f"Total cost {cost}")
     violations = info["violations"]
     for k, v in violations.items():
         print(f"Violations {k}: {v.sum()}")
 else:
     actions = np.zeros((T, env.udim))
+
+N = 10
+t1 = time.time()
+for _ in range(N):
+    env.reset()
+    acs_ = optimizer(env.state, weights=weights)
+    # runner(env.state, acs_, weights=weights)
+t_opt = time.time() - t1
+print(f"Optimizer fps {N/t_opt:.3f}")
+
+t1 = time.time()
+for _ in range(N):
+    env.reset()
+    runner(env.state, acs_, weights=weights)
+t_run = time.time() - t1
+print(f"Runner fps {N/t_run:.3f}")
+
 
 env.reset()
 env.render("human", draw_heat=DRAW_HEAT, weights=weights)
@@ -58,6 +78,7 @@ for t in range(T):
     env.step(actions[t])
     env.render("human", draw_heat=DRAW_HEAT, weights=weights)
     time.sleep(0.2)
+
 
 if MAKE_MP4:
     pathname = f"data/run_highway.mp4"

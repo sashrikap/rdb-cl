@@ -8,6 +8,7 @@ from os.path import join, dirname
 from collections import OrderedDict
 from rdb.visualize.render import forward_env, render_env
 from rdb.optim.utils import *
+from rdb.exps.utils import Profiler
 
 """
 Forward environments and collect trajectorys
@@ -151,10 +152,11 @@ class Runner(object):
         x = x0
         info = dict(costs=[], feats={}, feats_sum={}, violations={})
         xs = self._dynamics_fn(x0, actions)
-        info["costs"] = self._costs_runtime(x0, actions, weights)
-        cost_sum = np.sum(info["costs"])
 
+        info["costs"] = self._costs_runtime(x0, actions, weights)
         info["feats"], info["feats_sum"] = self._collect_features(x0, actions)
         info["violations"] = self._collect_violations(xs, actions)
         info["metadata"] = self._collect_metadata(xs, actions)
+
+        cost_sum = np.sum(info["costs"])
         return np.array(xs), cost_sum, info
