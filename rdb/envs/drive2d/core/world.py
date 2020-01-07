@@ -119,8 +119,8 @@ class DriveWorld(gym.Env):
         state = []
         for car in cars:
             state.append(car.state)
-        # for obj in self._objects:
-        #    state.append(obj.state)
+        for obj in self._objects:
+            state.append(obj.state)
         return np.concatenate(state)
 
     @state.setter
@@ -130,9 +130,9 @@ class DriveWorld(gym.Env):
         for car in cars:
             car.state = state[last_idx : last_idx + len(car.state)]
             last_idx += len(car.state)
-        """for obj in self._objects:
+        for obj in self._objects:
             obj.state = state[last_idx : last_idx + len(obj.state)]
-            last_idx += len(obj.state)"""
+            last_idx += len(obj.state)
 
     def set_task(self, state):
         raise NotImplementedError
@@ -144,9 +144,9 @@ class DriveWorld(gym.Env):
         for car in cars:
             car.init_state = state[last_idx : last_idx + len(car.state)]
             last_idx += len(car.state)
-        """for obj in self._objects:
+        for obj in self._objects:
             obj.state = state[last_idx : last_idx + len(obj.state)]
-            last_idx += len(obj.state)"""
+            last_idx += len(obj.state)
         self.state = state
 
     @property
@@ -244,14 +244,14 @@ class DriveWorld(gym.Env):
             fn = index_func(car.dynamics_fn, idx)
             fns[key] = fn
             indices[key] = idx
-        # for o_i, obj in enumerate(self._objects):
-        #     next_idx += np.prod(obj.state.shape)
-        #     idx = (curr_idx, next_idx)
-        #     curr_idx = next_idx
-        #     key = f"{obj.name}_{o_i:02d}"
-        #     fn = index_func(obj.dynamics_fn, idx)
-        #     fns[key] = fn
-        #     indices[key] = idx
+        for o_i, obj in enumerate(self._objects):
+            next_idx += np.prod(obj.state.shape)
+            idx = (curr_idx, next_idx)
+            curr_idx = next_idx
+            key = f"{obj.name}_{o_i:02d}"
+            fn = index_func(obj.dynamics_fn, idx)
+            fns[key] = fn
+            indices[key] = idx
         dynamics_fn = concat_funcs(fns.values())
         return dynamics_fn, indices
 
@@ -306,10 +306,12 @@ class DriveWorld(gym.Env):
         obj_fns = [None] * len(self._objects)
         for o_i, obj in enumerate(self._objects):
             main_idx = self._indices["main_car"]
+            obj_idx = self._indices[f"{obj.name}_{o_i:02d}"]
 
             def obj_dist_fn(state, actions):
                 main_pos = state[..., np.arange(*main_idx)]
-                obj_pos = obj.state
+                # obj_pos = obj.state
+                obj_pos = state[..., np.arange(*obj_idx)]
                 return feature.diff_to(main_pos, obj_pos)
 
             obj_fns[o_i] = obj_dist_fn

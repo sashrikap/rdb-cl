@@ -63,9 +63,6 @@ if not DUMMY_ACTION:
         print(f"Violations {k}: {v.sum()}")
     for k, v in info["feats_sum"].items():
         print(f"Feats sum {k}: {v:.3f}")
-    import pdb
-
-    pdb.set_trace()
 else:
     actions = np.zeros((T, env.udim))
 
