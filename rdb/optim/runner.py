@@ -23,28 +23,28 @@ class Runner(object):
 
     Args:
         env (object): environment
-        dynamcis_fn (fn): can pass in jit-accelerated function
-        costs_runtime (fn): can pass in jit-accelerated function
+        roll_forward (fn): can pass in jit-accelerated function
+        roll_costs (fn): can pass in jit-accelerated function
 
     Examples:
-        >>> xs = dynamics_fn(x0, us)
-        >>> costs = costs_runtime(x0, us, weights)
+        >>> xs = roll_forward(x0, us)
+        >>> costs = roll_costs(x0, us, weights)
 
     """
 
-    def __init__(self, env, dynamics_fn=None, costs_runtime=None, features_fn=None):
+    def __init__(self, env, roll_forward=None, roll_costs=None, roll_features=None):
         self._env = env
         self._dt = env.dt
         # Dynamics function
-        self._dynamics_fn = dynamics_fn
-        if dynamics_fn is None:
-            self._dynamics_fn = env.dynamics_fn
+        self._roll_forward = roll_forward
+        if roll_forward is None:
+            self._roll_forward = env.roll_forward
         # Define cost function
-        self._costs_runtime = costs_runtime
-        assert costs_runtime is not None
-        self._features_fn = features_fn
-        if features_fn is None:
-            self._features_fn = env.features_fn
+        self._roll_costs = roll_costs
+        assert roll_costs is not None
+        self._roll_features = roll_features
+        if roll_features is None:
+            self._roll_features = env.roll_features
 
     @property
     def env(self):
@@ -57,7 +57,7 @@ class Runner(object):
             feats_sum (dict): dict(key, sum([f_t0, f_t1, ..., f_tn])), sum
 
         """
-        feats = self._features_fn(x0, actions)
+        feats = self._roll_features(x0, actions)
         feats_sum = OrderedDict(
             {key: np.sum(val, axis=0) for (key, val) in feats.items()}
         )
@@ -144,16 +144,15 @@ class Runner(object):
 
         """
         # TODO: action space shape checking
-        assert self._costs_runtime is not None, "Cost function improperly defined"
+        assert self._roll_costs is not None, "Cost function improperly defined"
         weights_dict = sort_dict_by_keys(weights, self._env.features_keys)
         weights = np.array(list(weights_dict.values()))
-        costs_fn = partial(self._costs_runtime, weights=weights)
 
         x = x0
         info = dict(costs=[], feats={}, feats_sum={}, violations={})
-        xs = self._dynamics_fn(x0, actions)
+        xs = self._roll_forward(x0, actions)
 
-        info["costs"] = self._costs_runtime(x0, actions, weights)
+        info["costs"] = self._roll_costs(x0, actions, weights)
         info["feats"], info["feats_sum"] = self._collect_features(x0, actions)
         info["violations"] = self._collect_violations(xs, actions)
         info["metadata"] = self._collect_metadata(xs, actions)

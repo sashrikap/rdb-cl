@@ -63,19 +63,6 @@ proposal_std_dict = {
 }
 prior_log_prob_fn = partial(prior_log_prob, log_prior_dict=log_prior_dict)
 proposal_fn = partial(gaussian_proposal, log_std_dict=proposal_std_dict)
-designer = Designer(
-    rng_key=None,
-    env=env,
-    controller=controller,
-    runner=runner,
-    beta=BETA,
-    true_w=true_w,
-    prior_log_prob=prior_log_prob_fn,
-    proposal_fn=proposal_fn,
-    sample_method="mh",
-    sampler_args={"num_warmups": NUM_WARMUPS, "num_samples": NUM_DESIGNERS},
-    use_true_w=USER_TRUE_W,
-)
 
 
 def env_fn():
@@ -92,6 +79,20 @@ def controller_fn(env_):
     )
     return controller, runner
 
+
+designer = Designer(
+    rng_key=None,
+    env_fn=env_fn,
+    controller=controller,
+    runner=runner,
+    beta=BETA,
+    true_w=true_w,
+    prior_log_prob=prior_log_prob_fn,
+    proposal_fn=proposal_fn,
+    sample_method="mh",
+    sampler_args={"num_warmups": NUM_WARMUPS, "num_samples": NUM_DESIGNERS},
+    use_true_w=USER_TRUE_W,
+)
 
 key = random.PRNGKey(0)
 designer.update_key(key)

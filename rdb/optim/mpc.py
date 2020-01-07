@@ -116,9 +116,8 @@ def build_features(udim, roll_forward, f_feat):
     return roll_features
 
 
-# Optimize
 class Optimizer(object):
-    """Generic Optimizer.
+    """Generic Optimizer for optimal control.
 
     Example:
         >>> # General API
@@ -307,7 +306,7 @@ def shooting_method(env, f_cost, horizon, dt, replan=True, T=None):
         h_traj_u, h_grad_u, h_csum_u, xdim, udim, horizon, replan, T, env.features_keys
     )
     runner = Runner(
-        env, dynamics_fn=t_traj_u, costs_runtime=t_costs_u, features_fn=t_feats_u
+        env, roll_forward=t_traj_u, roll_costs=t_costs_u, roll_features=t_feats_u
     )
 
     return optimizer, runner

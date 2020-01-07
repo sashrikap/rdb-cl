@@ -14,6 +14,7 @@ from scipy.stats import gaussian_kde
 from rdb.exps.utils import Profiler
 import jax.numpy as np
 import numpy as onp
+import copy
 
 
 class Particles(object):
@@ -25,9 +26,16 @@ class Particles(object):
     """
 
     def __init__(
-        self, rng_key, env, controller, runner, sample_ws=None, sample_concate_ws=None
+        self,
+        rng_key,
+        env_fn,
+        controller,
+        runner,
+        sample_ws=None,
+        sample_concate_ws=None,
     ):
-        self._env = env
+        self._env_fn = env_fn
+        self._env = env_fn()
         self._controller = controller
         self._runner = runner
         self._sample_ws = sample_ws
@@ -79,7 +87,7 @@ class Particles(object):
             ), f"Not enough samples for {num_samples}."
             sub_ws = self._random_choice(self._sample_ws, num_samples, replacement=True)
             return Particles(
-                self._rng_key, self._env, self._controller, self._runner, sub_ws
+                self._rng_key, self._env_fn, self._controller, self._runner, sub_ws
             )
 
     def log_samples(self, num_samples=None):
@@ -185,14 +193,14 @@ class Particles(object):
         this_cost = multiply_dict_by_keys(target_w, this_feats_sum)
 
         target = Particles(
-            self._rng_key, self._env, self._controller, self._runner, [target_w]
+            self._rng_key, self._env_fn, self._controller, self._runner, [target_w]
         )
-        target_feats_sum = target.get_features_sum(task, task_name)
-        target_cost = multiply_dict_by_keys(target_w, target_feats_sum)
-
         import pdb
 
         pdb.set_trace()
+        target_feats_sum = target.get_features_sum(task, task_name)
+        target_cost = multiply_dict_by_keys(target_w, target_feats_sum)
+
         diff_cost = subtract_dict_by_keys(this_cost, target_cost)
         diff_rews = -1 * onp.sum(list(diff_cost.values()), axis=0)
         # if diff_rew > 0:
@@ -206,7 +214,7 @@ class Particles(object):
     def _get_init_state(self, task):
         self._env.set_task(task)
         self._env.reset()
-        state = self._env.state
+        state = copy.deepcopy(self._env.state)
         return state
 
     def resample(self, probs):
@@ -218,7 +226,7 @@ class Particles(object):
             new_concate_ws[key] = value[idxs]
         new_ps = Particles(
             self._rng_key,
-            self._env,
+            self._env_fn,
             self._controller,
             self._runner,
             sample_concate_ws=new_concate_ws,

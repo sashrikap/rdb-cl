@@ -99,6 +99,7 @@ class IRDOptimalControl(PGM):
         debug_true_w=False,
     ):
         self._rng_key = rng_key
+        self._env_fn = env_fn
         self._env = env_fn()
         self._controller, self._runner = controller_fn(self._env)
         self._eval_server = eval_server
@@ -114,7 +115,7 @@ class IRDOptimalControl(PGM):
         # assume designer uses the same beta, prior and prior proposal
         self._designer = Designer(
             rng_key,
-            self._env,
+            self._env_fn,
             self._controller,
             self._runner,
             beta,
@@ -203,7 +204,7 @@ class IRDOptimalControl(PGM):
             verbose=verbose,
         )
         samples = Particles(
-            self._rng_key, self._env, self._controller, self._runner, sample_ws
+            self._rng_key, self._env_fn, self._controller, self._runner, sample_ws
         )
         self._samples[last_name] = samples
         # if visualize:
@@ -223,7 +224,7 @@ class IRDOptimalControl(PGM):
         norm_ws = self._normalizer_fn()
         state = self._get_init_state(task)
         normalizer = Particles(
-            self._rng_key, self._env, self._controller, self._runner, norm_ws
+            self._rng_key, self._env_fn, self._controller, self._runner, norm_ws
         )
         norm_feats = normalizer.get_features(
             task, task_name, desc="Collecting Normalizer Features"
@@ -307,7 +308,7 @@ class Designer(PGM):
     def __init__(
         self,
         rng_key,
-        env,
+        env_fn,
         controller,
         runner,
         beta,
@@ -319,7 +320,8 @@ class Designer(PGM):
         use_true_w=False,
     ):
         self._rng_key = rng_key
-        self._env = env
+        self._env_fn = env_fn
+        self._env = env_fn()
         self._controller = controller
         self._runner = runner
         self._true_w = true_w
@@ -338,7 +340,7 @@ class Designer(PGM):
             else:
                 sample_ws = self._sampler.sample(self._true_w, task=task)
             samples = Particles(
-                self._rng_key, self._env, self._controller, self._runner, sample_ws
+                self._rng_key, self._env_fn, self._controller, self._runner, sample_ws
             )
             self._samples[task_name] = samples
         return self._samples[task_name]

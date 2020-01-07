@@ -62,9 +62,19 @@ proposal_std_dict = {
 }
 prior_log_prob_fn = partial(prior_log_prob, log_prior_dict=log_prior_dict)
 proposal_fn = partial(gaussian_proposal, log_std_dict=proposal_std_dict)
+
+
+def env_fn():
+    import gym, rdb.envs.drive2d
+
+    env = gym.make(ENV_NAME)
+    env.reset()
+    return env
+
+
 designer = Designer(
     rng_key=None,
-    env=env,
+    env_fn=env_fn,
     controller=controller,
     runner=runner,
     beta=BETA,

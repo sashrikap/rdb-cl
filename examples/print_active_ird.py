@@ -34,7 +34,13 @@ for method in FILEPAIRS.keys():
 
 key = random.PRNGKey(0)
 env, controller, runner, sample_ws = None, None, None, None
-ps = Particles(key, env, controller, runner, sample_ws)
+
+
+def env_fn():
+    return None
+
+
+ps = Particles(key, env_fn, controller, runner, sample_ws)
 
 method = "ratiomean"
 seed = "[0 9]"

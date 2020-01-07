@@ -8,6 +8,7 @@ from tqdm.auto import tqdm
 
 class ParticleWorkerSingle(object):
     def __init__(self, env_fn, controller_fn):
+        self._env_fn = env_fn
         self._env = env_fn()
         self._controller, self._runner = controller_fn(self._env)
         self._compute_result = None
@@ -26,7 +27,7 @@ class ParticleWorkerSingle(object):
 
     def compute(self, rng_key, weights, task, task_name):
         particles = Particles(
-            rng_key, self._env, self._controller, self._runner, weights
+            rng_key, self._env_fn, self._controller, self._runner, weights
         )
         particles.get_features(task, task_name)
         self._compute_result = particles.dump_task(task, task_name)

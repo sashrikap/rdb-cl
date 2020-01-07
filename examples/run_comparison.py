@@ -31,16 +31,21 @@ filepath = (
 )
 
 key = random.PRNGKey(0)
-env = gym.make("Week3_02-v0")
-env.reset()
 HORIZON = 10
 
+
+def env_fn():
+    env = gym.make("Week3_02-v0")
+    env.reset()
+    return env
+
+
+env = env_fn
 controller, runner = shooting_method(
     env, env.main_car.cost_runtime, HORIZON, env.dt, replan=False
 )
 sample_ws = None
-
-ps = Particles(key, env, controller, runner, sample_ws)
+ps = Particles(key, env_fn, controller, runner, sample_ws)
 ps.load(filepath)
 ps.log_samples(1)
 

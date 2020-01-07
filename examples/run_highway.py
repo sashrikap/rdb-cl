@@ -3,6 +3,7 @@ import time, copy
 import jax.numpy as np
 import rdb.envs.drive2d
 
+from rdb.infer.utils import collect_trajs
 from rdb.optim.mpc import shooting_method
 from rdb.optim.runner import Runner
 from rdb.visualize.render import render_env
@@ -15,11 +16,12 @@ MAKE_MP4 = False
 # ENV_NAME = "Week3_02-v0"  # Highway
 # TASK = (0.2, -0.7)
 ENV_NAME = "Week6_01-v0"  # Blockway
-TASK = (0.2, -0.7, -0.1, 0.4)
+# TASK = (0.2, -0.7, -0.1, 0.4)
+TASK = (-0.20000005, -5.9604645e-08, -0.16, 0.19999993)
 # TASK = (0.2, -0.7, 0.0, 0.4, -0.13, 0.3, -0.13, 0.5)
 
 env = gym.make(ENV_NAME)
-obs = env.reset()
+env.reset()
 main_car = env.main_car
 horizon = 10
 # T = 30
@@ -28,9 +30,17 @@ weights = {
     "dist_cars": 100.0,
     "dist_lanes": 50.0,
     "dist_fences": 300.0,
-    "dist_objects": 300.0,
+    "dist_objects": 3000.0,
     "speed": 20.0,
     "control": 80.0,
+}
+weights = {
+    "dist_cars": 1.0,
+    "dist_lanes": 0.1,
+    "dist_fences": 0.35,
+    "dist_objects": 1.25,
+    "speed": 0.05,
+    "control": 0.1,
 }
 
 if not DUMMY_ACTION:
@@ -39,18 +49,23 @@ if not DUMMY_ACTION:
     optimizer, runner = shooting_method(
         env, main_car.cost_runtime, horizon, env.dt, replan=REPLAN, T=T
     )
-    state = copy.deepcopy(env.state)
     env.set_task(TASK)
     env.reset()
+    state = copy.deepcopy(env.state)
     t1 = time.time()
-    actions = optimizer(env.state, weights=weights)
-    traj, cost, info = runner(env.state, actions, weights=weights)
+    actions = optimizer(state, weights=weights)
+    traj, cost, info = runner(state, actions, weights=weights)
+    # trajs = collect_trajs([weights], state, optimizer, runner)
     t_compile = time.time() - t1
     print(f"Compile time {t_compile:.3f}")
     print(f"Total cost {cost}")
-    violations = info["violations"]
-    for k, v in violations.items():
+    for k, v in info["violations"].items():
         print(f"Violations {k}: {v.sum()}")
+    for k, v in info["feats_sum"].items():
+        print(f"Feats sum {k}: {v:.3f}")
+    import pdb
+
+    pdb.set_trace()
 else:
     actions = np.zeros((T, env.udim))
 

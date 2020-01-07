@@ -228,7 +228,6 @@ class ExperimentActiveIRD(object):
         ):
             vios = belief.get_violations(task, task_name)
             perf = belief.compare_with(task, task_name, self._model.designer.true_w)
-
             performance += perf
             num_violate += np.array(list(vios.values())).sum(axis=0).mean()
 
