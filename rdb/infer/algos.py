@@ -11,7 +11,7 @@ Includes:
 Used for:
     * Inverse Reward Design
 
-Credits:
+Credits:å
     * Jerry Z. He 2019
 
 """
@@ -19,7 +19,9 @@ Credits:
 from jax import random
 from numpyro.handlers import scale, condition, seed
 from numpyro.infer import MCMC, NUTS
+from rdb.exps.utils import Profiler
 from tqdm.auto import tqdm, trange
+import jax
 import copy
 import numpyro
 import numpyro.distributions as dist
@@ -101,6 +103,8 @@ class MetropolisHasting(Inference):
 
     def _mh_step(self, obs, state, log_prob, *args, **kwargs):
         assert self._rng_key is not None, "Need to initialize with random key"
+
+        # @jax.jit # causes recursion error
         next_state = self._proposal(state)
         next_log_prob = self._kernel(obs, next_state, **kwargs)
         log_ratio = next_log_prob - log_prob

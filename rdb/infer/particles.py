@@ -195,9 +195,6 @@ class Particles(object):
         target = Particles(
             self._rng_key, self._env_fn, self._controller, self._runner, [target_w]
         )
-        import pdb
-
-        pdb.set_trace()
         target_feats_sum = target.get_features_sum(task, task_name)
         target_cost = multiply_dict_by_keys(target_w, target_feats_sum)
 

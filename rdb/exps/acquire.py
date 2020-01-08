@@ -55,7 +55,6 @@ class ActiveInfoGain(object):
               [H(X) - H(X|Y)] - [H(X) - H(X|Y')] = H(X|Y') - H(X|Y)
 
         """
-        # with Profiler("InfoGain"):
         desc = f"Computing {self._method} acquisition features"
         if not verbose:
             desc = None
@@ -121,7 +120,6 @@ class ActiveRatioTest(ActiveInfoGain):
         if not verbose:
             desc = None
         next_feats_sum = belief.get_features_sum(next_task, next_task_name, desc=desc)
-        # with Profiler("Ratio Test"):
         user_feats_sum = obs.get_features_sum(next_task, next_task_name)
         weights = belief.concate_weights
         log_ratios = self._compute_log_ratios(weights, next_feats_sum, user_feats_sum)

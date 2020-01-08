@@ -12,11 +12,11 @@ setup(
         "pillow",
         "scipy==1.1.0",
         "pyglet==1.3.2",
-        "numpyro",
         "matplotlib",
-        "jax",
-        "jaxlib",
         "gym",
+        "numpyro==0.2.3",
+        "jax==0.1.53",
+        # "jaxlib",  # numpyro installs the correct version
         "moviepy",
         "pygame",
         "toolz",
@@ -24,7 +24,6 @@ setup(
         "PyOpenGL",
         "seaborn",
         "ray",
-        "psutil",
         "tqdm",
     ],
 )

@@ -7,13 +7,14 @@ sns.set()
 import matplotlib.pyplot as plt
 
 N = -1
-seed = "[ 0 13]"
-# seed = None
-MAX_LEN = -1
+# seed = "[ 0 13]"
+seed = ""
+MAX_LEN = 6
 # MAX_LEN = 4
 
 
 def read_seed(path):
+    # print(path)
     data = np.load(path, allow_pickle=True)["eval_hist"].item()
     return data
 
@@ -65,7 +66,6 @@ def plot_data(path):
                     seedpaths.append(filepath)
 
     for path in seedpaths:
-        print(path)
         seeddata.append(read_seed(path))
 
     data = {}
@@ -79,7 +79,7 @@ def plot_data(path):
             # import pdb; pdb.set_trace()
     for method, mdict in data.items():
         mdict["perform"] = cleanup(mdict["perform"])
-        print(mdict["perform"].shape)
+        print(method, mdict["perform"].shape)
 
     plot_perform(data)
 
@@ -88,5 +88,5 @@ if __name__ == "__main__":
     # data_path = "data/191216/active_ird_exp1"
     # data_path = "data/191217/active_ird_exp1"
     # data_path = "data/200103/active_ird_exp_mid"
-    data_path = "data/200105/active_ird_exp_mid"
+    data_path = "data/200107/active_ird_exp_mid"
     plot_data(data_path)

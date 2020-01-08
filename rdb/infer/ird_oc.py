@@ -11,11 +11,12 @@ Note:
 
 import numpyro
 import jax
+import jax.numpy as np
 from numpyro.handlers import scale, condition, seed
 from rdb.optim.utils import multiply_dict_by_keys
 from rdb.infer.algos import *
 from rdb.infer.particles import Particles
-from rdb.exps.utils import plot_weights
+from rdb.exps.utils import plot_weights, Profiler
 from rdb.infer.utils import logsumexp
 from tqdm.auto import tqdm, trange
 from time import time
@@ -37,7 +38,7 @@ class PGM(object):
 
     def update_key(self, rng_key):
         self._rng_key = rng_key
-        self._sampler.update_key(rng_key)
+        # self._sampler.update_key(rng_key)
 
     def _build_sampler(self, kernel, proposal_fn, sample_method, sample_args):
         if sample_method == "mh":
@@ -145,6 +146,7 @@ class IRDOptimalControl(PGM):
     def update_key(self, rng_key):
         """ Update random key """
         super().update_key(rng_key)
+        self._sampler.update_key(rng_key)
         self._designer.update_key(rng_key)
         self._prior_log_prob = seed(self._prior_log_prob, rng_key)
         self._normalizer_fn = seed(self._normalizer_fn, rng_key)
@@ -357,6 +359,7 @@ class Designer(PGM):
 
     def update_key(self, rng_key):
         super().update_key(rng_key)
+        self._sampler.update_key(rng_key)
         self._prior_log_prob = seed(self._prior_log_prob, rng_key)
 
     def _build_kernel(self, beta):

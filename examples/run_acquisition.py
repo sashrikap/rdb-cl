@@ -16,42 +16,45 @@ import numpyro.distributions as dist
 
 # ENV_NAME = "Week3_02-v0"
 ENV_NAME = "Week6_01-v0"
-# RANDOM_KEYS = [1, 2, 3, 4]
-# RANDOM_KEYS = [5, 6, 7, 8]
-RANDOM_KEYS = [9, 10, 11, 12]
-# RANDOM_KEYS = [13, 14, 15, 16]
-# RANDOM_KEYS = [17, 18, 19, 20]
+RANDOM_KEYS = [1, 2, 3, 4]  # new macbook
+NUM_EVAL_WORKERS = 4
+# RANDOM_KEYS = [5, 6, 7, 8] # old macbook
+# NUM_EVAL_WORKERS = 2
+# RANDOM_KEYS = [9, 10, 11, 12] # alienware
+# NUM_EVAL_WORKERS = 4
+# RANDOM_KEYS = [13, 14, 15, 16] # dell
+# NUM_EVAL_WORKERS = 2
+RANDOM_KEYS = [17, 18, 19, 20]  # new macbook
 NUM_EVAL_WORKERS = 2
 NUM_WARMUPS = 100
-NUM_ACTIVE_TASKS = 24
+NUM_ACTIVE_TASKS = 36
 PARALLEL = True
 
 ## Full scale sampling
-# NUM_NORMALIZERS = 500
-# # NUM_SAMPLES = 800
+# NUM_NORMALIZERS = 2000
 # NUM_SAMPLES = 2000
-# NUM_ACTIVE_SAMPLES = 100
-# NUM_EVAL_SAMPLES = 100
-# NUM_EVAL_TASKS = 8
+# NUM_ACTIVE_SAMPLES = -1
+# NUM_EVAL_SAMPLES = -1
+# NUM_EVAL_TASKS = 48
 
 ## Debug set True
 USER_TRUE_W = False
 
 ## Faster sampling
-NUM_NORMALIZERS = 500
-NUM_SAMPLES = 500
+NUM_NORMALIZERS = 1000
+NUM_SAMPLES = 1000
 NUM_ACTIVE_SAMPLES = -1
 NUM_EVAL_SAMPLES = -1
-NUM_EVAL_TASKS = 24
+NUM_EVAL_TASKS = 36
 
 ## Testing
-NUM_NORMALIZERS = 50
-NUM_SAMPLES = 10
-NUM_ACTIVE_SAMPLES = 10
-NUM_EVAL_SAMPLES = 7
-NUM_EVAL_TASKS = 2
-NUM_EVAL_WORKERS = 1
-PARALLEL = False
+# NUM_NORMALIZERS = 50
+# NUM_SAMPLES = 10
+# NUM_ACTIVE_SAMPLES = 10
+# NUM_EVAL_SAMPLES = 7
+# NUM_EVAL_TASKS = 2
+# NUM_EVAL_WORKERS = 1
+# PARALLEL = False
 
 NUM_DESIGNERS = 50
 MAX_WEIGHT = 5.0
@@ -185,8 +188,8 @@ experiment = ExperimentActiveIRD(
     # debug_belief_task=(-0.2, 0.5),
     # debug_belief_task=None,
     # save_dir="data/191221_true",
-    save_dir="data/200106",
-    exp_name="active_ird_exp_test",
+    save_dir="data/200107",
+    exp_name="active_ird_exp_mid",
 )
 
 """ Experiment """
