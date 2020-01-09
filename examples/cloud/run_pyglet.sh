@@ -1,4 +1,3 @@
-## Instal conda
 apt-get update --yes
 apt-get upgrade --yes
 apt-get install wget freeglut3-dev --yes
@@ -13,11 +12,15 @@ Xvfb :99 -screen 0 1400x900x24 > /dev/null 2>&1 &
 apt-get install python3-pip --yes
 pip install --upgrade pip
 
-## create env
+
+
+# apt-get install freeglut3-dev --yes
 conda create -n saferew python=3.6 -y
 source activate saferew
-pip install -e ./rdb
-
-## Run experiment
-#python ./rdb/examples/run_acquisition.py
-python ./rdb/examples/run_highway.py
+pip install pyglet moviepy
+# #python -c "from pyglet.gl import *"
+# python -c "import pyglet"
+# python -c "from pyglet import gl, graphics"
+python -c "from moviepy.editor import ImageSequenceClip
+"
+# python -c "import os; print(os.environ['DISPLAY'])"

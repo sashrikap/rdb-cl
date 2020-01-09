@@ -21,7 +21,8 @@ from numpyro.handlers import seed
 import pyglet
 import matplotlib.cm
 from pyglet import gl, graphics
-from gym.envs.classic_control import rendering
+
+# from gym.envs.classic_control import rendering ## causes problem with headless server
 from rdb.envs.drive2d.core import lane, feature, car
 from rdb.optim.utils import *
 
@@ -77,6 +78,7 @@ class DriveWorld(gym.Env):
 
         # Render specifics
         self._window = None
+        self._headless = False
         self._label = None
         self._grass = None
         self._magnify = 1.0
@@ -402,54 +404,64 @@ class DriveWorld(gym.Env):
 
         if self._window is None:
             caption = f"{self.__class__}"
-            # JH Note: strange pyglet rendering requires /2
-            self._window = pyglet.window.Window(
-                width=int(WINDOW_W / 2), height=int(WINDOW_H / 2)
+            try:
+                self._window = pyglet.window.Window(
+                    width=int(WINDOW_W / 2), height=int(WINDOW_H / 2)
+                )
+            except:
+                ## On headless server
+                print("Display not supported on headless server")
+                self._headless = True
+        if not self._headless:
+            self._window.switch_to()
+            # Bring up window
+            self._window.dispatch_events()
+            self._window.clear()
+            if SYSTEM == "Darwin":
+                # JH Note: strange pyglet rendering requires /2
+                gl.glViewport(0, 0, int(WINDOW_W), int(WINDOW_H))
+            else:  # Linux, etc
+                gl.glViewport(0, 0, int(WINDOW_W / 2), int(WINDOW_H / 2))
+            gl.glMatrixMode(gl.GL_PROJECTION)
+            gl.glPushMatrix()
+            gl.glLoadIdentity()
+
+            if cars is None:
+                cars = self._cars
+            if main_car is None:
+                main_car = self.main_car
+
+            self.center_camera(main_car)
+            self.draw_background()
+            for lane in self._lanes:
+                lane.render()
+            for oi, obj in enumerate(self._objects):
+                obj.render()
+            for car in cars:
+                car.render()
+            main_car.render()
+            if draw_heat:
+                assert weights is not None
+                self.set_heat(weights)
+                self.draw_heatmap()
+
+            gl.glPopMatrix()
+            self.draw_text(text)
+
+            img_data = (
+                pyglet.image.get_buffer_manager().get_color_buffer().get_image_data()
             )
-        self._window.switch_to()
-        # Bring up window
-        self._window.dispatch_events()
-        self._window.clear()
-        if SYSTEM == "Darwin":
-            gl.glViewport(0, 0, int(WINDOW_W), int(WINDOW_H))
-        else:  # Linux, etc
-            gl.glViewport(0, 0, int(WINDOW_W / 2), int(WINDOW_H / 2))
-        gl.glMatrixMode(gl.GL_PROJECTION)
-        gl.glPushMatrix()
-        gl.glLoadIdentity()
-
-        if cars is None:
-            cars = self._cars
-        if main_car is None:
-            main_car = self.main_car
-
-        self.center_camera(main_car)
-        self.draw_background()
-        for lane in self._lanes:
-            lane.render()
-        for oi, obj in enumerate(self._objects):
-            obj.render()
-        for car in cars:
-            car.render()
-        main_car.render()
-        if draw_heat:
-            assert weights is not None
-            self.set_heat(weights)
-            self.draw_heatmap()
-
-        gl.glPopMatrix()
-        self.draw_text(text)
-
-        img_data = pyglet.image.get_buffer_manager().get_color_buffer().get_image_data()
-        arr = onp.fromstring(img_data.data, dtype=onp.uint8, sep="")
-        if SYSTEM == "Darwin":
-            arr = arr.reshape(int(WINDOW_W), int(WINDOW_H), 4)
+            arr = onp.fromstring(img_data.data, dtype=onp.uint8, sep="")
+            if SYSTEM == "Darwin":
+                arr = arr.reshape(int(WINDOW_W), int(WINDOW_H), 4)
+            else:
+                arr = arr.reshape(int(WINDOW_W / 2), int(WINDOW_H / 2), 4)
+            arr = arr[::-1, :, 0:3]
+            # if mode == "human":
+            self._window.flip()
+            return arr
         else:
-            arr = arr.reshape(int(WINDOW_W / 2), int(WINDOW_H / 2), 4)
-        arr = arr[::-1, :, 0:3]
-        # if mode == "human":
-        self._window.flip()
-        return arr
+            return None
 
     def sub_render(self, mode="rgb_array", subframe=0, text=None):
         """ Alpha-interpolate adjacent frames to make animation look smoother """

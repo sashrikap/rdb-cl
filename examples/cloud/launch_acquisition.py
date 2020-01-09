@@ -23,10 +23,7 @@ mnt = mount.MountLocal(
 # This will run locally
 launch_api.run_command(
     command="bash ./rdb/examples/cloud/run_acquisition.sh",
-    # command="echo $(whoami)",
-    # command="lsb_release -a",
-    # command="pip install -e ./rdb",
-    # command="uname",
+    # command="bash ./rdb/examples/cloud/run_pyglet.sh",
     mounts=[mnt],
     mode=local,
     docker_image="ubuntu:16.04",

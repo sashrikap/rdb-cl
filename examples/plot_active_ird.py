@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 N = -1
 # seed = "[ 0 13]"
 seed = ""
-MAX_LEN = 6
+MAX_LEN = 7
 # MAX_LEN = 4
 
 

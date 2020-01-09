@@ -1,4 +1,3 @@
-from moviepy.editor import ImageSequenceClip
 from functools import partial
 from matplotlib import pyplot as plt
 from os import makedirs
@@ -8,6 +7,9 @@ import multiprocessing
 
 
 def save_video(frames, fps, width, path):
+    ## Todo: this seems to be at odds with gcp headless servers
+    from moviepy.editor import ImageSequenceClip
+
     clip = ImageSequenceClip(frames, fps=fps).resize(width=width)
     clip.write_videofile(path, logger=None)
 
