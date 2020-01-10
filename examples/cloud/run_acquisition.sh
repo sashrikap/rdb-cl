@@ -19,5 +19,7 @@ source activate saferew
 pip install -e ./rdb
 
 ## Run experiment
-#python ./rdb/examples/run_acquisition.py
-python ./rdb/examples/run_highway.py
+# touch /gcp_output/test.txt
+# python ./rdb/examples/cloud/run_filetest.py
+# python ./rdb/examples/run_highway.py
+python ./rdb/examples/run_acquisition.py

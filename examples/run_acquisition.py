@@ -16,16 +16,40 @@ import numpyro.distributions as dist
 
 # ENV_NAME = "Week3_02-v0"
 ENV_NAME = "Week6_01-v0"
-RANDOM_KEYS = [1, 2, 3, 4]  # new macbook
-NUM_EVAL_WORKERS = 4
+GCP_MODE = False
+
+# RANDOM_KEYS = [1, 2, 3, 4]  # new macbook
+# NUM_EVAL_WORKERS = 4
 # RANDOM_KEYS = [5, 6, 7, 8] # old macbook
 # NUM_EVAL_WORKERS = 2
 # RANDOM_KEYS = [9, 10, 11, 12] # alienware
 # NUM_EVAL_WORKERS = 4
 # RANDOM_KEYS = [13, 14, 15, 16] # dell
 # NUM_EVAL_WORKERS = 2
-RANDOM_KEYS = [17, 18, 19, 20]  # new macbook
+# RANDOM_KEYS = [17, 18, 19, 20]  # new macbook
+# NUM_EVAL_WORKERS = 2
+
+
+# GCP_MODE = True       # gcp
+# RANDOM_KEYS = [21]
+# NUM_EVAL_WORKERS = 2
+GCP_MODE = True  # gcp
+RANDOM_KEYS = [22]
 NUM_EVAL_WORKERS = 2
+# GCP_MODE = True       # gcp
+# RANDOM_KEYS = [23]
+# NUM_EVAL_WORKERS = 2
+# GCP_MODE = True       # gcp
+# RANDOM_KEYS = [24]
+# NUM_EVAL_WORKERS = 2
+# GCP_MODE = True       # gcp
+# RANDOM_KEYS = [25]
+# NUM_EVAL_WORKERS = 2
+# GCP_MODE = True       # gcp
+# RANDOM_KEYS = [26]
+# NUM_EVAL_WORKERS = 2
+
+
 NUM_WARMUPS = 100
 NUM_ACTIVE_TASKS = 36
 PARALLEL = True
@@ -173,6 +197,8 @@ acquire_fns = {
     "random": ActiveRandom(rng_key=None, model=ird_model),
 }
 
+
+SAVE_ROOT = "data" if not GCP_MODE else "/gcp_output"  # Don't change this line
 experiment = ExperimentActiveIRD(
     ird_model,
     acquire_fns,
@@ -187,8 +213,8 @@ experiment = ExperimentActiveIRD(
     # fixed_candidates=[(-0.2, 0.5)],
     # debug_belief_task=(-0.2, 0.5),
     # debug_belief_task=None,
-    # save_dir="data/191221_true",
-    save_dir="data/200107",
+    # save_dir=f"{SAVE_ROOT}/191221_true",
+    save_dir=f"{SAVE_ROOT}/200107",
     exp_name="active_ird_exp_mid",
 )
 

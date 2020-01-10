@@ -3,6 +3,7 @@ import time, copy
 import jax.numpy as np
 import rdb.envs.drive2d
 
+from tqdm import tqdm
 from rdb.infer.utils import collect_trajs
 from rdb.optim.mpc import shooting_method
 from rdb.optim.runner import Runner
@@ -68,7 +69,7 @@ else:
 
 N = 10
 t1 = time.time()
-for _ in range(N):
+for _ in tqdm(range(N), total=N):
     env.reset()
     acs_ = optimizer(env.state, weights=weights)
     # runner(env.state, acs_, weights=weights)
@@ -76,7 +77,7 @@ t_opt = time.time() - t1
 print(f"Optimizer fps {N/t_opt:.3f}")
 
 t1 = time.time()
-for _ in range(N):
+for _ in tqdm(range(N), total=N):
     env.reset()
     runner(env.state, acs_, weights=weights)
 t_run = time.time() - t1
