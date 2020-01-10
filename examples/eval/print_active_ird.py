@@ -3,7 +3,7 @@ import jax.numpy as np
 from jax import random
 from rdb.infer.particles import Particles
 
-SAVEPATH = "data/191231_test/active_ird_exp1/save"
+SAVEPATH = "data/200107/active_ird_exp_mid/save"
 
 FILEPAIRS = {}
 
@@ -26,7 +26,7 @@ FILEPAIRS:
     - key: seed
       - list: filenames
 """
-print(FILEPAIRS)
+# print(FILEPAIRS)
 for method in FILEPAIRS.keys():
     for seed in FILEPAIRS[method].keys():
         list_ = FILEPAIRS[method][seed]
@@ -50,6 +50,9 @@ print(f"Method {method} seed {seed}")
 for itr, filename in enumerate(FILEPAIRS[method][seed]):
     print(filename)
     ps.load(filename)
+    import pdb
+
+    pdb.set_trace()
     ps.log_samples(4)
 
 print(f"\nIRD Observation")

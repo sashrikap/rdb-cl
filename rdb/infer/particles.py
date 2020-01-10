@@ -40,9 +40,6 @@ class Particles(object):
         self._runner = runner
         self._sample_ws = sample_ws
         self._sample_concate_ws = sample_concate_ws
-        assert (
-            self._sample_ws is not None or self._sample_concate_ws is not None
-        ), "Must initialize with proper weights"
         self._rng_key = rng_key
         ## Cache data
         self._sample_feats = {}
@@ -59,13 +56,19 @@ class Particles(object):
     @property
     def weights(self):
         if self._sample_ws is None:
-            self._sample_ws = divide_dict_by_keys(self.concate_weights)
+            assert (
+                self._sample_concate_ws is not None
+            ), "Must properly initialize particle weights"
+            self._sample_ws = divide_dict_by_keys(self._sample_concate_ws)
         return self._sample_ws
 
     @property
     def concate_weights(self):
         if self._sample_concate_ws is None:
-            self._sample_concate_ws = concate_dict_by_keys(self.weights)
+            assert (
+                self._sample_ws is not None
+            ), "Must properly initialize particle weights"
+            self._sample_concate_ws = concate_dict_by_keys(self._sample_ws)
         return self._sample_concate_ws
 
     @property

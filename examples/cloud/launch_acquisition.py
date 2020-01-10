@@ -10,10 +10,10 @@ if LOCAL_MODE:
     mounts = [local_mnt]
 else:
     launch_mode = mode.GCPMode(
-        zone="us-west1-a",
-        instance_type="n1-standard-4",
-        # zone="us-west2-a",
-        # instance_type="c2-standard-4",
+        # zone="us-west1-a",
+        # instance_type="n1-standard-4",
+        zone="us-west2-a",
+        instance_type="c2-standard-4",
         gcp_image="active-ird-rss-v01",
         gcp_image_project="aerial-citron-264318",
         gcp_project="aerial-citron-264318",

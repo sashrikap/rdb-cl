@@ -28,14 +28,6 @@ horizon = 10
 # T = 30
 T = 10
 weights = {
-    "dist_cars": 100.0,
-    "dist_lanes": 50.0,
-    "dist_fences": 300.0,
-    "dist_objects": 3000.0,
-    "speed": 20.0,
-    "control": 80.0,
-}
-weights = {
     "dist_cars": 1.0,
     "dist_lanes": 0.1,
     "dist_fences": 0.35,
