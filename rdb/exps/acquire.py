@@ -158,7 +158,7 @@ class ActiveRandom(ActiveInfoGain):
 
     def update_key(self, rng_key):
         self._rng_key = rng_key
-        self._random_uniform = seed(self._random_uniform, self._rng_key)
+        self._random_uniform = seed(random_uniform, self._rng_key)
 
     def __call__(self, next_task, next_task_name, belief, obs, verbose=True):
         """Random score

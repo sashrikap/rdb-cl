@@ -84,6 +84,7 @@ class ExperimentActiveIRD(object):
         self._all_tasks, self._all_task_names = {}, {}
         self._all_obs, self._all_beliefs = {}, {}
         self._all_candidates = []
+        self._eval_tasks = []
         self._curr_belief = {}
         for key in self._acquire_fns.keys():
             self._acquire_eval_hist[key] = []
@@ -91,7 +92,7 @@ class ExperimentActiveIRD(object):
     def update_key(self, rng_key):
         self._rng_key = rng_key
         self._model.update_key(rng_key)
-        self._random_choice = seed(self._random_choice, rng_key)
+        self._random_choice = seed(random_choice, rng_key)
         for fn in self._acquire_fns.values():
             fn.update_key(rng_key)
 
@@ -114,6 +115,7 @@ class ExperimentActiveIRD(object):
         belief = self._model.sample([task], [task_name], obs=[obs], visualize=True)
 
         """ Build history for each acquisition function"""
+        self._eval_tasks = eval_tasks
         for key in self._acquire_fns.keys():
             self._all_obs[key] = [obs]
             self._all_tasks[key] = [task]
@@ -134,7 +136,7 @@ class ExperimentActiveIRD(object):
             self._all_candidates.append(candidates)
 
             """ Run Active IRD on Candidates """
-            print(f"\nActive IRD iteration {it}")
+            print(f"\nActive IRD ({self._rng_key}) iteration {it}")
             for key in self._acquire_fns.keys():
                 ## Evaluate
                 # if self._debug_belief_task is not None:
@@ -270,8 +272,10 @@ class ExperimentActiveIRD(object):
         for key in self._all_obs.keys():
             np_obs[key] = [ob.weights[0] for ob in self._all_obs[key]]
         data = dict(
+            seed=str(self._rng_key),
             curr_obs=np_obs,
             curr_tasks=self._all_tasks,
+            eval_tasks=self._eval_tasks,
             eval_hist=self._acquire_eval_hist,
             candidate_tasks=self._all_candidates,
         )

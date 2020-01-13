@@ -14,11 +14,13 @@ from numpyro.handlers import scale, condition, seed
 
 
 def load_data(env, exp_dir, exp_name):
-    global CAND_TASKS
+    global TEST_DATA
     all_data = {}
     for file in tqdm(os.listdir(exp_dir)):
         # Load eval data
         file_path = join(exp_dir, file)
+        # if not "[0 9]" in file:
+        #     continue
 
         if not ".npz" in file_path:
             continue
@@ -35,7 +37,7 @@ def load_data(env, exp_dir, exp_name):
         try:
             candidate_tasks = list(eval_data["candidate_tasks"])
         except:
-            candidate_tasks = CAND_TASKS
+            candidate_tasks = None
 
         if VERBOSE:
             for fn_key, tasks in curr_tasks.items():
@@ -69,11 +71,16 @@ def load_data(env, exp_dir, exp_name):
             for itr in range(1, num_iters):
                 for fn_key in FN_KEYS:
                     if len(curr_tasks[fn_key]) > itr:
-                        candidates = CAND_TASKS[itr - 1]
-                        equals = [
-                            np.allclose(c, curr_tasks[fn_key][itr]) for c in candidates
-                        ]
-                        assert sum(equals) > 0
+                        if len(CAND_TASKS) < itr:
+                            print(f"short key {str(rng_key)} fn {fn_key} iter {itr}")
+                        else:
+                            candidates = CAND_TASKS[itr - 1]
+                            equals = [
+                                np.allclose(c, curr_tasks[fn_key][itr])
+                                for c in candidates
+                            ]
+                            if not sum(equals) > 0:
+                                print(f"bad key {str(rng_key)} fn {fn_key} iter {itr}")
 
         all_data[str(rng_key)] = (rng_key, eval_data, weight_samples)
     return all_data
@@ -103,4 +110,4 @@ if __name__ == "__main__":
     TEST_DATA = data2
     data = load_data(env, EXP_DIR, EXP_NAME)
 
-    save_data(env, data, EXP_DIR, EXP_NAME)
+    # save_data(env, data, EXP_DIR, EXP_NAME)

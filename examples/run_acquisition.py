@@ -94,7 +94,7 @@ def main():
         eval_server=eval_server,
         beta=BETA,
         true_w=TRUE_W,
-        prior_log_prob=prior_log_prob_fn,
+        prior_log_prob_fn=prior_log_prob_fn,
         normalizer_fn=norm_sample_fn,
         proposal_fn=proposal_fn,
         sample_args={"num_warmups": NUM_WARMUPS, "num_samples": NUM_SAMPLES},
@@ -156,12 +156,14 @@ if __name__ == "__main__":
     params = load_params("examples/acquisition_params.yaml")
     locals().update(params)
     if not GCP_MODE:
-        RANDOM_KEYS = [1, 2, 3, 4]  # new macbook
+        # RANDOM_KEYS = [1, 2, 3, 4]  # new macbook
         # RANDOM_KEYS = [1, 9, 10, 13]  # test
-        # RANDOM_KEYS = [14, 15, 17, 18]
-        # RANDOM_KEYS = [19, 20, 21, 22]
+        # RANDOM_KEYS = [9, 10]  # test
+        # RANDOM_KEYS = [17, 18, 19, 20]
+        RANDOM_KEYS = [20]
+        NUM_EVAL_WORKERS = 1
         # RANDOM_KEYS = [23, 24]
-        NUM_EVAL_WORKERS = 4
+        # NUM_EVAL_WORKERS = 4
         # RANDOM_KEYS = [9, 10, 11, 12] # alienware
         # NUM_EVAL_WORKERS = 4
         # RANDOM_KEYS = [13, 14, 15, 16] # dell

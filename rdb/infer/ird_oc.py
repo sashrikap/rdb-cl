@@ -91,7 +91,7 @@ class IRDOptimalControl(PGM):
         eval_server,
         beta,
         true_w,
-        prior_log_prob,
+        prior_log_prob_fn,
         normalizer_fn,
         proposal_fn,
         sample_method="mh",
@@ -106,10 +106,13 @@ class IRDOptimalControl(PGM):
         self._env = env_fn()
         self._controller, self._runner = controller_fn(self._env)
         self._eval_server = eval_server
-        # Parameters & distributions
+        # Rationality
         self._beta = beta
-        self._prior_log_prob = prior_log_prob
-        self._normalizer_fn = normalizer_fn
+        # Sampling functions
+        self._prior_raw_fn = prior_log_prob_fn
+        self._prior_log_prob = None
+        self._normalizer_raw_fn = normalizer_fn
+        self._normalizer_fn = None
         ## Caching normalizers, samples and features
         self._normalizer = None
         self._samples = {}
@@ -156,8 +159,8 @@ class IRDOptimalControl(PGM):
         super().update_key(rng_key)
         self._sampler.update_key(rng_key)
         self._designer.update_key(rng_key)
-        self._prior_log_prob = seed(self._prior_log_prob, rng_key)
-        self._normalizer_fn = seed(self._normalizer_fn, rng_key)
+        self._prior_log_prob = seed(self._prior_raw_fn, rng_key)
+        self._normalizer_fn = seed(self._normalizer_raw_fn, rng_key)
 
     def load_samples(self,):
         pass
@@ -245,6 +248,7 @@ class IRDOptimalControl(PGM):
 
     def _build_normalizer(self, task, task_name):
         """For new tasks, need to build normalizer."""
+        assert self._normalizer_fn is not None, "Need to set random seed"
         norm_ws = self._normalizer_fn()
         state = self._get_init_state(task)
         normalizer = Particles(
@@ -280,6 +284,8 @@ class IRDOptimalControl(PGM):
             Runs `p(w_obs | w)`
 
             """
+            assert self._prior_log_prob is not None, "need to set random seed"
+
             log_probs = []
             # Iterate over list of previous tasks
             for n_feats_sum, u_feats_sum in zip(norm_feats_sums, user_feats_sums):
@@ -337,7 +343,7 @@ class Designer(PGM):
         runner,
         beta,
         true_w,
-        prior_log_prob,
+        prior_log_prob_fn,
         proposal_fn,
         sample_method,
         sampler_args,
@@ -349,8 +355,11 @@ class Designer(PGM):
         self._controller = controller
         self._runner = runner
         self._true_w = true_w
-        self._prior_log_prob = prior_log_prob
         self._use_true_w = use_true_w
+        # Prior function
+        self._prior_raw_fn = prior_log_prob_fn
+        self._prior_log_prob = None
+        # Sampling kernel
         kernel = self._build_kernel(beta)
         self._samples = {}
         super().__init__(rng_key, kernel, proposal_fn, sample_method, sampler_args)
@@ -382,10 +391,11 @@ class Designer(PGM):
     def update_key(self, rng_key):
         super().update_key(rng_key)
         self._sampler.update_key(rng_key)
-        self._prior_log_prob = seed(self._prior_log_prob, rng_key)
+        self._prior_log_prob = seed(self._prior_raw_fn, rng_key)
 
     def _build_kernel(self, beta):
         def likelihood_fn(true_w, sample_w, task):
+            assert self._prior_log_prob is not None, "Need to set random seed"
             state = self._get_init_state(task)
             actions = self._controller(state, weights=sample_w)
             _, cost, info = self._runner(state, actions, weights=true_w)
