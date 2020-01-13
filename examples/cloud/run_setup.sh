@@ -22,4 +22,4 @@ pip install -e ./rdb
 # touch /gcp_output/test.txt
 # python ./rdb/examples/cloud/run_filetest.py
 # python ./rdb/examples/run_highway.py
-python ./rdb/examples/run_acquisition.py
+# python ./rdb/examples/run_acquisition.py

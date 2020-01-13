@@ -10,6 +10,7 @@ Note:
 """
 
 import numpyro
+import copy
 import jax
 import jax.numpy as np
 from numpyro.handlers import scale, condition, seed
@@ -98,6 +99,7 @@ class IRDOptimalControl(PGM):
         designer_args={},
         use_true_w=False,
         debug_true_w=False,
+        test_mode=True,  # Skip _cache_task part if true
     ):
         self._rng_key = rng_key
         self._env_fn = env_fn
@@ -128,12 +130,18 @@ class IRDOptimalControl(PGM):
             use_true_w=use_true_w,
         )
         self._debug_true_w = debug_true_w
+        self._test_mode = test_mode
+
         kernel = self._build_kernel(beta)
         super().__init__(rng_key, kernel, proposal_fn, sample_method, sample_args)
 
     @property
     def env(self):
         return self._env
+
+    @property
+    def env_fn(self):
+        return self._env_fn
 
     @property
     def designer(self):
@@ -150,6 +158,9 @@ class IRDOptimalControl(PGM):
         self._designer.update_key(rng_key)
         self._prior_log_prob = seed(self._prior_log_prob, rng_key)
         self._normalizer_fn = seed(self._normalizer_fn, rng_key)
+
+    def load_samples(self,):
+        pass
 
     def get_samples(self, task, task_name):
         """Sample features for belief weights on a task
@@ -198,15 +209,26 @@ class IRDOptimalControl(PGM):
         last_name = task_names[-1]
 
         print("Sampling IRD")
-        sample_ws = self._sampler.sample(
-            obs=all_obs_ws,  # all obs so far
-            init_state=last_obs_w,  # initialize with last obs
-            user_feats_sums=all_user_feats_sum,
-            norm_feats_sums=all_norm_feats_sum,
-            verbose=verbose,
-        )
+        if self._test_mode:
+            sample_ws = [
+                copy.deepcopy(obs[0].weights[0])
+                for _ in range(self._sampler.num_samples)
+            ]
+        else:
+            sample_ws = self._sampler.sample(
+                obs=all_obs_ws,  # all obs so far
+                init_state=last_obs_w,  # initialize with last obs
+                user_feats_sums=all_user_feats_sum,
+                norm_feats_sums=all_norm_feats_sum,
+                verbose=verbose,
+            )
         samples = Particles(
-            self._rng_key, self._env_fn, self._controller, self._runner, sample_ws
+            self._rng_key,
+            self._env_fn,
+            self._controller,
+            self._runner,
+            sample_ws,
+            test_mode=self._test_mode,
         )
         self._samples[last_name] = samples
         # if visualize:

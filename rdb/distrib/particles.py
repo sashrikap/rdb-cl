@@ -1,4 +1,8 @@
 """Distributed evaluator class. Used for parallel evaluation.
+
+General workflow:
+    * Experiment -> ParticleServer -> ParticleWorker
+      Experiment <- ParticleServer <-
 """
 import ray
 import math
@@ -25,9 +29,14 @@ class ParticleWorkerSingle(object):
     def initialize_done(self):
         return self._initialized
 
-    def compute(self, rng_key, weights, task, task_name):
+    def compute(self, rng_key, weights, task, task_name, test_mode=False):
         particles = Particles(
-            rng_key, self._env_fn, self._controller, self._runner, weights
+            rng_key,
+            self._env_fn,
+            self._controller,
+            self._runner,
+            weights,
+            test_mode=test_mode,
         )
         particles.get_features(task, task_name)
         self._compute_result = particles.dump_task(task, task_name)
@@ -102,6 +111,7 @@ class ParticleServer(object):
                         particles.weights,
                         itr_tasks[wi],
                         itr_names[wi],
+                        test_mode=particles.test_mode,
                     )
                 # Retrieve
                 for wi in range(idx_end - idx_start):
@@ -117,6 +127,7 @@ class ParticleServer(object):
                         particles.weights,
                         itr_tasks[wi],
                         itr_names[wi],
+                        test_mode=particles.test_mode,
                     )
                     particles.merge(result)
                     if verbose:

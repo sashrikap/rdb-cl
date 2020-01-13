@@ -18,6 +18,8 @@ Note:
 """
 
 from rdb.infer.utils import random_choice
+from rdb.infer.particles import Particles
+from rdb.exps.utils import Profiler
 from numpyro.handlers import seed
 from tqdm.auto import tqdm
 import jax.numpy as np
@@ -81,6 +83,7 @@ class ExperimentActiveIRD(object):
         self._acquire_eval_hist = {}
         self._all_tasks, self._all_task_names = {}, {}
         self._all_obs, self._all_beliefs = {}, {}
+        self._all_candidates = []
         self._curr_belief = {}
         for key in self._acquire_fns.keys():
             self._acquire_eval_hist[key] = []
@@ -103,7 +106,7 @@ class ExperimentActiveIRD(object):
         """Run main algorithmic loop."""
         self._build_cache()
         eval_tasks = self._random_choice(
-            self._model.env.all_tasks, self._num_eval_tasks, replacement=True
+            self._model.env.all_tasks, self._num_eval_tasks
         )
         """ First iteration """
         task_name = f"ird_{str(task)}"
@@ -128,6 +131,8 @@ class ExperimentActiveIRD(object):
                 candidates = self._random_choice(
                     self._model.env.all_tasks, self._num_active_tasks
                 )
+            self._all_candidates.append(candidates)
+
             """ Run Active IRD on Candidates """
             print(f"\nActive IRD iteration {it}")
             for key in self._acquire_fns.keys():
@@ -160,6 +165,11 @@ class ExperimentActiveIRD(object):
                 self._evaluate(key, next_belief, eval_tasks)
                 self._save(it)
 
+    def debug(self):
+        """Debug a previously recorded experiment run.
+        """
+        pass
+
     def _debug_belief(self, belief, task, obs):
         print(f"Observed weights")
         for key, val in obs.weights[0].items():
@@ -175,7 +185,7 @@ class ExperimentActiveIRD(object):
 
         Args:
             candidates (list): potential next tasks
-            obs (Particle[1]): current observed weight
+            obs (Particles.weights[1]): current observed weight
             fn_key (str): acquisition function key
 
         Note:
@@ -195,7 +205,6 @@ class ExperimentActiveIRD(object):
         for next_task, next_task_name in tqdm(
             zip(candidates, cand_names), total=len(candidates), desc=desc
         ):
-            # print(f"Task candidate {ni+1}/{len(candidates)}")
             scores.append(
                 self._acquire_fns[fn_key](
                     next_task, next_task_name, belief, obs, verbose=False
@@ -239,6 +248,20 @@ class ExperimentActiveIRD(object):
             {"violation": avg_violate, "perform": avg_perform}
         )
 
+    def _load(self):
+        expdir = f"{self._save_dir}/{self._exp_name}"
+        eval_data = np.load(path, allow_pickle=True)
+        np_obs = eval_data["eval_hist"].item()
+        self._all_tasks = eval_data["curr_tasks"].item()
+        self._acquire_eval_hist = eval_data["eval_hist"].item()
+        for key in self._all_beliefs.keys():
+            self._all_beliefs[key] = []
+            for itr in range(len()):
+                fname = f"weights_seed_{str(self._rng_key)}_method_{key}_itr_{itr:02d}"
+                savepath = f"{savedir}/{fname}.npz"
+                belief = self._model.load_samples()
+                self._all_beliefs[key].append(belief)
+
     def _save(self, itr):
         expdir = f"{self._save_dir}/{self._exp_name}"
         os.makedirs(expdir, exist_ok=True)
@@ -250,6 +273,7 @@ class ExperimentActiveIRD(object):
             curr_obs=np_obs,
             curr_tasks=self._all_tasks,
             eval_hist=self._acquire_eval_hist,
+            candidate_tasks=self._all_candidates,
         )
         path = f"{self._save_dir}/{self._exp_name}_seed_{str(self._rng_key)}.npz"
         with open(path, "wb+") as f:

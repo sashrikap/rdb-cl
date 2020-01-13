@@ -10,234 +10,160 @@ from rdb.infer.ird_oc import IRDOptimalControl
 from rdb.optim.mpc import shooting_method
 from rdb.distrib.particles import ParticleServer
 from rdb.infer.utils import *
+from rdb.exps.utils import load_params
 from functools import partial
 from jax import random
 import numpyro.distributions as dist
-
-# ENV_NAME = "Week3_02-v0"
-ENV_NAME = "Week6_01-v0"
-GCP_MODE = False
-
-# RANDOM_KEYS = [1, 2, 3, 4]  # new macbook
-# NUM_EVAL_WORKERS = 4
-# RANDOM_KEYS = [5, 6, 7, 8] # old macbook
-# NUM_EVAL_WORKERS = 2
-# RANDOM_KEYS = [9, 10, 11, 12] # alienware
-# NUM_EVAL_WORKERS = 4
-# RANDOM_KEYS = [13, 14, 15, 16] # dell
-# NUM_EVAL_WORKERS = 2
-# RANDOM_KEYS = [17, 18, 19, 20]  # new macbook
-# NUM_EVAL_WORKERS = 2
+import yaml, argparse
 
 
-# GCP_MODE = True       # gcp
-# RANDOM_KEYS = [21]
-# NUM_EVAL_WORKERS = 2
-# GCP_MODE = True  # gcp
-# RANDOM_KEYS = [22]
-# NUM_EVAL_WORKERS = 2
-# GCP_MODE = True       # gcp
-# RANDOM_KEYS = [23]
-# NUM_EVAL_WORKERS = 2
-# GCP_MODE = True       # gcp
-# RANDOM_KEYS = [24]
-# NUM_EVAL_WORKERS = 2
-# GCP_MODE = True       # gcp
-# RANDOM_KEYS = [25]
-# NUM_EVAL_WORKERS = 2
-# GCP_MODE = True       # gcp
-# RANDOM_KEYS = [26]
-# NUM_EVAL_WORKERS = 2
-# GCP_MODE = True       # gcp
-# RANDOM_KEYS = [27]
-# NUM_EVAL_WORKERS = 2
-GCP_MODE = True  # gcp
-RANDOM_KEYS = [28]
-NUM_EVAL_WORKERS = 2
-# GCP_MODE = True       # gcp
-# RANDOM_KEYS = [29]
-# NUM_EVAL_WORKERS = 2
-# GCP_MODE = True       # gcp
-# RANDOM_KEYS = [30]
-# NUM_EVAL_WORKERS = 2
-# GCP_MODE = True       # gcp
-# RANDOM_KEYS = [31]
-# NUM_EVAL_WORKERS = 2
-# GCP_MODE = True       # gcp
-# RANDOM_KEYS = [32]
-# NUM_EVAL_WORKERS = 2
+def main():
+    def env_fn():
+        import gym, rdb.envs.drive2d
 
+        env = gym.make(ENV_NAME)
+        env.reset()
+        return env
 
-NUM_WARMUPS = 100
-NUM_ACTIVE_TASKS = 36
-PARALLEL = True
+    def controller_fn(env):
+        controller, runner = shooting_method(
+            env, env.main_car.cost_runtime, HORIZON, env.dt, replan=False
+        )
+        return controller, runner
 
-## Full scale sampling
-# NUM_NORMALIZERS = 2000
-# NUM_SAMPLES = 2000
-# NUM_ACTIVE_SAMPLES = -1
-# NUM_EVAL_SAMPLES = -1
-# NUM_EVAL_TASKS = 48
+    # # TODO: find true w
+    # true_w = {
+    #     "dist_cars": 1.0,
+    #     "dist_lanes": 0.1,
+    #     "dist_fences": 0.6,
+    #     "speed": 0.5,
+    #     "control": 0.16,
+    # }
+    # # Training Environment
+    # task = (-0.4, 0.3)
 
-## Debug set True
-USER_TRUE_W = False
+    # TODO: find true w
+    # true_w = {
+    #     "dist_cars": 1.0,
+    #     "dist_lanes": 0.1,
+    #     "dist_fences": 0.6,
+    #     "speed": 0.5,
+    #     "control": 0.16,
+    # }
+    # # Training Environment
+    # task = (-0.4, 0.3)
 
-## Faster sampling
-NUM_NORMALIZERS = 1000
-NUM_SAMPLES = 1000
-NUM_ACTIVE_SAMPLES = -1
-NUM_EVAL_SAMPLES = -1
-NUM_EVAL_TASKS = 36
-
-## Testing
-# NUM_NORMALIZERS = 50
-# NUM_SAMPLES = 10
-# NUM_ACTIVE_SAMPLES = 10
-# NUM_EVAL_SAMPLES = 7
-# NUM_EVAL_TASKS = 2
-# NUM_EVAL_WORKERS = 1
-# PARALLEL = False
-
-NUM_DESIGNERS = 50
-MAX_WEIGHT = 5.0
-BETA = 1.0
-HORIZON = 10
-EXP_ITERATIONS = 8
-PROPOSAL_VAR = 0.25
-
-
-def env_fn():
-    import gym, rdb.envs.drive2d
-
-    env = gym.make(ENV_NAME)
-    env.reset()
-    return env
-
-
-def controller_fn(env):
-    controller, runner = shooting_method(
-        env, env.main_car.cost_runtime, HORIZON, env.dt, replan=False
+    """ Prior sampling & likelihood functions for PGM """
+    # log_prior_dict = {
+    #     "dist_cars": dist.Uniform(0.0, 0.01),
+    #     "dist_lanes": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
+    #     "dist_fences": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
+    #     "speed": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
+    #     "control": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
+    # }
+    log_prior_dict = {
+        "dist_cars": dist.Uniform(0.0, 0.01),
+        "dist_lanes": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
+        "dist_fences": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
+        "dist_objects": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
+        "speed": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
+        "control": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
+    }
+    proposal_std_dict = {
+        "dist_cars": 1e-6,
+        "dist_lanes": PROPOSAL_VAR,
+        "dist_fences": PROPOSAL_VAR,
+        "dist_objects": PROPOSAL_VAR,
+        "speed": PROPOSAL_VAR,
+        "control": PROPOSAL_VAR,
+    }
+    prior_log_prob_fn = partial(prior_log_prob, log_prior_dict=log_prior_dict)
+    prior_sample_fn = partial(prior_sample, log_prior_dict=log_prior_dict)
+    norm_sample_fn = partial(
+        normalizer_sample, sample_fn=prior_sample_fn, num=NUM_NORMALIZERS
     )
-    return controller, runner
+    proposal_fn = partial(gaussian_proposal, log_std_dict=proposal_std_dict)
+    eval_server = ParticleServer(
+        env_fn, controller_fn, num_workers=NUM_EVAL_WORKERS, parallel=PARALLEL
+    )
+
+    ird_model = IRDOptimalControl(
+        rng_key=None,
+        env_fn=env_fn,
+        controller_fn=controller_fn,
+        eval_server=eval_server,
+        beta=BETA,
+        true_w=TRUE_W,
+        prior_log_prob=prior_log_prob_fn,
+        normalizer_fn=norm_sample_fn,
+        proposal_fn=proposal_fn,
+        sample_args={"num_warmups": NUM_WARMUPS, "num_samples": NUM_SAMPLES},
+        designer_args={"num_warmups": NUM_WARMUPS, "num_samples": NUM_DESIGNERS},
+        use_true_w=USER_TRUE_W,
+    )
+
+    """ Active acquisition function for experiment """
+    acquire_fns = {
+        "infogain": ActiveInfoGain(
+            rng_key=None, model=ird_model, beta=BETA, debug=False
+        ),
+        "ratiomean": ActiveRatioTest(
+            rng_key=None, model=ird_model, method="mean", debug=False
+        ),
+        "ratiomin": ActiveRatioTest(
+            rng_key=None, model=ird_model, method="min", debug=False
+        ),
+        "random": ActiveRandom(rng_key=None, model=ird_model),
+    }
+
+    SAVE_ROOT = "data" if not GCP_MODE else "/gcp_output"  # Don't change this line
+    experiment = ExperimentActiveIRD(
+        ird_model,
+        acquire_fns,
+        eval_server=eval_server,
+        iterations=EXP_ITERATIONS,
+        num_eval_tasks=NUM_EVAL_TASKS,
+        num_eval_sample=NUM_EVAL_SAMPLES,
+        num_active_tasks=NUM_ACTIVE_TASKS,
+        num_active_sample=NUM_ACTIVE_SAMPLES,
+        # Hard coded candidates
+        # fixed_candidates=[(-0.4, -0.7), (-0.2, 0.5)],
+        # fixed_candidates=[(-0.2, 0.5)],
+        # debug_belief_task=(-0.2, 0.5),
+        # debug_belief_task=None,
+        # save_dir=f"{SAVE_ROOT}/191221_true",
+        save_dir=f"{SAVE_ROOT}/200110_test",
+        exp_name="active_ird_exp_mid",
+    )
+
+    """ Experiment """
+    for ki in RANDOM_KEYS:
+        key = random.PRNGKey(ki)
+        experiment.update_key(key)
+        experiment.run(TASK)
 
 
-# # TODO: find true w
-# true_w = {
-#     "dist_cars": 1.0,
-#     "dist_lanes": 0.1,
-#     "dist_fences": 0.6,
-#     "speed": 0.5,
-#     "control": 0.16,
-# }
-# # Training Environment
-# task = (-0.4, 0.3)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Process some integers.")
+    parser.add_argument("--GCP_MODE", action="store_true")
+    args = parser.parse_args()
 
-# TODO: find true w
-# true_w = {
-#     "dist_cars": 1.0,
-#     "dist_lanes": 0.1,
-#     "dist_fences": 0.6,
-#     "speed": 0.5,
-#     "control": 0.16,
-# }
-# # Training Environment
-# task = (-0.4, 0.3)
+    # ENV_NAME = "Week3_02-v0"
+    GCP_MODE = args.GCP_MODE
+    ENV_NAME = "Week6_01-v0"
 
-true_w = {
-    "dist_cars": 1.0,
-    "dist_lanes": 0.1,
-    "dist_fences": 0.35,
-    "dist_objects": 1.25,
-    "speed": 0.05,
-    "control": 0.1,
-}
-
-task = (0.2, -0.7, 0.0, 0.4)
-
-""" Prior sampling & likelihood functions for PGM """
-# log_prior_dict = {
-#     "dist_cars": dist.Uniform(0.0, 0.01),
-#     "dist_lanes": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
-#     "dist_fences": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
-#     "speed": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
-#     "control": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
-# }
-log_prior_dict = {
-    "dist_cars": dist.Uniform(0.0, 0.01),
-    "dist_lanes": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
-    "dist_fences": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
-    "dist_objects": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
-    "speed": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
-    "control": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
-}
-proposal_std_dict = {
-    "dist_cars": 1e-6,
-    "dist_lanes": PROPOSAL_VAR,
-    "dist_fences": PROPOSAL_VAR,
-    "dist_objects": PROPOSAL_VAR,
-    "speed": PROPOSAL_VAR,
-    "control": PROPOSAL_VAR,
-}
-prior_log_prob_fn = partial(prior_log_prob, log_prior_dict=log_prior_dict)
-prior_sample_fn = partial(prior_sample, log_prior_dict=log_prior_dict)
-norm_sample_fn = partial(
-    normalizer_sample, sample_fn=prior_sample_fn, num=NUM_NORMALIZERS
-)
-proposal_fn = partial(gaussian_proposal, log_std_dict=proposal_std_dict)
-eval_server = ParticleServer(
-    env_fn, controller_fn, num_workers=NUM_EVAL_WORKERS, parallel=PARALLEL
-)
-
-ird_model = IRDOptimalControl(
-    rng_key=None,
-    env_fn=env_fn,
-    controller_fn=controller_fn,
-    eval_server=eval_server,
-    beta=BETA,
-    true_w=true_w,
-    prior_log_prob=prior_log_prob_fn,
-    normalizer_fn=norm_sample_fn,
-    proposal_fn=proposal_fn,
-    sample_args={"num_warmups": NUM_WARMUPS, "num_samples": NUM_SAMPLES},
-    designer_args={"num_warmups": NUM_WARMUPS, "num_samples": NUM_DESIGNERS},
-    use_true_w=USER_TRUE_W,
-)
-
-""" Active acquisition function for experiment """
-acquire_fns = {
-    "infogain": ActiveInfoGain(rng_key=None, model=ird_model, beta=BETA, debug=False),
-    "ratiomean": ActiveRatioTest(
-        rng_key=None, model=ird_model, method="mean", debug=False
-    ),
-    "ratiomin": ActiveRatioTest(
-        rng_key=None, model=ird_model, method="min", debug=False
-    ),
-    "random": ActiveRandom(rng_key=None, model=ird_model),
-}
-
-
-SAVE_ROOT = "data" if not GCP_MODE else "/gcp_output"  # Don't change this line
-experiment = ExperimentActiveIRD(
-    ird_model,
-    acquire_fns,
-    eval_server=eval_server,
-    iterations=EXP_ITERATIONS,
-    num_eval_tasks=NUM_EVAL_TASKS,
-    num_eval_sample=NUM_EVAL_SAMPLES,
-    num_active_tasks=NUM_ACTIVE_TASKS,
-    num_active_sample=NUM_ACTIVE_SAMPLES,
-    # Hard coded candidates
-    # fixed_candidates=[(-0.4, -0.7), (-0.2, 0.5)],
-    # fixed_candidates=[(-0.2, 0.5)],
-    # debug_belief_task=(-0.2, 0.5),
-    # debug_belief_task=None,
-    # save_dir=f"{SAVE_ROOT}/191221_true",
-    save_dir=f"{SAVE_ROOT}/200107",
-    exp_name="active_ird_exp_mid",
-)
-
-""" Experiment """
-for ki in RANDOM_KEYS:
-    key = random.PRNGKey(ki)
-    experiment.update_key(key)
-    experiment.run(task)
+    # Load parameters
+    params = load_params("examples/acquisition_params.yaml")
+    locals().update(params)
+    if not GCP_MODE:
+        RANDOM_KEYS = [1, 2, 3, 4]  # new macbook
+        # RANDOM_KEYS = [1, 9, 10, 13]  # test
+        # RANDOM_KEYS = [14, 15, 17, 18]
+        # RANDOM_KEYS = [19, 20, 21, 22]
+        # RANDOM_KEYS = [23, 24]
+        NUM_EVAL_WORKERS = 4
+        # RANDOM_KEYS = [9, 10, 11, 12] # alienware
+        # NUM_EVAL_WORKERS = 4
+        # RANDOM_KEYS = [13, 14, 15, 16] # dell
+        # NUM_EVAL_WORKERS = 2
+    main()

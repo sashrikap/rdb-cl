@@ -18,6 +18,7 @@ setup(
         "jax==0.1.53",
         # "jaxlib",  # numpyro installs the correct version
         "moviepy",
+        "fast-histogram",
         "pygame",
         "toolz",
         "funcy",

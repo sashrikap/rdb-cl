@@ -6,12 +6,6 @@ import seaborn as sns
 sns.set()
 import matplotlib.pyplot as plt
 
-N = -1
-# seed = "[ 0 13]"
-seed = ""
-MAX_LEN = 8
-# MAX_LEN = 4
-
 
 def read_seed(path):
     # print(path)
@@ -38,7 +32,7 @@ def cleanup(arr):
         return np.array(arrs)[:N, :]
 
 
-def plot_perform(data):
+def plot_perform(path, data):
     sns.set_palette("husl")
     colors = "gbkr"
     for i, (method, mdict) in enumerate(data.items()):
@@ -46,18 +40,21 @@ def plot_perform(data):
         sns.tsplot(
             time=range(len(perf[0])), color=colors[i], data=perf, condition=method
         )
+    plt.xticks(range(len(perf[0])))
+    plt.legend(loc="lower right")
     plt.xlabel("Iteration")
     plt.ylabel("Log ratio")
-    plt.title("Relative Performance")
+    plt.title("Log Relative Performance")
+    plt.savefig(os.path.join(path, "performance.png"))
     plt.show()
     # print(data)
 
 
-def plot_data(path):
+def plot_data(data_path):
     seedpaths = []
     seeddata = []
-    dir_path = os.path.dirname(path)
-    filename = os.path.basename(path)
+    dir_path = os.path.dirname(data_path)
+    filename = os.path.basename(data_path)
     for file in sorted(os.listdir(dir_path)):
         if filename in file:
             filepath = os.path.join(dir_path, file)
@@ -70,6 +67,8 @@ def plot_data(path):
 
     data = {}
     for idx, sd in enumerate(seeddata):
+        if not all([len(h) > MAX_LEN for h in sd.values()]):
+            continue
         for method, hist in sd.items():
             if method not in data.keys():
                 data[method] = {"perform": []}
@@ -81,12 +80,17 @@ def plot_data(path):
         mdict["perform"] = cleanup(mdict["perform"])
         print(method, mdict["perform"].shape)
 
-    plot_perform(data)
+    plot_perform(data_path, data)
 
 
 if __name__ == "__main__":
+    N = -1
+    # seed = "[ 0 13]"
+    seed = ""
+    MAX_LEN = 8
+    # MAX_LEN = 4
     # data_path = "data/191216/active_ird_exp1"
     # data_path = "data/191217/active_ird_exp1"
     # data_path = "data/200103/active_ird_exp_mid"
-    data_path = "data/200107/active_ird_exp_mid"
+    data_path = "data/200110/active_ird_exp_mid"
     plot_data(data_path)

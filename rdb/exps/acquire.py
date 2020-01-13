@@ -61,15 +61,18 @@ class ActiveInfoGain(object):
         next_feats_sum = belief.get_features_sum(next_task, next_task_name, desc=desc)
 
         entropies = []
-        for next_designer_w in belief.weights:
-            next_probs = self._compute_probs(next_designer_w, next_feats_sum)
-            next_belief = belief.resample(next_probs)
-            # avoid gaussian entropy (causes NonSingular Matrix issue)
-            ent = next_belief.entropy("histogram")
-            if np.isnan(ent):
-                ent = 1000
-                print("WARNING: Entropy has NaN entropy value")
-            entropies.append(ent)
+        if belief.test_mode:
+            entropies = np.zeros(len(belief.weights))
+        else:
+            for next_designer_ws in belief.weights:
+                next_probs = self._compute_probs(next_designer_ws, next_feats_sum)
+                next_belief = belief.resample(next_probs)
+                # avoid gaussian entropy (causes NonSingular Matrix issue)
+                ent = next_belief.entropy("histogram")
+                if np.isnan(ent):
+                    ent = 1000
+                    print("WARNING: Entropy has NaN entropy value")
+                entropies.append(ent)
 
         entropies = np.array(entropies)
         infogain = -1 * np.mean(entropies)
@@ -97,7 +100,7 @@ class ActiveRatioTest(ActiveInfoGain):
     def _compute_log_ratios(self, weights, next_feats_sum, user_feats_sum):
         """Compares user features with belief sample features (from samplw_ws).
 
-        Ratio = exp(next_w @ user_feats) / exp(next_w @ next_feats)
+        Ratio = exp(next_ws @ user_feats) / exp(next_ws @ next_feats)
 
         """
 

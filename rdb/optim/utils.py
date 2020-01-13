@@ -1,3 +1,9 @@
+"""
+==================================================
+================ Dictionary Tools ================
+==================================================
+"""
+
 import jax.numpy as np
 import functools
 import numpy as onp
@@ -5,13 +11,6 @@ from collections import OrderedDict
 from functools import partial, reduce
 from toolz.functoolz import juxt
 from operator import mul, add
-
-
-"""
-==================================================
-================ Dictionary Tools ================
-==================================================
-"""
 
 
 def sort_dict_by_keys(dict_, keys):

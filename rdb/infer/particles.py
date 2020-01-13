@@ -10,6 +10,7 @@ from rdb.optim.utils import (
 )
 from numpyro.handlers import scale, condition, seed
 from rdb.exps.utils import plot_weights
+from fast_histogram import histogram1d
 from scipy.stats import gaussian_kde
 from rdb.exps.utils import Profiler
 import jax.numpy as np
@@ -33,14 +34,16 @@ class Particles(object):
         runner,
         sample_ws=None,
         sample_concate_ws=None,
+        test_mode=False,
     ):
         self._env_fn = env_fn
-        self._env = env_fn()
+        self._env = None
         self._controller = controller
         self._runner = runner
         self._sample_ws = sample_ws
         self._sample_concate_ws = sample_concate_ws
         self._rng_key = rng_key
+        self._test_mode = test_mode
         ## Cache data
         self._sample_feats = {}
         self._sample_feats_sum = {}
@@ -52,6 +55,10 @@ class Particles(object):
     @property
     def rng_key(self):
         return self._rng_key
+
+    @property
+    def test_mode(self):
+        return self._test_mode
 
     @property
     def weights(self):
@@ -90,7 +97,12 @@ class Particles(object):
             ), f"Not enough samples for {num_samples}."
             sub_ws = self._random_choice(self._sample_ws, num_samples, replacement=True)
             return Particles(
-                self._rng_key, self._env_fn, self._controller, self._runner, sub_ws
+                self._rng_key,
+                self._env_fn,
+                self._controller,
+                self._runner,
+                sub_ws,
+                test_mode=self._test_mode,
             )
 
     def log_samples(self, num_samples=None):
@@ -134,9 +146,18 @@ class Particles(object):
 
     def _cache_task(self, task, task_name, desc=None):
         state = self._get_init_state(task)
-        actions, feats, feats_sum, violations = collect_trajs(
-            self.weights, state, self._controller, self._runner, desc=desc
-        )
+        if self._test_mode:
+            dummy_dict = concate_dict_by_keys(self.weights)
+            actions, feats, feats_sum, violations = (
+                None,
+                dummy_dict,
+                dummy_dict,
+                dummy_dict,
+            )
+        else:
+            actions, feats, feats_sum, violations = collect_trajs(
+                self.weights, state, self._controller, self._runner, desc=desc
+            )
         self._sample_actions[task_name] = actions
         self._sample_feats[task_name] = feats
         self._sample_feats_sum[task_name] = feats_sum
@@ -173,6 +194,9 @@ class Particles(object):
             * compute_features
 
         """
+        if self._test_mode:
+            return 0.0
+
         state = self._get_init_state(task)
         num_violate = 0.0
         for w in self.weights:
@@ -192,11 +216,19 @@ class Particles(object):
             * compute_features
 
         """
+        if self._test_mode:
+            return 0.0
+
         this_feats_sum = self.get_features_sum(task, task_name)
         this_cost = multiply_dict_by_keys(target_w, this_feats_sum)
 
         target = Particles(
-            self._rng_key, self._env_fn, self._controller, self._runner, [target_w]
+            self._rng_key,
+            self._env_fn,
+            self._controller,
+            self._runner,
+            [target_w],
+            test_mode=self._test_mode,
         )
         target_feats_sum = target.get_features_sum(task, task_name)
         target_cost = multiply_dict_by_keys(target_w, target_feats_sum)
@@ -212,6 +244,8 @@ class Particles(object):
         return diff_rews.mean()
 
     def _get_init_state(self, task):
+        if self._env is None:
+            self._env = self._env_fn()
         self._env.set_task(task)
         self._env.reset()
         state = copy.deepcopy(self._env.state)
@@ -230,6 +264,7 @@ class Particles(object):
             self._controller,
             self._runner,
             sample_concate_ws=new_concate_ws,
+            test_mode=self._test_mode,
         )
         return new_ps
 
@@ -244,9 +279,9 @@ class Particles(object):
             * may be sensitive to histogram params (bins, ranges)
 
         """
+        FAST_HISTOGRAM = True
 
         data = onp.array(list(self.concate_weights.values()))
-
         # Omit first weight
         data = onp.log(data[1:, :])
         if method == "gaussian":
@@ -257,15 +292,26 @@ class Particles(object):
         elif method == "histogram":
             entropy = 0.0
             for row in data:
-                hist = onp.histogram(row, bins=bins, range=ranges, density=True)
-                # hist = histogram1d(row, bins=bins, range=ranges)
-                h_data = hist[0]
-                ent = -(h_data * onp.ma.log(onp.abs(h_data))).sum()
+                if FAST_HISTOGRAM:
+                    hist_count = histogram1d(row, bins=bins, range=ranges)
+                    hist_prob = hist_count / len(row)
+                    delta = (ranges[1] - ranges[0]) / bins
+                    hist_density = hist_prob / delta
+                else:
+                    # density is normalized by bucket width
+                    hist_density, slots = onp.histogram(
+                        row, bins=bins, range=ranges, density=True
+                    )
+                    delta = slots[1] - slots[0]
+                    hist_prob = hist_density * delta
+                ent = -(hist_density * onp.ma.log(onp.abs(hist_density)) * delta).sum()
                 entropy += ent
         return entropy
 
     def visualize(self, path, true_w):
         """Visualize weight belief distribution in histogram."""
+        if self._test_mode:
+            return
         plot_weights(self.weights, highlight_dict=true_w, path=path)
 
     def save(self, path):

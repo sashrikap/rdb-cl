@@ -76,7 +76,8 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
         state_idx, task_idx = obj_idx, 2
         for obj in self._objects:
             next_task_idx = task_idx + len(obj.state)
-            obj.state = np.array(task[task_idx:next_task_idx])
+            next_state_idx = state_idx + len(obj.state)
+            state[state_idx:next_state_idx] = np.array(task[task_idx:next_task_idx])
         self.set_init_state(state)
 
     def _get_nonlinear_features_list(self, feats_list):
