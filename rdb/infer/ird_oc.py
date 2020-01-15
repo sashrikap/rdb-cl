@@ -99,7 +99,7 @@ class IRDOptimalControl(PGM):
         designer_args={},
         use_true_w=False,
         debug_true_w=False,
-        test_mode=True,  # Skip _cache_task part if true
+        test_mode=False,  # Skip _cache_task part if true
     ):
         self._rng_key = rng_key
         self._env_fn = env_fn
@@ -110,9 +110,11 @@ class IRDOptimalControl(PGM):
         self._beta = beta
         # Sampling functions
         self._prior_raw_fn = prior_log_prob_fn
-        self._prior_log_prob = None
+        # self._prior_log_prob = None
+        self._prior_log_prob = prior_log_prob_fn
         self._normalizer_raw_fn = normalizer_fn
-        self._normalizer_fn = None
+        # self._normalizer_fn = None
+        self._normalizer_fn = normalizer_fn
         ## Caching normalizers, samples and features
         self._normalizer = None
         self._samples = {}
@@ -126,7 +128,7 @@ class IRDOptimalControl(PGM):
             self._runner,
             beta,
             true_w,
-            prior_log_prob,
+            prior_log_prob_fn,
             proposal_fn,
             sample_method,
             designer_args,
@@ -159,8 +161,10 @@ class IRDOptimalControl(PGM):
         super().update_key(rng_key)
         self._sampler.update_key(rng_key)
         self._designer.update_key(rng_key)
-        self._prior_log_prob = seed(self._prior_raw_fn, rng_key)
-        self._normalizer_fn = seed(self._normalizer_raw_fn, rng_key)
+        # self._prior_log_prob = seed(self._prior_raw_fn, rng_key)
+        # self._normalizer_fn = seed(self._normalizer_raw_fn, rng_key)
+        self._prior_log_prob = seed(self._prior_log_prob, rng_key)
+        self._normalizer_fn = seed(self._normalizer_fn, rng_key)
 
     def load_samples(self,):
         pass
@@ -181,7 +185,7 @@ class IRDOptimalControl(PGM):
         sub_sample = particles.subsample(1)
         return sub_sample
 
-    def sample(self, tasks, task_names, obs, verbose=True, visualize=False):
+    def sample(self, tasks, task_names, obs, verbose=True):
         """Sample b(w) for true weights given obs.weights.
 
         Args:
@@ -225,20 +229,19 @@ class IRDOptimalControl(PGM):
                 norm_feats_sums=all_norm_feats_sum,
                 verbose=verbose,
             )
-        samples = Particles(
+        samples = self.create_particles(sample_ws, self._test_mode)
+        self._samples[last_name] = samples
+        return self._samples[last_name]
+
+    def create_particles(self, weights, test_mode=False):
+        return Particles(
             self._rng_key,
             self._env_fn,
             self._controller,
             self._runner,
-            sample_ws,
-            test_mode=self._test_mode,
+            weights,
+            test_mode=test_mode,
         )
-        self._samples[last_name] = samples
-        # if visualize:
-        #     plot_weights(
-        #         samples.weights, highlight_dict=last_obs_w, save_path="data/samples.png"
-        #     )
-        return self._samples[last_name]
 
     def _get_init_state(self, task):
         self._env.set_task(task)
@@ -251,9 +254,7 @@ class IRDOptimalControl(PGM):
         assert self._normalizer_fn is not None, "Need to set random seed"
         norm_ws = self._normalizer_fn()
         state = self._get_init_state(task)
-        normalizer = Particles(
-            self._rng_key, self._env_fn, self._controller, self._runner, norm_ws
-        )
+        normalizer = self.create_particles(norm_ws, test_mode=False)
         norm_feats = normalizer.get_features(
             task, task_name, desc="Collecting Normalizer Features"
         )
@@ -358,7 +359,8 @@ class Designer(PGM):
         self._use_true_w = use_true_w
         # Prior function
         self._prior_raw_fn = prior_log_prob_fn
-        self._prior_log_prob = None
+        # self._prior_log_prob = None
+        self._prior_log_prob = prior_log_prob_fn
         # Sampling kernel
         kernel = self._build_kernel(beta)
         self._samples = {}
@@ -372,9 +374,7 @@ class Designer(PGM):
                 sample_ws = [self._true_w]
             else:
                 sample_ws = self._sampler.sample(self._true_w, task=task)
-            samples = Particles(
-                self._rng_key, self._env_fn, self._controller, self._runner, sample_ws
-            )
+            samples = self.create_particles(sample_ws, test_mode=False)
             self._samples[task_name] = samples
         return self._samples[task_name]
 
@@ -388,10 +388,15 @@ class Designer(PGM):
     def true_w(self):
         return self._true_w
 
+    @property
+    def env(self):
+        return self._env
+
     def update_key(self, rng_key):
         super().update_key(rng_key)
         self._sampler.update_key(rng_key)
-        self._prior_log_prob = seed(self._prior_raw_fn, rng_key)
+        # self._prior_log_prob = seed(self._prior_raw_fn, rng_key)
+        self._prior_log_prob = seed(self._prior_log_prob, rng_key)
 
     def _build_kernel(self, beta):
         def likelihood_fn(true_w, sample_w, task):

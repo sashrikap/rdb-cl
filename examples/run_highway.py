@@ -59,7 +59,7 @@ if not DUMMY_ACTION:
 else:
     actions = np.zeros((T, env.udim))
 
-N = 10
+N = 50
 t1 = time.time()
 for _ in tqdm(range(N), total=N):
     env.reset()

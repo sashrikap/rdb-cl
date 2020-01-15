@@ -58,12 +58,14 @@ def create_params(template, params):
         for prod in prod_vals:
             tparam = copy.deepcopy(template)
             for key, val in zip(list_keys, prod):
-                tparam[key] = val
+                tparam[key] = [val]
             all_params.append(tparam)
         return all_params
 
 
-def plot_weights(weights_dicts, highlight_dict=None, path=None):
+def plot_weights(
+    weights_dicts, highlight_dicts=[], highlight_colors=[], path=None, title=None
+):
     PLOT_BINS = 100
     MAX_WEIGHT = 8.0
 
@@ -81,15 +83,15 @@ def plot_weights(weights_dicts, highlight_dict=None, path=None):
             alpha=0.75,
         )
         ## Highlight value
-        if highlight_dict is not None:
-            # # not good, somethings bin too low and submerged
-            # val = highlight_dict[key]
-            # bin_i = np.argmin(np.abs(bins[:-1] - val))
-            # patches[bin_i].set_fc("r")
-            val = highlight_dict[key]
-            plt.axvline(x=np.log(val), c="r")
+        for d, c in zip(highlight_dicts, highlight_colors):
+            if d is None:
+                continue
+            val = d[key]
+            plt.axvline(x=np.log(val), c=c)
         plt.title(key)
     plt.tight_layout()
+    if title is not None:
+        fig.suptitle(title)
     if path is not None:
         plt.savefig(path)
         plt.close()

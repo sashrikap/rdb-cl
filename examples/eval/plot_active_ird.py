@@ -59,14 +59,14 @@ def plot_data(data_path):
         if filename in file:
             filepath = os.path.join(dir_path, file)
             if os.path.isfile(filepath):
-                if seed in filepath:
+                if seed in filepath and not_seed not in filepath:
                     seedpaths.append(filepath)
 
     for path in seedpaths:
         seeddata.append(read_seed(path))
 
     data = {}
-    for idx, sd in enumerate(seeddata):
+    for idx, (sd, spath) in enumerate(zip(seeddata, seedpaths)):
         if not all([len(h) > MAX_LEN for h in sd.values()]):
             continue
         for method, hist in sd.items():
@@ -75,22 +75,26 @@ def plot_data(data_path):
             data[method]["perform"].append([])
             for h in hist:
                 data[method]["perform"][-1].append(h["perform"])
+            print(f"idx {idx} seed {spath} perf {hist[0]['perform']:.3f}")
             # import pdb; pdb.set_trace()
     for method, mdict in data.items():
         mdict["perform"] = cleanup(mdict["perform"])
-        print(method, mdict["perform"].shape)
+        # print(method, mdict["perform"].shape)
+        print(method, mdict["perform"])
 
     plot_perform(data_path, data)
 
 
 if __name__ == "__main__":
     N = -1
-    # seed = "[ 0 13]"
+    # seed = "[ 0 14]"
     seed = ""
+    # not_seed = "[ 0 22]"
+    not_seed = "-------"
     MAX_LEN = 8
     # MAX_LEN = 4
     # data_path = "data/191216/active_ird_exp1"
     # data_path = "data/191217/active_ird_exp1"
     # data_path = "data/200103/active_ird_exp_mid"
-    data_path = "data/200110/active_ird_exp_mid"
+    data_path = "data/200110_test_eval_all/active_ird_exp_mid"
     plot_data(data_path)

@@ -53,7 +53,6 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
         self._car2_range = np.arange(car2_range[0], car2_range[1], car_delta)
         self._grid_tasks = (self._car1_range, self._car2_range)
         self._all_tasks = list(itertools.product(self._car1_range, self._car2_range))
-        self._task_sampler = None
 
     def set_task(self, task):
         assert len(task) == 2
@@ -159,7 +158,6 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
 
     def update_key(self, rng_key):
         super().update_key(rng_key)
-        self._task_sampler = seed(random_choice, rng_seed=rng_key)
 
 
 class Week3_01(HighwayDriveWorld_Week3):

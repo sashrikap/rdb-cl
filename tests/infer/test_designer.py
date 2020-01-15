@@ -91,5 +91,5 @@ def test_designer():
     key = random.PRNGKey(0)
     designer.update_key(key)
     particles = designer.sample(task, str(task))
-    diff_rew = particles.compare_with(task, str(task), true_w, verbose=True)
+    diff_rews = particles.compare_with(task, str(task), true_w, verbose=True)
     # print(f"{NUM_DESIGNERS} designers: diff {diff_rew:.3f}")

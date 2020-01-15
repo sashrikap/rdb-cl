@@ -54,7 +54,7 @@ class ExperimentActiveIRD(object):
         num_active_tasks=4,
         num_active_sample=-1,
         fixed_candidates=None,
-        debug_belief_task=None,
+        fixed_belief_tasks=None,
         save_dir="data/active_ird_exp1",
         exp_name="active_ird_exp1",
     ):
@@ -64,6 +64,7 @@ class ExperimentActiveIRD(object):
         self._eval_server = eval_server
         # Random key & function
         self._rng_key = None
+        # self._random_choice = None
         self._random_choice = random_choice
         self._iterations = iterations
         # Evaluation
@@ -73,7 +74,7 @@ class ExperimentActiveIRD(object):
         self._num_active_tasks = num_active_tasks
         self._num_active_sample = num_active_sample
         self._fixed_candidates = fixed_candidates
-        self._debug_belief_task = debug_belief_task
+        self._fixed_belief_tasks = fixed_belief_tasks
         # Save path
         self._save_dir = save_dir
         self._exp_name = exp_name
@@ -89,15 +90,19 @@ class ExperimentActiveIRD(object):
         for key in self._acquire_fns.keys():
             self._acquire_eval_hist[key] = []
 
+    def _read_cache(self):
+        pass
+
     def update_key(self, rng_key):
         self._rng_key = rng_key
         self._model.update_key(rng_key)
-        self._random_choice = seed(random_choice, rng_key)
+        # self._random_choice = seed(random_choice, rng_key)
+        self._random_choice = seed(self._random_choice, rng_key)
         for fn in self._acquire_fns.values():
             fn.update_key(rng_key)
 
     def run(self, task):
-        """Run experiment from task.
+        """Main function 1: Run experiment from task.
 
         Args:
             task (obj): initial task; if None, start from random.
@@ -112,7 +117,8 @@ class ExperimentActiveIRD(object):
         """ First iteration """
         task_name = f"ird_{str(task)}"
         obs = self._model.simulate_designer(task, task_name)
-        belief = self._model.sample([task], [task_name], obs=[obs], visualize=True)
+        belief = self._model.sample([task], [task_name], obs=[obs])
+        # self._diagnose_belief(belief, eval_tasks, fn_key="all", itr=0)
 
         """ Build history for each acquisition function"""
         self._eval_tasks = eval_tasks
@@ -138,9 +144,6 @@ class ExperimentActiveIRD(object):
             """ Run Active IRD on Candidates """
             print(f"\nActive IRD ({self._rng_key}) iteration {it}")
             for key in self._acquire_fns.keys():
-                ## Evaluate
-                # if self._debug_belief_task is not None:
-                #    self._debug_belief(belief, self._debug_belief_task, obs)
                 belief = self._curr_belief[key]
                 obs = self._all_obs[key][-1]
                 task_name = self._all_task_names[key][-1]
@@ -158,7 +161,6 @@ class ExperimentActiveIRD(object):
                     self._all_tasks[key],
                     self._all_task_names[key],
                     obs=self._all_obs[key],
-                    visualize=True,
                 )
                 self._all_obs[key].append(next_obs)
                 self._all_beliefs[key].append(next_belief)
@@ -167,18 +169,50 @@ class ExperimentActiveIRD(object):
                 self._evaluate(key, next_belief, eval_tasks)
                 self._save(it)
 
-    def debug(self):
-        """Debug a previously recorded experiment run.
-        """
-        pass
+    def debug(self, debug_dir):
+        """Main function 2: Debug past experiments from pre-saved directory.
 
-    def _debug_belief(self, belief, task, obs):
-        print(f"Observed weights")
-        for key, val in obs.weights[0].items():
-            print(f"-> {key}: {val:.3f}")
-        task_name = f"debug_{str(task)}"
-        feats = belief.get_features(task, task_name)
-        violations = belief.get_violations(task, task_name)
+        Args:
+            debug_dir (str): checkpoint directory.
+
+        """
+        print(
+            f"\n============= Debug Experiment ({self._rng_key}): {debug_dir} ============="
+        )
+        """Run main algorithmic loop."""
+        self._load_cache(debug_dir)
+        """ First iteration """
+        self._eval_tasks = self._model.env.all_tasks
+        # self._eval_tasks = self._random_choice(
+        #     self._model.env.all_tasks, self._num_eval_tasks
+        # )
+        for it in range(0, self._iterations + 1):
+            """ Run Active IRD on Candidates """
+            print(f"\nEvaluating IRD ({self._rng_key}) iteration {it}")
+            for key in self._acquire_fns.keys():
+                belief = self._all_beliefs[key][it]
+                # Evaluate and Save
+                self._evaluate(key, belief, self._eval_tasks, use_map=True)
+                self._save(it, skip_weights=True)
+
+    def _diagnose_belief(self, belief, tasks, fn_key, itr):
+        """Diagnose proxy reward over evaluation tasks.
+
+        Diagnose principle:
+            * Look at 5 top, 5 worst and 5 medium belief particles.
+
+        """
+        diagnose_N = 5
+        debug_dir = (
+            f"{self._save_dir}/{self._exp_name}/diagnose_seed_{str(self._rng_key)}"
+        )
+        os.makedirs(debug_dir, exist_ok=True)
+        for t_i, task in tqdm(enumerate(tasks), total=len(tasks), desc="Diagnosing"):
+            task_name = f"debug_{str(task)}"
+            file_prefix = f"{debug_dir}/fn_{fn_key}_itr_{itr}_"
+            belief.diagnose(
+                task, task_name, self._model.designer.true_w, diagnose_N, file_prefix
+            )
         # if np.sum(info["metadata"]["overtake1"]) > 0:
         #    import pdb; pdb.set_trace()
 
@@ -216,19 +250,29 @@ class ExperimentActiveIRD(object):
         next_task = candidates[np.argmax(scores)]
         return next_task
 
-    def _evaluate(self, fn_name, belief, eval_tasks):
+    def _evaluate(self, fn_name, belief, eval_tasks, use_map=False):
         """Evaluate current sampled belief on eval task.
+
+        Args:
+            use_map: use MAP estimate particle, intead of whole population, to estimate.
 
         Criteria:
             * Relative Reward.
             * Violations.
 
         """
-        # COmpute belief features
+        # Compute belief features
         eval_names = [f"eval_{task}" for task in eval_tasks]
-        belief = belief.subsample(self._num_eval_sample)
+        if use_map:
+            belief = self._model.create_particles([belief.map_estimate()])
+        else:
+            belief = belief.subsample(self._num_eval_sample)
+        target = self._model.create_particles([self._model.designer.true_w])
         belief = self._eval_server.compute_tasks(
             belief, eval_tasks, eval_names, verbose=True
+        )
+        target = self._eval_server.compute_tasks(
+            target, eval_tasks, eval_names, verbose=True
         )
 
         num_violate = 0.0
@@ -238,8 +282,8 @@ class ExperimentActiveIRD(object):
             zip(eval_tasks, eval_names), total=len(eval_tasks), desc=desc
         ):
             vios = belief.get_violations(task, task_name)
-            perf = belief.compare_with(task, task_name, self._model.designer.true_w)
-            performance += perf
+            perf = belief.compare_with(task, task_name, target_particles=target)
+            performance += perf.mean()
             num_violate += np.array(list(vios.values())).sum(axis=0).mean()
 
         avg_violate = float(num_violate / len(eval_tasks))
@@ -250,23 +294,43 @@ class ExperimentActiveIRD(object):
             {"violation": avg_violate, "perform": avg_perform}
         )
 
-    def _load(self):
-        expdir = f"{self._save_dir}/{self._exp_name}"
-        eval_data = np.load(path, allow_pickle=True)
-        np_obs = eval_data["eval_hist"].item()
-        self._all_tasks = eval_data["curr_tasks"].item()
+    def _load_cache(self, save_dir):
+        """Load previous checkpoint."""
+        # Load eval data
+        eval_path = f"{save_dir}/{self._exp_name}_seed_{str(self._rng_key)}.npz"
+        eval_data = np.load(eval_path, allow_pickle=True)
         self._acquire_eval_hist = eval_data["eval_hist"].item()
-        for key in self._all_beliefs.keys():
+        self._all_candidates = eval_data["candidate_tasks"]
+        self._eval_tasks = eval_data["eval_tasks"]
+        self._all_tasks = eval_data["curr_tasks"].item()
+        np_obs = eval_data["curr_obs"].item()
+        self._all_obs = {}
+        for key in np_obs.keys():
+            self._all_obs[key] = [
+                self._model.create_particles([ws]) for ws in np_obs[key]
+            ]
+        # Load beliefs
+        self._all_beliefs = {}
+        weight_dir = f"{save_dir}/{self._exp_name}/save"
+        for key in self._acquire_fns.keys():
             self._all_beliefs[key] = []
-            for itr in range(len()):
-                fname = f"weights_seed_{str(self._rng_key)}_method_{key}_itr_{itr:02d}"
-                savepath = f"{savedir}/{fname}.npz"
-                belief = self._model.load_samples()
+            weight_files = sorted(
+                [
+                    f
+                    for f in os.listdir(weight_dir)
+                    if key in f and str(self._rng_key) in f and "n"
+                ]
+            )
+            for file in weight_files:
+                weight_filepath = os.path.join(weight_dir, file)
+                belief = self._model.create_particles([])
+                belief.load(weight_filepath)
                 self._all_beliefs[key].append(belief)
 
-    def _save(self, itr):
-        expdir = f"{self._save_dir}/{self._exp_name}"
-        os.makedirs(expdir, exist_ok=True)
+    def _save(self, itr, skip_weights=False):
+        """Save checkpoint."""
+        exp_dir = f"{self._save_dir}/{self._exp_name}"
+        os.makedirs(exp_dir, exist_ok=True)
         ## Save evaluation history
         np_obs = {}
         for key in self._all_obs.keys():
@@ -284,14 +348,21 @@ class ExperimentActiveIRD(object):
             np.savez(f, **data)
 
         ## Save belief sample information
-        figdir = f"{self._save_dir}/{self._exp_name}/plots"
-        savedir = f"{self._save_dir}/{self._exp_name}/save"
-        os.makedirs(figdir, exist_ok=True)
-        os.makedirs(savedir, exist_ok=True)
+        fig_dir = f"{self._save_dir}/{self._exp_name}/plots"
+        save_dir = f"{self._save_dir}/{self._exp_name}/save"
+        os.makedirs(fig_dir, exist_ok=True)
+        os.makedirs(save_dir, exist_ok=True)
         for key in self._all_beliefs.keys():
             for itr, belief in enumerate(self._all_beliefs[key]):
                 fname = f"weights_seed_{str(self._rng_key)}_method_{key}_itr_{itr:02d}"
-                savepath = f"{savedir}/{fname}.npz"
-                figpath = f"{figdir}/{fname}.png"
-                belief.save(savepath)
-                belief.visualize(figpath, self._model.designer.true_w)
+                savepath = f"{save_dir}/{fname}.npz"
+                figpath = f"{fig_dir}/{fname}.png"
+                if itr < len(np_obs[key]):
+                    obs_w = np_obs[key][itr]
+                else:
+                    obs_w = None
+                if not skip_weights:
+                    belief.save(savepath)
+                belief.visualize(
+                    figpath, true_w=self._model.designer.true_w, obs_w=obs_w
+                )

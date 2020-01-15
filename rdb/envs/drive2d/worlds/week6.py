@@ -165,7 +165,6 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
 
     def update_key(self, rng_key):
         super().update_key(rng_key)
-        self._task_sampler = seed(random_choice, rng_seed=rng_key)
 
     @property
     def features_keys(self):

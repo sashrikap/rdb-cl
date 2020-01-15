@@ -81,6 +81,10 @@ def load_data(env, exp_dir, exp_name):
                             ]
                             if not sum(equals) > 0:
                                 print(f"bad key {str(rng_key)} fn {fn_key} iter {itr}")
+                                assert False
+            eval_data["candidate_tasks"] = CAND_TASKS
+        # More missing fields
+        eval_data["seed"] = str(rng_key)
 
         all_data[str(rng_key)] = (rng_key, eval_data, weight_samples)
     return all_data
@@ -88,7 +92,12 @@ def load_data(env, exp_dir, exp_name):
 
 def save_data(env, all_data, exp_dir, exp_name):
     for key_str, (rng_key, eval_data, weight_samples) in all_data.items():
-        print(rng_key)
+        # Save eval data
+        path = f"{exp_dir}/{exp_name}/{exp_name}_seed_{str(rng_key)}.npz"
+        with open(path, "wb+") as f:
+            np.savez(f, **eval_data)
+
+        # Save sample data
 
 
 if __name__ == "__main__":
@@ -110,4 +119,4 @@ if __name__ == "__main__":
     TEST_DATA = data2
     data = load_data(env, EXP_DIR, EXP_NAME)
 
-    # save_data(env, data, EXP_DIR, EXP_NAME)
+    save_data(env, data, EXP_DIR, EXP_NAME)

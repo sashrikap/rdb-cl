@@ -6,6 +6,8 @@ from tqdm import tqdm
 
 def launch(params_dict):
     locals().update(params_dict)
+    print(params_dict)
+    save_params("examples/acquisition_params.yaml", params_dict)
 
     filter_ext = (".pyc", ".log", ".git", ".mp4", ".npz", ".ipynb")
 
@@ -29,6 +31,7 @@ def launch(params_dict):
             gcp_log_path="rss-logs",  # Folder to store log files under
             terminate_on_end=True,
         )
+        # By default, /rdb/rdb -> /dar_payload/rdb/rdb
         gcp_mnt = mount.MountLocal(
             local_dir="../rdb", mount_point="./rdb", filter_ext=filter_ext
         )
@@ -41,7 +44,8 @@ def launch(params_dict):
 
     # This will run locally
     launch_api.run_command(
-        command="bash /dar_payload/rdb/examples/cloud/run_setup.sh && python ./rdb/examples/run_acquisition.py --GCP_MODE",
+        command="bash /dar_payload/rdb/examples/cloud/run_acquisition.sh",
+        # command="echo 'check out' && ls /gcp_input/200110_test_eval_all",
         # command="pwd && touch good.txt",
         # command="bash ./rdb/examples/cloud/run_pyglet.sh",
         mounts=mounts,
@@ -58,7 +62,12 @@ if __name__ == "__main__":
     if LOCAL_MODE:
         launch(template)
     else:
-        params = {"RANDOM_KEYS": list(range(26, 36)), "NUM_EVAL_WORKERS": 4}
+        # params = {"RANDOM_KEYS": list(range(26, 36)), "NUM_EVAL_WORKERS": 8}
+        params = {
+            "RANDOM_KEYS": [9, 10, 13, 14, 15, 17, 18, 19, 20, 21, 22, 23, 24],
+            "NUM_EVAL_WORKERS": 8,
+        }
+        # params = {"RANDOM_KEYS": [9], "NUM_EVAL_WORKERS": 8}
         all_params = create_params(template, params)
         for param in tqdm(all_params, desc="Launching jobs"):
             launch(param)

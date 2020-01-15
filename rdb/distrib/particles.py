@@ -17,6 +17,9 @@ class ParticleWorkerSingle(object):
         self._controller, self._runner = controller_fn(self._env)
         self._compute_result = None
         self._initialized = False
+        self._particles = Particles(
+            None, self._env_fn, self._controller, self._runner, sample_ws=[]
+        )
 
     def initialize(self):
         self._env.reset()
@@ -30,16 +33,11 @@ class ParticleWorkerSingle(object):
         return self._initialized
 
     def compute(self, rng_key, weights, task, task_name, test_mode=False):
-        particles = Particles(
-            rng_key,
-            self._env_fn,
-            self._controller,
-            self._runner,
-            weights,
-            test_mode=test_mode,
-        )
-        particles.get_features(task, task_name)
-        self._compute_result = particles.dump_task(task, task_name)
+        self._particles.test_mode = test_mode
+        self._particles.update_key(rng_key)
+        self._particles.update_weights(weights)
+        self._particles.get_features(task, task_name)
+        self._compute_result = self._particles.dump_task(task, task_name)
         return self._compute_result
 
     def get_result(self):

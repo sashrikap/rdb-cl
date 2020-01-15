@@ -100,6 +100,7 @@ def main():
         sample_args={"num_warmups": NUM_WARMUPS, "num_samples": NUM_SAMPLES},
         designer_args={"num_warmups": NUM_WARMUPS, "num_samples": NUM_DESIGNERS},
         use_true_w=USER_TRUE_W,
+        test_mode=TEST_MODE,
     )
 
     """ Active acquisition function for experiment """
@@ -116,7 +117,8 @@ def main():
         "random": ActiveRandom(rng_key=None, model=ird_model),
     }
 
-    SAVE_ROOT = "data" if not GCP_MODE else "/gcp_output"  # Don't change this line
+    SAVE_ROOT = "data" if not GCP_MODE else "/gcp_output"  # Don'tchange this line
+    DEBUG_ROOT = "data" if not GCP_MODE else "/gcp_input"
     experiment = ExperimentActiveIRD(
         ird_model,
         acquire_fns,
@@ -132,15 +134,22 @@ def main():
         # debug_belief_task=(-0.2, 0.5),
         # debug_belief_task=None,
         # save_dir=f"{SAVE_ROOT}/191221_true",
-        save_dir=f"{SAVE_ROOT}/200110_test",
+        # save_dir=f"{SAVE_ROOT}/200110_test_eval",
+        save_dir=f"{SAVE_ROOT}/200110_test_eval_all",
         exp_name="active_ird_exp_mid",
     )
 
     """ Experiment """
+    # for ki in RANDOM_KEYS:
+    #     key = random.PRNGKey(ki)
+    #     experiment.update_key(key)
+    #     experiment.run(TASK)
+
+    """ Debug """
     for ki in RANDOM_KEYS:
         key = random.PRNGKey(ki)
         experiment.update_key(key)
-        experiment.run(TASK)
+        experiment.debug(f"{DEBUG_ROOT}/200110_test_eval_all")
 
 
 if __name__ == "__main__":
@@ -151,19 +160,30 @@ if __name__ == "__main__":
     # ENV_NAME = "Week3_02-v0"
     GCP_MODE = args.GCP_MODE
     ENV_NAME = "Week6_01-v0"
+    TEST_MODE = False
 
     # Load parameters
-    params = load_params("examples/acquisition_params.yaml")
+    if not GCP_MODE:
+        params = load_params("examples/acquisition_params.yaml")
+    else:
+        params = load_params("/dar_payload/rdb/examples/acquisition_params.yaml")
     locals().update(params)
     if not GCP_MODE:
         # RANDOM_KEYS = [1, 2, 3, 4]  # new macbook
         # RANDOM_KEYS = [1, 9, 10, 13]  # test
         # RANDOM_KEYS = [9, 10]  # test
-        # RANDOM_KEYS = [17, 18, 19, 20]
-        RANDOM_KEYS = [20]
-        NUM_EVAL_WORKERS = 1
-        # RANDOM_KEYS = [23, 24]
-        # NUM_EVAL_WORKERS = 4
+        # RANDOM_KEYS = [13, 14, 15]
+        # RANDOM_KEYS = [17]
+        # RANDOM_KEYS = [18]
+        # RANDOM_KEYS = [19]
+        # RANDOM_KEYS = [20]
+        # RANDOM_KEYS = [21]
+        # RANDOM_KEYS = [22]
+        # RANDOM_KEYS = [23]
+        RANDOM_KEYS = [24]
+        NUM_EVAL_WORKERS = 4
+        # RANDOM_KEYS = [9, 10, 13, 14, 15, 17, 18, 19, 20, 21, 22, 23, 24]
+        # NUM_EVAL_WORKERS = 8
         # RANDOM_KEYS = [9, 10, 11, 12] # alienware
         # NUM_EVAL_WORKERS = 4
         # RANDOM_KEYS = [13, 14, 15, 16] # dell

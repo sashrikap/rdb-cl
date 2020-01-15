@@ -16,6 +16,7 @@ from rdb.exps.utils import Profiler
 import jax.numpy as np
 import numpy as onp
 import copy
+import math
 
 
 class Particles(object):
@@ -23,6 +24,7 @@ class Particles(object):
 
     Args:
         sample_ws (list)
+        rng_key (jax.random): if None, need to call `particles.update_key()`
 
     """
 
@@ -45,12 +47,27 @@ class Particles(object):
         self._rng_key = rng_key
         self._test_mode = test_mode
         ## Cache data
+        self.build_cache()
+        ## Sampling function
+        if rng_key is None:
+            self._random_choice = None
+        else:
+            self._random_choice = seed(random_choice, rng_key)
+
+    def update_key(self, rng_key):
+        self._rng_key = rng_key
+        self._random_choice = seed(random_choice, rng_key)
+
+    def build_cache(self):
         self._sample_feats = {}
         self._sample_feats_sum = {}
         self._sample_violations = {}
         self._sample_actions = {}
-        ## Sampling function
-        self._random_choice = seed(random_choice, rng_key)
+
+    def update_weights(self, sample_ws=None, sample_concate_ws=None):
+        self._sample_ws = sample_ws
+        self._sample_concate_ws = sample_concate_ws
+        self.build_cache()
 
     @property
     def rng_key(self):
@@ -59,6 +76,10 @@ class Particles(object):
     @property
     def test_mode(self):
         return self._test_mode
+
+    @test_mode.setter
+    def test_mode(self, mode):
+        self._test_mode = mode
 
     @property
     def weights(self):
@@ -89,6 +110,7 @@ class Particles(object):
             * Simulate designer.
 
         """
+        assert self._random_choice is not None, "Need to initialize"
         if num_samples is None or num_samples < 0:
             return self
         else:
@@ -208,9 +230,15 @@ class Particles(object):
             num_violate += num
         return float(num_violate) / len(self.weights)
 
-    def compare_with(self, task, task_name, target_w, verbose=False):
+    def compare_with(
+        self, task, task_name, target_w=None, target_particles=None, verbose=False
+    ):
         """Compare with a set of target weights (usually true weights). Returns log
         prob ratio of reward, measured by target w.
+
+        Args:
+            target_w list(dict): provide this or `target_particles`
+            target_particles (Particles): provide this or `target_w`
 
         Requires:
             * compute_features
@@ -219,29 +247,37 @@ class Particles(object):
         if self._test_mode:
             return 0.0
 
-        this_feats_sum = self.get_features_sum(task, task_name)
-        this_cost = multiply_dict_by_keys(target_w, this_feats_sum)
+        if target_particles is None:
+            assert target_w is not None, "Must provide a target weights"
+            target_particles = Particles(
+                self._rng_key,
+                self._env_fn,
+                self._controller,
+                self._runner,
+                [target_w],
+                test_mode=self._test_mode,
+            )
+        else:
+            assert target_particles is not None, "Must provide a target weights"
+            target_w = target_particles.weights[0]
+        import pdb
 
-        target = Particles(
-            self._rng_key,
-            self._env_fn,
-            self._controller,
-            self._runner,
-            [target_w],
-            test_mode=self._test_mode,
-        )
-        target_feats_sum = target.get_features_sum(task, task_name)
+        pdb.set_trace()
+
+        this_feats_sum = self.get_features_sum(task, task_name)
+        this_costs = multiply_dict_by_keys(target_w, this_feats_sum)
+        target_feats_sum = target_particles.get_features_sum(task, task_name)
         target_cost = multiply_dict_by_keys(target_w, target_feats_sum)
 
-        diff_cost = subtract_dict_by_keys(this_cost, target_cost)
-        diff_rews = -1 * onp.sum(list(diff_cost.values()), axis=0)
+        diff_costs = subtract_dict_by_keys(this_costs, target_cost)
+        diff_rews = -1 * onp.sum(list(diff_costs.values()), axis=0)
         # if diff_rew > 0:
         #    import pdb; pdb.set_trace()
         if verbose:
             print(
                 f"Diff rew {len(diff_rews)} items: mean {diff_rews.mean():.3f} std {diff_rews.std():.3f} max {diff_rews.max():.3f} min {diff_rews.min():.3f}"
             )
-        return diff_rews.mean()
+        return diff_rews
 
     def _get_init_state(self, task):
         if self._env is None:
@@ -253,6 +289,9 @@ class Particles(object):
 
     def resample(self, probs):
         """Resample from particles using list of probs. Similar to particle filter update."""
+        assert (
+            self._random_choice is not None
+        ), "Must properly initialize particle weights"
         N = len(self.weights)
         idxs = self._random_choice(onp.arange(N), num=N, probs=probs, replacement=True)
         new_concate_ws = dict()
@@ -269,7 +308,7 @@ class Particles(object):
         return new_ps
 
     def entropy(self, method="histogram", bins=50, ranges=(-5.0, 5.0)):
-        """Estimate entropy
+        """Estimate entropy.
 
         Note:
             * Gaussian histogram may cause instability
@@ -308,11 +347,94 @@ class Particles(object):
                 entropy += ent
         return entropy
 
-    def visualize(self, path, true_w):
+    def map_estimate(self, method="histogram", bins=50, ranges=(-5.0, 5.0)):
+        """Find maximum a posteriori estimate from current samples.
+
+        Note:
+            * weights are high dimensional. We approximately estimate
+            density by summing bucket counts.
+        """
+        data = onp.array(list(self.concate_weights.values()))
+        # Omit first weight
+        data = onp.log(data[1:, :])
+
+        if method == "histogram":
+            bins = onp.linspace(*ranges, bins)
+            probs = onp.zeros(data.shape[1])
+            for row in data:
+                which_bins = onp.digitize(row, bins)
+                unique_vals, indices, counts = onp.unique(
+                    which_bins, return_index=True, return_counts=True
+                )
+                for val, ct in zip(unique_vals, counts):
+                    val_bins_idx = which_bins == val
+                    probs[val_bins_idx] += float(ct) / len(row)
+            map_idx = onp.argmax(probs)
+            map_weight = self.weights[map_idx]
+            return map_weight
+        else:
+            raise NotImplementedError
+
+    def diagnose(self, task, task_name, target_w, diagnose_N, file_prefix, desc=None):
+        """ Look at top/mid/bottom * diagnose_N particles and their performance. Record videos.
+
+        Args:
+            file_prefix: include directory info e.g. "data/exp_xxx/save_"
+
+        """
+        assert len(self.weights) >= diagnose_N * 3
+        diff_rews = self.compare_with(task, task_name, target_w)
+        ranks = onp.argsort(diff_rews)
+        top_N_idx = ranks[-diagnose_N:]
+        mid_N_idx = ranks[
+            math.floor((len(ranks) - diagnose_N) / 2) : math.floor(
+                (len(ranks) + diagnose_N) / 2
+            )
+        ]
+        low_N_idx = list(ranks[:diagnose_N])
+        top_N_idx, mid_N_idx, low_N_idx = (
+            list(top_N_idx),
+            list(mid_N_idx),
+            list(low_N_idx),
+        )
+        actions = np.array(self.get_actions(task, task_name))
+        top_rews, top_acs = diff_rews[top_N_idx], actions[top_N_idx]
+        mid_rews, mid_acs = diff_rews[mid_N_idx], actions[mid_N_idx]
+        low_rews, low_acs = diff_rews[low_N_idx], actions[low_N_idx]
+        mean_diff = diff_rews.mean()
+        init_state = self._get_init_state(task)
+
+        for label, group_rews, group_acs in zip(
+            ["top", "mid", "low"],
+            [top_rews, mid_rews, low_rews],
+            [top_acs, mid_acs, low_acs],
+        ):
+            for rew, acs in zip(group_rews, group_acs):
+                file_path = (
+                    f"{file_prefix}lable_{label}_mean_{mean_diff:.3f}_rew_{rew:.3f}.mp4"
+                )
+                # Collect proxy reward paths
+                self._runner.collect_mp4(init_state, acs, path=file_path)
+            # Collect true reward paths
+            target_acs = self._controller(init_state, weights=target_w)
+            target_path = f"{file_prefix}lable_{label}_mean_{mean_diff:.3f}_true.mp4"
+            self._runner.collect_mp4(init_state, target_acs, path=target_path)
+
+    def record(self, task, task_name, actions, filepath):
+        pass
+
+    def visualize(self, path, true_w, obs_w):
         """Visualize weight belief distribution in histogram."""
         if self._test_mode:
             return
-        plot_weights(self.weights, highlight_dict=true_w, path=path)
+        map_w = self.map_estimate()
+        plot_weights(
+            self.weights,
+            highlight_dicts=[true_w, obs_w, map_w],
+            highlight_colors=["r", "k", "m"],
+            path=path,
+            title="Proxy Reward; true (red), obs (black) map (magenta)",
+        )
 
     def save(self, path):
         """Save weight belief particles as npz file."""

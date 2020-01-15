@@ -154,11 +154,13 @@ class ActiveRandom(ActiveInfoGain):
     def __init__(self, rng_key, model, method="random", debug=False):
         super().__init__(rng_key, model, beta=0.0, debug=debug)
         self._method = method
+        # self._random_uniform = None
         self._random_uniform = random_uniform
 
     def update_key(self, rng_key):
         self._rng_key = rng_key
-        self._random_uniform = seed(random_uniform, self._rng_key)
+        # self._random_uniform = seed(random_uniform, self._rng_key)
+        self._random_uniform = seed(self._random_uniform, self._rng_key)
 
     def __call__(self, next_task, next_task_name, belief, obs, verbose=True):
         """Random score

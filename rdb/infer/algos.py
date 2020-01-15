@@ -99,7 +99,8 @@ class MetropolisHasting(Inference):
     def __init__(self, rng_key, kernel, num_samples, num_warmups, proposal_fn):
         super().__init__(rng_key, kernel, num_samples, num_warmups)
         self._proposal_raw_fn = proposal_fn
-        self._proposal = None
+        # self._proposal = None
+        self._proposal = proposal_fn
         self._coin_flip = None
 
     def _mh_step(self, obs, state, log_prob, *args, **kwargs):
@@ -125,7 +126,8 @@ class MetropolisHasting(Inference):
 
     def update_key(self, rng_key):
         self._rng_key = rng_key
-        self._proposal = seed(self._proposal_raw_fn, rng_seed=rng_key)
+        # self._proposal = seed(self._proposal_raw_fn, rng_seed=rng_key)
+        self._proposal = seed(self._proposal, rng_seed=rng_key)
         self._coin_flip = self._create_coin_flip()
 
     def sample(
