@@ -21,7 +21,8 @@ def launch(params_dict):
         launch_mode = mode.GCPMode(
             # zone="us-west1-a",
             # instance_type="n1-standard-4",
-            zone="us-west2-a",
+            zone="us-west2-a",  # 40 c2 isntance
+            # zone="us-east1-b",  # 8 c2 isntance
             instance_type="c2-standard-4",
             preemptible=True,
             gcp_image="active-ird-rss-v01",
@@ -64,8 +65,10 @@ if __name__ == "__main__":
     else:
         # params = {"RANDOM_KEYS": list(range(26, 36)), "NUM_EVAL_WORKERS": 8}
         params = {
-            "RANDOM_KEYS": [9, 10, 13, 14, 15, 17, 18, 19, 20, 21, 22, 23, 24],
-            "NUM_EVAL_WORKERS": 8,
+            # "RANDOM_KEYS": list(range(6)),
+            "RANDOM_KEYS": list(range(8)),
+            # "RANDOM_KEYS": [20, 21, 22, 23, 24],
+            "NUM_EVAL_WORKERS": 16,
         }
         # params = {"RANDOM_KEYS": [9], "NUM_EVAL_WORKERS": 8}
         all_params = create_params(template, params)

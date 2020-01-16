@@ -123,7 +123,7 @@ class IRDOptimalControl(PGM):
         # assume designer uses the same beta, prior and prior proposal
         self._designer = Designer(
             rng_key,
-            self._env_fn,
+            self.env_fn,
             self._controller,
             self._runner,
             beta,
@@ -374,7 +374,9 @@ class Designer(PGM):
                 sample_ws = [self._true_w]
             else:
                 sample_ws = self._sampler.sample(self._true_w, task=task)
-            samples = self.create_particles(sample_ws, test_mode=False)
+            samples = Particles(
+                self._rng_key, self._env_fn, self._controller, self._runner, sample_ws
+            )
             self._samples[task_name] = samples
         return self._samples[task_name]
 
@@ -410,3 +412,39 @@ class Designer(PGM):
             return log_prob
 
         return likelihood_fn
+
+
+class DesignerInformed(Designer):
+    """Simulated designer module. Select's better "informed" proxies.
+    """
+
+    def __init__(
+        self,
+        rng_key,
+        env_fn,
+        controller,
+        runner,
+        beta,
+        true_w,
+        prior_log_prob_fn,
+        proposal_fn,
+        sample_method,
+        sampler_args,
+        use_true_w=False,
+        num_informed_tasks=3,
+    ):
+        super().__init__(
+            self,
+            rng_key,
+            env_fn,
+            controller,
+            runner,
+            beta,
+            true_w,
+            prior_log_prob_fn,
+            proposal_fn,
+            sample_method,
+            sampler_args,
+            use_true_w,
+        )
+        self._num_informed_tasks = num_informed_tasks

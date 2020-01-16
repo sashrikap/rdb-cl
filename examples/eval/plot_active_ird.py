@@ -5,6 +5,7 @@ import seaborn as sns
 
 sns.set()
 import matplotlib.pyplot as plt
+from jax import random
 
 
 def read_seed(path):
@@ -24,15 +25,15 @@ def cleanup(arr):
         for a in arr:
             # if len(a) == max_len:
             #     arrs.append(a)
-            if len(a) > MAX_LEN:
-                arrs.append(a[:MAX_LEN])
+            if len(a) > MAX_LEN + PADDING:
+                arrs.append(a[PADDING : PADDING + MAX_LEN])
                 # arrs.append(a[:3])
         # return arrs[:2]
         # print(np.array(arrs))
         return np.array(arrs)[:N, :]
 
 
-def plot_perform(path, data):
+def plot_perform(data_dir, data):
     sns.set_palette("husl")
     colors = "gbkr"
     for i, (method, mdict) in enumerate(data.items()):
@@ -45,29 +46,29 @@ def plot_perform(path, data):
     plt.xlabel("Iteration")
     plt.ylabel("Log ratio")
     plt.title("Log Relative Performance")
-    plt.savefig(os.path.join(path, "performance.png"))
+    plt.savefig(os.path.join(data_dir, "performance.png"))
     plt.show()
     # print(data)
 
 
-def plot_data(data_path):
+def plot_data(exp_dir, exp_name):
     seedpaths = []
     seeddata = []
-    dir_path = os.path.dirname(data_path)
-    filename = os.path.basename(data_path)
-    for file in sorted(os.listdir(dir_path)):
-        if filename in file:
-            filepath = os.path.join(dir_path, file)
-            if os.path.isfile(filepath):
-                if seed in filepath and not_seed not in filepath:
-                    seedpaths.append(filepath)
+    for file in sorted(os.listdir(exp_dir)):
+        if exp_name in file:
+            exp_path = os.path.join(exp_dir, file)
+            if os.path.isfile(exp_path):
+                use_bools = [str(s) in exp_path for s in use_seeds]
+                not_bools = [str(s) in exp_path for s in not_seeds]
+                if onp.any(use_bools) and not onp.any(not_bools):
+                    seedpaths.append(exp_path)
 
-    for path in seedpaths:
-        seeddata.append(read_seed(path))
+    for exp_path in seedpaths:
+        seeddata.append(read_seed(exp_path))
 
     data = {}
     for idx, (sd, spath) in enumerate(zip(seeddata, seedpaths)):
-        if not all([len(h) > MAX_LEN for h in sd.values()]):
+        if not all([len(h) > PADDING + MAX_LEN for h in sd.values()]):
             continue
         for method, hist in sd.items():
             if method not in data.keys():
@@ -75,26 +76,31 @@ def plot_data(data_path):
             data[method]["perform"].append([])
             for h in hist:
                 data[method]["perform"][-1].append(h["perform"])
-            print(f"idx {idx} seed {spath} perf {hist[0]['perform']:.3f}")
+            print(
+                f"idx {idx} seed {spath} perf {hist[0]['perform']:.3f}, {hist[1]['perform']:.3f}"
+            )
             # import pdb; pdb.set_trace()
     for method, mdict in data.items():
         mdict["perform"] = cleanup(mdict["perform"])
-        # print(method, mdict["perform"].shape)
-        print(method, mdict["perform"])
+        print(method, mdict["perform"].shape)
+        # print(method, mdict["perform"])
 
-    plot_perform(data_path, data)
+    plot_perform(exp_dir, data)
 
 
 if __name__ == "__main__":
     N = -1
-    # seed = "[ 0 14]"
-    seed = ""
-    # not_seed = "[ 0 22]"
-    not_seed = "-------"
+    use_seeds = [9, 10, 13, 14, 15, 17, 18, 19]
+    not_seeds = [20, 21, 22, 23, 24]
     MAX_LEN = 8
+    PADDING = 0
+
+    use_seeds = [str(random.PRNGKey(si)) for si in use_seeds]
+    not_seeds = [str(random.PRNGKey(si)) for si in not_seeds]
     # MAX_LEN = 4
     # data_path = "data/191216/active_ird_exp1"
     # data_path = "data/191217/active_ird_exp1"
     # data_path = "data/200103/active_ird_exp_mid"
-    data_path = "data/200110_test_eval_all/active_ird_exp_mid"
-    plot_data(data_path)
+    exp_dir = "data/200110_test_eval_all/active_ird_exp_mid"
+    exp_name = "active_ird_exp_mid"
+    plot_data(exp_dir, exp_name)

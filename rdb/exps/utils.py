@@ -51,6 +51,8 @@ def create_params(template, params):
         if type(val) == list and len(val) > 0:
             list_keys.append(key)
             list_vals.append(val)
+        else:
+            template[key] = val
     if len(list_keys) == 0:
         return [template]
     else:

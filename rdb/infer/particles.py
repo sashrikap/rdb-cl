@@ -260,9 +260,6 @@ class Particles(object):
         else:
             assert target_particles is not None, "Must provide a target weights"
             target_w = target_particles.weights[0]
-        import pdb
-
-        pdb.set_trace()
 
         this_feats_sum = self.get_features_sum(task, task_name)
         this_costs = multiply_dict_by_keys(target_w, this_feats_sum)
@@ -347,7 +344,7 @@ class Particles(object):
                 entropy += ent
         return entropy
 
-    def map_estimate(self, method="histogram", bins=50, ranges=(-5.0, 5.0)):
+    def map_estimate(self, num_map=1, method="histogram", bins=50, ranges=(-5.0, 5.0)):
         """Find maximum a posteriori estimate from current samples.
 
         Note:
@@ -369,9 +366,9 @@ class Particles(object):
                 for val, ct in zip(unique_vals, counts):
                     val_bins_idx = which_bins == val
                     probs[val_bins_idx] += float(ct) / len(row)
-            map_idx = onp.argmax(probs)
-            map_weight = self.weights[map_idx]
-            return map_weight
+            map_idxs = onp.argsort(-1 * probs)[:num_map]
+            map_weights = [self.weights[idx] for idx in map_idxs]
+            return map_weights
         else:
             raise NotImplementedError
 
@@ -424,7 +421,12 @@ class Particles(object):
         pass
 
     def visualize(self, path, true_w, obs_w):
-        """Visualize weight belief distribution in histogram."""
+        """Visualize weight belief distribution in histogram.
+
+        TODO:
+            * Slow, takes ~5s for 1000 weight particles
+
+        """
         if self._test_mode:
             return
         map_w = self.map_estimate()

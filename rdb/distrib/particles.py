@@ -1,8 +1,12 @@
 """Distributed evaluator class. Used for parallel evaluation.
 
+Useful for:
+    * Evaluate each belief point on high # of tasks
+
 General workflow:
     * Experiment -> ParticleServer -> ParticleWorker
       Experiment <- ParticleServer <-
+
 """
 import ray
 import math

@@ -54,13 +54,6 @@ def main():
     # task = (-0.4, 0.3)
 
     """ Prior sampling & likelihood functions for PGM """
-    # log_prior_dict = {
-    #     "dist_cars": dist.Uniform(0.0, 0.01),
-    #     "dist_lanes": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
-    #     "dist_fences": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
-    #     "speed": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
-    #     "control": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
-    # }
     log_prior_dict = {
         "dist_cars": dist.Uniform(0.0, 0.01),
         "dist_lanes": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
@@ -116,6 +109,10 @@ def main():
         ),
         "random": ActiveRandom(rng_key=None, model=ird_model),
     }
+    keys = list(acquire_fns.keys())
+    for key in keys:
+        if key not in ACTIVE_FNS:
+            del acquire_fns[key]
 
     SAVE_ROOT = "data" if not GCP_MODE else "/gcp_output"  # Don'tchange this line
     DEBUG_ROOT = "data" if not GCP_MODE else "/gcp_input"
@@ -128,28 +125,26 @@ def main():
         num_eval_sample=NUM_EVAL_SAMPLES,
         num_active_tasks=NUM_ACTIVE_TASKS,
         num_active_sample=NUM_ACTIVE_SAMPLES,
+        num_map_estimate=NUM_MAP,
         # Hard coded candidates
         # fixed_candidates=[(-0.4, -0.7), (-0.2, 0.5)],
-        # fixed_candidates=[(-0.2, 0.5)],
         # debug_belief_task=(-0.2, 0.5),
-        # debug_belief_task=None,
-        # save_dir=f"{SAVE_ROOT}/191221_true",
-        # save_dir=f"{SAVE_ROOT}/200110_test_eval",
-        save_dir=f"{SAVE_ROOT}/200110_test_eval_all",
-        exp_name="active_ird_exp_mid",
+        save_dir=f"{SAVE_ROOT}/{SAVE_NAME}",
+        # exp_name="active_ird_exp_mid",
+        exp_name=f"{EXP_NAME}",
     )
 
     """ Experiment """
-    # for ki in RANDOM_KEYS:
-    #     key = random.PRNGKey(ki)
-    #     experiment.update_key(key)
-    #     experiment.run(TASK)
-
-    """ Debug """
     for ki in RANDOM_KEYS:
         key = random.PRNGKey(ki)
         experiment.update_key(key)
-        experiment.debug(f"{DEBUG_ROOT}/200110_test_eval_all")
+        experiment.run(TASK)
+
+    """ Debug """
+    # for ki in RANDOM_KEYS:
+    #     key = random.PRNGKey(ki)
+    #     experiment.update_key(key)
+    #     experiment.debug(f"{DEBUG_ROOT}/200110")
 
 
 if __name__ == "__main__":
@@ -157,35 +152,16 @@ if __name__ == "__main__":
     parser.add_argument("--GCP_MODE", action="store_true")
     args = parser.parse_args()
 
-    # ENV_NAME = "Week3_02-v0"
     GCP_MODE = args.GCP_MODE
-    ENV_NAME = "Week6_01-v0"
     TEST_MODE = False
 
     # Load parameters
     if not GCP_MODE:
-        params = load_params("examples/acquisition_params.yaml")
+        params = load_params("examples/acquisition_template.yaml")
     else:
         params = load_params("/dar_payload/rdb/examples/acquisition_params.yaml")
     locals().update(params)
     if not GCP_MODE:
-        # RANDOM_KEYS = [1, 2, 3, 4]  # new macbook
-        # RANDOM_KEYS = [1, 9, 10, 13]  # test
-        # RANDOM_KEYS = [9, 10]  # test
-        # RANDOM_KEYS = [13, 14, 15]
-        # RANDOM_KEYS = [17]
-        # RANDOM_KEYS = [18]
-        # RANDOM_KEYS = [19]
-        # RANDOM_KEYS = [20]
-        # RANDOM_KEYS = [21]
-        # RANDOM_KEYS = [22]
-        # RANDOM_KEYS = [23]
         RANDOM_KEYS = [24]
         NUM_EVAL_WORKERS = 4
-        # RANDOM_KEYS = [9, 10, 13, 14, 15, 17, 18, 19, 20, 21, 22, 23, 24]
-        # NUM_EVAL_WORKERS = 8
-        # RANDOM_KEYS = [9, 10, 11, 12] # alienware
-        # NUM_EVAL_WORKERS = 4
-        # RANDOM_KEYS = [13, 14, 15, 16] # dell
-        # NUM_EVAL_WORKERS = 2
     main()

@@ -1,4 +1,4 @@
-"""Acquisition Procedures.
+"""Acquisition Procedures for ExperimentActiveIRD.
 
 Given a new task, compute a saliency score for the new task.
 

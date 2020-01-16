@@ -19,11 +19,10 @@ source activate saferew
 pip install -e ./rdb
 
 ## Set up input folder
-#wget https://www.dropbox.com/s/a0spfbfrl557fe9/200110_test_eval_all.tar.gz
-wget https://storage.googleapis.com/active-ird-experiments/rss-logs/logs/input/200110_test_eval_all.tar.gz
-tar xvzf 200110_test_eval_all.tar.gz
-mkdir /gcp_input
-mv 200110_test_eval_all /gcp_input/
+# wget https://storage.googleapis.com/active-ird-experiments/rss-logs/logs/input/200110_test_eval_all.tar.gz
+# tar xvzf 200110_test_eval_all.tar.gz
+# mkdir /gcp_input
+# mv 200110_test_eval_all /gcp_input/
 
 ## Run experiment
 # touch /gcp_output/test.txt

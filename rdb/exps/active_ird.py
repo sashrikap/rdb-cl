@@ -22,6 +22,7 @@ from rdb.infer.particles import Particles
 from rdb.exps.utils import Profiler
 from numpyro.handlers import seed
 from tqdm.auto import tqdm
+from time import time
 import jax.numpy as np
 import numpy as onp
 import copy
@@ -53,6 +54,7 @@ class ExperimentActiveIRD(object):
         num_eval_sample=5,
         num_active_tasks=4,
         num_active_sample=-1,
+        num_map_estimate=4,
         fixed_candidates=None,
         fixed_belief_tasks=None,
         save_dir="data/active_ird_exp1",
@@ -70,6 +72,7 @@ class ExperimentActiveIRD(object):
         # Evaluation
         self._num_eval_tasks = num_eval_tasks
         self._num_eval_sample = num_eval_sample
+        self._num_map_estimate = num_map_estimate
         # Active Task proposal
         self._num_active_tasks = num_active_tasks
         self._num_active_sample = num_active_sample
@@ -78,6 +81,7 @@ class ExperimentActiveIRD(object):
         # Save path
         self._save_dir = save_dir
         self._exp_name = exp_name
+        self._last_time = time()
 
     def _build_cache(self):
         """ Build cache data """
@@ -182,7 +186,8 @@ class ExperimentActiveIRD(object):
         """Run main algorithmic loop."""
         self._load_cache(debug_dir)
         """ First iteration """
-        self._eval_tasks = self._model.env.all_tasks
+        eval_tasks = self._model.env.all_tasks
+        self._eval_tasks = []
         # self._eval_tasks = self._random_choice(
         #     self._model.env.all_tasks, self._num_eval_tasks
         # )
@@ -192,29 +197,8 @@ class ExperimentActiveIRD(object):
             for key in self._acquire_fns.keys():
                 belief = self._all_beliefs[key][it]
                 # Evaluate and Save
-                self._evaluate(key, belief, self._eval_tasks, use_map=True)
+                self._evaluate(key, belief, eval_tasks, use_map=self._num_map_estimate)
                 self._save(it, skip_weights=True)
-
-    def _diagnose_belief(self, belief, tasks, fn_key, itr):
-        """Diagnose proxy reward over evaluation tasks.
-
-        Diagnose principle:
-            * Look at 5 top, 5 worst and 5 medium belief particles.
-
-        """
-        diagnose_N = 5
-        debug_dir = (
-            f"{self._save_dir}/{self._exp_name}/diagnose_seed_{str(self._rng_key)}"
-        )
-        os.makedirs(debug_dir, exist_ok=True)
-        for t_i, task in tqdm(enumerate(tasks), total=len(tasks), desc="Diagnosing"):
-            task_name = f"debug_{str(task)}"
-            file_prefix = f"{debug_dir}/fn_{fn_key}_itr_{itr}_"
-            belief.diagnose(
-                task, task_name, self._model.designer.true_w, diagnose_N, file_prefix
-            )
-        # if np.sum(info["metadata"]["overtake1"]) > 0:
-        #    import pdb; pdb.set_trace()
 
     def _propose_task(self, candidates, belief, obs, fn_key):
         """Find best next task for this acquire function.
@@ -250,7 +234,7 @@ class ExperimentActiveIRD(object):
         next_task = candidates[np.argmax(scores)]
         return next_task
 
-    def _evaluate(self, fn_name, belief, eval_tasks, use_map=False):
+    def _evaluate(self, fn_name, belief, eval_tasks, use_map=-1):
         """Evaluate current sampled belief on eval task.
 
         Args:
@@ -263,8 +247,8 @@ class ExperimentActiveIRD(object):
         """
         # Compute belief features
         eval_names = [f"eval_{task}" for task in eval_tasks]
-        if use_map:
-            belief = self._model.create_particles([belief.map_estimate()])
+        if use_map > 0:
+            belief = self._model.create_particles([belief.map_estimate(use_map)])
         else:
             belief = belief.subsample(self._num_eval_sample)
         target = self._model.create_particles([self._model.designer.true_w])
@@ -297,9 +281,9 @@ class ExperimentActiveIRD(object):
     def _load_cache(self, save_dir):
         """Load previous checkpoint."""
         # Load eval data
-        eval_path = f"{save_dir}/{self._exp_name}_seed_{str(self._rng_key)}.npz"
+        eval_path = f"{save_dir}/{self._exp_name}/{self._exp_name}_seed_{str(self._rng_key)}.npz"
         eval_data = np.load(eval_path, allow_pickle=True)
-        self._acquire_eval_hist = eval_data["eval_hist"].item()
+        ## Empty eval history
         self._all_candidates = eval_data["candidate_tasks"]
         self._eval_tasks = eval_data["eval_tasks"]
         self._all_tasks = eval_data["curr_tasks"].item()
@@ -311,14 +295,16 @@ class ExperimentActiveIRD(object):
             ]
         # Load beliefs
         self._all_beliefs = {}
+        self._acquire_eval_hist = {}
         weight_dir = f"{save_dir}/{self._exp_name}/save"
         for key in self._acquire_fns.keys():
             self._all_beliefs[key] = []
+            self._acquire_eval_hist[key] = []
             weight_files = sorted(
                 [
                     f
                     for f in os.listdir(weight_dir)
-                    if key in f and str(self._rng_key) in f and "n"
+                    if key in f and str(self._rng_key) in f
                 ]
             )
             for file in weight_files:
@@ -343,7 +329,7 @@ class ExperimentActiveIRD(object):
             eval_hist=self._acquire_eval_hist,
             candidate_tasks=self._all_candidates,
         )
-        path = f"{self._save_dir}/{self._exp_name}_seed_{str(self._rng_key)}.npz"
+        path = f"{self._save_dir}/{self._exp_name}/{self._exp_name}_seed_{str(self._rng_key)}.npz"
         with open(path, "wb+") as f:
             np.savez(f, **data)
 
@@ -363,6 +349,35 @@ class ExperimentActiveIRD(object):
                     obs_w = None
                 if not skip_weights:
                     belief.save(savepath)
-                belief.visualize(
-                    figpath, true_w=self._model.designer.true_w, obs_w=obs_w
-                )
+                    belief.visualize(
+                        figpath, true_w=self._model.designer.true_w, obs_w=obs_w
+                    )
+        self._log_time()
+
+    def _log_time(self):
+        if self._last_time is not None:
+            secs = time() - self._last_time
+            h = secs // (60 * 60)
+            m = (secs - h * 60 * 60) // 60
+            s = secs - (h * 60 * 60) - (m * 60)
+            print(f"Active IRD Iteration Time: {int(h)}h {int(m)}m {s:.3f}s\n")
+        self._last_time = time()
+
+    # def _diagnose_belief(self, belief, tasks, fn_key, itr):
+    #     """Diagnose proxy reward over evaluation tasks.
+
+    #     Diagnose principle:
+    #         * Look at 5 top, 5 worst and 5 medium belief particles.
+
+    #     """
+    #     diagnose_N = 5
+    #     debug_dir = (
+    #         f"{self._save_dir}/{self._exp_name}/diagnose_seed_{str(self._rng_key)}"
+    #     )
+    #     os.makedirs(debug_dir, exist_ok=True)
+    #     for t_i, task in tqdm(enumerate(tasks), total=len(tasks), desc="Diagnosing"):
+    #         task_name = f"debug_{str(task)}"
+    #         file_prefix = f"{debug_dir}/fn_{fn_key}_itr_{itr}_"
+    #         belief.diagnose(
+    #             task, task_name, self._model.designer.true_w, diagnose_N, file_prefix
+    #         )
