@@ -186,11 +186,9 @@ class ExperimentActiveIRD(object):
         """Run main algorithmic loop."""
         self._load_cache(debug_dir)
         """ First iteration """
-        eval_tasks = self._model.env.all_tasks
-        self._eval_tasks = []
-        # self._eval_tasks = self._random_choice(
-        #     self._model.env.all_tasks, self._num_eval_tasks
-        # )
+        self._eval_tasks = self._random_choice(
+            self._model.env.all_tasks, self._num_eval_tasks
+        )
         for it in range(0, self._iterations + 1):
             """ Run Active IRD on Candidates """
             print(f"\nEvaluating IRD ({self._rng_key}) iteration {it}")
@@ -248,7 +246,7 @@ class ExperimentActiveIRD(object):
         # Compute belief features
         eval_names = [f"eval_{task}" for task in eval_tasks]
         if use_map > 0:
-            belief = self._model.create_particles([belief.map_estimate(use_map)])
+            belief = self._model.create_particles(belief.map_estimate(use_map))
         else:
             belief = belief.subsample(self._num_eval_sample)
         target = self._model.create_particles([self._model.designer.true_w])

@@ -60,6 +60,9 @@ def logsumexp(vs):
 
 
 def random_choice(items, num, probs=None, replacement=True):
+    if num < 0:
+        return items
+
     if not replacement:
         # no replacement
         assert probs is None, "Cannot use probs without replacement"

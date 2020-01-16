@@ -429,7 +429,7 @@ class Particles(object):
         """
         if self._test_mode:
             return
-        map_w = self.map_estimate()
+        map_w = self.map_estimate()[0]
         plot_weights(
             self.weights,
             highlight_dicts=[true_w, obs_w, map_w],
