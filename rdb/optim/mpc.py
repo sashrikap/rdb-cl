@@ -14,6 +14,7 @@ from scipy.optimize import fmin_l_bfgs_b
 from functools import partial
 from time import time
 from rdb.optim.runner import Runner
+from rdb.exps.utils import Profiler
 from rdb.optim.utils import *
 from jax.lax import fori_loop, scan
 from jax.ops import index_update

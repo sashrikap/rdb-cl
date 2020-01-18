@@ -1,11 +1,8 @@
-"""Run Active-IRD Experiment Loop.
-
-Note:
-    * See (rdb.exps.active_ird.py) for more details.
-
+"""Debug Candidate
 """
+
 from rdb.exps.active_ird import ExperimentActiveIRD
-from rdb.exps.acquire import ActiveInfoGain, ActiveRatioTest, ActiveRandom
+from rdb.exps.active import ActiveInfoGain, ActiveRatioTest, ActiveRandom
 from rdb.infer.ird_oc import IRDOptimalControl
 from rdb.optim.mpc import shooting_method
 from rdb.distrib.particles import ParticleServer
@@ -14,10 +11,10 @@ from rdb.exps.utils import load_params
 from functools import partial
 from jax import random
 import numpyro.distributions as dist
-import yaml, argparse
+import argparse
 
 
-def main():
+def debug_candidate(debug_dir, exp_name):
     def env_fn():
         import gym, rdb.envs.drive2d
 
@@ -31,31 +28,9 @@ def main():
         )
         return controller, runner
 
-    # # TODO: find true w
-    # true_w = {
-    #     "dist_cars": 1.0,
-    #     "dist_lanes": 0.1,
-    #     "dist_fences": 0.6,
-    #     "speed": 0.5,
-    #     "control": 0.16,
-    # }
-    # # Training Environment
-    # task = (-0.4, 0.3)
-
-    # TODO: find true w
-    # true_w = {
-    #     "dist_cars": 1.0,
-    #     "dist_lanes": 0.1,
-    #     "dist_fences": 0.6,
-    #     "speed": 0.5,
-    #     "control": 0.16,
-    # }
-    # # Training Environment
-    # task = (-0.4, 0.3)
-
     """ Prior sampling & likelihood functions for PGM """
     log_prior_dict = {
-        "dist_cars": dist.Uniform(0.0, 0.01),
+        "dist_cars": dist.Uniform(-0.01, 0.01),
         "dist_lanes": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
         "dist_fences": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
         "dist_objects": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
@@ -70,18 +45,18 @@ def main():
         "speed": PROPOSAL_VAR,
         "control": PROPOSAL_VAR,
     }
-    prior_log_prob_fn = partial(prior_log_prob, log_prior_dict=log_prior_dict)
-    prior_sample_fn = partial(prior_sample, log_prior_dict=log_prior_dict)
-    norm_sample_fn = partial(
-        normalizer_sample, sample_fn=prior_sample_fn, num=NUM_NORMALIZERS
-    )
-    proposal_fn = partial(gaussian_proposal, log_std_dict=proposal_std_dict)
+    prior_log_prob_fn = build_log_prob_fn(log_prior_dict)
+    prior_sample_fn = build_prior_sample_fn(log_prior_dict)
+    proposal_fn = build_gaussian_proposal(proposal_std_dict)
+    norm_sample_fn = build_normalizer_sampler(prior_sample_fn, NUM_NORMALIZERS)
+
     eval_server = ParticleServer(
         env_fn, controller_fn, num_workers=NUM_EVAL_WORKERS, parallel=PARALLEL
     )
 
     ird_model = IRDOptimalControl(
         rng_key=None,
+        env_id=ENV_NAME,
         env_fn=env_fn,
         controller_fn=controller_fn,
         eval_server=eval_server,
@@ -91,13 +66,17 @@ def main():
         normalizer_fn=norm_sample_fn,
         proposal_fn=proposal_fn,
         sample_args={"num_warmups": NUM_WARMUPS, "num_samples": NUM_SAMPLES},
-        designer_args={"num_warmups": NUM_WARMUPS, "num_samples": NUM_DESIGNERS},
+        designer_args={
+            "num_warmups": NUM_DESIGNER_WARMUPS,
+            "num_samples": NUM_DESIGNERS,
+        },
         use_true_w=USER_TRUE_W,
-        test_mode=TEST_MODE,
+        num_prior_tasks=NUM_PRIOR_TASKS,
+        test_mode=False,
     )
 
     """ Active acquisition function for experiment """
-    acquire_fns = {
+    active_fns = {
         "infogain": ActiveInfoGain(
             rng_key=None, model=ird_model, beta=BETA, debug=False
         ),
@@ -109,42 +88,31 @@ def main():
         ),
         "random": ActiveRandom(rng_key=None, model=ird_model),
     }
-    keys = list(acquire_fns.keys())
+    keys = list(active_fns.keys())
     for key in keys:
         if key not in ACTIVE_FNS:
-            del acquire_fns[key]
+            del active_fns[key]
 
-    SAVE_ROOT = "data" if not GCP_MODE else "/gcp_output"  # Don'tchange this line
-    DEBUG_ROOT = "data" if not GCP_MODE else "/gcp_input"
+    SAVE_ROOT = "data"
+    DEBUG_ROOT = "data"
     experiment = ExperimentActiveIRD(
         ird_model,
-        acquire_fns,
+        active_fns,
         eval_server=eval_server,
         iterations=EXP_ITERATIONS,
         num_eval_tasks=NUM_EVAL_TASKS,
         num_eval_sample=NUM_EVAL_SAMPLES,
+        num_eval_map=NUM_EVAL_MAP,
         num_active_tasks=NUM_ACTIVE_TASKS,
         num_active_sample=NUM_ACTIVE_SAMPLES,
-        num_map_estimate=NUM_MAP,
-        # Hard coded candidates
-        # fixed_candidates=[(-0.4, -0.7), (-0.2, 0.5)],
-        # debug_belief_task=(-0.2, 0.5),
-        save_dir=f"{SAVE_ROOT}/{SAVE_NAME}",
-        # exp_name="active_ird_exp_mid",
         exp_name=f"{EXP_NAME}",
     )
 
     """ Experiment """
-    for ki in RANDOM_KEYS:
+    for ki in CANDIDATE_KEYS:
         key = random.PRNGKey(ki)
         experiment.update_key(key)
-        experiment.run(TASK)
-
-    """ Debug """
-    # for ki in RANDOM_KEYS:
-    #     key = random.PRNGKey(ki)
-    #     experiment.update_key(key)
-    #     experiment.debug(f"{DEBUG_ROOT}/200110")
+        experiment.debug_candidate(DEBUG_DIR)
 
 
 if __name__ == "__main__":
@@ -152,16 +120,13 @@ if __name__ == "__main__":
     parser.add_argument("--GCP_MODE", action="store_true")
     args = parser.parse_args()
 
-    GCP_MODE = args.GCP_MODE
-    TEST_MODE = False
-
-    # Load parameters
-    if not GCP_MODE:
-        params = load_params("examples/acquisition_template.yaml")
-    else:
-        params = load_params("/dar_payload/rdb/examples/acquisition_params.yaml")
+    params = load_params("examples/params/active_template.yaml")
     locals().update(params)
-    if not GCP_MODE:
-        RANDOM_KEYS = [24]
-        NUM_EVAL_WORKERS = 4
-    main()
+
+    DEBUG_DIR = "data/200117/"
+    EXP_NAME = "active_ird_exp_one"
+    ENV_NAME = "Week6_01-v0"
+    CANDIDATE_KEYS = list(range(8))
+
+    # RAND_EXP_NAME = "random_ird_exp_mid"
+    debug_candidate(DEBUG_DIR, EXP_NAME)

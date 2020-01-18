@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import jax.numpy as np
 import logging, time
+import numpy as onp
 import copy
 import yaml
 from jax import random
@@ -63,42 +64,6 @@ def create_params(template, params):
                 tparam[key] = [val]
             all_params.append(tparam)
         return all_params
-
-
-def plot_weights(
-    weights_dicts, highlight_dicts=[], highlight_colors=[], path=None, title=None
-):
-    PLOT_BINS = 100
-    MAX_WEIGHT = 8.0
-
-    fig = plt.figure(figsize=(8, 6), dpi=80)
-    n_values = len(weights_dicts[0].values())
-    for i, key in enumerate(weights_dicts[0].keys()):
-        values = [np.log(s[key]) for s in weights_dicts]
-        plt.subplot(n_values, 1, i + 1)
-        n, bins, patches = plt.hist(
-            values,
-            PLOT_BINS,
-            range=(-MAX_WEIGHT, MAX_WEIGHT),
-            density=True,
-            facecolor="b",
-            alpha=0.75,
-        )
-        ## Highlight value
-        for d, c in zip(highlight_dicts, highlight_colors):
-            if d is None:
-                continue
-            val = d[key]
-            plt.axvline(x=np.log(val), c=c)
-        plt.title(key)
-    plt.tight_layout()
-    if title is not None:
-        fig.suptitle(title)
-    if path is not None:
-        plt.savefig(path)
-        plt.close()
-    else:
-        plt.show()
 
 
 class Profiler(object):

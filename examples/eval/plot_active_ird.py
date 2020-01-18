@@ -14,23 +14,22 @@ def read_seed(path):
     return data
 
 
-def cleanup(arr):
+def cleanup(arr, max_len):
     if len(arr) == 1:
         return np.array(arr)
     else:
-        max_len = max([len(a) for a in arr])
         # print([len(a) for a in arr])
         # print(f"{len(arr)} seeds")
         arrs = []
         for a in arr:
             # if len(a) == max_len:
             #     arrs.append(a)
-            if len(a) > MAX_LEN + PADDING:
-                arrs.append(a[PADDING : PADDING + MAX_LEN])
+            if len(a) >= max_len + PADDING:
+                arrs.append(a[PADDING : PADDING + max_len])
                 # arrs.append(a[:3])
         # return arrs[:2]
         # print(np.array(arrs))
-        return np.array(arrs)[:N, :]
+        return np.array(arrs)[:, :]
 
 
 def plot_perform(data_dir, data):
@@ -51,12 +50,21 @@ def plot_perform(data_dir, data):
     # print(data)
 
 
-def plot_data(exp_dir, exp_name):
+def plot_data():
     seedpaths = []
     seeddata = []
-    for file in sorted(os.listdir(exp_dir)):
+    for file in sorted(os.listdir(os.path.join(exp_dir, exp_name))):
         if exp_name in file:
-            exp_path = os.path.join(exp_dir, file)
+            exp_path = os.path.join(exp_dir, exp_name, file)
+            if os.path.isfile(exp_path):
+                use_bools = [str(s) in exp_path for s in use_seeds]
+                not_bools = [str(s) in exp_path for s in not_seeds]
+                if onp.any(use_bools) and not onp.any(not_bools):
+                    seedpaths.append(exp_path)
+
+    for file in sorted(os.listdir(os.path.join(rand_dir, rand_name))):
+        if rand_name in file:
+            exp_path = os.path.join(rand_dir, rand_name, file)
             if os.path.isfile(exp_path):
                 use_bools = [str(s) in exp_path for s in use_seeds]
                 not_bools = [str(s) in exp_path for s in not_seeds]
@@ -65,6 +73,7 @@ def plot_data(exp_dir, exp_name):
 
     for exp_path in seedpaths:
         seeddata.append(read_seed(exp_path))
+        print(exp_path, len(seeddata[-1]))
 
     data = {}
     for idx, (sd, spath) in enumerate(zip(seeddata, seedpaths)):
@@ -81,7 +90,10 @@ def plot_data(exp_dir, exp_name):
             )
             # import pdb; pdb.set_trace()
     for method, mdict in data.items():
-        mdict["perform"] = cleanup(mdict["perform"])
+        if "random" in method:
+            mdict["perform"] = cleanup(mdict["perform"], MAX_RANDOM_LEN)
+        else:
+            mdict["perform"] = cleanup(mdict["perform"], MAX_LEN)
         print(method, mdict["perform"].shape)
         # print(method, mdict["perform"])
 
@@ -90,9 +102,11 @@ def plot_data(exp_dir, exp_name):
 
 if __name__ == "__main__":
     N = -1
-    use_seeds = [9, 10, 13, 14, 15, 17, 18, 19]
+    # use_seeds = list(range(20))
+    use_seeds = list(range(8))
     not_seeds = [20, 21, 22, 23, 24]
-    MAX_LEN = 8
+    MAX_LEN = 6
+    MAX_RANDOM_LEN = 20
     PADDING = 0
 
     use_seeds = [str(random.PRNGKey(si)) for si in use_seeds]
@@ -101,6 +115,8 @@ if __name__ == "__main__":
     # data_path = "data/191216/active_ird_exp1"
     # data_path = "data/191217/active_ird_exp1"
     # data_path = "data/200103/active_ird_exp_mid"
-    exp_dir = "data/200110_test_eval_all/active_ird_exp_mid"
-    exp_name = "active_ird_exp_mid"
-    plot_data(exp_dir, exp_name)
+    exp_dir = "data/200117"
+    exp_name = "active_ird_exp_one"
+    rand_dir = "data/200116"
+    rand_name = "random_ird_exp_mid"
+    plot_data()

@@ -7,17 +7,22 @@ from tqdm import tqdm
 def launch(params_dict):
     locals().update(params_dict)
     print(params_dict)
-    save_params("examples/acquisition_params.yaml", params_dict)
+    save_params("examples/params/active_params.yaml", params_dict)
 
     filter_ext = (".pyc", ".log", ".git", ".mp4", ".npz", ".ipynb")
 
     if LOCAL_MODE:
         local_mnt = mount.MountLocal(local_dir="../rdb", mount_point="./rdb")
-        launch_mode = mode.LocalMode(
-            filter_ext=filter_ext
+        launch_mode = (
+            mode.LocalMode()
         )  ## Having a 2nd output mount in local mode seems to cause file race condition
         mounts = [local_mnt]
     else:
+        gcp_label = ""
+        if "RANDOM_KEYS" in params_dict and "EXP_NAME" in params_dict:
+            key_str = "_".join([str(k) for k in params_dict["RANDOM_KEYS"]])
+            gcp_label = f"{params_dict['EXP_NAME']}_{key_str}"
+
         launch_mode = mode.GCPMode(
             # zone="us-west1-a",
             # instance_type="n1-standard-4",
@@ -31,6 +36,7 @@ def launch(params_dict):
             gcp_bucket="active-ird-experiments",
             gcp_log_path="rss-logs",  # Folder to store log files under
             terminate_on_end=True,
+            gcp_label=gcp_label,
         )
         # By default, /rdb/rdb -> /dar_payload/rdb/rdb
         gcp_mnt = mount.MountLocal(
@@ -45,7 +51,7 @@ def launch(params_dict):
 
     # This will run locally
     launch_api.run_command(
-        command="bash /dar_payload/rdb/examples/cloud/run_acquisition.sh",
+        command="bash /dar_payload/rdb/examples/cloud/run_active.sh",
         # command="echo 'check out' && ls /gcp_input/200110_test_eval_all",
         # command="pwd && touch good.txt",
         # command="bash ./rdb/examples/cloud/run_pyglet.sh",
@@ -58,7 +64,7 @@ if __name__ == "__main__":
     LOCAL_MODE = False
 
     # ========== Parameters =============
-    template = load_params("examples/acquisition_template.yaml")
+    template = load_params("examples/params/active_template.yaml")
 
     if LOCAL_MODE:
         launch(template)

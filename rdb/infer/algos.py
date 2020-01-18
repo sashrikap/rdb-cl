@@ -44,7 +44,6 @@ class Inference(object):
 
     def __init__(self, rng_key, kernel, num_samples, num_warmups):
         self._rng_key = rng_key
-        # self._kernel = seed(kernel, rng_seed=rng_key)
         self._kernel = kernel
         self._num_samples = num_samples
         self._num_warmups = num_warmups
@@ -99,14 +98,12 @@ class MetropolisHasting(Inference):
     def __init__(self, rng_key, kernel, num_samples, num_warmups, proposal_fn):
         super().__init__(rng_key, kernel, num_samples, num_warmups)
         self._proposal_raw_fn = proposal_fn
-        # self._proposal = None
-        self._proposal = proposal_fn
+        self._proposal = None
         self._coin_flip = None
 
     def _mh_step(self, obs, state, log_prob, *args, **kwargs):
         assert self._rng_key is not None, "Need to initialize with random key"
 
-        # @jax.jit # causes recursion error
         assert self._proposal is not None, "Need to set random seed"
         next_state = self._proposal(state)
         next_log_prob = self._kernel(obs, next_state, **kwargs)
@@ -126,8 +123,7 @@ class MetropolisHasting(Inference):
 
     def update_key(self, rng_key):
         self._rng_key = rng_key
-        # self._proposal = seed(self._proposal_raw_fn, rng_seed=rng_key)
-        self._proposal = seed(self._proposal, rng_seed=rng_key)
+        self._proposal = seed(self._proposal_raw_fn, rng_seed=rng_key)
         self._coin_flip = self._create_coin_flip()
 
     def sample(
@@ -151,6 +147,8 @@ class MetropolisHasting(Inference):
 
         log_prob = self._kernel(obs, state, **kwargs)
         range_ = range(self._num_warmups)
+        if verbose:
+            range_ = trange(num_samples, desc="MH Warmup")
         for i in range_:
             _, state, log_prob = self._mh_step(obs, state, log_prob, *args, **kwargs)
 

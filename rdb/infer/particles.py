@@ -8,8 +8,8 @@ from rdb.optim.utils import (
     concate_dict_by_keys,
     divide_dict_by_keys,
 )
+from rdb.visualize.plot import plot_weights, plot_rankings
 from numpyro.handlers import scale, condition, seed
-from rdb.exps.utils import plot_weights
 from fast_histogram import histogram1d
 from scipy.stats import gaussian_kde
 from rdb.exps.utils import Profiler
@@ -25,6 +25,7 @@ class Particles(object):
     Args:
         sample_ws (list)
         rng_key (jax.random): if None, need to call `particles.update_key()`
+        env (object): provide to save time
 
     """
 
@@ -37,9 +38,10 @@ class Particles(object):
         sample_ws=None,
         sample_concate_ws=None,
         test_mode=False,
+        env=None,
     ):
         self._env_fn = env_fn
-        self._env = None
+        self._env = env
         self._controller = controller
         self._runner = runner
         self._sample_ws = sample_ws
@@ -90,6 +92,10 @@ class Particles(object):
             self._sample_ws = divide_dict_by_keys(self._sample_concate_ws)
         return self._sample_ws
 
+    @weights.setter
+    def weights(self, ws):
+        self.update_weights(sample_ws=ws)
+
     @property
     def concate_weights(self):
         if self._sample_concate_ws is None:
@@ -100,8 +106,8 @@ class Particles(object):
         return self._sample_concate_ws
 
     @property
-    def cached_tasks(self):
-        return self._sample_feats.keys()
+    def cached_names(self):
+        return list(self._sample_feats.keys())
 
     def subsample(self, num_samples=None):
         """Subsample from current list.
@@ -125,6 +131,7 @@ class Particles(object):
                 self._runner,
                 sub_ws,
                 test_mode=self._test_mode,
+                env=self._env,
             )
 
     def log_samples(self, num_samples=None):
@@ -143,26 +150,29 @@ class Particles(object):
             * Computing feature is costly. Caches features under task_name.
 
         """
-        if task_name not in self._sample_feats.keys():
+        if task_name not in self.cached_names:
             self._cache_task(task, task_name, desc)
         return self._sample_feats[task_name]
 
     def get_features_sum(self, task, task_name, desc=None):
         """Compute expected feature sums for sample weights on task.
         """
-        if task_name not in self._sample_feats_sum.keys():
+        if task_name not in self.cached_names:
             self._cache_task(task, task_name, desc)
         return self._sample_feats_sum[task_name]
 
     def get_violations(self, task, task_name, desc=None):
         """Compute violations (cached) for sample weights on task."""
-        if task_name not in self._sample_violations.keys():
+        if task_name not in self.cached_names:
             self._cache_task(task, task_name, desc)
-        return self._sample_violations[task_name]
+        violations = self._sample_violations[task_name]
+        for key, val in violations.items():
+            violations[key] = val.sum(axis=-1)
+        return violations
 
     def get_actions(self, task, task_name, desc=None):
         """Compute actions (cached) for sample weights on task."""
-        if task_name not in self._sample_actions.keys():
+        if task_name not in self.cached_names:
             self._cache_task(task, task_name, desc)
         return self._sample_actions[task_name]
 
@@ -203,7 +213,7 @@ class Particles(object):
     def merge(self, data):
         """Merge dumped data from another Particles instance."""
         task_name = data["task_name"]
-        if task_name not in self._sample_actions.keys():
+        if task_name not in self.cached_names:
             self._sample_actions[task_name] = data["actions"]
             self._sample_feats[task_name] = data["feats"]
             self._sample_feats_sum[task_name] = data["feats_sum"]
@@ -230,15 +240,12 @@ class Particles(object):
             num_violate += num
         return float(num_violate) / len(self.weights)
 
-    def compare_with(
-        self, task, task_name, target_w=None, target_particles=None, verbose=False
-    ):
+    def compare_with(self, task, task_name, target, verbose=False):
         """Compare with a set of target weights (usually true weights). Returns log
         prob ratio of reward, measured by target w.
 
         Args:
-            target_w list(dict): provide this or `target_particles`
-            target_particles (Particles): provide this or `target_w`
+            target (Particles): target to compare against
 
         Requires:
             * compute_features
@@ -246,35 +253,26 @@ class Particles(object):
         """
         if self._test_mode:
             return 0.0
+        target_w = target.weights[0]
 
-        if target_particles is None:
-            assert target_w is not None, "Must provide a target weights"
-            target_particles = Particles(
-                self._rng_key,
-                self._env_fn,
-                self._controller,
-                self._runner,
-                [target_w],
-                test_mode=self._test_mode,
-            )
-        else:
-            assert target_particles is not None, "Must provide a target weights"
-            target_w = target_particles.weights[0]
-
+        ## Compare reward difference
         this_feats_sum = self.get_features_sum(task, task_name)
         this_costs = multiply_dict_by_keys(target_w, this_feats_sum)
-        target_feats_sum = target_particles.get_features_sum(task, task_name)
+        target_feats_sum = target.get_features_sum(task, task_name)
         target_cost = multiply_dict_by_keys(target_w, target_feats_sum)
 
         diff_costs = subtract_dict_by_keys(this_costs, target_cost)
         diff_rews = -1 * onp.sum(list(diff_costs.values()), axis=0)
-        # if diff_rew > 0:
-        #    import pdb; pdb.set_trace()
+        ## Compare violation difference
+        this_vios = self.get_violations(task, task_name)
+        target_vios = target.get_violations(task, task_name)
+        diff_vios = subtract_dict_by_keys(this_vios, target_vios)
+        diff_vios = onp.sum(list(diff_vios.values()), axis=0)
         if verbose:
             print(
                 f"Diff rew {len(diff_rews)} items: mean {diff_rews.mean():.3f} std {diff_rews.std():.3f} max {diff_rews.max():.3f} min {diff_rews.min():.3f}"
             )
-        return diff_rews
+        return diff_rews, diff_vios
 
     def _get_init_state(self, task):
         if self._env is None:
@@ -368,19 +366,30 @@ class Particles(object):
                     probs[val_bins_idx] += float(ct) / len(row)
             map_idxs = onp.argsort(-1 * probs)[:num_map]
             map_weights = [self.weights[idx] for idx in map_idxs]
-            return map_weights
+            # MAP esimate usually used for evaluation; thread-safe to provide self._env
+            map_particles = Particles(
+                self._rng_key,
+                self._env_fn,
+                self._controller,
+                self._runner,
+                sample_ws=map_weights,
+                env=self._env,
+            )
+            return map_particles
         else:
             raise NotImplementedError
 
-    def diagnose(self, task, task_name, target_w, diagnose_N, file_prefix, desc=None):
+    def diagnose(
+        self, task, task_name, target, diagnose_N, prefix, thumbnail=False, desc=None
+    ):
         """ Look at top/mid/bottom * diagnose_N particles and their performance. Record videos.
 
         Args:
-            file_prefix: include directory info e.g. "data/exp_xxx/save_"
+            prefix: include directory info e.g. "data/exp_xxx/save_"
 
         """
         assert len(self.weights) >= diagnose_N * 3
-        diff_rews = self.compare_with(task, task_name, target_w)
+        diff_rews, diff_vios = self.compare_with(task, task_name, target)
         ranks = onp.argsort(diff_rews)
         top_N_idx = ranks[-diagnose_N:]
         mid_N_idx = ranks[
@@ -399,22 +408,31 @@ class Particles(object):
         mid_rews, mid_acs = diff_rews[mid_N_idx], actions[mid_N_idx]
         low_rews, low_acs = diff_rews[low_N_idx], actions[low_N_idx]
         mean_diff = diff_rews.mean()
+
+        map_particles = self.map_estimate(diagnose_N)
+        map_acs = np.array(map_particles.get_actions(task, task_name))
+        map_rews, map_vios = map_particles.compare_with(task, task_name, target)
+
         init_state = self._get_init_state(task)
 
+        if thumbnail:
+            tbn_path = f"{prefix}_task.png"
+            self._runner.collect_thumbnail(init_state, path=tbn_path)
+
         for label, group_rews, group_acs in zip(
-            ["top", "mid", "low"],
-            [top_rews, mid_rews, low_rews],
-            [top_acs, mid_acs, low_acs],
+            ["map", "top", "mid", "low"],
+            [map_rews, top_rews, mid_rews, low_rews],
+            [map_acs, top_acs, mid_acs, low_acs],
         ):
             for rew, acs in zip(group_rews, group_acs):
                 file_path = (
-                    f"{file_prefix}lable_{label}_mean_{mean_diff:.3f}_rew_{rew:.3f}.mp4"
+                    f"{prefix}label_{label}_mean_{mean_diff:.3f}_rew_{rew:.3f}.mp4"
                 )
                 # Collect proxy reward paths
                 self._runner.collect_mp4(init_state, acs, path=file_path)
             # Collect true reward paths
-            target_acs = self._controller(init_state, weights=target_w)
-            target_path = f"{file_prefix}lable_{label}_mean_{mean_diff:.3f}_true.mp4"
+            target_acs = self._controller(init_state, weights=target.weights[0])
+            target_path = f"{prefix}label_{label}_mean_{mean_diff:.3f}_true.mp4"
             self._runner.collect_mp4(init_state, target_acs, path=target_path)
 
     def record(self, task, task_name, actions, filepath):
@@ -429,12 +447,12 @@ class Particles(object):
         """
         if self._test_mode:
             return
-        map_w = self.map_estimate()[0]
+        map_w = self.map_estimate().weights[0]
         plot_weights(
             self.weights,
             highlight_dicts=[true_w, obs_w, map_w],
             highlight_colors=["r", "k", "m"],
-            path=path,
+            path=path + ".png",
             title="Proxy Reward; true (red), obs (black) map (magenta)",
         )
 
@@ -446,3 +464,33 @@ class Particles(object):
 
     def load(self, path):
         self._sample_ws = np.load(path, allow_pickle=True)["weights"]
+
+    def visualize_tasks(self, path, suffix, task_names, perfs):
+        """Visualize task distribution.
+
+        Args:
+            perfs (list): performance, ususally output from self.compare_with
+        """
+        assert len(self.weights) == 1, "Can only visualize one weight sample"
+        vios = concate_dict_by_keys(list(self._sample_violations.values()))
+        num_violates = np.array(list(vios.values())).sum(axis=(0, 2, 3))
+        # Ranking violations and performance (based on violation)
+        plot_rankings(
+            num_violates,
+            "Violations",
+            [perfs],
+            ["Perf diff"],
+            path=f"{path}_violations{suffix}.png",
+            title="Violations",
+            yrange=[-20, 20],
+        )
+        # Ranking performance and violations (based on performance)
+        plot_rankings(
+            perfs,
+            "Perf diff",
+            [num_violates],
+            ["Violations"],
+            path=f"{path}_performance{suffix}.png",
+            title="Performance",
+            yrange=[-20, 20],
+        )

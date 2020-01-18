@@ -1,0 +1,32 @@
+ENV_NAME: Week6_01-v0
+EXP_ITERATIONS: 8
+HORIZON: 10
+BETA: 1.0
+
+MAX_WEIGHT: 5.0
+
+SAVE_NAME: "200115"
+EXP_NAME: "designer_informed"
+
+NUM_DESIGNERS: 200
+# NUM_DESIGNERS: 50
+NUM_WARMUPS: 400
+
+PARALLEL: true
+NUM_ITERATIONS: 8
+NUM_EVAL_WORKERS: 4
+# NUM_EVAL_TASKS: 10
+NUM_EVAL_TASKS: -1
+
+PROPOSAL_VAR: 1.25
+RANDOM_KEYS: [23]
+
+
+TASK: [0.2, -0.7, 0.0, 0.4]
+TRUE_W:
+    dist_cars: 1.0
+    dist_lanes: 0.1
+    dist_fences: 0.35
+    dist_objects: 1.25
+    speed: 0.05
+    control: 0.1

@@ -1,34 +1,133 @@
 import matplotlib.pyplot as plt
 import matplotlib
-import numpy as np
+import numpy as onp
 import rdb
 from imageio import imread
 from os.path import join, dirname, isfile, isdir
 from os import listdir
 from matplotlib import cm, gridspec
-from mpl_toolkits import mplot3d
-from IPython.display import display, Video
-from IPython.display import display, update_display
-from ipywidgets import (
-    interact,
-    interactive,
-    fixed,
-    Button,
-    Layout,
-    interact_manual,
-    widgets,
-)
+
+# from mpl_toolkits import mplot3d
+from IPython import get_ipython
+
+if get_ipython() is not None:
+    from IPython.display import display, Video
+    from IPython.display import display, update_display
+    from ipywidgets import (
+        interact,
+        interactive,
+        fixed,
+        Button,
+        Layout,
+        interact_manual,
+        widgets,
+    )
 
 """
 Plotting Utilities
 """
 
 
+def plot_weights(
+    weights_dicts, highlight_dicts=[], highlight_colors=[], path=None, title=None
+):
+    PLOT_BINS = 100
+    MAX_WEIGHT = 8.0
+
+    fig = plt.figure(figsize=(8, 6), dpi=80)
+    n_values = len(weights_dicts[0].values())
+    for i, key in enumerate(weights_dicts[0].keys()):
+        values = [onp.log(s[key]) for s in weights_dicts]
+        plt.subplot(n_values, 1, i + 1)
+        n, bins, patches = plt.hist(
+            values,
+            PLOT_BINS,
+            range=(-MAX_WEIGHT, MAX_WEIGHT),
+            density=True,
+            facecolor="b",
+            alpha=0.75,
+        )
+        ## Highlight value
+        for d, c in zip(highlight_dicts, highlight_colors):
+            if d is None:
+                continue
+            val = d[key]
+            plt.axvline(x=onp.log(val), c=c)
+        plt.xlabel(key)
+    plt.tight_layout()
+    if title is not None:
+        fig.suptitle(title)
+    if path is not None:
+        plt.savefig(path)
+        plt.close()
+    else:
+        plt.show()
+
+
+def plot_rankings(
+    main_val,
+    main_label,
+    auxiliary_vals=[],
+    auxiliary_labels=[],
+    path=None,
+    title=None,
+    yrange=None,
+    loc="lower right",
+    normalize=False,
+    delta=0.0,
+    annotate_rankings=False,
+):
+    """Plot main_val and auxiliary_vals based on ranking of main_val.
+
+    Args:
+        main_val (list): main value to be plotted
+        main_label (list):
+        auxiliary_values (list([])): >=0 list of other values
+        auxiliary_labels (list([])): >=0 other labels
+        path (str): save path
+        title (str)
+        loc (str): legend location
+        normalize (bool):
+        delta (float): avoid overlapping
+    """
+    idxs = onp.argsort(onp.array(main_val))
+    _, ax = plt.subplots()
+    all_vals = auxiliary_vals + [main_val]
+    all_labels = auxiliary_labels + [main_label]
+    # Sort based on keys (so that colors stay the same across plots)
+    label_idxs = onp.argsort(all_labels)
+    all_labels = [all_labels[i] for i in label_idxs]
+    all_vals = [all_vals[i] for i in label_idxs]
+    # Plot
+    n_delta = 0.0
+    for val, label in zip(all_vals, all_labels):
+        val = onp.array(val)[idxs]
+        if normalize:
+            val /= onp.max(onp.abs(val))
+        val += n_delta * delta  # avoid overlapping
+        n_delta += 1
+        xs = list(range(len(val)))
+        ax.plot(xs, val, "^", label=label)
+        if annotate_rankings:
+            for i, xy in enumerate(zip(xs, val)):
+                # ax.annotate(idxs[i], xy=xy, textcoords='data')
+                ax.text(xy[0], xy[1], idxs[i], size=7)
+    ax.legend(loc=loc)
+    if title is not None:
+        ax.set_title(title)
+    if yrange is not None:
+        ax.set_ylim(*yrange)
+    if path is not None:
+        plt.savefig(path)
+    else:
+        plt.show()
+
+
 def plot_3d(xs, ys, zs, xlabel="", ylabel="", title=""):
     fig = plt.figure()
     ax = plt.axes(projection="3d")
-    X, Y = np.meshgrid(xs, ys)
-    Z = np.array(zs)
+    X, Y = onp.meshgrid(xs, ys)
+    Z = onp.array(zs)
     surf = ax.plot_surface(
         X, Y, Z, cmap=cm.coolwarm, linewidth=0, antialiased=True, rstride=1, cstride=1
     )
@@ -90,8 +189,8 @@ def plot_3d_interactive_features(
     gs0 = gridspec.GridSpec(1, 2, width_ratios=[2, 1])
     ax0 = fig.add_subplot(gs0[:, :-1], projection="3d")
     ax0.clear()
-    X3d, Y3d = np.meshgrid(xs, ys)
-    Z3d = np.array(zs)
+    X3d, Y3d = onp.meshgrid(xs, ys)
+    Z3d = onp.array(zs)
     surf = ax0.plot_surface(
         X3d,
         Y3d,
@@ -117,12 +216,12 @@ def plot_3d_interactive_features(
 
     # Feature range
     feat_keys = list(feats.keys())
-    min_feats = [np.min(feats[key]) for key in feat_keys]
-    max_feats = [np.max(feats[key]) for key in feat_keys]
+    min_feats = [onp.min(feats[key]) for key in feat_keys]
+    max_feats = [onp.max(feats[key]) for key in feat_keys]
 
     ix, iy = 0, 0
     vals = [feats[key][ix][iy] for key in feat_keys]
-    xbar = np.arange(len(feat_keys))
+    xbar = onp.arange(len(feat_keys))
     ax10.clear()
     ax10.set_xticks(xbar, feat_keys)
     ax10.set_ylim(min(min_feats), max(max_feats))
@@ -132,8 +231,8 @@ def plot_3d_interactive_features(
         global ex, ey
         ex, ey = event.xdata, event.ydata
         # plt.suptitle(f"Clicked at x({ex:.2f}), y({ey:.2f})")
-        # ix = np.argmin(np.abs(xs - ex))
-        # iy = np.argmin(np.abs(ys - ey))
+        # ix = onp.argmin(onp.abs(xs - ex))
+        # iy = onp.argmin(onp.abs(ys - ey))
         # plt.suptitle(f"x({ex:.2f}) y({ey:.2f}) rew({rews[]})")
         # plot_feats(ix, iy)
 
@@ -160,7 +259,7 @@ def plot_3d_interactive_features(
         SIZE = 40
 
         vals = [feats[key][ix][iy] for key in feat_keys]
-        xbar = np.arange(len(feat_keys))
+        xbar = onp.arange(len(feat_keys))
         ax10.clear()
         ax10.set_ylim(min(min_feats), max(max_feats))
         ax10.bar(xbar, vals, tick_label=feat_keys)
@@ -192,8 +291,8 @@ def plot_3d_interactive_features(
 
     def slide_xy(x, y):
         global ix, iy
-        ix = int(np.argmin(np.abs(xs - x)))
-        iy = int(np.argmin(np.abs(ys - y)))
+        ix = int(onp.argmin(onp.abs(xs - x)))
+        iy = int(onp.argmin(onp.abs(ys - y)))
         plot_feats(ix, iy)
 
     # slider widgets

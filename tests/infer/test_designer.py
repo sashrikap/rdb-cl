@@ -87,7 +87,7 @@ designer = Designer(
 )
 
 
-def test_designer():
+def outdated_test_designer():
     key = random.PRNGKey(0)
     designer.update_key(key)
     particles = designer.sample(task, str(task))

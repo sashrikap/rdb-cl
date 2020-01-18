@@ -14,12 +14,13 @@ import copy
 import jax
 import jax.numpy as np
 from numpyro.handlers import scale, condition, seed
+from rdb.infer.utils import random_choice, logsumexp
 from rdb.optim.utils import multiply_dict_by_keys
-from rdb.infer.algos import *
+from rdb.visualize.plot import plot_weights
 from rdb.infer.particles import Particles
-from rdb.exps.utils import plot_weights, Profiler
-from rdb.infer.utils import logsumexp
+from rdb.exps.utils import Profiler
 from tqdm.auto import tqdm, trange
+from rdb.infer.algos import *
 from time import time
 
 
@@ -31,7 +32,9 @@ class PGM(object):
 
     """
 
-    def __init__(self, rng_key, kernel, proposal_fn, sample_method, sample_args):
+    def __init__(
+        self, rng_key, kernel, proposal_fn, sample_method="mh", sample_args={}
+    ):
         self._rng_key = rng_key
         self._sampler = self._build_sampler(
             kernel, proposal_fn, sample_method, sample_args
@@ -86,6 +89,7 @@ class IRDOptimalControl(PGM):
     def __init__(
         self,
         rng_key,
+        env_id,
         env_fn,
         controller_fn,
         eval_server,
@@ -97,11 +101,14 @@ class IRDOptimalControl(PGM):
         sample_method="mh",
         sample_args={},  # "num_warmups": 100, "num_samples": 200
         designer_args={},
+        num_prior_tasks=0,
         use_true_w=False,
         debug_true_w=False,
         test_mode=False,  # Skip _cache_task part if true
     ):
         self._rng_key = rng_key
+        # Environment settings
+        self._env_id = env_id
         self._env_fn = env_fn
         self._env = env_fn()
         self._controller, self._runner = controller_fn(self._env)
@@ -110,35 +117,38 @@ class IRDOptimalControl(PGM):
         self._beta = beta
         # Sampling functions
         self._prior_raw_fn = prior_log_prob_fn
-        # self._prior_log_prob = None
-        self._prior_log_prob = prior_log_prob_fn
+        self._prior_log_prob = None
         self._normalizer_raw_fn = normalizer_fn
-        # self._normalizer_fn = None
-        self._normalizer_fn = normalizer_fn
+        self._normalizer_fn = None
         ## Caching normalizers, samples and features
         self._normalizer = None
         self._samples = {}
         self._user_actions = {}
         self._user_feats = {}
+        self._debug_true_w = debug_true_w
+        self._test_mode = test_mode
+        kernel = self._build_kernel(beta)
+        super().__init__(rng_key, kernel, proposal_fn, sample_method, sample_args)
         # assume designer uses the same beta, prior and prior proposal
+        truth = self.create_particles([true_w])
         self._designer = Designer(
             rng_key,
             self.env_fn,
             self._controller,
             self._runner,
             beta,
-            true_w,
+            truth,
             prior_log_prob_fn,
             proposal_fn,
             sample_method,
             designer_args,
             use_true_w=use_true_w,
+            num_prior_tasks=num_prior_tasks,
         )
-        self._debug_true_w = debug_true_w
-        self._test_mode = test_mode
 
-        kernel = self._build_kernel(beta)
-        super().__init__(rng_key, kernel, proposal_fn, sample_method, sample_args)
+    @property
+    def env_id(self):
+        return self._env_id
 
     @property
     def env(self):
@@ -161,10 +171,8 @@ class IRDOptimalControl(PGM):
         super().update_key(rng_key)
         self._sampler.update_key(rng_key)
         self._designer.update_key(rng_key)
-        # self._prior_log_prob = seed(self._prior_raw_fn, rng_key)
-        # self._normalizer_fn = seed(self._normalizer_raw_fn, rng_key)
-        self._prior_log_prob = seed(self._prior_log_prob, rng_key)
-        self._normalizer_fn = seed(self._normalizer_fn, rng_key)
+        self._prior_log_prob = seed(self._prior_raw_fn, rng_key)
+        self._normalizer_fn = seed(self._normalizer_raw_fn, rng_key)
 
     def load_samples(self,):
         pass
@@ -181,9 +189,7 @@ class IRDOptimalControl(PGM):
 
     def simulate_designer(self, task, task_name):
         """Sample one w from b(w) on task"""
-        particles = self._designer.sample(task, task_name)
-        sub_sample = particles.subsample(1)
-        return sub_sample
+        return self._designer.simulate(task, task_name)
 
     def sample(self, tasks, task_names, obs, verbose=True):
         """Sample b(w) for true weights given obs.weights.
@@ -329,11 +335,17 @@ class IRDOptimalControl(PGM):
 
 
 class Designer(PGM):
-    """Simulated designer module. Given true weights, sample noisy rational design weights.
+    """Simulated designer module.
+
+    Given true weights, sample MAP design weights.
 
     Note:
         * Currently assumes same beta, proposal as IRD module, although
           doesn't have to be.
+
+    Args:
+        truth (Particles): true weight particles
+
     """
 
     def __init__(
@@ -343,33 +355,38 @@ class Designer(PGM):
         controller,
         runner,
         beta,
-        true_w,
+        truth,
         prior_log_prob_fn,
         proposal_fn,
-        sample_method,
-        sampler_args,
+        sample_method="mh",
+        sampler_args={},
         use_true_w=False,
+        num_prior_tasks=0,
     ):
         self._rng_key = rng_key
         self._env_fn = env_fn
         self._env = env_fn()
         self._controller = controller
         self._runner = runner
-        self._true_w = true_w
+        self._true_w = truth.weights[0]
+        self._truth = truth
         self._use_true_w = use_true_w
         # Prior function
         self._prior_raw_fn = prior_log_prob_fn
-        # self._prior_log_prob = None
-        self._prior_log_prob = prior_log_prob_fn
+        self._prior_log_prob = None
         # Sampling kernel
         kernel = self._build_kernel(beta)
         self._samples = {}
         super().__init__(rng_key, kernel, proposal_fn, sample_method, sampler_args)
+        # Designer Prior
+        self._random_choice = None
+        self._prior_tasks = []
+        self._num_prior_tasks = num_prior_tasks
 
     def sample(self, task, task_name, verbose=True):
         """Sample 1 set of weights from b(design_w) given true_w"""
         if task_name not in self._samples.keys():
-            print("Sampling Designer")
+            print(f"Sampling Designer (prior={len(self._prior_tasks)})")
             if self._use_true_w:
                 sample_ws = [self._true_w]
             else:
@@ -379,6 +396,28 @@ class Designer(PGM):
             )
             self._samples[task_name] = samples
         return self._samples[task_name]
+
+    def simulate(self, task, task_name):
+        """Give 1 sample"""
+        particles = self.sample(task, task_name)
+        return particles.subsample(1)
+
+    def reset_prior_tasks(self):
+        assert (
+            self._random_choice is not None
+        ), "Need to initialize Designer with random seed"
+        assert self._num_prior_tasks < len(self._env.all_tasks)
+        tasks = self._random_choice(self._env.all_tasks, self._num_prior_tasks)
+        self._prior_tasks = tasks
+
+    @property
+    def prior_tasks(self):
+        return self._prior_tasks
+
+    @prior_tasks.setter
+    def prior_tasks(self, tasks):
+        """ Modifies Underlying Designer Prior. Use very carefully."""
+        self._prior_tasks = tasks
 
     def _get_init_state(self, task):
         self._env.set_task(task)
@@ -391,14 +430,20 @@ class Designer(PGM):
         return self._true_w
 
     @property
+    def truth(self):
+        return self._truth
+
+    @property
     def env(self):
         return self._env
 
     def update_key(self, rng_key):
         super().update_key(rng_key)
+        self._truth.update_key(rng_key)
         self._sampler.update_key(rng_key)
-        # self._prior_log_prob = seed(self._prior_raw_fn, rng_key)
-        self._prior_log_prob = seed(self._prior_log_prob, rng_key)
+        self._prior_log_prob = seed(self._prior_raw_fn, rng_key)
+        self._random_choice = seed(random_choice, rng_key)
+        self.reset_prior_tasks()
 
     def _build_kernel(self, beta):
         def likelihood_fn(true_w, sample_w, task):
@@ -415,7 +460,9 @@ class Designer(PGM):
 
 
 class DesignerInformed(Designer):
-    """Simulated designer module. Select's better "informed" proxies.
+    """Simulated designer module.
+
+    Select's better "informed" proxies.
     """
 
     def __init__(
@@ -425,26 +472,44 @@ class DesignerInformed(Designer):
         controller,
         runner,
         beta,
-        true_w,
+        truth,
         prior_log_prob_fn,
         proposal_fn,
-        sample_method,
-        sampler_args,
+        sample_method="mh",
+        sampler_args={},
         use_true_w=False,
-        num_informed_tasks=3,
     ):
         super().__init__(
-            self,
             rng_key,
             env_fn,
             controller,
             runner,
             beta,
-            true_w,
+            truth,
             prior_log_prob_fn,
             proposal_fn,
             sample_method,
             sampler_args,
             use_true_w,
         )
-        self._num_informed_tasks = num_informed_tasks
+        self._random_choice = None
+        self._prior_tasks = None
+
+    def _build_kernel(self, beta):
+        """Compute likelihood by looking at all prior tasks."""
+
+        def likelihood_fn(true_w, sample_w, task):
+            assert self._prior_log_prob is not None, "Need to set random seed"
+            assert self._prior_tasks is not None, "Need prior tasks"
+            all_tasks = self._prior_tasks + [task]
+            log_prob = 0.0
+            for taski in all_tasks:
+                state = self._get_init_state(taski)
+                actions = self._controller(state, weights=sample_w)
+                _, cost, info = self._runner(state, actions, weights=true_w)
+                rew = -1 * cost
+                log_prob += beta * rew
+            log_prob += self._prior_log_prob(sample_w)
+            return log_prob
+
+        return likelihood_fn

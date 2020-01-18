@@ -22,7 +22,12 @@ class ParticleWorkerSingle(object):
         self._compute_result = None
         self._initialized = False
         self._particles = Particles(
-            None, self._env_fn, self._controller, self._runner, sample_ws=[]
+            None,
+            self._env_fn,
+            self._controller,
+            self._runner,
+            sample_ws=[],
+            env=self._env,
         )
 
     def initialize(self):
@@ -87,7 +92,7 @@ class ParticleServer(object):
         # Filter existing tasks
         new_tasks, new_task_names = [], []
         for task, task_name in zip(tasks, task_names):
-            if task_name not in particles.cached_tasks:
+            if task_name not in particles.cached_names:
                 new_tasks.append(task)
                 new_task_names.append(task_name)
         tasks, task_names = new_tasks, new_task_names
@@ -138,4 +143,4 @@ class ParticleServer(object):
         if verbose:
             pbar.close()
 
-        return particles
+        # return particles

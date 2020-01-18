@@ -126,7 +126,7 @@ class Runner(object):
         clear_output()
         display(Video(mp4_path, width=FRAME_WIDTH))
 
-    def collect_thumbnail(self, state, actions, width=450, path=None, text=None):
+    def collect_thumbnail(self, state, actions=None, width=450, path=None, text=None):
         if path is None:
             path = join(dirname(rdb.__file__), "..", "data", "thumbnail.png")
         self._env.reset()

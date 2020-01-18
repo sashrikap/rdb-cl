@@ -6,14 +6,17 @@ Note:
 """
 
 from rdb.exps.designer_prior import ExperimentDesignerPrior
-from rdb.optim.mpc import shooting_method
-from rdb.infer.ird_oc import DesignerInformed
 from rdb.distrib.particles import ParticleServer
+from rdb.infer.ird_oc import Designer
+from rdb.optim.mpc import shooting_method
+from rdb.infer.particles import Particles
 from rdb.exps.utils import load_params
 from functools import partial
+from rdb.infer.utils import *
 from jax import random
 import numpyro.distributions as dist
 import yaml, argparse
+import argparse
 
 
 def main():
@@ -31,7 +34,7 @@ def main():
         return controller, runner
 
     log_prior_dict = {
-        "dist_cars": dist.Uniform(0.0, 0.01),
+        "dist_cars": dist.Uniform(-0.01, 0.01),
         "dist_lanes": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
         "dist_fences": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
         "dist_objects": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
@@ -46,32 +49,58 @@ def main():
         "speed": PROPOSAL_VAR,
         "control": PROPOSAL_VAR,
     }
-    prior_log_prob_fn = partial(prior_log_prob, log_prior_dict=log_prior_dict)
-    prior_sample_fn = partial(prior_sample, log_prior_dict=log_prior_dict)
-    norm_sample_fn = partial(
-        normalizer_sample, sample_fn=prior_sample_fn, num=NUM_NORMALIZERS
-    )
-    proposal_fn = partial(gaussian_proposal, log_std_dict=proposal_std_dict)
+    prior_log_prob_fn = build_log_prob_fn(log_prior_dict)
+    prior_sample_fn = build_prior_sample_fn(log_prior_dict)
+    proposal_fn = build_gaussian_proposal(proposal_std_dict)
+
     eval_server = ParticleServer(
         env_fn, controller_fn, num_workers=NUM_EVAL_WORKERS, parallel=PARALLEL
     )
 
-    designer = DesignerInformed(
+    _env = env_fn()
+    _controller, _runner = controller_fn(_env)
+    _truth = Particles(None, env_fn, _controller, _runner, [TRUE_W])
+
+    designer = Designer(
         rng_key=None,
-        env_fn=self._env_fn,
-        controller=self._controller,
-        runner=self._runner,
-        betw=beta,
-        true_w=true_w,
+        env_fn=env_fn,
+        controller=_controller,
+        runner=_runner,
+        beta=BETA,
+        truth=_truth,
         prior_log_prob_fn=prior_log_prob_fn,
         proposal_fn=proposal_fn,
-        sample_method=sample_method,
-        sampler_args=designer_args,
-        use_true_w=use_true_w,
+        sampler_args={"num_warmups": NUM_WARMUPS, "num_samples": NUM_DESIGNERS},
+        use_true_w=False,
     )
 
-    experiment = ExperimentDesignerPrior(designer, eval_server=eval_server)
+    SAVE_ROOT = "data" if not GCP_MODE else "/gcp_output"
+    experiment = ExperimentDesignerPrior(
+        rng_key=None,
+        designer=designer,
+        eval_server=eval_server,
+        num_eval_tasks=NUM_EVAL_TASKS,
+        save_dir=f"{SAVE_ROOT}/{SAVE_NAME}",
+        exp_name=EXP_NAME,
+    )
+    for ki in RANDOM_KEYS:
+        key = random.PRNGKey(ki)
+        experiment.update_key(key)
+        for itr in range(NUM_ITERATIONS):
+            experiment.run(TASK, num_prior_tasks=itr)
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Process some integers.")
+    parser.add_argument("--GCP_MODE", action="store_true")
+    args = parser.parse_args()
+
+    GCP_MODE = args.GCP_MODE
+
+    # Load parameters
+    if not GCP_MODE:
+        params = load_params("examples/params/designer_template.yaml")
+    else:
+        params = load_params("/dar_payload/rdb/examples/params/designer_params.yaml")
+    locals().update(params)
     main()

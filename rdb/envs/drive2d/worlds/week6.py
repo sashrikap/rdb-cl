@@ -31,11 +31,10 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
         horizon=10,
         num_lanes=3,
         lane_width=0.13,
-        car1_range=[-0.8, 0.8],
-        car2_range=[-0.8, 0.8],
+        car_ranges=[[-0.8, 0.8], [-0.8, 0.8]],
         car_delta=0.2,
         obstacle_states=[],
-        obs_range=[-0.16, 0.16, -0.8, 0.8],
+        obs_ranges=[[-0.16, 0.16, -0.8, 0.8]],
         obs_delta=[0.04, 0.2],
     ):
         # Define cars
@@ -52,16 +51,19 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
             objs.append(objects.Obstacle(np.array(state)))
         super().__init__(main_car, cars, num_lanes=num_lanes, objects=objs, dt=dt)
         # Define all tasks to sample from
-        self._car1_range = np.arange(car1_range[0], car1_range[1], car_delta)
-        self._car2_range = np.arange(car2_range[0], car2_range[1], car_delta)
-        self._obs_range_x = np.arange(obs_range[0], obs_range[1], obs_delta[0])
-        self._obs_range_y = np.arange(obs_range[2], obs_range[3], obs_delta[1])
-        self._grid_tasks = [self._car1_range, self._car2_range]
-        for oi in range(len(self._objects)):
-            self._grid_tasks.append(self._obs_range_x)
-            self._grid_tasks.append(self._obs_range_y)
-        self._all_tasks = list(itertools.product(*self._grid_tasks))
+        self.setup_tasks(car_ranges, car_delta, obs_ranges, obs_delta)
         self._task_sampler = None
+
+    def setup_tasks(self, car_ranges, car_delta, obs_ranges, obs_delta):
+        self._grid_tasks = []
+        for ci, car_range in enumerate(car_ranges):
+            self._grid_tasks.append(np.arange(car_range[0], car_range[1], car_delta))
+        for oi in range(len(self._objects)):
+            obs_range_x = np.arange(obs_ranges[oi][0], obs_ranges[oi][1], obs_delta[0])
+            obs_range_y = np.arange(obs_ranges[oi][2], obs_ranges[oi][3], obs_delta[1])
+            self._grid_tasks.append(obs_range_x)
+            self._grid_tasks.append(obs_range_y)
+        self._all_tasks = list(itertools.product(*self._grid_tasks))
 
     def set_task(self, task):
         assert len(task) == 2 + 2 * len(self._objects), "Task format incorrect"
@@ -78,6 +80,8 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
             next_task_idx = task_idx + len(obj.state)
             next_state_idx = state_idx + len(obj.state)
             state[state_idx:next_state_idx] = np.array(task[task_idx:next_task_idx])
+            task_idx = next_task_idx
+            state_idx = next_state_idx
         self.set_init_state(state)
 
     def _get_nonlinear_features_list(self, feats_list):
@@ -180,7 +184,7 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
 
 
 class Week6_01(HighwayDriveWorld_Week6):
-    """Highway merging scenario, now with obstacles
+    """Highway merging scenario with one obstacle
     """
 
     def __init__(self):
@@ -215,5 +219,96 @@ class Week6_01(HighwayDriveWorld_Week6):
             horizon=horizon,
             num_lanes=num_lanes,
             lane_width=lane_width,
+            obstacle_states=obstacle_states,
+        )
+
+
+class Week6_02(HighwayDriveWorld_Week6):
+    """Highway merging scenario, now with two obstacles
+    """
+
+    def __init__(self):
+        ## Boilerplate
+        main_speed = 0.7
+        car_speed = 0.5
+        main_state = np.array([0, 0, np.pi / 2, main_speed])
+        goal_speed = 0.8
+        goal_lane = 0
+        horizon = 10
+        dt = 0.25
+        control_bound = 0.5
+        lane_width = 0.13
+        num_lanes = 3
+        # Car states
+        car1 = np.array([0.0, 0.3, np.pi / 2, 0])
+        car2 = np.array([-lane_width, 0.9, np.pi / 2, 0])
+        car_states = np.array([car1, car2])
+        car_speeds = np.array([car_speed, car_speed])
+        car_ranges = [[-0.4, 1.2], [-0.4, 1.2]]
+        # Obstacle states
+        obstacle_states = np.array([[0.0, 0.3], [-lane_width, 0.3]])
+        obs_ranges = [[-0.16, 0.0, -0.4, 1.2], [0.0, 0.16, -0.4, 1.2]]
+
+        super().__init__(
+            main_state,
+            goal_speed=goal_speed,
+            goal_lane=goal_lane,
+            control_bound=control_bound,
+            car_states=car_states,
+            car_speeds=car_speeds,
+            dt=dt,
+            horizon=horizon,
+            num_lanes=num_lanes,
+            lane_width=lane_width,
+            car_ranges=car_ranges,
+            obs_ranges=obs_ranges,
+            obs_delta=[0.08, 0.2],
+            obstacle_states=obstacle_states,
+        )
+
+
+class Week6_03(HighwayDriveWorld_Week6):
+    """Highway merging scenario, now with two obstacles
+    """
+
+    def __init__(self):
+        ## Boilerplate
+        main_speed = 0.7
+        car_speed = 0.5
+        main_state = np.array([0, 0, np.pi / 2, main_speed])
+        goal_speed = 0.8
+        goal_lane = 0
+        horizon = 10
+        dt = 0.25
+        control_bound = 0.5
+        lane_width = 0.13
+        num_lanes = 3
+        # Car states
+        car1 = np.array([0.0, 0.3, np.pi / 2, 0])
+        car2 = np.array([-lane_width, 0.9, np.pi / 2, 0])
+        car_states = np.array([car1, car2])
+        car_speeds = np.array([car_speed, car_speed])
+        # Obstacle states
+        obstacle_states = np.array([[0.0, 0.3], [-lane_width, 0.3], [lane_width, 0.3]])
+        obs_ranges = [
+            [-0.13, -0.129, -0.4, 1.2],
+            [0.0, 0.01, -0.4, 1.2],
+            [0.13, 0.131, -0.4, 1.2],
+        ]
+        obs_delta = [0.04, 0.2]
+
+        super().__init__(
+            main_state,
+            goal_speed=goal_speed,
+            goal_lane=goal_lane,
+            control_bound=control_bound,
+            car_states=car_states,
+            car_speeds=car_speeds,
+            dt=dt,
+            horizon=horizon,
+            num_lanes=num_lanes,
+            lane_width=lane_width,
+            obs_ranges=obs_ranges,
+            obs_delta=obs_delta,
             obstacle_states=obstacle_states,
         )

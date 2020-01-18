@@ -78,7 +78,7 @@ class ActiveInfoGain(object):
         infogain = -1 * np.mean(entropies)
 
         if self._debug:
-            print(f"Acquire method {self._method}")
+            print(f"Active method {self._method}")
             print(
                 f"\tEntropies mean {np.mean(entropies):.3f} std {np.std(entropies):.3f}"
             )
@@ -129,7 +129,7 @@ class ActiveRatioTest(ActiveInfoGain):
 
         if self._debug:
             min_idx = np.argmin(log_ratios)
-            print(f"Acquire method {self._method}")
+            print(f"Active method {self._method}")
             print(f"\tMin weight")
             for key, val in belief.weights[min_idx].items():
                 print(f"\t-> {key}: {val:.3f}")
@@ -159,8 +159,7 @@ class ActiveRandom(ActiveInfoGain):
 
     def update_key(self, rng_key):
         self._rng_key = rng_key
-        # self._random_uniform = seed(random_uniform, self._rng_key)
-        self._random_uniform = seed(self._random_uniform, self._rng_key)
+        self._random_uniform = seed(random_uniform, self._rng_key)
 
     def __call__(self, next_task, next_task_name, belief, obs, verbose=True):
         """Random score

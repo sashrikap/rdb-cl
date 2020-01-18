@@ -25,6 +25,9 @@ setup(
         "PyOpenGL",
         "seaborn",
         "ray",
+        "ipython",
         "tqdm",
+        "imageio",
+        "ipywidgets",
     ],
 )

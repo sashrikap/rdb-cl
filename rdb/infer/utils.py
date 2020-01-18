@@ -2,6 +2,7 @@
 """
 import numpy as onp
 import jax.numpy as np
+import jax
 import copy
 import numpyro
 import numpyro.distributions as dist
@@ -10,6 +11,7 @@ from numpyro.handlers import seed
 from scipy.stats import gaussian_kde
 from tqdm.auto import tqdm, trange
 from rdb.exps.utils import Profiler
+from functools import partial
 
 
 def stack_dict_values(dicts, normalize=False):
@@ -118,7 +120,7 @@ def collect_trajs(list_ws, state, controller, runner, desc=None):
     return actions, feats, feats_sum, violations
 
 
-def prior_sample(log_prior_dict):
+def build_prior_sample_fn(log_prior_dict):
     """Sample prior distribution.
 
     Args:
@@ -126,23 +128,30 @@ def prior_sample(log_prior_dict):
 
     Note:
         * log_prior_dict is LOG VALUE
-        * Need seed(prior_sample, rng_key) to run
+        * Need seed(fn, rng_key) to run
 
     """
-    output = {}
-    for key, dist_ in log_prior_dict.items():
-        val = numpyro.sample(key, dist_)
-        output[key] = onp.exp(val)
-        # print(key, val)
-    return output
+
+    # @jax.jit
+    def sample_fn():
+        output = {}
+        for key, dist_ in log_prior_dict.items():
+            val = numpyro.sample(key, dist_)
+            # print(f"key {key} val {val:.3f}")
+            output[key] = np.exp(val)
+        return output
+
+    return sample_fn
 
 
-def prior_log_prob(sample_dict, log_prior_dict):
+def build_log_prob_fn(log_prior_dict):
     """Measure sample likelihood, based on prior.
 
     Args:
-        sample_dict (dict): maps keyword -> value
         log_prior_dict (dict): maps keyword -> numpyro.dist
+
+    Input:
+        sample_dict (dict): maps keyword -> value
 
     Note:
         * Sample dict is RAW VALUE
@@ -151,7 +160,7 @@ def prior_log_prob(sample_dict, log_prior_dict):
 
     """
 
-    def check_range(sample_val, prior_dist):
+    def check_log_range(sample_val, prior_dist):
         """Check the range of sample_val against prior dist.
 
             Note:
@@ -163,48 +172,60 @@ def prior_log_prob(sample_dict, log_prior_dict):
         assert isinstance(
             prior_dist, dist.Uniform
         ), f"Type `{type(prior_dist)}` supported"
+        log_val = np.log(sample_val)
         low = prior_dist.low
         high = prior_dist.high
-        return onp.where(
-            sample_val < low or sample_val > high,
-            -onp.inf,
-            prior_dist.log_prob(sample_val),
+        return np.where(
+            log_val < low or log_val > high, -np.inf, prior_dist.log_prob(log_val)
         )
 
-    log_prob = 0.0
-    for key, dist_ in log_prior_dict.items():
-        val = sample_dict[key]
-        log_val = onp.log(val)
-        # print(f"{key} {log_val} range {check_range(log_val, dist_)}")
-        log_prob += check_range(log_val, dist_)
+    def log_prob_fn(sample_dict):
+        log_prob = 0.0
+        for key, dist_ in log_prior_dict.items():
+            val = sample_dict[key]
+            # log_val = np.log(val)
+            # print(f"{key} log val {log_val:3f} check range {check_log_range(val, dist_):3f}")
+            log_prob += check_log_range(val, dist_)
+        return log_prob
 
-    return log_prob
+    return log_prob_fn
 
 
-def gaussian_proposal(state, log_std_dict):
+def build_gaussian_proposal(log_std_dict):
     """Propose next state given current state, based on Gaussian dist.
 
     Args:
         log_std_dict (dict): std of log(var)
 
+    Note:
+        * Need seed(fn, rng_key) to run
+
     """
-    next_state = copy.deepcopy(state)
-    for key, val in next_state.items():
-        if key in log_std_dict.keys():
-            # Convert to log val
-            log_val = onp.log(val)
-            std = log_std_dict[key]
+
+    def gaussian_proposal(state):
+        keys, vals = list(state.keys()), list(state.values())
+        stds = list([log_std_dict[k] for k in keys])
+        # next_vals = vf_sample_fn(np.array(stds), np.array(vals))
+        next_vals = []
+        for std, val in zip(stds, vals):
+            log_val = np.log(val)
             next_log_val = numpyro.sample("next_log_val", dist.Normal(log_val, std))
-            # Convert back to normal val
-            next_state[key] = onp.exp(next_log_val)
-    return next_state
+            next_vals.append(np.exp(next_log_val))
+        next_state = dict(zip(keys, next_vals))
+        return next_state
+
+    return gaussian_proposal
 
 
-def normalizer_sample(sample_fn, num):
-    """Run sample function fixed number of times to generate samples.
-    """
-    samples = []
-    for _ in range(num):
-        # for _ in trange(num, desc="Normalizer weights"):
-        samples.append(sample_fn())
-    return samples
+def build_normalizer_sampler(sample_fn, num):
+    # @jax.jit
+    def sampler():
+        """Run sample function fixed number of times to generate samples.
+        """
+        samples = []
+        for _ in range(num):
+            # for _ in trange(num, desc="Normalizer weights"):
+            samples.append(sample_fn())
+        return samples
+
+    return sampler
