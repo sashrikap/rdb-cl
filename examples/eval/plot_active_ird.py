@@ -53,23 +53,25 @@ def plot_perform(data_dir, data):
 def plot_data():
     seedpaths = []
     seeddata = []
-    for file in sorted(os.listdir(os.path.join(exp_dir, exp_name))):
-        if exp_name in file:
-            exp_path = os.path.join(exp_dir, exp_name, file)
-            if os.path.isfile(exp_path):
-                use_bools = [str(s) in exp_path for s in use_seeds]
-                not_bools = [str(s) in exp_path for s in not_seeds]
-                if onp.any(use_bools) and not onp.any(not_bools):
-                    seedpaths.append(exp_path)
+    if os.path.isdir(os.path.join(exp_dir, exp_name)):
+        for file in sorted(os.listdir(os.path.join(exp_dir, exp_name))):
+            if exp_name in file:
+                exp_path = os.path.join(exp_dir, exp_name, file)
+                if os.path.isfile(exp_path):
+                    use_bools = [str(s) in exp_path for s in use_seeds]
+                    not_bools = [str(s) in exp_path for s in not_seeds]
+                    if onp.any(use_bools) and not onp.any(not_bools):
+                        seedpaths.append(exp_path)
 
-    for file in sorted(os.listdir(os.path.join(rand_dir, rand_name))):
-        if rand_name in file:
-            exp_path = os.path.join(rand_dir, rand_name, file)
-            if os.path.isfile(exp_path):
-                use_bools = [str(s) in exp_path for s in use_seeds]
-                not_bools = [str(s) in exp_path for s in not_seeds]
-                if onp.any(use_bools) and not onp.any(not_bools):
-                    seedpaths.append(exp_path)
+    if os.path.isdir(os.path.join(rand_dir, rand_name)):
+        for file in sorted(os.listdir(os.path.join(rand_dir, rand_name))):
+            if rand_name in file:
+                exp_path = os.path.join(rand_dir, rand_name, file)
+                if os.path.isfile(exp_path):
+                    use_bools = [str(s) in exp_path for s in use_seeds]
+                    not_bools = [str(s) in exp_path for s in not_seeds]
+                    if onp.any(use_bools) and not onp.any(not_bools):
+                        seedpaths.append(exp_path)
 
     for exp_path in seedpaths:
         seeddata.append(read_seed(exp_path))
@@ -103,20 +105,19 @@ def plot_data():
 if __name__ == "__main__":
     N = -1
     # use_seeds = list(range(20))
-    use_seeds = list(range(8))
+    use_seeds = list(range(1))
     not_seeds = [20, 21, 22, 23, 24]
-    MAX_LEN = 6
+    MAX_LEN = 4
     MAX_RANDOM_LEN = 20
     PADDING = 0
 
     use_seeds = [str(random.PRNGKey(si)) for si in use_seeds]
     not_seeds = [str(random.PRNGKey(si)) for si in not_seeds]
-    # MAX_LEN = 4
-    # data_path = "data/191216/active_ird_exp1"
-    # data_path = "data/191217/active_ird_exp1"
-    # data_path = "data/200103/active_ird_exp_mid"
-    exp_dir = "data/200117"
-    exp_name = "active_ird_exp_one"
-    rand_dir = "data/200116"
+    # exp_dir = "data/200116"
+    # exp_name = "active_ird_exp_mid"
+
+    exp_dir = "data/200118"
+    exp_name = "active_ird_exp_three"
+    rand_dir = "data/200116_nope"
     rand_name = "random_ird_exp_mid"
     plot_data()

@@ -60,6 +60,7 @@ class ExperimentActiveIRD(object):
         fixed_belief_tasks=None,
         save_dir="data/active_ird_exp1",
         exp_name="active_ird_exp1",
+        exp_params={},
     ):
         # Inverse Reward Design Model
         self._model = model
@@ -80,6 +81,7 @@ class ExperimentActiveIRD(object):
         self._num_active_sample = num_active_sample
         self._fixed_belief_tasks = fixed_belief_tasks
         # Save path
+        self._exp_params = exp_params
         self._save_dir = save_dir
         self._exp_name = exp_name
         self._last_time = time()
@@ -291,6 +293,11 @@ class ExperimentActiveIRD(object):
         if "truth" in eval_data:
             true_ws = [eval_data["true_w"].item()]
             self._model.designer.truth.weights = true_ws
+        # Load parameters and check
+        # if "exp_params" in eval_data:
+        #     exp_params = eval_data["exp_params"].item()
+        #     for key, val in exp_params.items():
+        #         assert key in self._exp_params and self._exp_params == val
 
         # Load beliefs
         self._all_beliefs = {}
@@ -339,8 +346,9 @@ class ExperimentActiveIRD(object):
             np_obs[key] = [ob.weights[0] for ob in self._all_obs[key]]
         data = dict(
             seed=str(self._rng_key),
+            exp_params=self._exp_params,
             env_id=str(self._model.env_id),
-            true_w=self._model.designer.truth.weights[0],
+            true_w=self._model.designer.true_w,
             curr_obs=np_obs,
             curr_tasks=self._all_tasks,
             eval_tasks=self._eval_tasks,
@@ -454,6 +462,7 @@ class ExperimentActiveIRD(object):
                         diagnose_N=3,
                         prefix=prefix,
                         thumbnail=True,
+                        video=True,
                     )
 
     # def _diagnose_belief(self, belief, tasks, fn_key, itr):

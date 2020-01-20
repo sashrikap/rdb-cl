@@ -1,3 +1,4 @@
+import os
 import rdb
 import time
 import numpy as np
@@ -103,6 +104,7 @@ class Runner(object):
                 frames.append(frame)
             else:
                 raise NotImplementedError
+        self._env.close_window()
         return frames
 
     def collect_mp4(self, state, actions, width=450, path=None, text=None):
@@ -111,11 +113,11 @@ class Runner(object):
         self._env.reset()
         self._env.state = state
         render_env(self._env, state, actions, fps=3, path=path, text=text)
+        self._env.close_window()
         return path
 
-    def nb_show_mp4(self, state, actions, path):
+    def nb_show_mp4(self, state, actions, path, clear=True):
         """ Visualize mp4 on Jupyter notebook """
-        import os
         from ipywidgets import Output
         from IPython.display import display, Image, Video, clear_output
 
@@ -123,7 +125,8 @@ class Runner(object):
             os.remove(path)
         FRAME_WIDTH = 450
         mp4_path = self.collect_mp4(state, actions, path=path, width=FRAME_WIDTH)
-        clear_output()
+        if clear:
+            clear_output()
         display(Video(mp4_path, width=FRAME_WIDTH))
 
     def collect_thumbnail(self, state, actions=None, width=450, path=None, text=None):
@@ -133,6 +136,7 @@ class Runner(object):
         self._env.state = state
         frame = self._env.render("rgb_array", text=text)
         frame = imresize(frame, (width, width))
+        self._env.close_window()
         imsave(path, frame)
 
     def __call__(self, x0, actions, weights=None):

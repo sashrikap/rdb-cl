@@ -89,6 +89,8 @@ class ParticleServer(object):
                 worker.initialize()
 
     def compute_tasks(self, particles, tasks, task_names, verbose=True):
+        if particles is None:
+            return
         # Filter existing tasks
         new_tasks, new_task_names = [], []
         for task, task_name in zip(tasks, task_names):

@@ -463,6 +463,11 @@ class DriveWorld(gym.Env):
         else:
             return None
 
+    def close_window(self):
+        if self._window is not None:
+            self._window.close()
+        self._window = None
+
     def sub_render(self, mode="rgb_array", subframe=0, text=None):
         """ Alpha-interpolate adjacent frames to make animation look smoother """
         ratio = (subframe + 1.0) / float(self._subframes)

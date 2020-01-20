@@ -1,7 +1,7 @@
 """Sampling-based probability over reward weights.
 
 """
-from rdb.infer.utils import collect_trajs, random_choice
+from rdb.infer.utils import collect_trajs, random_choice, get_init_state
 from rdb.optim.utils import (
     multiply_dict_by_keys,
     subtract_dict_by_keys,
@@ -177,7 +177,9 @@ class Particles(object):
         return self._sample_actions[task_name]
 
     def _cache_task(self, task, task_name, desc=None):
-        state = self._get_init_state(task)
+        if self._env is None:
+            self._env = self._env_fn()
+        state = get_init_state(self._env, task)
         if self._test_mode:
             dummy_dict = concate_dict_by_keys(self.weights)
             actions, feats, feats_sum, violations = (
@@ -229,7 +231,9 @@ class Particles(object):
         if self._test_mode:
             return 0.0
 
-        state = self._get_init_state(task)
+        if self._env is None:
+            self._env = self._env_fn()
+        state = get_init_state(self._env, task)
         num_violate = 0.0
         for w in self.weights:
             actions = self._controller(state, weights=w)
@@ -245,7 +249,7 @@ class Particles(object):
         prob ratio of reward, measured by target w.
 
         Args:
-            target (Particles): target to compare against
+            target (Particles): target to compare against; if None, no target
 
         Requires:
             * compute_features
@@ -253,34 +257,33 @@ class Particles(object):
         """
         if self._test_mode:
             return 0.0
-        target_w = target.weights[0]
 
-        ## Compare reward difference
-        this_feats_sum = self.get_features_sum(task, task_name)
-        this_costs = multiply_dict_by_keys(target_w, this_feats_sum)
-        target_feats_sum = target.get_features_sum(task, task_name)
-        target_cost = multiply_dict_by_keys(target_w, target_feats_sum)
+        if target is not None:
+            target_w = target.weights[0]
 
-        diff_costs = subtract_dict_by_keys(this_costs, target_cost)
-        diff_rews = -1 * onp.sum(list(diff_costs.values()), axis=0)
-        ## Compare violation difference
-        this_vios = self.get_violations(task, task_name)
-        target_vios = target.get_violations(task, task_name)
-        diff_vios = subtract_dict_by_keys(this_vios, target_vios)
-        diff_vios = onp.sum(list(diff_vios.values()), axis=0)
-        if verbose:
-            print(
-                f"Diff rew {len(diff_rews)} items: mean {diff_rews.mean():.3f} std {diff_rews.std():.3f} max {diff_rews.max():.3f} min {diff_rews.min():.3f}"
-            )
-        return diff_rews, diff_vios
+            ## Compare reward difference
+            this_feats_sum = self.get_features_sum(task, task_name)
+            this_costs = multiply_dict_by_keys(target_w, this_feats_sum)
+            target_feats_sum = target.get_features_sum(task, task_name)
+            target_cost = multiply_dict_by_keys(target_w, target_feats_sum)
 
-    def _get_init_state(self, task):
-        if self._env is None:
-            self._env = self._env_fn()
-        self._env.set_task(task)
-        self._env.reset()
-        state = copy.deepcopy(self._env.state)
-        return state
+            diff_costs = subtract_dict_by_keys(this_costs, target_cost)
+            diff_rews = -1 * onp.sum(list(diff_costs.values()), axis=0)
+            ## Compare violation difference
+            this_vios = self.get_violations(task, task_name)
+            target_vios = target.get_violations(task, task_name)
+            diff_vios = subtract_dict_by_keys(this_vios, target_vios)
+            diff_vios = onp.sum(list(diff_vios.values()), axis=0)
+            if verbose:
+                print(
+                    f"Diff rew {len(diff_rews)} items: mean {diff_rews.mean():.3f} std {diff_rews.std():.3f} max {diff_rews.max():.3f} min {diff_rews.min():.3f}"
+                )
+            return diff_rews, diff_vios
+        else:
+            this_vios = self.get_violations(task, task_name)
+            this_vios = onp.sum(list(this_vios.values()), axis=0)
+            diff_rews = np.zeros(1)
+            return diff_rews, this_vios
 
     def resample(self, probs):
         """Resample from particles using list of probs. Similar to particle filter update."""
@@ -380,7 +383,15 @@ class Particles(object):
             raise NotImplementedError
 
     def diagnose(
-        self, task, task_name, target, diagnose_N, prefix, thumbnail=False, desc=None
+        self,
+        task,
+        task_name,
+        target,
+        diagnose_N,
+        prefix,
+        thumbnail=False,
+        desc=None,
+        video=True,
     ):
         """ Look at top/mid/bottom * diagnose_N particles and their performance. Record videos.
 
@@ -388,52 +399,55 @@ class Particles(object):
             prefix: include directory info e.g. "data/exp_xxx/save_"
 
         """
-        assert len(self.weights) >= diagnose_N * 3
-        diff_rews, diff_vios = self.compare_with(task, task_name, target)
-        ranks = onp.argsort(diff_rews)
-        top_N_idx = ranks[-diagnose_N:]
-        mid_N_idx = ranks[
-            math.floor((len(ranks) - diagnose_N) / 2) : math.floor(
-                (len(ranks) + diagnose_N) / 2
-            )
-        ]
-        low_N_idx = list(ranks[:diagnose_N])
-        top_N_idx, mid_N_idx, low_N_idx = (
-            list(top_N_idx),
-            list(mid_N_idx),
-            list(low_N_idx),
-        )
-        actions = np.array(self.get_actions(task, task_name))
-        top_rews, top_acs = diff_rews[top_N_idx], actions[top_N_idx]
-        mid_rews, mid_acs = diff_rews[mid_N_idx], actions[mid_N_idx]
-        low_rews, low_acs = diff_rews[low_N_idx], actions[low_N_idx]
-        mean_diff = diff_rews.mean()
-
-        map_particles = self.map_estimate(diagnose_N)
-        map_acs = np.array(map_particles.get_actions(task, task_name))
-        map_rews, map_vios = map_particles.compare_with(task, task_name, target)
-
-        init_state = self._get_init_state(task)
+        if self._env is None:
+            self._env = self._env_fn()
+        init_state = get_init_state(self._env, task)
 
         if thumbnail:
             tbn_path = f"{prefix}_task.png"
             self._runner.collect_thumbnail(init_state, path=tbn_path)
 
-        for label, group_rews, group_acs in zip(
-            ["map", "top", "mid", "low"],
-            [map_rews, top_rews, mid_rews, low_rews],
-            [map_acs, top_acs, mid_acs, low_acs],
-        ):
-            for rew, acs in zip(group_rews, group_acs):
-                file_path = (
-                    f"{prefix}label_{label}_mean_{mean_diff:.3f}_rew_{rew:.3f}.mp4"
+        if video:
+            assert len(self.weights) >= diagnose_N * 3
+            diff_rews, diff_vios = self.compare_with(task, task_name, target)
+            ranks = onp.argsort(diff_rews)
+            top_N_idx = ranks[-diagnose_N:]
+            mid_N_idx = ranks[
+                math.floor((len(ranks) - diagnose_N) / 2) : math.floor(
+                    (len(ranks) + diagnose_N) / 2
                 )
-                # Collect proxy reward paths
-                self._runner.collect_mp4(init_state, acs, path=file_path)
-            # Collect true reward paths
-            target_acs = self._controller(init_state, weights=target.weights[0])
-            target_path = f"{prefix}label_{label}_mean_{mean_diff:.3f}_true.mp4"
-            self._runner.collect_mp4(init_state, target_acs, path=target_path)
+            ]
+            low_N_idx = list(ranks[:diagnose_N])
+            top_N_idx, mid_N_idx, low_N_idx = (
+                list(top_N_idx),
+                list(mid_N_idx),
+                list(low_N_idx),
+            )
+            actions = np.array(self.get_actions(task, task_name))
+            top_rews, top_acs = diff_rews[top_N_idx], actions[top_N_idx]
+            mid_rews, mid_acs = diff_rews[mid_N_idx], actions[mid_N_idx]
+            low_rews, low_acs = diff_rews[low_N_idx], actions[low_N_idx]
+            mean_diff = diff_rews.mean()
+
+            map_particles = self.map_estimate(diagnose_N)
+            map_acs = np.array(map_particles.get_actions(task, task_name))
+            map_rews, map_vios = map_particles.compare_with(task, task_name, target)
+
+            for label, group_rews, group_acs in zip(
+                ["map", "top", "mid", "low"],
+                [map_rews, top_rews, mid_rews, low_rews],
+                [map_acs, top_acs, mid_acs, low_acs],
+            ):
+                for rew, acs in zip(group_rews, group_acs):
+                    file_path = (
+                        f"{prefix}label_{label}_mean_{mean_diff:.3f}_rew_{rew:.3f}.mp4"
+                    )
+                    # Collect proxy reward paths
+                    self._runner.collect_mp4(init_state, acs, path=file_path)
+                # Collect true reward paths
+                target_acs = self._controller(init_state, weights=target.weights[0])
+                target_path = f"{prefix}label_{label}_mean_{mean_diff:.3f}_true.mp4"
+                self._runner.collect_mp4(init_state, target_acs, path=target_path)
 
     def record(self, task, task_name, actions, filepath):
         pass

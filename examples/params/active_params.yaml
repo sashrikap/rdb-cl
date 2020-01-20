@@ -3,9 +3,9 @@ ACTIVE_FNS:
 - ratiomean
 - ratiomin
 BETA: 1.0
-ENV_NAME: Week6_02-v0
+ENV_NAME: Week6_03-v0
 EXP_ITERATIONS: 12
-EXP_NAME: active_ird_exp_two
+EXP_NAME: active_ird_exp_three
 HORIZON: 10
 MAX_WEIGHT: 5.0
 NUM_ACTIVE_SAMPLES: 500
@@ -23,8 +23,8 @@ NUM_WARMUPS: 1000
 PARALLEL: false
 PROPOSAL_VAR: 1.25
 RANDOM_KEYS:
-- 7
-SAVE_NAME: '200117'
+- 3
+SAVE_NAME: '200118'
 TASK:
 - 0.2
 - -0.7

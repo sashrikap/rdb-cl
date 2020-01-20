@@ -114,6 +114,7 @@ def main():
         save_dir=f"{SAVE_ROOT}/{SAVE_NAME}",
         # exp_name="active_ird_exp_mid",
         exp_name=f"{EXP_NAME}",
+        exp_params=PARAMS,
     )
 
     """ Experiment """
@@ -140,10 +141,10 @@ if __name__ == "__main__":
 
     # Load parameters
     if not GCP_MODE:
-        params = load_params("examples/params/active_template.yaml")
+        PARAMS = load_params("examples/params/active_template.yaml")
     else:
-        params = load_params("/dar_payload/rdb/examples/params/active_params.yaml")
-    locals().update(params)
+        PARAMS = load_params("/dar_payload/rdb/examples/params/active_params.yaml")
+    locals().update(PARAMS)
     if not GCP_MODE:
         RANDOM_KEYS = [24]
         NUM_EVAL_WORKERS = 4

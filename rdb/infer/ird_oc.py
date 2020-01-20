@@ -11,10 +11,12 @@ Note:
 
 import numpyro
 import copy
+import json
+import os
 import jax
 import jax.numpy as np
 from numpyro.handlers import scale, condition, seed
-from rdb.infer.utils import random_choice, logsumexp
+from rdb.infer.utils import random_choice, logsumexp, get_init_state
 from rdb.optim.utils import multiply_dict_by_keys
 from rdb.visualize.plot import plot_weights
 from rdb.infer.particles import Particles
@@ -22,6 +24,10 @@ from rdb.exps.utils import Profiler
 from tqdm.auto import tqdm, trange
 from rdb.infer.algos import *
 from time import time
+
+import pprint
+
+pp = pprint.PrettyPrinter(indent=4)
 
 
 class PGM(object):
@@ -71,6 +77,7 @@ class IRDOptimalControl(PGM):
             `p ~ exp(beta * reward)`
         prior_log_prob (fn): log probability of prior
         normalizer_fn (fn): sample fixed number of normalizers
+        true_w (dict):
         use_true_w (bool): debug designer with true w
 
     Methods:
@@ -103,6 +110,8 @@ class IRDOptimalControl(PGM):
         designer_args={},
         num_prior_tasks=0,
         use_true_w=False,
+        interactive_mode=True,
+        interactive_name="Default",
         debug_true_w=False,
         test_mode=False,  # Skip _cache_task part if true
     ):
@@ -130,21 +139,27 @@ class IRDOptimalControl(PGM):
         kernel = self._build_kernel(beta)
         super().__init__(rng_key, kernel, proposal_fn, sample_method, sample_args)
         # assume designer uses the same beta, prior and prior proposal
-        truth = self.create_particles([true_w])
-        self._designer = Designer(
-            rng_key,
-            self.env_fn,
-            self._controller,
-            self._runner,
-            beta,
-            truth,
-            prior_log_prob_fn,
-            proposal_fn,
-            sample_method,
-            designer_args,
-            use_true_w=use_true_w,
-            num_prior_tasks=num_prior_tasks,
-        )
+        if not interactive_mode:
+            truth = self.create_particles([true_w])
+            self._designer = Designer(
+                rng_key,
+                self.env_fn,
+                self._controller,
+                self._runner,
+                beta,
+                truth,
+                prior_log_prob_fn,
+                proposal_fn,
+                sample_method,
+                designer_args,
+                use_true_w=use_true_w,
+                num_prior_tasks=num_prior_tasks,
+            )
+        else:
+            # Interactive Mode
+            self._designer = DesignerInteractive(
+                rng_key, self.env_fn, self._controller, self._runner, interactive_name
+            )
 
     @property
     def env_id(self):
@@ -249,17 +264,11 @@ class IRDOptimalControl(PGM):
             test_mode=test_mode,
         )
 
-    def _get_init_state(self, task):
-        self._env.set_task(task)
-        self._env.reset()
-        state = self._env.state
-        return state
-
     def _build_normalizer(self, task, task_name):
         """For new tasks, need to build normalizer."""
         assert self._normalizer_fn is not None, "Need to set random seed"
         norm_ws = self._normalizer_fn()
-        state = self._get_init_state(task)
+        state = get_init_state(self.env, task)
         normalizer = self.create_particles(norm_ws, test_mode=False)
         norm_feats = normalizer.get_features(
             task, task_name, desc="Collecting Normalizer Features"
@@ -368,8 +377,11 @@ class Designer(PGM):
         self._env = env_fn()
         self._controller = controller
         self._runner = runner
-        self._true_w = truth.weights[0]
         self._truth = truth
+        if self._truth is not None:
+            self._true_w = truth.weights[0]
+        else:
+            self._true_w = None
         self._use_true_w = use_true_w
         # Prior function
         self._prior_raw_fn = prior_log_prob_fn
@@ -419,12 +431,6 @@ class Designer(PGM):
         """ Modifies Underlying Designer Prior. Use very carefully."""
         self._prior_tasks = tasks
 
-    def _get_init_state(self, task):
-        self._env.set_task(task)
-        self._env.reset()
-        state = self._env.state
-        return state
-
     @property
     def true_w(self):
         return self._true_w
@@ -448,7 +454,7 @@ class Designer(PGM):
     def _build_kernel(self, beta):
         def likelihood_fn(true_w, sample_w, task):
             assert self._prior_log_prob is not None, "Need to set random seed"
-            state = self._get_init_state(task)
+            state = get_init_state(self.env, task)
             actions = self._controller(state, weights=sample_w)
             _, cost, info = self._runner(state, actions, weights=true_w)
             rew = -1 * cost
@@ -459,57 +465,122 @@ class Designer(PGM):
         return likelihood_fn
 
 
-class DesignerInformed(Designer):
-    """Simulated designer module.
-
-    Select's better "informed" proxies.
+class DesignerInteractive(Designer):
+    """Interactive Designer used in Jupyter Notebook interactive mode.
     """
 
-    def __init__(
-        self,
-        rng_key,
-        env_fn,
-        controller,
-        runner,
-        beta,
-        truth,
-        prior_log_prob_fn,
-        proposal_fn,
-        sample_method="mh",
-        sampler_args={},
-        use_true_w=False,
-    ):
+    def __init__(self, rng_key, env_fn, controller, runner, name="Default"):
         super().__init__(
-            rng_key,
-            env_fn,
-            controller,
-            runner,
-            beta,
-            truth,
-            prior_log_prob_fn,
-            proposal_fn,
-            sample_method,
-            sampler_args,
-            use_true_w,
+            rng_key=rng_key,
+            env_fn=env_fn,
+            controller=controller,
+            runner=runner,
+            beta=None,
+            truth=None,
+            prior_log_prob_fn=None,
+            proposal_fn=None,
+            sample_method=None,
         )
-        self._random_choice = None
-        self._prior_tasks = None
+        self._name = name
+        self._savedir = self.init_savedir()
+        self._user_inputs = []
+
+    def run_from_ipython(self):
+        try:
+            __IPYTHON__
+            return True
+        except NameError:
+            return False
+
+    def init_savedir(self):
+        """Create empty directory to dump interactive videos.
+        """
+        # By default, this is run from notebook
+        assert self.run_from_ipython()
+        # nb directory: "/Users/jerry/Dropbox/Projects/SafeRew/rdb/examples/notebook"
+        savedir = f"../../data/interactive_{self._name}"
+        if not os.path.isdir(savedir):
+            os.mkdir(savedir)
+        return savedir
+
+    def sample(self, task, task_name, verbose=True):
+        raise NotImplementedError
+
+    @property
+    def name(self):
+        return self._name
+
+    def simulate(self, task, task_name):
+        """Interactively query weight input.
+
+        In Jupyter Notebook:
+            * Display a task visualization.
+            * Show previous weights, current MAP belief
+            * Let user play around with different weights
+            * Let user feed in a selected weight.
+
+        Todo:
+            * Display all other not-selected candidates.
+        """
+        self.env.set_task(task)
+        init_state = get_init_state(self.env, task)
+        # Visualize task
+        while True:
+            user_in = input("Type in weights or Y to accept last")
+            if user_in == "Y":
+                if len(self._user_inputs) == 0:
+                    print("Need at least one input")
+                    continue
+                else:
+                    break
+            try:
+                user_in_w = json.loads(user_in)
+                self._user_inputs.append(user_in_w)
+                # Visualize trajectory
+                acs = self._controller(init_state, weights=user_in_w)
+                num_weights = len(self._user_inputs)
+                path = f"{self._savedir}/user_trial_{num_weights}_task_{str(task)}.mp4"
+                print("Received Weights")
+                pp.pprint(user_in_w)
+                self._runner.nb_show_mp4(init_state, acs, path=path, clear=False)
+            except Exception as e:
+                print(e)
+                print("Invalid input.")
+                continue
+        return Particles(
+            self._rng_key,
+            self._env_fn,
+            self._controller,
+            self._runner,
+            [self._user_inputs[-1]],
+        )
+
+    def reset_prior_tasks(self):
+        raise NotImplementedError
+
+    @property
+    def prior_tasks(self):
+        raise NotImplementedError
+
+    @prior_tasks.setter
+    def prior_tasks(self, tasks):
+        raise NotImplementedError
+
+    @property
+    def true_w(self):
+        return None
+
+    @property
+    def truth(self):
+        return None
+
+    def update_key(self, rng_key):
+        return
+
+    def _build_sampler(self, kernel, proposal_fn, sample_method, sample_args):
+        """Dummy sampler."""
+        pass
 
     def _build_kernel(self, beta):
-        """Compute likelihood by looking at all prior tasks."""
-
-        def likelihood_fn(true_w, sample_w, task):
-            assert self._prior_log_prob is not None, "Need to set random seed"
-            assert self._prior_tasks is not None, "Need prior tasks"
-            all_tasks = self._prior_tasks + [task]
-            log_prob = 0.0
-            for taski in all_tasks:
-                state = self._get_init_state(taski)
-                actions = self._controller(state, weights=sample_w)
-                _, cost, info = self._runner(state, actions, weights=true_w)
-                rew = -1 * cost
-                log_prob += beta * rew
-            log_prob += self._prior_log_prob(sample_w)
-            return log_prob
-
-        return likelihood_fn
+        """Dummy kernel."""
+        pass

@@ -116,7 +116,8 @@ class ActiveRatioTest(ActiveInfoGain):
         Score = -1 * rew(sample_w, traj_user)/rew(sample_w, traj_sample).
 
         Note:
-            * The higher the better.
+            * The higher the better. i.e. in that task, observed user traj less optimal
+            than sampled traj, measured by sample_w
 
         """
         desc = f"Computing {self._method} acquisition features"
