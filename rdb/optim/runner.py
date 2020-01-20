@@ -139,6 +139,20 @@ class Runner(object):
         self._env.close_window()
         imsave(path, frame)
 
+    def nb_show_thumbnail(self, state, path, clear=True):
+        """ Visualize mp4 on Jupyter notebook """
+        from ipywidgets import Output
+        from IPython.display import display, Image, clear_output
+
+        if os.path.isfile(path):
+            os.remove(path)
+        FRAME_WIDTH = 450
+        self.collect_thumbnail(state, path=path, width=FRAME_WIDTH)
+        if clear:
+            clear_output()
+        # display(Video(mp4_path, width=FRAME_WIDTH))
+        display(Image(path))
+
     def __call__(self, x0, actions, weights=None):
         """Run optimization.
 

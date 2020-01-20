@@ -22,18 +22,11 @@ PARALLEL: True
 # ENV_NAME: "Week6_02-v0"
 # NUM_EVAL_TASKS: 4096
 
-ACTIVE_FNS: ["infogain", "ratiomean", "ratiomin"]
-EXP_NAME: "active_ird_exp_three"
+ACTIVE_FNS: ["infogain", "ratiomean", "ratiomin", "random"]
+EXP_NAME: "interactive_ird_exp_three"
 EXP_ITERATIONS: 12
 ENV_NAME: "Week6_03-v0"
 NUM_EVAL_TASKS: 4096
-
-
-# ACTIVE_FNS: ["random"]
-# EXP_NAME: "random_ird_exp_mid"
-# EXP_ITERATIONS: 64
-# ENV_NAME: "Week6_01-v0"
-# NUM_EVAL_TASKS: -1
 
 
 ## Designer settigns

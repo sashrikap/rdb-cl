@@ -126,6 +126,5 @@ def run_interactive():
     """ Experiment """
     for ki in p.RANDOM_KEYS:
         key = random.PRNGKey(ki)
-        print(key)
         experiment.update_key(key)
         experiment.run()

@@ -525,7 +525,11 @@ class DesignerInteractive(Designer):
         self.env.set_task(task)
         init_state = get_init_state(self.env, task)
         # Visualize task
+        image_path = f"{self._savedir}/user_trial_0_task_{str(task)}.png"
+        self._runner.nb_show_thumbnail(init_state, image_path, clear=False)
+        # Query user input
         while True:
+            print(f"Current task: {str(task)}")
             user_in = input("Type in weights or Y to accept last")
             if user_in == "Y":
                 if len(self._user_inputs) == 0:
@@ -539,10 +543,12 @@ class DesignerInteractive(Designer):
                 # Visualize trajectory
                 acs = self._controller(init_state, weights=user_in_w)
                 num_weights = len(self._user_inputs)
-                path = f"{self._savedir}/user_trial_{num_weights}_task_{str(task)}.mp4"
+                video_path = (
+                    f"{self._savedir}/user_trial_{num_weights}_task_{str(task)}.mp4"
+                )
                 print("Received Weights")
                 pp.pprint(user_in_w)
-                self._runner.nb_show_mp4(init_state, acs, path=path, clear=False)
+                self._runner.nb_show_mp4(init_state, acs, path=video_path, clear=False)
             except Exception as e:
                 print(e)
                 print("Invalid input.")
@@ -575,7 +581,7 @@ class DesignerInteractive(Designer):
         return None
 
     def update_key(self, rng_key):
-        return
+        self._rng_key = rng_key
 
     def _build_sampler(self, kernel, proposal_fn, sample_method, sample_args):
         """Dummy sampler."""
