@@ -205,7 +205,7 @@ class ExperimentActiveIRD(object):
         # Compute belief features
         cand_names = [f"active_{task}" for task in candidates]
         belief = belief.subsample(self._num_active_sample)
-        if cand_names != "random":
+        if fn_key != "random":
             # Random does not need pre-computation
             self._eval_server.compute_tasks(
                 belief, candidates, cand_names, verbose=True
@@ -236,30 +236,41 @@ class ExperimentActiveIRD(object):
             * Violations.
 
         """
-        # Compute belief features
-        eval_names = [f"eval_{task}" for task in eval_tasks]
-        if self._num_eval_map > 0:
-            belief = belief.map_estimate(self._num_eval_map)
+        if self._model.interactive_mode:
+            # Interactive mode, skip evaluation to speed up
+            avg_violate = 0.0
+            avg_perform = 0.0
         else:
-            belief = belief.subsample(self._num_eval_sample)
-        target = self._model.designer.truth
-        self._eval_server.compute_tasks(belief, eval_tasks, eval_names, verbose=True)
-        self._eval_server.compute_tasks(target, eval_tasks, eval_names, verbose=True)
+            # Compute belief features
+            eval_names = [f"eval_{task}" for task in eval_tasks]
+            if self._num_eval_map > 0:
+                belief = belief.map_estimate(self._num_eval_map)
+            else:
+                belief = belief.subsample(self._num_eval_sample)
+            target = self._model.designer.truth
+            self._eval_server.compute_tasks(
+                belief, eval_tasks, eval_names, verbose=True
+            )
+            self._eval_server.compute_tasks(
+                target, eval_tasks, eval_names, verbose=True
+            )
 
-        num_violate = 0.0
-        performance = 0.0
-        desc = f"Evaluating method {fn_name}"
-        for task, task_name in tqdm(
-            zip(eval_tasks, eval_names), total=len(eval_tasks), desc=desc
-        ):
-            diff_perf, diff_vios = belief.compare_with(task, task_name, target=target)
-            performance += diff_perf.mean()
-            num_violate += diff_vios.mean()
+            num_violate = 0.0
+            performance = 0.0
+            desc = f"Evaluating method {fn_name}"
+            for task, task_name in tqdm(
+                zip(eval_tasks, eval_names), total=len(eval_tasks), desc=desc
+            ):
+                diff_perf, diff_vios = belief.compare_with(
+                    task, task_name, target=target
+                )
+                performance += diff_perf.mean()
+                num_violate += diff_vios.mean()
 
-        avg_violate = float(num_violate / len(eval_tasks))
-        avg_perform = float(performance / len(eval_tasks))
-        print(f">>> Average Violation diff {avg_violate:.2f}")
-        print(f">>> Average Performance diff {avg_perform:.2f}")
+            avg_violate = float(num_violate / len(eval_tasks))
+            avg_perform = float(performance / len(eval_tasks))
+            print(f">>> Average Violation diff {avg_violate:.2f}")
+            print(f">>> Average Performance diff {avg_perform:.2f}")
         self._active_eval_hist[fn_name].append(
             {"violation": avg_violate, "perform": avg_perform}
         )
@@ -359,6 +370,7 @@ class ExperimentActiveIRD(object):
         path = f"{self._save_dir}/{self._exp_name}/{self._exp_name}_seed_{str(self._rng_key)}.npz"
         with open(path, "wb+") as f:
             np.savez(f, **data)
+        print("save", exp_dir)
 
         ## Save belief sample information
         fig_dir = f"{self._save_dir}/{self._exp_name}/plots"

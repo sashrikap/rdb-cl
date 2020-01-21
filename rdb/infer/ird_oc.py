@@ -139,6 +139,7 @@ class IRDOptimalControl(PGM):
         kernel = self._build_kernel(beta)
         super().__init__(rng_key, kernel, proposal_fn, sample_method, sample_args)
         # assume designer uses the same beta, prior and prior proposal
+        self._interactive_mode = interactive_mode
         if not interactive_mode:
             truth = self.create_particles([true_w])
             self._designer = Designer(
@@ -180,6 +181,10 @@ class IRDOptimalControl(PGM):
     @property
     def eval_server(self):
         return self._eval_server
+
+    @property
+    def interactive_mode(self):
+        return self._interactive_mode
 
     def update_key(self, rng_key):
         """ Update random key """
@@ -498,9 +503,8 @@ class DesignerInteractive(Designer):
         # By default, this is run from notebook
         assert self.run_from_ipython()
         # nb directory: "/Users/jerry/Dropbox/Projects/SafeRew/rdb/examples/notebook"
-        savedir = f"../../data/interactive_{self._name}"
-        if not os.path.isdir(savedir):
-            os.mkdir(savedir)
+        savedir = f"../../data/interactive/{self._name}"
+        os.makedirs(savedir, exist_ok=True)
         return savedir
 
     def sample(self, task, task_name, verbose=True):

@@ -287,6 +287,7 @@ class DriveWorld(gym.Env):
             # car_shape = np.array([self._car_width, self._car_length])
 
             def car_dist_fn(state, actions, car_idx=car_idx):
+                # Very important to keep third argument for variable closure
                 car_pos = state[..., np.arange(*car_idx)]
                 main_pos = state[..., np.arange(*main_idx)]
                 return feature.diff_to(car_pos, main_pos)
@@ -310,9 +311,8 @@ class DriveWorld(gym.Env):
             main_idx = self._indices["main_car"]
             obj_idx = self._indices[f"{obj.name}_{o_i:02d}"]
 
-            def obj_dist_fn(state, actions):
+            def obj_dist_fn(state, actions, obj_idx=obj_idx):
                 main_pos = state[..., np.arange(*main_idx)]
-                # obj_pos = obj.state
                 obj_pos = state[..., np.arange(*obj_idx)]
                 return feature.diff_to(main_pos, obj_pos)
 

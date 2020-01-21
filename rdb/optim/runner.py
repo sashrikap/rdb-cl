@@ -127,6 +127,7 @@ class Runner(object):
         mp4_path = self.collect_mp4(state, actions, path=path, width=FRAME_WIDTH)
         if clear:
             clear_output()
+        print(f"video path {mp4_path}")
         display(Video(mp4_path, width=FRAME_WIDTH))
 
     def collect_thumbnail(self, state, actions=None, width=450, path=None, text=None):

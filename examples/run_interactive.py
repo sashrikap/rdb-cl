@@ -23,11 +23,13 @@ class objectview(object):
         self.__dict__ = d
 
 
-def run_interactive():
+def run_interactive(active_fn_name):
     # Load parameters
     # nb directory: "/Users/jerry/Dropbox/Projects/SafeRew/rdb/examples/notebook"
     PARAMS = load_params("../params/interactive_template.yaml")
     # locals().update(PARAMS)
+    PARAMS["EXP_NAME"] = f"{PARAMS['EXP_NAME']}_{active_fn_name}"
+    PARAMS["INTERACTIVE_NAME"] = f"{PARAMS['INTERACTIVE_NAME']}_{active_fn_name}"
     p = objectview(PARAMS)
 
     def env_fn():
@@ -104,10 +106,11 @@ def run_interactive():
     }
     keys = list(active_fns.keys())
     for key in keys:
-        if key not in p.ACTIVE_FNS:
+        if key != active_fn_name:
             del active_fns[key]
+    assert len(list(active_fns)) == 1
 
-    SAVE_ROOT = "data"
+    SAVE_ROOT = "../../data"
     experiment = ExperimentActiveIRD(
         ird_model,
         active_fns,
