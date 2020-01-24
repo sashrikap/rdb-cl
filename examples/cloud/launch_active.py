@@ -30,6 +30,7 @@ def launch(params_dict):
             # zone="us-east1-b",  # 8 c2 isntance
             instance_type="c2-standard-4",
             preemptible=False,
+            # preemptible=True,
             gcp_image="active-ird-rss-v01",
             gcp_image_project="aerial-citron-264318",
             gcp_project="aerial-citron-264318",
@@ -72,7 +73,7 @@ if __name__ == "__main__":
         # params = {"RANDOM_KEYS": list(range(26, 36)), "NUM_EVAL_WORKERS": 8}
         params = {
             # "RANDOM_KEYS": list(range(6)),
-            "RANDOM_KEYS": list(range(4)),
+            "RANDOM_KEYS": list(range(2)),
             # "RANDOM_KEYS": [20, 21, 22, 23, 24],
             "NUM_EVAL_WORKERS": 16,
         }

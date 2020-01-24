@@ -101,14 +101,17 @@ class MetropolisHasting(Inference):
         self._proposal = None
         self._coin_flip = None
 
-    def _mh_step(self, obs, state, log_prob, *args, **kwargs):
+    def _mh_step(self, obs, state, log_prob, verbose=False, *args, **kwargs):
         assert self._rng_key is not None, "Need to initialize with random key"
 
         assert self._proposal is not None, "Need to set random seed"
         next_state = self._proposal(state)
         next_log_prob = self._kernel(obs, next_state, **kwargs)
         log_ratio = next_log_prob - log_prob
-        # print(f"log next {next_log_prob:.2f} log current {log_prob:.2f}")
+        if verbose:
+            print(f"log next {next_log_prob:.2f} log current {log_prob:.2f}")
+        # if next_log_prob < -1e5:
+        #     import pdb; pdb.set_trace()
         accept = self._coin_flip() < np.exp(log_ratio)
         if not accept:
             next_state = state
@@ -146,24 +149,35 @@ class MetropolisHasting(Inference):
             num_samples = self._num_samples
 
         log_prob = self._kernel(obs, state, **kwargs)
+
+        # Warm-up phase
+        warmup_accepts = []
         range_ = range(self._num_warmups)
         if verbose:
-            range_ = trange(num_samples, desc="MH Warmup")
+            range_ = trange(self._num_warmups, desc="MH Warmup")
         for i in range_:
-            _, state, log_prob = self._mh_step(obs, state, log_prob, *args, **kwargs)
+            accept = False
+            while not accept:
+                accept, state, log_prob = self._mh_step(
+                    obs, state, log_prob, verbose=False, *args, **kwargs
+                )
+                warmup_accepts.append(accept)
+            ratio = float(np.sum(warmup_accepts)) / len(warmup_accepts)
+            if verbose:
+                range_.set_description(f"MH Warmup; Accept {100 * ratio:.1f}%")
 
+        # Actual sampling phase (idential to warmup)
         samples = []
         accepts = []
-        ratio = 0.0
-        num_steps = 0
         range_ = range(num_samples)
         if verbose:
             range_ = trange(num_samples, desc="MH Sampling")
         for i in range_:
             accept = False
             while not accept:
-                num_steps += 1
-                accept, state, log_prob = self._mh_step(obs, state, log_prob, **kwargs)
+                accept, state, log_prob = self._mh_step(
+                    obs, state, log_prob, verbose=False, *args, **kwargs
+                )
                 accepts.append(accept)
             ratio = float(np.sum(accepts)) / len(accepts)
             if verbose:
@@ -227,4 +241,4 @@ class RejectionSampling(Inference):
         super().__init__(rng_key, kernel, num_samples, num_warmups)
 
     def sample(self, obs, *args, **kargs):
-        pass
+        raise NotImplementedError

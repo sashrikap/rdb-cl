@@ -121,13 +121,20 @@ if __name__ == "__main__":
     parser.add_argument("--GCP_MODE", action="store_true")
     args = parser.parse_args()
 
+    # PARAMS = load_params("examples/params/active_template.yaml")
     PARAMS = load_params("examples/params/active_template.yaml")
     locals().update(PARAMS)
 
-    DEBUG_DIR = "data/200118/"
-    EXP_NAME = "active_ird_exp_three"
-    ENV_NAME = "Week6_03-v0"
+    DEBUG_DIR = "data/200120/"
+    # EXP_NAME = "active_ird_exp_three"
+    # ENV_NAME = "Week6_03-v0"
+    EXP_NAME = "active_ird_exp_two"
+    ENV_NAME = "Week6_02-v0"
     CANDIDATE_KEYS = list(range(8))
+
+    # EXP_NAME = "interactive_ird_exp_three_random"
+    # CANDIDATE_KEYS = [26]
+    # ENV_NAME = "Week6_03-v0"
 
     # RAND_EXP_NAME = "random_ird_exp_mid"
     debug_candidate(DEBUG_DIR, EXP_NAME)

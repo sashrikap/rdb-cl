@@ -8,6 +8,7 @@ NUM_EVAL_WORKERS: 4
 NUM_WARMUPS: 1000
 NUM_ACTIVE_TASKS: 36
 PARALLEL: True
+ACTIVE_FNS: ["infogain", "ratiomean", "ratiomin", "random"]
 
 # ACTIVE_FNS: ["infogain", "ratiomean", "ratiomin"]
 # EXP_NAME: "active_ird_exp_one"
@@ -17,16 +18,16 @@ PARALLEL: True
 
 
 # ACTIVE_FNS: ["infogain", "ratiomean", "ratiomin"]
-# EXP_NAME: "active_ird_exp_two"
-# EXP_ITERATIONS: 12
-# ENV_NAME: "Week6_02-v0"
-# NUM_EVAL_TASKS: 4096
-
-ACTIVE_FNS: ["infogain", "ratiomean", "ratiomin"]
-EXP_NAME: "active_ird_exp_three"
-EXP_ITERATIONS: 12
-ENV_NAME: "Week6_03-v0"
+EXP_NAME: "active_ird_exp_two"
+EXP_ITERATIONS: 6
+ENV_NAME: "Week6_02-v0"
 NUM_EVAL_TASKS: 4096
+
+# ACTIVE_FNS: ["infogain", "ratiomean", "ratiomin"]
+# EXP_NAME: "active_ird_exp_three"
+# EXP_ITERATIONS: 6
+# ENV_NAME: "Week6_03-v0"
+# NUM_EVAL_TASKS: 4096
 
 
 # ACTIVE_FNS: ["random"]
@@ -46,7 +47,7 @@ NUM_SAMPLES: 1000
 NUM_ACTIVE_SAMPLES: 500
 NUM_EVAL_SAMPLES: -1
 NUM_EVAL_MAP: 4
-SAVE_NAME: "200118"
+SAVE_NAME: "200120"
 
 
 ## Testing

@@ -30,8 +30,9 @@ def run_interactive(active_fn_name, evaluate=False):
         PARAMS = load_params("examples/params/interactive_template.yaml")
     else:
         # From jupyter notebook
-        PARAMS = load_params("../params/interactive_template.yaml")
+        PARAMS = load_params("../../examples/params/interactive_template.yaml")
 
+    PARAMS["INTERACTIVE_NAME"] = "Jerry_02"
     PARAMS["EXP_NAME"] = f"{PARAMS['EXP_NAME']}_{active_fn_name}"
     PARAMS["INTERACTIVE_NAME"] = f"{PARAMS['INTERACTIVE_NAME']}_{active_fn_name}"
     p = objectview(PARAMS)
@@ -150,8 +151,8 @@ def run_interactive(active_fn_name, evaluate=False):
 if __name__ == "__main__":
     # for exp_key in ["infogain", "ratiomean", "ratiomin", "random"]:
     # for exp_key in ["infogain", "ratiomean", "ratiomin", "random"]:
-    for exp_key in ["random"]:
-        # for exp_key in ["infogain"]:
+    # for exp_key in ["random"]:
+    for exp_key in ["infogain"]:
         # for exp_key in ["ratiomin"]:
         # for exp_key in ["ratiomean"]:
         run_interactive(exp_key, evaluate=True)

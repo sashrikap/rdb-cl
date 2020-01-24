@@ -104,8 +104,8 @@ def plot_data():
 
 if __name__ == "__main__":
     N = -1
-    # use_seeds = list(range(20))
-    use_seeds = list(range(1))
+    use_seeds = [1]  # list(range(20))
+    # use_seeds = list(range(1))
     not_seeds = [20, 21, 22, 23, 24]
     MAX_LEN = 4
     MAX_RANDOM_LEN = 20
@@ -116,8 +116,9 @@ if __name__ == "__main__":
     # exp_dir = "data/200116"
     # exp_name = "active_ird_exp_mid"
 
-    exp_dir = "data/200118"
-    exp_name = "active_ird_exp_three"
+    # exp_dir = "data/200118"
+    exp_dir = "data/200120"
+    exp_name = "active_ird_exp_two"
     rand_dir = "data/200116_nope"
     rand_name = "random_ird_exp_mid"
     plot_data()

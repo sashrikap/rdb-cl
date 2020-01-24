@@ -29,10 +29,14 @@ Plotting Utilities
 
 
 def plot_weights(
-    weights_dicts, highlight_dicts=[], highlight_colors=[], path=None, title=None
+    weights_dicts,
+    highlight_dicts=[],
+    highlight_colors=[],
+    path=None,
+    title=None,
+    max_weight=8.0,
+    bins=100,
 ):
-    PLOT_BINS = 100
-    MAX_WEIGHT = 8.0
 
     fig = plt.figure(figsize=(8, 6), dpi=80)
     n_values = len(weights_dicts[0].values())
@@ -41,8 +45,8 @@ def plot_weights(
         plt.subplot(n_values, 1, i + 1)
         n, bins, patches = plt.hist(
             values,
-            PLOT_BINS,
-            range=(-MAX_WEIGHT, MAX_WEIGHT),
+            bins,
+            range=(-max_weight, max_weight),
             density=True,
             facecolor="b",
             alpha=0.75,

@@ -8,6 +8,7 @@ Include:
 """
 
 import jax.numpy as np
+import numpy as onp
 from rdb.optim.utils import (
     multiply_dict_by_keys,
     subtract_dict_by_keys,
@@ -47,7 +48,7 @@ class ActiveInfoGain(object):
         probs = np.exp(log_probs - denom)
         return probs
 
-    def __call__(self, next_task, next_task_name, belief, obs, verbose=True):
+    def __call__(self, next_task, next_task_name, belief, obs, verbose=True, params={}):
         """Information gain (negative entropy) criteria.
 
         Note:
@@ -68,19 +69,26 @@ class ActiveInfoGain(object):
                 next_probs = self._compute_probs(next_designer_ws, next_feats_sum)
                 next_belief = belief.resample(next_probs)
                 # avoid gaussian entropy (causes NonSingular Matrix issue)
-                ent = next_belief.entropy("histogram")
-                if np.isnan(ent):
+                # currently uses onp.ma.log which is non-differentiable
+                ent = float(
+                    next_belief.entropy(
+                        "histogram",
+                        max_weight=params["MAX_WEIGHT"],
+                        bins=params["HIST_BINS"],
+                    )
+                )
+                if onp.isnan(ent):
                     ent = 1000
                     print("WARNING: Entropy has NaN entropy value")
                 entropies.append(ent)
 
-        entropies = np.array(entropies)
-        infogain = -1 * np.mean(entropies)
+        entropies = onp.array(entropies)
+        infogain = -1 * onp.mean(entropies)
 
         if self._debug:
             print(f"Active method {self._method}")
             print(
-                f"\tEntropies mean {np.mean(entropies):.3f} std {np.std(entropies):.3f}"
+                f"\tEntropies mean {onp.mean(entropies):.3f} std {onp.std(entropies):.3f}"
             )
 
         return infogain
@@ -110,7 +118,7 @@ class ActiveRatioTest(ActiveInfoGain):
         log_ratios = -1 * np.sum(list(diff_costs.values()), axis=0)
         return np.array(log_ratios)
 
-    def __call__(self, next_task, next_task_name, belief, obs, verbose=True):
+    def __call__(self, next_task, next_task_name, belief, obs, verbose=True, params={}):
         """Disagreement criteria.
 
         Score = -1 * rew(sample_w, traj_user)/rew(sample_w, traj_sample).
@@ -162,7 +170,7 @@ class ActiveRandom(ActiveInfoGain):
         self._rng_key = rng_key
         self._random_uniform = seed(random_uniform, self._rng_key)
 
-    def __call__(self, next_task, next_task_name, belief, obs, verbose=True):
+    def __call__(self, next_task, next_task_name, belief, obs, verbose=True, params={}):
         """Random score
 
         """

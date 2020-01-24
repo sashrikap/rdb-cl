@@ -51,6 +51,13 @@ class Runner(object):
     def env(self):
         return self._env
 
+    def run_from_ipython(self):
+        try:
+            __IPYTHON__
+            return True
+        except NameError:
+            return False
+
     def _collect_features(self, x0, actions):
         """
         Return:
@@ -104,7 +111,8 @@ class Runner(object):
                 frames.append(frame)
             else:
                 raise NotImplementedError
-        self._env.close_window()
+        if self.run_from_ipython():
+            self._env.close_window()
         return frames
 
     def collect_mp4(self, state, actions, width=450, path=None, text=None):
@@ -137,7 +145,8 @@ class Runner(object):
         self._env.state = state
         frame = self._env.render("rgb_array", text=text)
         frame = imresize(frame, (width, width))
-        self._env.close_window()
+        if self.run_from_ipython():
+            self._env.close_window()
         imsave(path, frame)
 
     def nb_show_thumbnail(self, state, path, clear=True):

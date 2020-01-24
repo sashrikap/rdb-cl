@@ -58,6 +58,7 @@ class ExperimentActiveIRD(object):
         num_active_sample=-1,
         fixed_candidates=None,
         fixed_belief_tasks=None,
+        max_visualize_weights=8.0,
         save_dir="data/active_ird_exp1",
         exp_name="active_ird_exp1",
         exp_params={},
@@ -80,6 +81,7 @@ class ExperimentActiveIRD(object):
         self._fixed_candidates = fixed_candidates
         self._num_active_sample = num_active_sample
         self._fixed_belief_tasks = fixed_belief_tasks
+        self._max_visualize_weights = max_visualize_weights
         # Save path
         self._exp_params = exp_params
         self._save_dir = save_dir
@@ -108,11 +110,12 @@ class ExperimentActiveIRD(object):
         for fn in self._active_fns.values():
             fn.update_key(rng_key)
 
-    def run(self):
+    def run(self, plot_candidates=False):
         """Main function 1: Run experiment from task.
 
         Args:
-            task (obj): initial task; if None, start from random.
+            # task (obj): initial task; if None, start from random.
+            plot_candidates (bool): plot rankings of proposed candidates
 
         """
         print(
@@ -171,6 +174,7 @@ class ExperimentActiveIRD(object):
                 self._all_tasks[key].append(next_task)
                 self._all_task_names[key].append(next_task_name)
                 self._all_cand_scores[key].append(scores)
+                self._plot_candidate_scores(it)
                 self._log_time(f"Itr {it} {key} Propose")
 
                 ## Main IRD Sampling
@@ -218,11 +222,17 @@ class ExperimentActiveIRD(object):
         ):
             scores.append(
                 self._active_fns[fn_key](
-                    next_task, next_task_name, belief, obs, verbose=False
+                    next_task,
+                    next_task_name,
+                    belief,
+                    obs,
+                    verbose=False,
+                    params=self._exp_params,
                 )
             )
         scores = np.array(scores)
-        next_task = candidates[np.argmax(scores)]
+        print(f"Function {fn_key} chose task {np.argmax(scores)} among {len(scores)}")
+        next_task = candidates[onp.argmax(scores)]
         return next_task, scores
 
     def _evaluate(self, fn_name, belief, eval_tasks):
@@ -236,7 +246,7 @@ class ExperimentActiveIRD(object):
             * Violations.
 
         """
-        if self._model.interactive_mode:
+        if self._model.interactive_mode and self._model.designer.run_from_ipython():
             # Interactive mode, skip evaluation to speed up
             avg_violate = 0.0
             avg_perform = 0.0
@@ -279,6 +289,10 @@ class ExperimentActiveIRD(object):
         """Load previous checkpoint."""
         # Load eval data
         eval_path = f"{load_dir}/{self._exp_name}/{self._exp_name}_seed_{str(self._rng_key)}.npz"
+        if not os.path.isfile(eval_path):
+            print(f"Failed to load {eval_path}")
+            return False
+
         eval_data = np.load(eval_path, allow_pickle=True)
         if load_eval:
             self._active_eval_hist = eval_data["eval_hist"].item()
@@ -290,6 +304,10 @@ class ExperimentActiveIRD(object):
         if len(self._eval_tasks) == 0:
             self._eval_tasks = self._model.env.all_tasks
         self._all_tasks = eval_data["curr_tasks"].item()
+
+        ## TODO: remove this
+        # print("Remove this for debugging purpose")
+        # self._eval_tasks = self._random_choice(self._eval_tasks, 8)
 
         # Load observations
         np_obs = eval_data["curr_obs"].item()
@@ -328,10 +346,10 @@ class ExperimentActiveIRD(object):
                 belief = self._model.create_particles([])
                 belief.load(weight_filepath)
                 self._all_beliefs[key].append(belief)
-
         # Load random seed
         rng_key = str_to_key(eval_data["seed"].item())
         self.update_key(rng_key)
+        return True
 
     def _save(self, itr, skip_weights=False):
         """Save checkpoint.
@@ -389,7 +407,11 @@ class ExperimentActiveIRD(object):
                 if not skip_weights:
                     belief.save(savepath)
                     belief.visualize(
-                        figpath, true_w=self._model.designer.true_w, obs_w=obs_w
+                        figpath,
+                        true_w=self._model.designer.true_w,
+                        obs_w=obs_w,
+                        max_weight=self._max_visualize_weights,
+                        bins=self._exp_params["HIST_BINS"],
                     )
 
     def _log_time(self, caption=""):
@@ -400,6 +422,35 @@ class ExperimentActiveIRD(object):
             s = secs - (h * 60 * 60) - (m * 60)
             print(f"Active IRD {caption} Time: {int(h)}h {int(m)}m {s:.2f}s")
         self._last_time = time()
+
+    def run_evaluation(self, override=False):
+        """For interactive mode. Since it's costly to run evaluation during interactive
+        mode, we save the beliefs and evaluate post-hoc.
+
+        Args:
+            override (bool): if false, do not re-calculate evaluations.
+
+        """
+        print(
+            f"\n============= Evaluate Candidates ({self._rng_key}): {self._save_dir} {self._exp_name} ============="
+        )
+        if not self._load_cache(self._save_dir):
+            return
+        all_cands = self._all_candidates
+        all_scores = self._all_cand_scores
+        all_beliefs = self._all_beliefs
+        eval_tasks = self._eval_tasks
+        num_iter = all_cands.shape[0]
+        print(f"Methods {list(all_beliefs.keys())}, iterations {num_iter}")
+        for itr in range(num_iter):
+            for key in all_beliefs:
+                if len(all_beliefs[key]) <= itr:
+                    continue
+                belief = all_beliefs[key][itr]
+                if override or len(self._active_eval_hist[key]) <= itr:
+                    self._evaluate(key, belief, eval_tasks)
+                    self._save(itr=itr)
+                    self._log_time(f"Itr {itr} Method {key} Eval & Save")
 
     def debug_candidate(self, debug_dir):
         """Debug past experiments' candidates from pre-saved directory.
@@ -412,53 +463,23 @@ class ExperimentActiveIRD(object):
 
         """
         print(
-            f"\n============= Debug Candidates ({self._rng_key}): {debug_dir}{self._exp_name} ============="
+            f"\n============= Debug Candidates ({self._rng_key}): {debug_dir} {self._exp_name} ============="
         )
-        self._load_cache(debug_dir)
+        if not self._load_cache(debug_dir):
+            print(f"Failed to load from {debug_dir}")
+            return
         all_cands = self._all_candidates
         all_scores = self._all_cand_scores
         all_beliefs = self._all_beliefs
-
         num_iter = all_cands.shape[0]
-        ranking_dir = os.path.join(debug_dir, self._exp_name, "candidates")
+
         video_dir = os.path.join(debug_dir, self._exp_name, "cand_video")
-        os.makedirs(ranking_dir, exist_ok=True)
         os.makedirs(video_dir, exist_ok=True)
         truth = self._model.designer.truth
-        for itr in range(num_iter):
+        for itr in range(1, num_iter + 1):
+            self._plot_candidate_scores(itr, debug_dir)
             candidates = all_cands[itr]
             for fn_key in all_scores.keys():
-                # Check current active function
-                if len(all_scores[fn_key]) <= itr:
-                    continue
-                cand_scores = onp.array(all_scores[fn_key][itr])
-
-                # Check other active function
-                other_scores_all = copy.deepcopy(all_scores)
-                del other_scores_all[fn_key]
-                other_scores = []
-                other_keys = []
-                for key in other_scores_all.keys():
-                    if len(other_scores_all[key]) > itr:
-                        other_scores.append(other_scores_all[key][itr])
-                        other_keys.append(key)
-
-                # Ranking plot
-                file = f"key_{self._rng_key}_cand_itr_{itr}_fn_{fn_key}_ranking.png"
-                path = os.path.join(ranking_dir, file)
-                plot_rankings(
-                    cand_scores,
-                    fn_key,
-                    other_scores,
-                    other_keys,
-                    path=path,
-                    title=f"{fn_key}_itr_{itr}",
-                    yrange=[-1.2, 1.6],
-                    loc="upper left",
-                    normalize=True,
-                    delta=0.2,
-                    annotate_rankings=True,
-                )
                 # Save thumbnail & videos
                 top_N = 3
                 top_tasks = onp.argsort(-1 * cand_scores)[:top_N]
@@ -474,8 +495,47 @@ class ExperimentActiveIRD(object):
                         diagnose_N=3,
                         prefix=prefix,
                         thumbnail=True,
-                        video=True,
+                        video=False,
                     )
+
+    def _plot_candidate_scores(self, itr, debug_dir=None):
+        if debug_dir is None:
+            debug_dir = self._save_dir
+        all_scores = self._all_cand_scores
+        ranking_dir = os.path.join(debug_dir, self._exp_name, "candidates")
+        os.makedirs(ranking_dir, exist_ok=True)
+        for fn_key in all_scores.keys():
+            # Check current active function
+            if len(all_scores[fn_key]) < itr:
+                continue
+            cand_scores = onp.array(all_scores[fn_key][itr - 1])
+            other_scores = []
+            other_keys = []
+            # Check other active function
+            other_scores_all = copy.deepcopy(all_scores)
+            del other_scores_all[fn_key]
+            for key in other_scores_all.keys():
+                if len(other_scores_all[key]) > itr - 1:
+                    other_scores.append(other_scores_all[key][itr - 1])
+                    other_keys.append(key)
+
+            # Ranking plot
+            file = f"key_{self._rng_key}_cand_itr_{itr}_fn_{fn_key}_ranking.png"
+            path = os.path.join(ranking_dir, file)
+            print(f"Candidate plot saved to {path}")
+            plot_rankings(
+                cand_scores,
+                fn_key,
+                other_scores,
+                other_keys,
+                path=path,
+                title=f"{fn_key}_itr_{itr}",
+                yrange=[-1.2, 1.6],
+                loc="upper left",
+                normalize=True,
+                delta=0.2,
+                annotate_rankings=True,
+            )
 
     # def _diagnose_belief(self, belief, tasks, fn_key, itr):
     #     """Diagnose proxy reward over evaluation tasks.

@@ -187,6 +187,7 @@ def build_log_prob_fn(log_prior_dict):
         log_val = np.log(sample_val)
         low = prior_dist.low
         high = prior_dist.high
+        # print(f"prior log low {log_val < low} high {log_val > high} val {log_val}")
         return np.where(
             log_val < low or log_val > high, -np.inf, prior_dist.log_prob(log_val)
         )
@@ -198,6 +199,8 @@ def build_log_prob_fn(log_prior_dict):
             # log_val = np.log(val)
             # print(f"{key} log val {log_val:3f} check range {check_log_range(val, dist_):3f}")
             log_prob += check_log_range(val, dist_)
+        # if log_prob < -100.:
+        #     import pdb; pdb.set_trace()
         return log_prob
 
     return log_prob_fn

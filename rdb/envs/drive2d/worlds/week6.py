@@ -147,7 +147,7 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
             env=self, max_speed=1.0
         )
         constraints_dict["underspeed"] = constraints.build_underspeed(
-            env=self, min_speed=0.2
+            env=self, min_speed=-0.2
         )
         constraints_dict["uncomfortable"] = constraints.build_uncomfortable(
             env=self, max_actions=self._control_bound
@@ -196,7 +196,47 @@ class Week6_01(HighwayDriveWorld_Week6):
         goal_lane = 0
         horizon = 10
         dt = 0.25
-        control_bound = 0.5
+        control_bound = 1.2
+        lane_width = 0.13
+        num_lanes = 3
+        # Car states
+        car1 = np.array([0.0, 0.3, np.pi / 2, 0])
+        car2 = np.array([-lane_width, 0.9, np.pi / 2, 0])
+        car_states = np.array([car1, car2])
+        car_speeds = np.array([car_speed, car_speed])
+        # Obstacle states
+        # obstacle_states = np.array([[0.0, 0.3], [-lane_width, 0.3], [-lane_width, 0.5]])
+        obstacle_states = np.array([[0.0, 0.3]])
+
+        super().__init__(
+            main_state,
+            goal_speed=goal_speed,
+            goal_lane=goal_lane,
+            control_bound=control_bound,
+            car_states=car_states,
+            car_speeds=car_speeds,
+            dt=dt,
+            horizon=horizon,
+            num_lanes=num_lanes,
+            lane_width=lane_width,
+            obstacle_states=obstacle_states,
+        )
+
+
+class Week6_01_v1(HighwayDriveWorld_Week6):
+    """Highway merging scenario with one obstacle
+    """
+
+    def __init__(self):
+        ## Boilerplate
+        main_speed = 0.7
+        car_speed = 0.5
+        main_state = np.array([0, 0, np.pi / 2, main_speed])
+        goal_speed = 0.8
+        goal_lane = 0
+        horizon = 10
+        dt = 0.25
+        control_bound = 1.2
         lane_width = 0.13
         num_lanes = 3
         # Car states
@@ -236,7 +276,7 @@ class Week6_02(HighwayDriveWorld_Week6):
         goal_lane = 0
         horizon = 10
         dt = 0.25
-        control_bound = 0.5
+        control_bound = 1.2
         lane_width = 0.13
         num_lanes = 3
         # Car states
@@ -280,7 +320,7 @@ class Week6_03(HighwayDriveWorld_Week6):
         goal_lane = 0
         horizon = 10
         dt = 0.25
-        control_bound = 0.5
+        control_bound = 1.2
         lane_width = 0.13
         num_lanes = 3
         # Car states

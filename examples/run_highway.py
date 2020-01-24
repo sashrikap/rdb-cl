@@ -14,18 +14,18 @@ from rdb.visualize.preprocess import normalize_features
 DUMMY_ACTION = False
 DRAW_HEAT = True
 REPLAN = False
-BENCHMARK = False
+BENCHMARK = 500
 MAKE_MP4 = False
 # ENV_NAME = "Week3_02-v0"  # Highway
 # TASK = (0.2, -0.7)
 # ENV_NAME = "Week6_01-v0"  # Blockway
 # TASK = (0.2, -0.7, -0.1, 0.4)
 # TASK = (-0.20000005, -5.9604645e-08, -0.16, 0.19999993)
-ENV_NAME = "Week6_02-v0"  # Two Blockway
-TASK = (-0.7, -0.7, 0.13, 0.4, -0.13, 0.4)
-# ENV_NAME = "Week6_03-v0"  # Three Blockway
+# ENV_NAME = "Week6_02-v0"  # Two Blockway
+# TASK = (-0.7, -0.7, 0.13, 0.4, -0.13, 0.4)
+ENV_NAME = "Week6_03-v0"  # Three Blockway
 # TASK = (0.2, -0.7, 0.0, 0.4, -0.13, 0.8, 0.13, -0.8)
-# TASK = "RANDOM"
+TASK = "RANDOM"
 
 env = gym.make(ENV_NAME)
 env.reset()
@@ -60,10 +60,12 @@ if not DUMMY_ACTION:
     state = copy.deepcopy(env.state)
     t1 = time.time()
     actions = optimizer(state, weights=weights)
+    max_acs = onp.linalg.norm(actions, axis=1)
+    print(f"Max action norm {max(max_acs):.3f}")
     traj, cost, info = runner(state, actions, weights=weights)
     # trajs = collect_trajs([weights], state, optimizer, runner)
 
-    if BENCHMARK:
+    if BENCHMARK > 0:
         t_compile = time.time() - t1
         print(f"Compile time {t_compile:.3f}")
         print(f"Total cost {cost}")
@@ -72,11 +74,11 @@ if not DUMMY_ACTION:
         for k, v in info["feats_sum"].items():
             print(f"Feats sum {k}: {v:.3f}")
 
-        N = 50
+        N = BENCHMARK
         t1 = time.time()
         for _ in tqdm(range(N), total=N):
             env.reset()
-            acs_ = optimizer(env.state, weights=weights)
+            acs_ = optimizer(state, weights=weights)
             # runner(env.state, acs_, weights=weights)
         t_opt = time.time() - t1
         print(f"Optimizer fps {N/t_opt:.3f}")
@@ -84,7 +86,7 @@ if not DUMMY_ACTION:
         t1 = time.time()
         for _ in tqdm(range(N), total=N):
             env.reset()
-            runner(env.state, acs_, weights=weights)
+            runner(state, acs_, weights=weights)
         t_run = time.time() - t1
         print(f"Runner fps {N/t_run:.3f}")
 
@@ -94,7 +96,7 @@ if not DUMMY_ACTION:
             env.reset()
             for key in weights.keys():
                 weights[key] = onp.random.random()
-            acs_ = optimizer(env.state, weights=weights)
+            acs_ = optimizer(state, weights=weights)
             # runner(env.state, acs_, weights=weights)
         t_opt = time.time() - t1
         print(f"Optimizer fps {N/t_opt:.3f}")
@@ -104,7 +106,7 @@ if not DUMMY_ACTION:
             env.reset()
             for key in weights.keys():
                 weights[key] = onp.random.random()
-            runner(env.state, acs_, weights=weights)
+            runner(state, acs_, weights=weights)
         t_run = time.time() - t1
         print(f"Runner fps {N/t_run:.3f}")
 

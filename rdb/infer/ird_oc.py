@@ -110,7 +110,7 @@ class IRDOptimalControl(PGM):
         designer_args={},
         num_prior_tasks=0,
         use_true_w=False,
-        interactive_mode=True,
+        interactive_mode=False,
         interactive_name="Default",
         debug_true_w=False,
         test_mode=False,  # Skip _cache_task part if true
@@ -211,13 +211,14 @@ class IRDOptimalControl(PGM):
         """Sample one w from b(w) on task"""
         return self._designer.simulate(task, task_name)
 
-    def sample(self, tasks, task_names, obs, verbose=True):
+    def sample(self, tasks, task_names, obs, verbose=True, max_norm=True):
         """Sample b(w) for true weights given obs.weights.
 
         Args:
             tasks (list): list of tasks so far
             task_names (list): list of task names so far
             obs (list): list of observation particles, each for 1 task
+            max_norm (bool): use max trajectory as normalizer
 
         Note:
             * Samples are cached by the last task name to date (`task_names[-1]`)
@@ -226,18 +227,29 @@ class IRDOptimalControl(PGM):
             * currently `tasks`, `task_names`, `obs` are ugly lists
 
         """
-        if self._normalizer is None:
-            self._normalizer = self._build_normalizer(tasks[0], task_names[0])
         all_obs_ws = []
-        all_user_feats_sum, all_norm_feats_sum = [], []
+        all_user_acs = []
+        all_init_states = []
+        all_user_feats_sum = []
+        all_norm_feats_sum = []
         for task_i, name_i, obs_i in zip(tasks, task_names, obs):
+            all_init_states.append(get_init_state(self.env, task_i))
             all_obs_ws.append(obs_i.weights[0])
             all_user_feats_sum.append(obs_i.get_features_sum(task_i, name_i))
-            all_norm_feats_sum.append(
-                self._normalizer.get_features_sum(
-                    task_i, name_i, "Computing Normalizers"
+            all_user_acs.append(obs_i.get_actions(task_i, name_i))
+
+        if max_norm:
+            all_norm_feats_sum = [None for _ in range(len(tasks))]
+        else:
+            if self._normalizer is None:
+                self._normalizer = self._build_normalizer(tasks[0], task_names[0])
+            for task_i, name_i, obs_i in zip(tasks, task_names, obs):
+                all_norm_feats_sum.append(
+                    self._normalizer.get_features_sum(
+                        task_i, name_i, "Computing Normalizers"
+                    )
                 )
-            )
+
         last_obs_w = obs[-1].weights[0]
         last_name = task_names[-1]
 
@@ -253,6 +265,8 @@ class IRDOptimalControl(PGM):
                 init_state=last_obs_w,  # initialize with last obs
                 user_feats_sums=all_user_feats_sum,
                 norm_feats_sums=all_norm_feats_sum,
+                all_init_states=all_init_states,
+                all_user_acs=all_user_acs,
                 verbose=verbose,
             )
         samples = self.create_particles(sample_ws, self._test_mode)
@@ -290,8 +304,11 @@ class IRDOptimalControl(PGM):
             prior_w (dict): sampled from prior
             user_w (dict): user-specified reward weight
             tasks (array): environment init state
-            norm_feats_sum(array): samples used to normalize likelihood in
+            norm_feats_sum(array): samples used to normalize . likelihood in
                 inverse reward design problem. Sampled before running `pgm.sample`.
+            user_feats_sums (list)
+            all_init_states (list)
+            all_user_acs (list)
 
         TODO:
             * `user_ws` (represented as `obs` in generic sampling class) is not used in
@@ -299,7 +316,14 @@ class IRDOptimalControl(PGM):
 
         """
 
-        def likelihood_fn(user_ws, sample_w, norm_feats_sums, user_feats_sums):
+        def likelihood_fn(
+            user_ws,
+            sample_w,
+            norm_feats_sums,
+            user_feats_sums,
+            all_init_states,
+            all_user_acs,
+        ):
             """Main likelihood logic.
 
             Runs `p(w_obs | w)`
@@ -309,40 +333,35 @@ class IRDOptimalControl(PGM):
 
             log_probs = []
             # Iterate over list of previous tasks
-            for n_feats_sum, u_feats_sum in zip(norm_feats_sums, user_feats_sums):
+            for n_feats_sum, u_feats_sum, init_state, user_acs in zip(
+                norm_feats_sums, user_feats_sums, all_init_states, all_user_acs
+            ):
+
                 for val in u_feats_sum.values():
                     assert len(val) == 1, "Only can take 1 user sample"
                 sample_costs = multiply_dict_by_keys(sample_w, u_feats_sum)
                 ## Numerator
                 sample_rew = -beta * np.sum(list(sample_costs.values()))
                 ## Normalizing constant
-                normal_costs = multiply_dict_by_keys(sample_w, n_feats_sum)
-                normal_rews = -beta * np.sum(list(normal_costs.values()), axis=0)
-                sum_normal_rew = -np.log(len(normal_rews)) + logsumexp(normal_rews)
+                if n_feats_sum is None:
+                    # Use max trajectory to replace norm
+                    # Important to initialize from observation actions
+                    acs = self._controller(init_state, us0=user_acs, weights=sample_w)
+                    _, normal_costs, info = self._runner(
+                        init_state, acs, weights=sample_w
+                    )
+                    sum_normal_rew = -beta * normal_costs
+                else:
+                    # Use weight samples of approximate norm
+                    normal_costs = multiply_dict_by_keys(sample_w, n_feats_sum)
+                    normal_rews = -beta * np.sum(list(normal_costs.values()), axis=0)
+                    sum_normal_rew = -np.log(len(normal_rews)) + logsumexp(normal_rews)
 
                 if self._debug_true_w:
-                    true_costs = multiply_dict_by_keys(
-                        self._designer.true_w, u_feats_sum
-                    )
-                    true_rew = -beta * np.sum(list(true_costs.values()))
-                    true_normal_costs = multiply_dict_by_keys(
-                        self._designer.true_w, n_feats_sum
-                    )
-                    true_normal_rews = -beta * np.sum(
-                        list(true_normal_costs.values()), axis=0
-                    )
-                    true_sum_normal_rew = -np.log(len(true_normal_rews)) + logsumexp(
-                        true_normal_rews
-                    )
-                    print(
-                        f"Sample rew {sample_rew - sum_normal_rew:.3f} true rew {true_rew - true_sum_normal_rew:.3f}"
-                    )
-                    # import pdb; pdb.set_trace()
+                    print(f"sample - normal {sample_rew - sum_normal_rew:.3f}")
 
                 log_probs.append(sample_rew - sum_normal_rew)
             log_probs.append(self._prior_log_prob(sample_w))
-            # if len(log_probs) > 2:
-            #     print([f"{p:.3f}" for p in log_probs])
             return sum(log_probs)
 
         return likelihood_fn
@@ -472,9 +491,21 @@ class Designer(PGM):
 
 class DesignerInteractive(Designer):
     """Interactive Designer used in Jupyter Notebook interactive mode.
+
+    Args:
+        normalize_key (str): used to normalize user-input, e.g. keep "dist_cars" weight 1.0.
+
     """
 
-    def __init__(self, rng_key, env_fn, controller, runner, name="Default"):
+    def __init__(
+        self,
+        rng_key,
+        env_fn,
+        controller,
+        runner,
+        name="Default",
+        normalize_key="dist_cars",
+    ):
         super().__init__(
             rng_key=rng_key,
             env_fn=env_fn,
@@ -489,6 +520,7 @@ class DesignerInteractive(Designer):
         self._name = name
         self._savedir = self.init_savedir()
         self._user_inputs = []
+        self._normalize_key = normalize_key
 
     def run_from_ipython(self):
         try:
@@ -501,7 +533,7 @@ class DesignerInteractive(Designer):
         """Create empty directory to dump interactive videos.
         """
         # By default, this is run from notebook
-        assert self.run_from_ipython()
+        # assert self.run_from_ipython()
         # nb directory: "/Users/jerry/Dropbox/Projects/SafeRew/rdb/examples/notebook"
         savedir = f"../../data/interactive/{self._name}"
         os.makedirs(savedir, exist_ok=True)
@@ -513,6 +545,13 @@ class DesignerInteractive(Designer):
     @property
     def name(self):
         return self._name
+
+    def normalize_weights(self, weights):
+        assert self._normalize_key in weights, "Normalize key misspecified"
+        factor = weights[self._normalize_key]
+        for key, val in weights.items():
+            weights[key] = val / factor
+        return weights
 
     def simulate(self, task, task_name):
         """Interactively query weight input.
@@ -534,7 +573,7 @@ class DesignerInteractive(Designer):
         # Query user input
         while True:
             print(f"Current task: {str(task)}")
-            user_in = input("Type in weights or Y to accept last")
+            user_in = input("Type in weights or to accept (Y) last: ")
             if user_in == "Y":
                 if len(self._user_inputs) == 0:
                     print("Need at least one input")
@@ -543,6 +582,7 @@ class DesignerInteractive(Designer):
                     break
             try:
                 user_in_w = json.loads(user_in)
+                user_in_w = self.normalize_weights(user_in_w)
                 self._user_inputs.append(user_in_w)
                 # Visualize trajectory
                 acs = self._controller(init_state, weights=user_in_w)

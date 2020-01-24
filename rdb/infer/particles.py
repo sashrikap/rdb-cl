@@ -305,7 +305,7 @@ class Particles(object):
         )
         return new_ps
 
-    def entropy(self, method="histogram", bins=50, ranges=(-5.0, 5.0)):
+    def entropy(self, method="histogram", bins=50, max_weight=5.0, verbose=True):
         """Estimate entropy.
 
         Note:
@@ -318,6 +318,7 @@ class Particles(object):
         """
         FAST_HISTOGRAM = True
 
+        ranges = (-max_weight, max_weight)
         data = onp.array(list(self.concate_weights.values()))
         # Omit first weight
         data = onp.log(data[1:, :])
@@ -343,6 +344,8 @@ class Particles(object):
                     hist_prob = hist_density * delta
                 ent = -(hist_density * onp.ma.log(onp.abs(hist_density)) * delta).sum()
                 entropy += ent
+            # if verbose:
+            #    print(f"Entropy {entropy:.3f}")
         return entropy
 
     def map_estimate(self, num_map=1, method="histogram", bins=50, ranges=(-5.0, 5.0)):
@@ -452,7 +455,7 @@ class Particles(object):
     def record(self, task, task_name, actions, filepath):
         pass
 
-    def visualize(self, path, true_w, obs_w):
+    def visualize(self, path, true_w, obs_w, max_weight=8.0, bins=50):
         """Visualize weight belief distribution in histogram.
 
         TODO:
@@ -468,6 +471,7 @@ class Particles(object):
             highlight_colors=["r", "k", "m"],
             path=path + ".png",
             title="Proxy Reward; true (red), obs (black) map (magenta)",
+            max_weight=max_weight,
         )
 
     def save(self, path):
