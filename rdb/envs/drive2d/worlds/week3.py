@@ -63,20 +63,20 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
         state[y1_idx] = task[1]
         self.set_init_state(state)
 
-    def _get_nonlinear_features_list(self, feats_list):
+    def _get_nonlinear_features_dict(self, feats_dict):
         """
         Args:
-            feats_list (list): dict of environment feature functions
+            feats_dict (list): dict of environment feature functions
 
         Note:
             * Gaussian : exp(-dist^2/sigma^2)
             * Exponent : exp(run_over)
 
         """
-        nonlinear_dict = {}
+        nlr_feats_dict = {}
         sum_keep = partial(np.sum, keepdims=True)
         # Gaussian
-        nonlinear_dict["dist_cars"] = compose(
+        nlr_feats_dict["dist_cars"] = compose(
             np.sum,
             partial(
                 feature.gaussian_feat,
@@ -84,26 +84,26 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
             ),
         )
         # Gaussian
-        nonlinear_dict["dist_lanes"] = compose(
+        nlr_feats_dict["dist_lanes"] = compose(
             np.sum,
             feature.neg_feat,
             partial(feature.gaussian_feat, sigma=self._car_length),
             partial(feature.index_feat, index=self._goal_lane),
         )
-        """nonlinear_dict["dist_lanes"] = compose(
+        """nlr_feats_dict["dist_lanes"] = compose(
             np.sum, quadratic_feat, partial(index_feat, index=self._goal_lane)
         )"""
         # Quadratic barrier function
-        """nonlinear_dict["dist_fences"] = compose(
+        """nlr_feats_dict["dist_fences"] = compose(
             np.sum, partial(sigmoid_feat, mu=8.0 / self._car_width), neg_feat
         )"""
-        nonlinear_dict["dist_fences"] = compose(
+        nlr_feats_dict["dist_fences"] = compose(
             np.sum,
             feature.quadratic_feat,
             feature.neg_relu_feat,
             lambda dist: dist - (self._lane_width + self._car_length) / 2,
         )
-        """nonlinear_dict["dist_fences"] = compose(
+        """nlr_feats_dict["dist_fences"] = compose(
             np.sum,
             partial(
                 feature.gaussian_feat,
@@ -112,25 +112,20 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
             # debug_print
         )"""
         bound = self._control_bound
-        nonlinear_dict["control"] = compose(np.sum, feature.quadratic_feat)
-        nonlinear_dict["speed"] = compose(
+        nlr_feats_dict["control"] = compose(np.sum, feature.quadratic_feat)
+        nlr_feats_dict["speed"] = compose(
             np.sum, partial(feature.quadratic_feat, goal=self._goal_speed)
         )
 
+        nlr_feats_dict = chain_dict_funcs(nlr_feats_dict, feats_dict)
         # Speed up
-        for key, fn in nonlinear_dict.items():
-            nonlinear_dict[key] = jax.jit(fn)
+        for key, fn in nlr_feats_dict.items():
+            nlr_feats_dict[key] = jax.jit(fn)
 
-        nonlinear_list = list(
-            sort_dict_by_keys(nonlinear_dict, self.features_keys).values()
-        )
-        feats_list = chain_list_funcs(nonlinear_list, feats_list)
-        return feats_list
+        return nlr_feats_dict
 
     def _get_constraints_fn(self):
-        constraints_dict = {}
-
-        constraints_dict = {}
+        constraints_dict = OrderedDict()
         constraints_dict["offtrack"] = constraints.build_offtrack(env=self)
         constraints_dict["overspeed"] = constraints.build_overspeed(
             env=self, max_speed=1.0
@@ -150,7 +145,7 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
         return constraints_dict, constraints_fn
 
     def _get_metadata_fn(self):
-        metadata_dict = {}
+        metadata_dict = OrderedDict()
         metadata_dict["overtake0"] = constraints.build_overtake(env=self, car_idx=0)
         metadata_dict["overtake1"] = constraints.build_overtake(env=self, car_idx=1)
         metadata_fn = merge_dict_funcs(metadata_dict)

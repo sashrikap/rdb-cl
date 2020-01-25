@@ -85,14 +85,15 @@ class DriveWorld(gym.Env):
         self._cm = matplotlib.cm.coolwarm
         self._heat_fn = None
 
+        # Dyanmics, features, constraints and metadata functions
         self._xdim = onp.prod(self.state.shape)
         self._dynamics_fn, self._indices = self._get_dynamics_fn()
-        self._raw_features_dict, self._raw_features_list, self._features_list, self._features_fn = (
+        self._raw_features_dict, self._features_dict, self._features_fn = (
             self._get_features_fn()
         )
-        self._compile()
         self._constraints_dict, self._constraints_fn = self._get_constraints_fn()
         self._metadata_dict, self._metadata_fn = self._get_metadata_fn()
+        self._compile()
 
         # For sampling tasks
         self._rng_key = None
@@ -152,11 +153,6 @@ class DriveWorld(gym.Env):
         self.state = state
 
     @property
-    def features_list(self):
-        """Nonlinear features dict."""
-        return self._features_list
-
-    @property
     def features_fn(self):
         """Nonlinear dictionary features function."""
         return self._features_fn
@@ -172,14 +168,6 @@ class DriveWorld(gym.Env):
     @property
     def metadata_fn(self):
         return self._metadata_fn
-
-    @property
-    def raw_features_list(self):
-        return self._raw_features_list
-
-    @property
-    def raw_features_dict(self):
-        return self._raw_features_dict
 
     @property
     def dynamics_fn(self):
@@ -210,16 +198,31 @@ class DriveWorld(gym.Env):
         return self._objects
 
     @property
+    def raw_features_dict(self):
+        return self._raw_features_dict
+
+    @property
+    def features_dict(self):
+        return self._features_dict
+
+    @property
+    def raw_features_keys(self):
+        return tuple(self._raw_features_dict.keys())
+
+    @property
     def features_keys(self):
-        return ["dist_cars", "dist_lanes", "speed", "control"]
+        """Nonliear features keys"""
+        return tuple(self._features_dict.keys())
 
     @property
     def constraints_keys(self):
-        return ["collision", "overspeed", "underspeed", "uncomfortable"]
+        return tuple(self._constraints_dict.keys())
 
     def _compile(self):
         self._dynamics_fn = jax.jit(self._dynamics_fn)
         self._features_fn = jax.jit(self._features_fn)
+        self._constraints_fn = jax.jit(self._constraints_fn)
+        self._metadata_fn = jax.jit(self._metadata_fn)
 
     def _get_dynamics_fn(self):
         """Build Dict(key: dynamics_fn) mapping.
@@ -259,6 +262,9 @@ class DriveWorld(gym.Env):
 
     def _get_raw_features_dict(self):
         """Build dict(key: feature_fn) mapping.
+
+        Note:
+            Decides environment feature key order for raw_feats, nonlinear_feats.
 
         Example:
             >>> feat_1 = feature_fn_1(state)
@@ -323,37 +329,47 @@ class DriveWorld(gym.Env):
             return feature.speed_size(state[..., np.arange(*main_idx)])
 
         # Control feature function
-        def control_fn(state, actions):
+        def control_mag_fn(state, actions):
             return feature.control_magnitude(actions)
+
+        def control_thrust_fn(state, actions):
+            return feature.control_thrust(actions)
+
+        def control_brake_fn(state, actions):
+            return feature.control_brake(actions)
+
+        def control_turn_fn(state, actions):
+            return feature.control_turn(actions)
 
         feats_dict["dist_cars"] = concat_funcs(car_fns, axis=0)
         feats_dict["dist_lanes"] = concat_funcs(lane_fns, axis=0)
         feats_dict["dist_objects"] = concat_funcs(obj_fns, axis=0)
         feats_dict["speed"] = speed_fn
-        feats_dict["control"] = control_fn
+        feats_dict["speed_over"] = speed_fn
+        feats_dict["speed_under"] = speed_fn
+        feats_dict["control"] = control_mag_fn
+        feats_dict["control_thrust"] = control_thrust_fn
+        feats_dict["control_brake"] = control_brake_fn
+        feats_dict["control_turn"] = control_turn_fn
 
         return feats_dict
 
-    def _get_raw_features(self):
-        feats_dict = self._get_raw_features_dict()
-        feats_list = list(sort_dict_by_keys(feats_dict, self.features_keys).values())
-        return feats_dict, feats_list
-
     def _get_features_fn(self):
-        raw_feats_dict, raw_feats_list = self._get_raw_features()
-        nlr_feats_list = self._get_nonlinear_features_list(raw_feats_list)
+        """Compute raw features and non-linear features.
+
+        """
+        raw_feats_dict = self._get_raw_features_dict()
+        nlr_feats_dict = self._get_nonlinear_features_dict(raw_feats_dict)
+        nlr_feats_dict = sort_dict_by_keys(nlr_feats_dict, raw_feats_dict.keys())
         # Pre-compile individual feature functions, for speed up
-        for idx, fn in enumerate(nlr_feats_list):
-            nlr_feats_list[idx] = jax.jit(fn)
+        for key, fn in nlr_feats_dict.items():
+            nlr_feats_dict[key] = jax.jit(fn)
 
         # One-input-multi-output
-        nlr_feats_dict = OrderedDict(zip(self.features_keys, nlr_feats_list))
         merged_feats_dict_fn = merge_dict_funcs(nlr_feats_dict)
-        # merged_feats_list_fn = merge_list_funcs(nlr_feats_list)
+        return raw_feats_dict, nlr_feats_dict, merged_feats_dict_fn
 
-        return raw_feats_dict, raw_feats_list, nlr_feats_list, merged_feats_dict_fn
-
-    def _get_nonlinear_features_list(self, feats_list):
+    def _get_nonlinear_features_dict(self, feats_dict):
         raise NotImplementedError
 
     def _get_constraints_fn(self):
@@ -401,7 +417,6 @@ class DriveWorld(gym.Env):
         weights=None,
     ):
         assert mode in ["human", "state_pixels", "rgb_array"]
-
         if self._window is None:
             caption = f"{self.__class__}"
             try:
@@ -555,9 +570,13 @@ class DriveWorld(gym.Env):
         graphics.draw(4, gl.GL_LINES, ("v2f", line_strip))
 
     def set_heat(self, weights):
-        def val(x, y):
-            ws = np.array(list(weights.values()))
-            cost_fn = partial(self._main_car.cost_runtime, weights=ws)
+        # Clean up weights input
+        weights = zero_fill_dict(weights, self.features_keys)
+        weights_dict = sort_dict_by_keys(weights, self.features_keys)
+        weights = np.array(list(weights_dict.values()))
+
+        def val(x, y, weights=weights):
+            cost_fn = partial(self._main_car.cost_runtime, weights=weights)
             state = deepcopy(self.state)
             main_idx = self._indices["main_car"]
             state[main_idx[0] : main_idx[0] + 3] = [x, y, onp.pi / 3]

@@ -10,6 +10,7 @@ Note:
 """
 
 import numpyro
+import pprint
 import copy
 import json
 import os
@@ -24,8 +25,6 @@ from rdb.exps.utils import Profiler
 from tqdm.auto import tqdm, trange
 from rdb.infer.algos import *
 from time import time
-
-import pprint
 
 pp = pprint.PrettyPrinter(indent=4)
 

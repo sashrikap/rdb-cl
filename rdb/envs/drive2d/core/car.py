@@ -132,9 +132,9 @@ class OptimalControlCar(Car):
             >>> cost = cost_runtime(state, action, weights)
 
         """
-        env_feats_list = self.env.features_list
+        env_feats_dict = self.env.features_dict
         # Runtime costs
-        cost_runtime = weigh_funcs_runtime(env_feats_list)
+        cost_runtime = weigh_funcs_runtime(env_feats_dict)
         return cost_runtime
 
     def control(self, u, dt):

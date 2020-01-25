@@ -6,7 +6,7 @@ from rdb.optim.utils import (
     multiply_dict_by_keys,
     subtract_dict_by_keys,
     concate_dict_by_keys,
-    divide_dict_by_keys,
+    unconcate_dict_by_keys,
 )
 from rdb.visualize.plot import plot_weights, plot_rankings
 from numpyro.handlers import scale, condition, seed
@@ -89,7 +89,7 @@ class Particles(object):
             assert (
                 self._sample_concate_ws is not None
             ), "Must properly initialize particle weights"
-            self._sample_ws = divide_dict_by_keys(self._sample_concate_ws)
+            self._sample_ws = unconcate_dict_by_keys(self._sample_concate_ws)
         return self._sample_ws
 
     @weights.setter

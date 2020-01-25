@@ -67,6 +67,25 @@ def diff_to(x, y):
 
 
 @jax.jit
+def more_than(x, y):
+    x = make_batch(x)
+    y = make_batch(y)
+    return np.maximum(x - y, 0)
+
+
+@jax.jit
+def less_than(x, y):
+    x = make_batch(x)
+    y = make_batch(y)
+    return np.maximum(y - x, 0)
+
+
+##==================================================
+##========== Functional features functions =========
+##==================================================
+
+
+@jax.jit
 def dist_to_lane(center, normal, x):
     """ lane.normal @ diff_to_lane """
     x = make_batch(x)
@@ -76,30 +95,51 @@ def dist_to_lane(center, normal, x):
 
 @jax.jit
 def dist_inside_fence(center, normal, x):
+    """How much distance inside fence.
+
+    Args:
+        center (array(2,)): center position
+        normal (array(2,)): normal direction, pointing inside lane
+
+    """
     x = make_batch(x)
     diff = np.array(x[..., :2]) - np.array(center)
     return np.sum(normal * diff, axis=-1)
 
 
 @jax.jit
-def diff_to_fence(center, normal, x):
+def dist_outside_fence(center, normal, x):
+    """How much distance outside fence.
+
+    Args:
+        center (array(2,)): center position
+        normal (array(2,)): normal direction, pointing inside lane
+
     """
-    Params
-    : center : (2,)
-    : normal : (2,)
-    : x      : (nbatch, 2)
-    Outout
-    : diff   : (nbatch, 2)
-    """
-    x = make_batch(x)
-    diff = np.array(x[..., :2]) - np.array(center)
-    diff = normal * diff
-    angle = np.array(x[..., 2])
-    vh = np.concatenate([np.sin(angle), -np.cos(angle)], axis=-1)
-    vv = np.concatenate([np.cos(angle), np.sin(angle)], axis=-1)
-    diff_h = np.sum(diff * vh, axis=-1, keepdims=True)
-    diff_v = np.sum(diff * vv, axis=-1, keepdims=True)
-    return np.concatenate([diff_h, diff_v], axis=-1)
+    return -1 * dist_inside_fence(center, normal, x)
+
+
+# @jax.jit
+# def diff_to_fence(center, normal, x):
+#     """ Positional difference from fence
+#     Args:
+#       center (2,)
+#       normal (2,)
+#       x (nbatch, 2)
+#
+#     Outout
+#       diff (nbatch, 2)
+#
+#     """
+#     x = make_batch(x)
+#     diff = np.array(x[..., :2]) - np.array(center)
+#     diff = normal * diff
+#     angle = np.array(x[..., 2])
+#     vh = np.concatenate([np.sin(angle), -np.cos(angle)], axis=-1)
+#     vv = np.concatenate([np.cos(angle), np.sin(angle)], axis=-1)
+#     diff_h = np.sum(diff * vh, axis=-1, keepdims=True)
+#     diff_v = np.sum(diff * vv, axis=-1, keepdims=True)
+#     return np.concatenate([diff_h, diff_v], axis=-1)
 
 
 @jax.jit
@@ -116,11 +156,38 @@ def speed_size(state):
 
 @jax.jit
 def control_magnitude(action):
+    """Action (batch): [turn, accel/brake]
+    """
     action = make_batch(action)
-    return np.sum(np.square(action), axis=-1)
+    return np.linalg.norm(action, axis=-1)
 
 
-# Numerical
+@jax.jit
+def control_thrust(action):
+    action = make_batch(action)
+    thrust = np.maximum(action * np.array([0, 1]), 0)
+    return np.sum(thrust, axis=-1)
+
+
+@jax.jit
+def control_brake(action):
+    action = make_batch(action)
+    brake = np.minimum(action * np.array([0, 1]), 0)
+    return np.sum(brake, axis=-1)
+
+
+@jax.jit
+def control_turn(action):
+    action = make_batch(action)
+    turn = np.abs(action * np.array([1, 0]))
+    return np.sum(action, axis=-1)
+
+
+##==================================================
+##========== Numerical features functions ==========
+##==================================================
+
+
 @jax.jit
 def index_feat(data, index):
     data = make_batch(data)
@@ -147,6 +214,14 @@ def abs_feat(data, goal=None):
 def neg_feat(data):
     data = make_batch(data)
     return -1 * data
+
+
+@jax.jit
+def positive_const_feat(data):
+    """Constant if greater than 0. Used to test boundaries.
+    """
+    data = make_batch(data)
+    return np.where(data > 0, np.ones_like(data), np.zeros_like(data))
 
 
 @jax.jit

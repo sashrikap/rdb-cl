@@ -23,8 +23,13 @@ def test_weights_dict():
     def f2(a, b):
         return np.array(a) - np.array(b)
 
-    fns = {"f1": f1, "f2": f2}
+    def f3(a, b):
+        return np.array(a) * np.array(b)
+
+    fns = {"f1": f1, "f2": f2, "f3": f3}
     weights = {"f1": 1, "f2": 2}
+    fn_keys = list(fns.keys())
+    weights = zero_fill_dict(weights, fn_keys)
     fn = weigh_funcs_dict(fns, weights_dict=weights)
     assert np.allclose(fn(1, 2), 1)
 
@@ -36,8 +41,13 @@ def test_weights_dict_jax():
     def f2(a, b):
         return np.array(a) - np.array(b)
 
-    fns = {"f1": f1, "f2": f2}
+    def f3(a, b):
+        return np.array(a) * np.array(b)
+
+    fns = {"f1": f1, "f2": f2, "f3": f3}
     weights = {"f1": 1, "f2": 2}
+    fn_keys = list(fns.keys())
+    weights = sort_dict_by_keys(zero_fill_dict(weights, fn_keys), fn_keys)
     t1 = time()
     fn = jax.jit(weigh_funcs_dict_runtime(fns))
     assert np.allclose(fn(1, 2, weights=weights), 1)
@@ -50,6 +60,8 @@ def test_weights_dict_jax():
     # print(f"Took time {dt2}")
 
     weights = {"f1": 2, "f2": 2}
+    fn_keys = list(fns.keys())
+    weights = sort_dict_by_keys(zero_fill_dict(weights, fn_keys), fn_keys)
     t3 = time()
     assert np.allclose(fn(1, 2, weights=weights), 4)
     dt3 = time() - t3
@@ -64,7 +76,7 @@ def test_weights_list_jax():
     def f2(a, b):
         return np.array(a) - np.array(b)
 
-    fns = [f1, f2]
+    fns = {"f1": f1, "f2": f2}
     weights = [1, 2]
     t1 = time()
     fn = jax.jit(weigh_funcs_runtime(fns))

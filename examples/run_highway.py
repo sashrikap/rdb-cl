@@ -12,35 +12,39 @@ from rdb.visualize.render import render_env
 from rdb.visualize.preprocess import normalize_features
 
 DUMMY_ACTION = False
-DRAW_HEAT = True
+DRAW_HEAT = False
+# DRAW_HEAT = False
 REPLAN = False
-BENCHMARK = 500
+# BENCHMARK = 100
+BENCHMARK = -1
 MAKE_MP4 = False
 # ENV_NAME = "Week3_02-v0"  # Highway
 # TASK = (0.2, -0.7)
 # ENV_NAME = "Week6_01-v0"  # Blockway
 # TASK = (0.2, -0.7, -0.1, 0.4)
+ENV_NAME = "Week6_01-v0"
+TASK = (0.4, -0.7, -0.10, 0.2)
 # TASK = (-0.20000005, -5.9604645e-08, -0.16, 0.19999993)
 # ENV_NAME = "Week6_02-v0"  # Two Blockway
 # TASK = (-0.7, -0.7, 0.13, 0.4, -0.13, 0.4)
-ENV_NAME = "Week6_03-v0"  # Three Blockway
+# ENV_NAME = "Week6_03-v0"  # Three Blockway
 # TASK = (0.2, -0.7, 0.0, 0.4, -0.13, 0.8, 0.13, -0.8)
-TASK = "RANDOM"
+# TASK = "RANDOM"
 
 env = gym.make(ENV_NAME)
 env.reset()
 main_car = env.main_car
 horizon = 10
-# T = 30
 T = 10
 weights = {
-    "dist_cars": 1.0,
+    "dist_cars": 1.1,
     "dist_lanes": 0.1,
     "dist_fences": 0.35,
-    "dist_objects": 1.25,
+    "dist_objects": 100.25,
     "speed": 0.05,
     "control": 0.1,
 }
+# weights = {"dist_lanes": 5.35}
 if TASK == "RANDOM":
     num_tasks = len(env.all_tasks)
     print(f"Total tasks {num_tasks}")
@@ -64,7 +68,6 @@ if not DUMMY_ACTION:
     print(f"Max action norm {max(max_acs):.3f}")
     traj, cost, info = runner(state, actions, weights=weights)
     # trajs = collect_trajs([weights], state, optimizer, runner)
-
     if BENCHMARK > 0:
         t_compile = time.time() - t1
         print(f"Compile time {t_compile:.3f}")

@@ -7,9 +7,9 @@ Note:
 
 from rdb.exps.active_ird import ExperimentActiveIRD
 from rdb.exps.active import ActiveInfoGain, ActiveRatioTest, ActiveRandom
+from rdb.distrib.particles import ParticleServer
 from rdb.infer.ird_oc import IRDOptimalControl
 from rdb.optim.mpc import shooting_method
-from rdb.distrib.particles import ParticleServer
 from rdb.infer.utils import *
 from rdb.exps.utils import load_params
 from functools import partial

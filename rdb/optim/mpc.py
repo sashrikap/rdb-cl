@@ -191,13 +191,15 @@ class Optimizer(object):
         return self.h_traj_u(x0, us)
 
     def __call__(self, x0, us0=None, weights=None, init="zeros"):
-        # Turn dict into sorted list
+        ## Turn dict into list, in the same order as environment features_keys
+        ## which later gets chained into one cost function
+        weights = zero_fill_dict(weights, self._features_keys)
         weights_dict = sort_dict_by_keys(weights, self._features_keys)
         weights = np.array(list(weights_dict.values()))
 
         if not self._compiled:
             print("First time running optimizer, compiling with jit...")
-            self._compiled = True
+            t_start = time()
         if us0 is None:
             if init == "zeros":
                 us0 = np.zeros((self._horizon, self._udim))
@@ -218,6 +220,9 @@ class Optimizer(object):
                 csum_u_x0 = lambda u: self.h_csum_u(x_t, u, weights)
                 grad_u_x0 = lambda u: self.h_grad_u(x_t, u, weights)
                 opt_u_t, cmin_t, info_t = fmin_l_bfgs_b(csum_u_x0, us0, grad_u_x0)
+                if not self._compiled:
+                    self._compiled = True
+                    print(f"First pass compile time {time() - t_start:.3f}")
                 opt_u_t = np.reshape(opt_u_t, (-1, self._udim))
                 opt_u.append(opt_u_t[0])
                 xs_t = self.h_traj_u(x_t, opt_u_t)
@@ -247,6 +252,9 @@ class Optimizer(object):
                 "cost_fn": csum_u_x0,
                 "costs": costs,
             }
+            if not self._compiled:
+                self._compiled = True
+                print(f"First pass compile time {time() - t_start:.3f}")
             return opt_u
 
 
@@ -304,7 +312,15 @@ def shooting_method(env, f_cost, horizon, dt, replan=True, T=None):
     t_feats_u = build_features(roll_forward=t_forward, f_feat=f_feat, udim=udim)
 
     optimizer = Optimizer(
-        h_traj_u, h_grad_u, h_csum_u, xdim, udim, horizon, replan, T, env.features_keys
+        h_traj_u=h_traj_u,
+        h_grad_u=h_grad_u,
+        h_csum_u=h_csum_u,
+        xdim=xdim,
+        udim=udim,
+        horizon=horizon,
+        replan=replan,
+        T=T,
+        features_keys=env.features_keys,
     )
     runner = Runner(
         env, roll_forward=t_traj_u, roll_costs=t_costs_u, roll_features=t_feats_u

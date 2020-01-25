@@ -55,6 +55,7 @@ class HighwayDriveWorld(DriveWorld):
     def _get_raw_features_dict(self):
         feats_dict = super()._get_raw_features_dict()
 
+        ## Distance to fences
         fence_fns = [None] * len(self._fences)
         normals = np.array([[1.0, 0.0], [-1.0, 0.0]])
         for f_i, (fence, normal) in enumerate(zip(self._fences, normals)):
@@ -62,22 +63,11 @@ class HighwayDriveWorld(DriveWorld):
 
             def fence_dist_fn(state, actions, fence=fence, normal=normal):
                 main_pos = state[..., np.arange(*main_idx)]
-                return feature.dist_inside_fence(fence.center, normal, main_pos)
+                return feature.dist_outside_fence(fence.center, normal, main_pos)
                 # return feature.diff_to_fence(fence.center, normal, main_pos)
 
             fence_fns[f_i] = fence_dist_fn
         feats_dict["dist_fences"] = concat_funcs(fence_fns, axis=0)
         feats_dict["dist_fences"] = jax.jit(feats_dict["dist_fences"])
+
         return feats_dict
-
-    @property
-    def features_keys(self):
-        keys = super().features_keys
-        keys += ["dist_fences"]
-        return keys
-
-    @property
-    def constraints_keys(self):
-        keys = super().constraints_keys
-        keys += ["offtrack", "wronglane"]
-        return keys

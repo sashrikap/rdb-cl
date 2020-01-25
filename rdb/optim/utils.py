@@ -12,11 +12,43 @@ from functools import partial, reduce
 from toolz.functoolz import juxt
 from operator import mul, add
 
+"""
+==================================================
+================ Dictionary Tools ================
+==================================================
+"""
+
+
+def zero_fill_dict(dict_, keys):
+    """When `dict_` does not contain all of `keys`, zero-fill the missing elements.
+
+    Userful when designer provides weight_dict that does not use all features.
+
+    """
+    out = {}
+    for key in keys:
+        if key not in dict_:
+            out[key] = 0.0
+        else:
+            out[key] = dict_[key]
+    return out
+
 
 def sort_dict_by_keys(dict_, keys):
+    """Sort `dict_` into `OrderedDict()` based on `keys`.
+
+    Example:
+        >>> function({'b': 1, 'a':2}, keys=['a', 'b'])
+        >>> # get OrderedDict({'a': 2, 'b': 1})
+
+    Note:
+        * `dict_` must contain all `keys`
+
+    """
     d = OrderedDict()
     for k in keys:
-        assert k in dict_.keys()
+        assert k in dict_
+        # if k in dict_:
         d[k] = dict_[k]
     return d
 
@@ -25,7 +57,7 @@ def concate_dict_by_keys(dicts):
     """Stack key-value pairs for list of dictionaries
 
     Example:
-        >>> concate([{'a': [1], 'b': [2]}, {'a': [2], 'b': [3]}])
+        >>> function([{'a': [1], 'b': [2]}, {'a': [2], 'b': [3]}])
         >>> # get {'a': [[1], [2]], 'b': [[2], [3]]}
 
     Note:
@@ -43,7 +75,14 @@ def concate_dict_by_keys(dicts):
         return out_dict
 
 
-def divide_dict_by_keys(dict_):
+def unconcate_dict_by_keys(dict_):
+    """Opposite of concate_dict_by_keys.
+
+    Example:
+        >>> input: {'a': np.array(10, 15)}
+        >>> ouptut [{'a': np.array(15,)}, ] * 10
+
+    """
     keys = list(dict_.keys())
     values = list(dict_.values())
     out_dicts = []
@@ -56,7 +95,10 @@ def multiply_dict_by_keys(da, db):
     """Multiply key-value pairs.
 
     Usage:
-        * Trajectory cost computation
+        * Trajectory cost computation multiply_dict_by_keys(weights, features)
+
+    Note:
+        * `db` (features) must contain all `da` (weights) keys
 
     """
     newd = OrderedDict()
@@ -71,6 +113,9 @@ def subtract_dict_by_keys(da, db):
 
     Usage:
         * Trajectory cost comparisons
+
+    Note:
+        * `db` (typically features) must contain all `da` (features) keys
 
     """
     newd = OrderedDict()
@@ -113,34 +158,49 @@ def sum_funcs(funcs):
     return compose(add_op, juxt(funcs))
 
 
-def weigh_funcs(funcs_list, weights_list):
-    """Weigh multiple functions by predefined weights.
+# def weigh_funcs(funcs_dict, weights_dict):
+#     """Weigh multiple functions by predefined weights.
 
-    Functions & weights are organized by list.
+#     Functions & weights are organized by dict.
 
-    """
-    fns = []
-    assert len(funcs_list) == len(
-        weights_list
-    ), "Must keep funcs and weights the same length"
-    for fn, w in zip(funcs_list, weights_list):
-        fns.append(compose(partial(mul, w), fn))
-    add_op = partial(reduce, add)
-    return compose(add_op, juxt(fns))
+#     Note:
+#         * MUST ensure that `funcs_dict` and `weights_dict` contain matching
+#         keys, e.g. when users' weights omit certain features
+
+#     """
+#     fns = []
+#     funcs_keys, weights_keys = list(funcs_dict.keys()), list(weights_dict.keys())
+#     assert len(funcs_keys) == len(
+#         weights_keys
+#     ), "Must keep funcs and weights the same length"
+#     for key in funcs_keys:
+#         fns.append(compose(partial(mul, weights_dict[key]), funcs_dict[key]))
+#     add_op = partial(reduce, add)
+#     return compose(add_op, juxt(fns))
 
 
-def weigh_funcs_runtime(funcs_list):
+def weigh_funcs_runtime(funcs_dict):
     """Weigh multiple functions by runtime weights.
 
-    Functions and weights are organized by list.
+    Functions and weights are organized by dict.
 
     Example:
-        >>> cost_fn = weigh_funcs_runtime(funcs_list)
+        >>> cost_fn = weigh_funcs_runtime(funcs_dict)
         >>> cost = cost_fn(xs, weights)
+
+    Note:
+        * MUST ensure that `funcs_dict` and `weights_dict` contain matching
+        keys in the same order (use sort_dict_by_keys). This function does
+        not perform checking.
 
     """
 
+    funcs_list = list(funcs_dict.values())
+    funcs_keys = list(funcs_dict.keys())
+
     def func(*args, weights):
+        assert isinstance(weights, list) or isinstance(weights, np.ndarray)
+        assert len(funcs_list) == len(weights)
         output = 0.0
         for fn, w in zip(funcs_list, weights):
             output += w * fn(*args)
@@ -152,16 +212,16 @@ def weigh_funcs_runtime(funcs_list):
 def weigh_funcs_dict(funcs_dict, weights_dict):
     """Weigh multiple functions by predefined weights.
 
-    Functions & weights are organized by dictionary.
+    Notes:
+        * Functions & weights are organized by dictionary.
+        * funcs_dict is inclusive of weights_dict
 
     """
-    # pairs = [(fn, weights_dict[key]) for key, fn in funcs_dict.items()]
     fns = []
     for key, fn in funcs_dict.items():
-        if key in weights_dict.keys():
-            w = weights_dict[key]
-            # w * fn(args)
-            fns.append(compose(partial(mul, w), fn))
+        assert key in weights_dict
+        w = weights_dict[key]
+        fns.append(compose(partial(mul, w), fn))
     add_op = partial(reduce, add)
     return compose(add_op, juxt(fns))
 
@@ -178,26 +238,11 @@ def weigh_funcs_dict_runtime(funcs_dict):
     """
 
     def func(*args, weights):
+        assert isinstance(weights, dict)
         output = 0.0
         for key, fn in funcs_dict.items():
-            if key in weights.keys():
-                w = weights[key]
-                # w * fn(args)
-                output += w * fn(*args)
-        return output
-
-    return func
-
-
-def merge_list_funcs(funcs_list):
-    """Execute a list of functions individually.
-
-    """
-
-    def func(*args):
-        output = []
-        for fn in funcs_list:
-            output.append(fn(*args))
+            assert key in weights
+            output += weights[key] * fn(*args)
         return output
 
     return func
@@ -217,19 +262,6 @@ def merge_dict_funcs(funcs_dict):
     return func
 
 
-def chain_list_funcs(outer_list, inner_list):
-    """Chain lists of functions.
-
-    Example:
-        >>> output[i] = outer[i](inner[i](data))
-
-    """
-    output = []
-    for outer, inner in zip(outer_list, inner_list):
-        output.append(compose(outer, inner))
-    return output
-
-
 def chain_dict_funcs(outer_dict, inner_dict):
     """Chain dictionaries of functions.
 
@@ -239,8 +271,9 @@ def chain_dict_funcs(outer_dict, inner_dict):
     """
     output = OrderedDict()
     for key, outer in outer_dict.items():
-        if key in inner_dict.keys():
-            output[key] = compose(outer, inner_dict[key])
+        # if key in inner_dict.keys():
+        assert key in inner_dict
+        output[key] = compose(outer, inner_dict[key])
     return output
 
 
@@ -300,3 +333,30 @@ def index_func(fn, idx_pair=(0, -1)):
 def debug_print(data):
     print(data)
     return data
+
+
+# def merge_list_funcs(funcs_list):
+#     """Execute a list of functions individually.
+
+#     """
+
+#     def func(*args):
+#         output = []
+#         for fn in funcs_list:
+#             output.append(fn(*args))
+#         return output
+
+#     return func
+
+
+# def chain_list_funcs(outer_list, inner_list):
+#     """Chain lists of functions.
+
+#     Example:
+#         >>> output[i] = outer[i](inner[i](data))
+
+#     """
+#     output = []
+#     for outer, inner in zip(outer_list, inner_list):
+#         output.append(compose(outer, inner))
+#     return output
