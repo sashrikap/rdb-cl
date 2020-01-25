@@ -120,18 +120,6 @@ def collect_trajs(list_ws, state, controller, runner, desc=None):
     return actions, feats, feats_sum, violations
 
 
-def get_init_state(env, task):
-    """Get initial state of environment on task
-
-    Note:
-        * Will change internal state of environment
-    """
-    env.set_task(task)
-    env.reset()
-    state = copy.deepcopy(env.state)
-    return state
-
-
 def build_prior_sample_fn(log_prior_dict):
     """Sample prior distribution.
 

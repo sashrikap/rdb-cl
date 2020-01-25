@@ -16,6 +16,7 @@ from rdb.envs.drive2d.worlds.highway import HighwayDriveWorld
 from functools import partial
 from numpyro.handlers import seed
 from rdb.infer.utils import random_choice
+from rdb.exps.utils import Profiler
 
 
 class HighwayDriveWorld_Week6(HighwayDriveWorld):
@@ -36,6 +37,7 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
         obstacle_states=[],
         obs_ranges=[[-0.16, 0.16, -0.8, 0.8]],
         obs_delta=[0.04, 0.2],
+        task_naturalness="all",
     ):
         # Define cars
         cars = []
@@ -51,8 +53,9 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
             objs.append(objects.Obstacle(np.array(state)))
         super().__init__(main_car, cars, num_lanes=num_lanes, objects=objs, dt=dt)
         # Define all tasks to sample from
-        self.setup_tasks(car_ranges, car_delta, obs_ranges, obs_delta)
         self._task_sampler = None
+        self._task_naturalness = task_naturalness
+        self.setup_tasks(car_ranges, car_delta, obs_ranges, obs_delta)
 
     def setup_tasks(self, car_ranges, car_delta, obs_ranges, obs_delta):
         self._grid_tasks = []
@@ -63,26 +66,46 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
             obs_range_y = np.arange(obs_ranges[oi][2], obs_ranges[oi][3], obs_delta[1])
             self._grid_tasks.append(obs_range_x)
             self._grid_tasks.append(obs_range_y)
-        self._all_tasks = list(itertools.product(*self._grid_tasks))
+        all_tasks = list(itertools.product(*self._grid_tasks))
+        self._all_tasks = self._get_natural_tasks(all_tasks)
 
     def set_task(self, task):
-        assert len(task) == 2 + 2 * len(self._objects), "Task format incorrect"
+        state = self.get_init_state(task)
+        self.set_init_state(state)
+
+    def get_init_state(self, task):
+        """Get task initial state without modifying environment internal variables.
+
+        Effect:
+            * env.reset
+
+        """
+        return self._get_init_states([task])[0]
+
+    def _get_init_states(self, tasks):
+        """Vectorized version of `get_init_state`
+        """
+        tasks = onp.array(tasks)
+        assert tasks.shape[-1] == 2 + 2 * len(self._objects), "Task format incorrect"
         car_y0_idx, car_y1_idx = 1, 5
         obj_idx = 12
         self.reset()
         state = copy.deepcopy(self.state)
+        all_states = onp.tile(state, (len(tasks), 1))
         # Car state
-        state[car_y0_idx] = task[0]
-        state[car_y1_idx] = task[1]
+        all_states[:, car_y0_idx] = tasks[:, 0]
+        all_states[:, car_y1_idx] = tasks[:, 1]
         # Object state
         state_idx, task_idx = obj_idx, 2
         for obj in self._objects:
             next_task_idx = task_idx + len(obj.state)
             next_state_idx = state_idx + len(obj.state)
-            state[state_idx:next_state_idx] = np.array(task[task_idx:next_task_idx])
+            all_states[:, state_idx:next_state_idx] = onp.array(
+                tasks[:, task_idx:next_task_idx]
+            )
             task_idx = next_task_idx
             state_idx = next_state_idx
-        self.set_init_state(state)
+        return all_states
 
     def _get_nonlinear_features_dict(self, feats_dict):
         """
@@ -182,6 +205,57 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
     def update_key(self, rng_key):
         super().update_key(rng_key)
 
+    def _get_natural_tasks(self, tasks):
+        """Filter out tasks that are not natural (keep tasks where initial positions
+        of other cars and objects are far).
+
+        """
+        if self._task_naturalness == "all":
+            all_tasks = tasks
+        elif self._task_naturalness == "distance":
+            ## Difference to cars and objects
+            all_states = self._get_init_states(tasks)
+            all_acs = np.zeros((len(tasks), 2))
+
+            diff_cars = self._raw_features_dict["dist_cars"](all_states, all_acs)
+            diff_objs = self._raw_features_dict["dist_objects"](all_states, all_acs)
+
+            diff_cars = diff_cars.reshape(-1, len(self._cars), 2)
+            diff_objs = diff_objs.reshape(-1, len(self._objects), 2)
+
+            head_length = 2 * self._car_length
+            back_length = self._car_length
+            car_width = self._car_width
+
+            # Whether any car is too close
+            cars_x_too_close = onp.logical_and(
+                diff_cars[:, :, 0] < car_width, diff_cars[:, :, 0] < -car_width
+            )
+            cars_y_too_close = onp.logical_and(
+                diff_cars[:, :, 1] < head_length, diff_cars[:, :, 1] < -back_length
+            )
+            cars_too_close = np.any(
+                onp.logical_and(cars_x_too_close, cars_y_too_close), axis=-1
+            )
+            # Whether any object is too close
+            objs_x_too_close = onp.logical_and(
+                diff_objs[:, :, 0] < car_width, diff_objs[:, :, 0] < -car_width
+            )
+            objs_y_too_close = onp.logical_and(
+                diff_objs[:, :, 1] < head_length, diff_objs[:, :, 1] < -back_length
+            )
+            objs_too_close = np.any(
+                onp.logical_or(objs_x_too_close, objs_y_too_close), axis=-1
+            )
+
+            too_close = onp.logical_or(cars_too_close, objs_too_close)
+            all_tasks = onp.array(tasks)[onp.logical_not(onp.array(too_close))]
+            # all_tasks = onp.array(tasks)[onp.array(too_close)]
+        else:
+            raise NotImplementedError
+
+        return all_tasks
+
 
 class Week6_01(HighwayDriveWorld_Week6):
     """Highway merging scenario with one obstacle
@@ -207,6 +281,8 @@ class Week6_01(HighwayDriveWorld_Week6):
         # Obstacle states
         # obstacle_states = np.array([[0.0, 0.3], [-lane_width, 0.3], [-lane_width, 0.5]])
         obstacle_states = np.array([[0.0, 0.3]])
+        # Don't filter any task
+        task_naturalness = "all"
 
         super().__init__(
             main_state,
@@ -220,6 +296,7 @@ class Week6_01(HighwayDriveWorld_Week6):
             num_lanes=num_lanes,
             lane_width=lane_width,
             obstacle_states=obstacle_states,
+            task_naturalness=task_naturalness,
         )
 
 
@@ -247,7 +324,9 @@ class Week6_01_v1(HighwayDriveWorld_Week6):
         # Obstacle states
         # obstacle_states = np.array([[0.0, 0.3], [-lane_width, 0.3], [-lane_width, 0.5]])
         obstacle_states = np.array([[0.0, 0.3]])
-        raise NotImplementedError
+        # Filter tasks based on initial car distance
+        task_naturalness = "distance"
+
         super().__init__(
             main_state,
             goal_speed=goal_speed,
@@ -260,6 +339,7 @@ class Week6_01_v1(HighwayDriveWorld_Week6):
             num_lanes=num_lanes,
             lane_width=lane_width,
             obstacle_states=obstacle_states,
+            task_naturalness=task_naturalness,
         )
 
 
@@ -288,6 +368,8 @@ class Week6_02(HighwayDriveWorld_Week6):
         # Obstacle states
         obstacle_states = np.array([[0.0, 0.3], [-lane_width, 0.3]])
         obs_ranges = [[-0.16, 0.0, -0.4, 1.2], [0.0, 0.16, -0.4, 1.2]]
+        # Don't filter any task
+        task_naturalness = "all"
 
         super().__init__(
             main_state,
@@ -304,6 +386,7 @@ class Week6_02(HighwayDriveWorld_Week6):
             obs_ranges=obs_ranges,
             obs_delta=[0.08, 0.2],
             obstacle_states=obstacle_states,
+            task_naturalnes=task_naturalness,
         )
 
 
@@ -336,6 +419,8 @@ class Week6_03(HighwayDriveWorld_Week6):
             [0.13, 0.131, -0.4, 1.2],
         ]
         obs_delta = [0.04, 0.2]
+        # Don't filter any task
+        task_naturalness = "all"
 
         super().__init__(
             main_state,
@@ -351,4 +436,5 @@ class Week6_03(HighwayDriveWorld_Week6):
             obs_ranges=obs_ranges,
             obs_delta=obs_delta,
             obstacle_states=obstacle_states,
+            task_naturalness=task_naturalness,
         )

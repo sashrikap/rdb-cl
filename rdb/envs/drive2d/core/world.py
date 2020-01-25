@@ -91,14 +91,15 @@ class DriveWorld(gym.Env):
         self._raw_features_dict, self._features_dict, self._features_fn = (
             self._get_features_fn()
         )
+        # Compute violations, metadata and task naturalness
         self._constraints_dict, self._constraints_fn = self._get_constraints_fn()
         self._metadata_dict, self._metadata_fn = self._get_metadata_fn()
         self._compile()
 
         # For sampling tasks
         self._rng_key = None
-        self._all_tasks = None
-        self._grid_tasks = None
+        self._all_tasks = []
+        self._grid_tasks = []
 
     @property
     def subframes(self):
@@ -373,10 +374,13 @@ class DriveWorld(gym.Env):
         raise NotImplementedError
 
     def _get_constraints_fn(self):
-        raise NotImplementedError
+        return {}, lambda x: x
 
     def _get_metadata_fn(self):
         return {}, lambda x: x
+
+    def _get_natural_tasks(self, tasks):
+        return tasks
 
     def update_key(self, rng_key):
         self._rng_key = rng_key

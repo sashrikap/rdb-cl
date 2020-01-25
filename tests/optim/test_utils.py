@@ -132,3 +132,37 @@ def test_concate_dict_speed():
     for _ in range(10):
         with Profiler("Concate dict"):
             concate_dict_by_keys(dicts)
+
+
+def test_concat_funcs():
+    def f1(x1, x2):
+        return x1 - x2
+
+    def f2(x1, x2):
+        return x1 + 2 * x2
+
+    concat_fn = concat_funcs([f1, f2], axis=-1)
+    stack_fn = stack_funcs([f1, f2], axis=-1)
+    x1 = np.array([1, 2])
+    x2 = np.array([2, 3])
+    stack_output = np.array([[-1, -1], [5, 8]])
+    concat_output = np.array([-1, -1, 5, 8])
+    assert np.allclose(stack_fn(x1, x2), stack_output)
+    assert np.allclose(concat_fn(x1, x2), concat_output)
+
+
+def test_concat_funcs_2d():
+    def f1(x1, x2):
+        return x1 - x2
+
+    def f2(x1, x2):
+        return x1 + 2 * x2
+
+    concat_fn = concat_funcs([f1, f2], axis=-1)
+    stack_fn = stack_funcs([f1, f2], axis=-1)
+    x1 = np.array([[1, 2], [1, 2]])
+    x2 = np.array([[2, 3], [2, 3]])
+    stack_output = np.array([[[-1, -1], [-1, -1]], [[5, 8], [5, 8]]])
+    concat_output = np.array([[-1, -1, 5, 8], [-1, -1, 5, 8]])
+    assert np.allclose(stack_fn(x1, x2), stack_output)
+    assert np.allclose(concat_fn(x1, x2), concat_output)

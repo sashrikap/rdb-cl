@@ -17,7 +17,7 @@ import os
 import jax
 import jax.numpy as np
 from numpyro.handlers import scale, condition, seed
-from rdb.infer.utils import random_choice, logsumexp, get_init_state
+from rdb.infer.utils import random_choice, logsumexp
 from rdb.optim.utils import multiply_dict_by_keys
 from rdb.visualize.plot import plot_weights
 from rdb.infer.particles import Particles
@@ -232,7 +232,7 @@ class IRDOptimalControl(PGM):
         all_user_feats_sum = []
         all_norm_feats_sum = []
         for task_i, name_i, obs_i in zip(tasks, task_names, obs):
-            all_init_states.append(get_init_state(self.env, task_i))
+            all_init_states.append(self.env.get_init_state(task))
             all_obs_ws.append(obs_i.weights[0])
             all_user_feats_sum.append(obs_i.get_features_sum(task_i, name_i))
             all_user_acs.append(obs_i.get_actions(task_i, name_i))
@@ -286,7 +286,7 @@ class IRDOptimalControl(PGM):
         """For new tasks, need to build normalizer."""
         assert self._normalizer_fn is not None, "Need to set random seed"
         norm_ws = self._normalizer_fn()
-        state = get_init_state(self.env, task)
+        state = self.env.get_init_state(task)
         normalizer = self.create_particles(norm_ws, test_mode=False)
         norm_feats = normalizer.get_features(
             task, task_name, desc="Collecting Normalizer Features"
@@ -477,7 +477,7 @@ class Designer(PGM):
     def _build_kernel(self, beta):
         def likelihood_fn(true_w, sample_w, task):
             assert self._prior_log_prob is not None, "Need to set random seed"
-            state = get_init_state(self.env, task)
+            state = self.env.get_init_state(task)
             actions = self._controller(state, weights=sample_w)
             _, cost, info = self._runner(state, actions, weights=true_w)
             rew = -1 * cost
@@ -565,7 +565,7 @@ class DesignerInteractive(Designer):
             * Display all other not-selected candidates.
         """
         self.env.set_task(task)
-        init_state = get_init_state(self.env, task)
+        init_state = self.env.get_init_state(task)
         # Visualize task
         image_path = f"{self._savedir}/user_trial_0_task_{str(task)}.png"
         self._runner.nb_show_thumbnail(init_state, image_path, clear=False)

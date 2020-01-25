@@ -1,7 +1,7 @@
 """Sampling-based probability over reward weights.
 
 """
-from rdb.infer.utils import collect_trajs, random_choice, get_init_state
+from rdb.infer.utils import collect_trajs, random_choice
 from rdb.optim.utils import (
     multiply_dict_by_keys,
     subtract_dict_by_keys,
@@ -179,7 +179,7 @@ class Particles(object):
     def _cache_task(self, task, task_name, desc=None):
         if self._env is None:
             self._env = self._env_fn()
-        state = get_init_state(self._env, task)
+        state = self._env.get_init_state(task)
         if self._test_mode:
             dummy_dict = concate_dict_by_keys(self.weights)
             actions, feats, feats_sum, violations = (
@@ -233,7 +233,7 @@ class Particles(object):
 
         if self._env is None:
             self._env = self._env_fn()
-        state = get_init_state(self._env, task)
+        state = self._env.get_init_state(task)
         num_violate = 0.0
         for w in self.weights:
             actions = self._controller(state, weights=w)
@@ -404,7 +404,7 @@ class Particles(object):
         """
         if self._env is None:
             self._env = self._env_fn()
-        init_state = get_init_state(self._env, task)
+        init_state = self._env.get_init_state(task)
 
         if thumbnail:
             tbn_path = f"{prefix}_task.png"

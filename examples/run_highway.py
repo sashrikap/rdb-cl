@@ -11,7 +11,7 @@ from rdb.optim.runner import Runner
 from rdb.visualize.render import render_env
 from rdb.visualize.preprocess import normalize_features
 
-DUMMY_ACTION = False
+DUMMY_ACTION = True
 DRAW_HEAT = False
 # DRAW_HEAT = False
 REPLAN = False
@@ -22,14 +22,14 @@ MAKE_MP4 = False
 # TASK = (0.2, -0.7)
 # ENV_NAME = "Week6_01-v0"  # Blockway
 # TASK = (0.2, -0.7, -0.1, 0.4)
-ENV_NAME = "Week6_01-v0"
+ENV_NAME = "Week6_01-v1"
 TASK = (0.4, -0.7, -0.10, 0.2)
 # TASK = (-0.20000005, -5.9604645e-08, -0.16, 0.19999993)
 # ENV_NAME = "Week6_02-v0"  # Two Blockway
 # TASK = (-0.7, -0.7, 0.13, 0.4, -0.13, 0.4)
 # ENV_NAME = "Week6_03-v0"  # Three Blockway
 # TASK = (0.2, -0.7, 0.0, 0.4, -0.13, 0.8, 0.13, -0.8)
-# TASK = "RANDOM"
+TASK = "RANDOM"
 
 env = gym.make(ENV_NAME)
 env.reset()

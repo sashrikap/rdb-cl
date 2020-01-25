@@ -17,6 +17,20 @@ def test_diff_to():
     assert np.allclose(diff_to(x, y), result)
 
 
+def test_diff_to_2d():
+    x = np.repeat(np.array([[0, 0, np.pi / 2, 0]]), 5, axis=0)
+    y = np.repeat(np.array([[1, 2, np.pi / 2, 0]]), 5, axis=0)
+    result = np.repeat(np.array([[-1, -2]]), 5, axis=0)
+    assert np.allclose(diff_to(x, y), result)
+
+
+def test_diff_to_2d1d():
+    x = np.repeat(np.array([[0, 0, np.pi / 2, 0]]), 5, axis=0)
+    y = np.array([1, 2, np.pi / 2, 0])
+    result = np.repeat(np.array([[-1, -2]]), 5, axis=0)
+    assert np.allclose(diff_to(x, y), result)
+
+
 def test_dist_to_segment():
     pt1 = np.array([1, 0])
     pt2 = np.array([0.5, 0])

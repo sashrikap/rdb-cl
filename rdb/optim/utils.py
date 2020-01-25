@@ -5,7 +5,7 @@
 """
 
 import jax.numpy as np
-import functools
+import functools, itertools
 import numpy as onp
 from collections import OrderedDict
 from functools import partial, reduce
@@ -317,6 +317,9 @@ def combine_funcs(funcs):
 def index_func(fn, idx_pair=(0, -1)):
     """Register a function with index pair.
 
+    Return:
+        function
+
     Example:
         >>> fn = make_func(np.sum, (1, 3))
         >>> fn([1, 2, 2, 3]) = 4
@@ -324,10 +327,37 @@ def index_func(fn, idx_pair=(0, -1)):
     """
     assert type(idx_pair) == tuple and len(idx_pair) == 2
 
-    def func(data, *kargs):
+    def _func(data, *kargs):
         return fn(np.array(data)[..., np.arange(*idx_pair)], *kargs)
 
-    return func
+    return _func
+
+
+def or_funcs(funcs):
+    """Logical or."""
+
+    def _func(*args):
+        return bool(sum([fn(*args) for fn in funcs]))
+
+    return _func
+
+
+def and_funcs(funcs):
+    """Logical or."""
+
+    def _func(*args):
+        return bool(onp.prod([fn(*args) for fn in funcs]))
+
+    return _func
+
+
+def not_func(func):
+    """Logical negate."""
+
+    def _func(*args):
+        return bool(not func(*args))
+
+    return _func
 
 
 def debug_print(data):

@@ -12,12 +12,15 @@ Conventions:
 
 
 def car_dynamics_fn(friction):
-    """
-    Usage:
-    `next_x = x + delta_x(x, u)`
-    Params:
-    : x : state
-    : u : [steer, accel]
+    """Forward Dynamics.
+
+    Example:
+        >>> next_x = x + delta_x(x, u)
+
+    Args:
+        x (ndarray): state
+        u (ndarray): [steer, accel]
+
     """
 
     @jax.jit
@@ -36,12 +39,15 @@ def car_dynamics_fn(friction):
 
 
 def speed_dynamics_fn():
-    """
-    Usage:
-    `next_x = x + delta_x(x, u)`
-    Params:
-    : x : state
-    : u : [angle, speed]
+    """Speed control dynamics.
+
+    Example:
+        >>> next_x = x + delta_x(x, u)
+
+    Args:
+        x (ndarray) : state
+        u (ndarray) : [angle, speed]
+
     """
 
     @jax.jit
