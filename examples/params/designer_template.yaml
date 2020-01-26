@@ -1,9 +1,13 @@
 ENV_NAME: Week6_01-v0
 EXP_ITERATIONS: 8
-HORIZON: 10
-BETA: 1.0
 
-MAX_WEIGHT: 5.0
+## MPC Specific
+HORIZON: 10
+
+## Plotting & weight scaling
+MAX_WEIGHT: 20.0
+HIST_BINS: 200
+BETA: 0.5
 
 SAVE_NAME: "200115"
 EXP_NAME: "designer_informed"

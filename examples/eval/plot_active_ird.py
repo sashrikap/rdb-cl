@@ -1,11 +1,11 @@
+from jax import random
 import os
 import jax.numpy as np
 import numpy as onp
+import matplotlib.pyplot as plt
 import seaborn as sns
 
 sns.set()
-import matplotlib.pyplot as plt
-from jax import random
 
 
 def read_seed(path):

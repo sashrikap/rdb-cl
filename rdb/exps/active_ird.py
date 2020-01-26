@@ -15,13 +15,16 @@ Full Active-IRD Evaluation:
 Note:
     * see (rdb.exps.active.py) for acquisition functions
 
+Credits:
+    * Jerry Z. He 2019-2020
+
 """
 
 from rdb.infer.utils import random_choice
 from rdb.infer.particles import Particles
+from numpyro.handlers import seed
 from rdb.visualize.plot import *
 from rdb.exps.utils import *
-from numpyro.handlers import seed
 from tqdm.auto import tqdm
 from time import time
 import jax.numpy as np
@@ -59,6 +62,8 @@ class ExperimentActiveIRD(object):
         fixed_candidates=None,
         fixed_belief_tasks=None,
         max_visualize_weights=8.0,
+        design_data={},
+        num_load_design=-1,
         save_dir="data/active_ird_exp1",
         exp_name="active_ird_exp1",
         exp_params={},
@@ -87,9 +92,13 @@ class ExperimentActiveIRD(object):
         self._save_dir = save_dir
         self._exp_name = exp_name
         self._last_time = time()
+        # Load design and cache
+        self._num_load_design = num_load_design
+        self._design_data = design_data
 
     def _build_cache(self):
         """ Build cache data """
+        self._initial_task = None
         self._active_eval_hist = {}
         self._all_tasks, self._all_task_names = {}, {}
         self._all_obs, self._all_beliefs = {}, {}
@@ -99,9 +108,9 @@ class ExperimentActiveIRD(object):
         self._curr_belief = {}
         for key in self._active_fns.keys():
             self._active_eval_hist[key] = []
-
-    def _read_cache(self):
-        pass
+            self._all_cand_scores[key] = []
+            self._all_tasks[key], self._all_task_names[key] = [], []
+            self._all_obs[key], self._all_beliefs[key] = [], []
 
     def update_key(self, rng_key):
         self._rng_key = rng_key
@@ -122,36 +131,15 @@ class ExperimentActiveIRD(object):
             f"\n============= Main Experiment ({self._rng_key}): {self._exp_name} ============="
         )
         self._log_time("Begin")
-        """Run main algorithmic loop."""
         self._build_cache()
-        eval_tasks = self._random_choice(
+        self._load_design()
+        self._eval_tasks = self._random_choice(
             self._model.env.all_tasks, self._num_eval_tasks
         )
-        if self._num_eval_tasks > 0:
-            self._eval_tasks = eval_tasks
-        else:
-            self._eval_tasks = []  # do not save when eval onall tasks
 
-        """ First iteration """
-        task = self._random_choice(self._model.env.all_tasks, 1)[0]
-        task_name = f"ird_{str(task)}"
-        obs = self._model.simulate_designer(task, task_name)
-        belief = self._model.sample([task], [task_name], obs=[obs])
-
-        """ Build history for each acquisition function"""
-        for key in self._active_fns.keys():
-            self._all_obs[key] = [obs]
-            self._all_tasks[key] = [task]
-            self._all_task_names[key] = [task_name]
-            self._all_beliefs[key] = [belief]
-            self._all_cand_scores[key] = []
-            self._curr_belief[key] = belief
-            self._evaluate(key, belief, eval_tasks)
-            self._save(itr=0)
-            self._log_time("Itr 0 Eval & Save")
-
-        for it in range(1, self._iterations + 1):
-            """ Candidates for next tasks """
+        ### Main Experiment Loop ###
+        for itr in range(0, self._iterations):
+            ## Candidates for next tasks
             if self._fixed_candidates is not None:
                 candidates = self._fixed_candidates
             else:
@@ -160,44 +148,72 @@ class ExperimentActiveIRD(object):
                 )
             self._all_candidates.append(candidates)
 
-            """ Run Active IRD on Candidates """
-            print(f"\nActive IRD ({self._rng_key}) iteration {it}")
+            ### Run Active IRD on Candidates ###
+            print(f"\nActive IRD ({self._rng_key}) iteration {itr}")
             for key in self._active_fns.keys():
-                belief = self._curr_belief[key]
-                obs = self._all_obs[key][-1]
-                task_name = self._all_task_names[key][-1]
-                print(f"Method: {key}; Task name {task_name}")
+                all_beliefs = self._all_beliefs[key]
+                all_obs = self._all_obs[key]
+                all_tasks = self._all_tasks[key]
+                print(f"Method: {key}")
 
-                ## Actively propose & Record next task
-                next_task, scores = self._propose_task(candidates, belief, obs, key)
-                next_task_name = f"ird_{str(next_task)}"
-                self._all_tasks[key].append(next_task)
-                self._all_task_names[key].append(next_task_name)
+                ## Actively Task Proposal
+                if len(all_obs) == 0:
+                    task, scores = self._propose_random_task()
+                else:
+                    task, scores = self._propose_task(
+                        candidates, all_beliefs, all_obs, all_tasks, key
+                    )
+
+                task_name = f"ird_{str(task)}"
+                self._all_tasks[key].append(task)
+                self._all_task_names[key].append(task_name)
                 self._all_cand_scores[key].append(scores)
-                self._plot_candidate_scores(it)
-                self._log_time(f"Itr {it} {key} Propose")
+                self._log_time(f"Itr {itr} {key} Propose")
 
-                ## Main IRD Sampling
-                next_obs = self._model.simulate_designer(next_task, next_task_name)
-                next_belief = self._model.sample(
+                ## Simulate Designer
+                obs = self._model.simulate_designer(task, task_name)
+                self._all_obs[key].append(obs)
+                self._log_time(f"Itr {itr} {key} Designer")
+
+                ## IRD Sampling w/ Divide And Conquer
+                belief = self._model.sample(
                     self._all_tasks[key],
                     self._all_task_names[key],
                     obs=self._all_obs[key],
                 )
-                self._all_obs[key].append(next_obs)
-                self._all_beliefs[key].append(next_belief)
-                self._curr_belief[key] = next_belief
-                # Evaluate and Save
-                self._evaluate(key, next_belief, eval_tasks)
-                self._save(it)
-                self._log_time(f"Itr {it} {key} Eval & Save")
+                self._all_beliefs[key].append(belief)
+                self._curr_belief[key] = belief
+                self._log_time(f"Itr {itr} {key} IRD Divide & Conquer")
 
-    def _propose_task(self, candidates, belief, obs, fn_key):
+                ## Evaluate, plot and Save
+                self._plot_candidate_scores(itr)
+                self._evaluate(key, belief, self._eval_tasks)
+                self._save(itr=itr)
+                self._log_time(f"Itr {itr} {key} Eval & Save")
+
+    def _propose_random_task(self):
+        """Used to choose first task, when user initial design is not provided.
+        """
+
+        assert (
+            self._num_load_design < 0
+        ), "Should not propose random task if user design is provided"
+        if self._initial_task is None:
+            task = self._random_choice(self._model.env.all_tasks, 1)[0]
+            self._initial_task = task
+        else:
+            task = self._initial_task
+        scores = onp.zeros(self._num_active_tasks)
+        return task, scores
+
+    def _propose_task(self, candidates, all_beliefs, all_obs, all_tasks, fn_key):
         """Find best next task for this active function.
 
         Args:
             candidates (list): potential next tasks
-            obs (Particles.weights[1]): current observed weight
+            all_beliefs (list): all beliefs so far, usually only the last one is useful
+            all_obs (Particles.weights[1]): all observations so far
+            all_tasks (list): all tasks proposed so far
             fn_key (str): acquisition function key
 
         Note:
@@ -205,17 +221,26 @@ class ExperimentActiveIRD(object):
             * Use small task space to avoid being too slow.
 
         """
-        scores = []
+
+        assert (
+            len(all_beliefs) == len(all_obs) == len(all_tasks)
+        ), "Observation and tasks mismatch"
+        assert len(all_obs) > 0, "Need at least 1 observation"
+
         # Compute belief features
         cand_names = [f"active_{task}" for task in candidates]
+        belief = all_beliefs[-1]
         belief = belief.subsample(self._num_active_sample)
         if fn_key != "random":
             # Random does not need pre-computation
             self._eval_server.compute_tasks(
                 belief, candidates, cand_names, verbose=True
             )
-            self._eval_server.compute_tasks(obs, candidates, cand_names, verbose=True)
+            self._eval_server.compute_tasks(
+                all_obs[-1], candidates, cand_names, verbose=True
+            )
 
+        scores = []
         desc = "Evaluaitng candidate tasks"
         for next_task, next_task_name in tqdm(
             zip(candidates, cand_names), total=len(candidates), desc=desc
@@ -225,13 +250,13 @@ class ExperimentActiveIRD(object):
                     next_task,
                     next_task_name,
                     belief,
-                    obs,
+                    all_obs,
                     verbose=False,
-                    params=self._exp_params,
+                    params=self._exp_params,  # Hyperparameters
                 )
             )
-        scores = np.array(scores)
-        print(f"Function {fn_key} chose task {np.argmax(scores)} among {len(scores)}")
+        scores = onp.array(scores)
+        print(f"Function {fn_key} chose task {onp.argmax(scores)} among {len(scores)}")
         next_task = candidates[onp.argmax(scores)]
         return next_task, scores
 
@@ -285,9 +310,71 @@ class ExperimentActiveIRD(object):
             {"violation": avg_violate, "perform": avg_perform}
         )
 
+    def _load_design(self):
+        """Load previous weight designs before experiment.
+
+        In real applications, usually designers begin with a few (e.g. 5) environments
+        they have in mind, and a rough design based on them. We load these designs and
+        perform active ird from there.
+
+        Note:
+            design_data (dict):
+            {
+                'ENV_NAME': gym environment name,
+                'DESIGNS':
+                [ # list of environment & design pairs
+                    {
+                        TASK: ...,
+                        WEIGHTS: {...}
+                    },
+                ]
+            }
+            num_load (int): how many previous designs do we use
+
+        """
+        num_load, design_data = self._num_load_design, self._design_data
+        if num_load < 0:
+            return
+        assert (
+            design_data["ENV_NAME"] == self._exp_params["ENV_NAME"]
+        ), "Environment name mismatch"
+        assert len(design_data["DESIGNS"]) >= num_load, "Not enough designs to load"
+
+        load_designs = design_data["DESIGNS"][:num_load]
+        for i, design_i in enumerate(load_designs):
+            # Load previous design
+            task = design_i["TASK"]
+            task_name = f"design_{task}"
+            weights = design_i["WEIGHTS"]
+            obs = self._model.create_particles([weights])
+
+            # Cache previous designs for active functions
+            for key in self._active_fns.keys():
+                # Make sure nothing cached before design data
+                assert len(self._all_obs[key]) == i
+                assert len(self._all_tasks[key]) == i
+                assert len(self._all_task_names[key]) == i
+                self._all_obs[key].append(obs)
+                self._all_tasks[key].append(task)
+                self._all_task_names[key].append(task_name)
+
+        ## Compute IRD Belief based on loaded data
+        belief = self._model.sample(
+            self._all_tasks[key], self._all_task_names[key], obs=self._all_obs[key]
+        )
+        for i in range(num_load):
+            # Pack the same beliefs into belief history
+            assert len(self._all_beliefs[key]) == i
+            self._all_beliefs[key].append(belief)
+
     def _load_cache(self, load_dir, load_eval=True):
-        """Load previous checkpoint."""
+        """Load previous experiment checkpoint.
+
+        The opposite ove self._save().
+
+        """
         # Load eval data
+        self._build_cache()
         eval_path = f"{load_dir}/{self._exp_name}/{self._exp_name}_seed_{str(self._rng_key)}.npz"
         if not os.path.isfile(eval_path):
             print(f"Failed to load {eval_path}")
@@ -296,8 +383,6 @@ class ExperimentActiveIRD(object):
         eval_data = np.load(eval_path, allow_pickle=True)
         if load_eval:
             self._active_eval_hist = eval_data["eval_hist"].item()
-        else:
-            self._active_eval_hist = {}
         self._all_candidates = eval_data["candidate_tasks"]
         self._all_cand_scores = eval_data["candidate_scores"].item()
         self._eval_tasks = eval_data["eval_tasks"]
@@ -311,7 +396,6 @@ class ExperimentActiveIRD(object):
 
         # Load observations
         np_obs = eval_data["curr_obs"].item()
-        self._all_obs = {}
         for key in np_obs.keys():
             self._all_obs[key] = [
                 self._model.create_particles([ws]) for ws in np_obs[key]
@@ -329,11 +413,8 @@ class ExperimentActiveIRD(object):
         #         assert key in self._exp_params and self._exp_params == val
 
         # Load beliefs
-        self._all_beliefs = {}
         weight_dir = f"{load_dir}/{self._exp_name}/save"
         for key in self._active_fns.keys():
-            self._all_beliefs[key] = []
-            self._active_eval_hist[key] = []
             weight_files = sorted(
                 [
                     f
@@ -380,10 +461,12 @@ class ExperimentActiveIRD(object):
             true_w=self._model.designer.true_w,
             curr_obs=np_obs,
             curr_tasks=self._all_tasks,
-            eval_tasks=self._eval_tasks,
             eval_hist=self._active_eval_hist,
             candidate_tasks=self._all_candidates,
             candidate_scores=self._all_cand_scores,
+            eval_tasks=self._eval_tasks
+            if self._num_eval_tasks > 0
+            else [],  # do not save when eval onall tasks (too large)
         )
         path = f"{self._save_dir}/{self._exp_name}/{self._exp_name}_seed_{str(self._rng_key)}.npz"
         with open(path, "wb+") as f:
@@ -476,7 +559,7 @@ class ExperimentActiveIRD(object):
         video_dir = os.path.join(debug_dir, self._exp_name, "cand_video")
         os.makedirs(video_dir, exist_ok=True)
         truth = self._model.designer.truth
-        for itr in range(1, num_iter + 1):
+        for itr in range(0, num_iter):
             self._plot_candidate_scores(itr, debug_dir)
             candidates = all_cands[itr]
             for fn_key in all_scores.keys():
@@ -506,17 +589,17 @@ class ExperimentActiveIRD(object):
         os.makedirs(ranking_dir, exist_ok=True)
         for fn_key in all_scores.keys():
             # Check current active function
-            if len(all_scores[fn_key]) < itr:
+            if len(all_scores[fn_key]) <= itr:
                 continue
-            cand_scores = onp.array(all_scores[fn_key][itr - 1])
+            cand_scores = onp.array(all_scores[fn_key][itr])
             other_scores = []
             other_keys = []
             # Check other active function
             other_scores_all = copy.deepcopy(all_scores)
             del other_scores_all[fn_key]
             for key in other_scores_all.keys():
-                if len(other_scores_all[key]) > itr - 1:
-                    other_scores.append(other_scores_all[key][itr - 1])
+                if len(other_scores_all[key]) > itr:
+                    other_scores.append(other_scores_all[key][itr])
                     other_keys.append(key)
 
             # Ranking plot
@@ -536,22 +619,3 @@ class ExperimentActiveIRD(object):
                 delta=0.2,
                 annotate_rankings=True,
             )
-
-    # def _diagnose_belief(self, belief, tasks, fn_key, itr):
-    #     """Diagnose proxy reward over evaluation tasks.
-
-    #     Diagnose principle:
-    #         * Look at 5 top, 5 worst and 5 medium belief particles.
-
-    #     """
-    #     diagnose_N = 5
-    #     debug_dir = (
-    #         f"{self._save_dir}/{self._exp_name}/diagnose_seed_{str(self._rng_key)}"
-    #     )
-    #     os.makedirs(debug_dir, exist_ok=True)
-    #     for t_i, task in tqdm(enumerate(tasks), total=len(tasks), desc="Diagnosing"):
-    #         task_name = f"debug_{str(task)}"
-    #         file_prefix = f"{debug_dir}/fn_{fn_key}_itr_{itr}_"
-    #         belief.diagnose(
-    #             task, task_name, self._model.designer.true_w, diagnose_N, file_prefix
-    #         )

@@ -1,0 +1,74 @@
+DESIGNS:
+- TASK:
+  - -0.2
+  - -0.2
+  - 0.0
+  - -0.8
+  WEIGHTS:
+    control: 0.1
+    dist_cars: 1.0
+    dist_fences: 1.07
+    dist_lanes: 0.04
+    dist_objects: 1.05
+    speed: 0.1
+- TASK:
+  - 0.8
+  - -0.2
+  - 0.0
+  - 0.6
+  WEIGHTS:
+    control: 0.1
+    dist_cars: 1.0
+    dist_fences: 1.07
+    dist_lanes: 0.04
+    dist_objects: 1.05
+    speed: 0.1
+- TASK:
+  - 0.4
+  - -0.4
+  - -0.12
+  - 0.6
+  WEIGHTS:
+    control: 0.06667
+    dist_cars: 1.0
+    dist_fences: 4.78333
+    dist_lanes: 0.33333
+    dist_objects: 1.75
+    speed: 0.66667
+- TASK:
+  - -0.4
+  - -0.2
+  - 0.08
+  - 0.4
+  WEIGHTS:
+    control: 0.06667
+    dist_cars: 1.0
+    dist_fences: 4.78333
+    dist_lanes: 0.33333
+    dist_objects: 1.75
+    speed: 0.66667
+- TASK:
+  - -0.6
+  - -0.2
+  - -0.16
+  - 0.2
+  WEIGHTS:
+    control: 0.06667
+    dist_cars: 1.0
+    dist_fences: 4.78333
+    dist_lanes: 0.33333
+    dist_objects: 1.75
+    speed: 0.66667
+- TASK:
+  - 0.4
+  - 0.4
+  - -0.12
+  - 0.7
+  WEIGHTS:
+    control: 0.06667
+    dist_cars: 1.0
+    dist_fences: 4.78333
+    dist_lanes: 0.33333
+    dist_objects: 1.75
+    speed: 0.66667
+ENV_NAME: Week6_01-v1

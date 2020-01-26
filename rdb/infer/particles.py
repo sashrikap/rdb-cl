@@ -476,7 +476,6 @@ class Particles(object):
 
     def save(self, path):
         """Save weight belief particles as npz file."""
-        # path: ../particles/seed_{}_iteration_{}_method.npz
         with open(path, "wb+") as f:
             np.savez(f, weights=self.weights)
 

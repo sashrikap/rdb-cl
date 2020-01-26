@@ -5,6 +5,10 @@ Given a new task, compute a saliency score for the new task.
 Include:
     * Info Gain: H(X) - H(X | Y)
     * Max discrepancy (ratio): f(X, Y) / f(X)
+
+Credits:
+    * Jerry Z. He 2019-2020
+
 """
 
 import jax.numpy as np
@@ -48,7 +52,9 @@ class ActiveInfoGain(object):
         probs = np.exp(log_probs - denom)
         return probs
 
-    def __call__(self, next_task, next_task_name, belief, obs, verbose=True, params={}):
+    def __call__(
+        self, next_task, next_task_name, belief, all_obs, verbose=True, params={}
+    ):
         """Information gain (negative entropy) criteria.
 
         Note:
@@ -118,7 +124,9 @@ class ActiveRatioTest(ActiveInfoGain):
         log_ratios = -1 * np.sum(list(diff_costs.values()), axis=0)
         return np.array(log_ratios)
 
-    def __call__(self, next_task, next_task_name, belief, obs, verbose=True, params={}):
+    def __call__(
+        self, next_task, next_task_name, belief, all_obs, verbose=True, params={}
+    ):
         """Disagreement criteria.
 
         Score = -1 * rew(sample_w, traj_user)/rew(sample_w, traj_sample).
@@ -129,6 +137,9 @@ class ActiveRatioTest(ActiveInfoGain):
 
         """
         desc = f"Computing {self._method} acquisition features"
+        ## Last observation
+        obs = all_obs[-1]
+
         if not verbose:
             desc = None
         next_feats_sum = belief.get_features_sum(next_task, next_task_name, desc=desc)
@@ -170,7 +181,9 @@ class ActiveRandom(ActiveInfoGain):
         self._rng_key = rng_key
         self._random_uniform = seed(random_uniform, self._rng_key)
 
-    def __call__(self, next_task, next_task_name, belief, obs, verbose=True, params={}):
+    def __call__(
+        self, next_task, next_task_name, belief, all_obs, verbose=True, params={}
+    ):
         """Random score
 
         """

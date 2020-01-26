@@ -9,10 +9,11 @@ Includes:
     * NUTS - No-U-Turn Monte Carlo (numpyro-backed)
 
 Used for:
-    * Inverse Reward Design
+    * Active Inverse Reward Design Experiments
+    * Divide and Conquer IRD
 
-Credits:å
-    * Jerry Z. He 2019
+Credits:
+    * Jerry Z. He 2019-2020
 
 """
 

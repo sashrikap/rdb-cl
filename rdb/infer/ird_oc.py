@@ -21,9 +21,10 @@ from rdb.infer.utils import random_choice, logsumexp
 from rdb.optim.utils import multiply_dict_by_keys
 from rdb.visualize.plot import plot_weights
 from rdb.infer.particles import Particles
-from rdb.exps.utils import Profiler
 from tqdm.auto import tqdm, trange
 from rdb.infer.algos import *
+from rdb.exps.utils import *
+from os.path import join
 from time import time
 
 pp = pprint.PrettyPrinter(indent=4)
@@ -226,13 +227,17 @@ class IRDOptimalControl(PGM):
             * currently `tasks`, `task_names`, `obs` are ugly lists
 
         """
+        assert (
+            len(tasks) == len(task_names) == len(obs)
+        ), "Tasks and observations mismatch"
         all_obs_ws = []
         all_user_acs = []
         all_init_states = []
         all_user_feats_sum = []
         all_norm_feats_sum = []
         for task_i, name_i, obs_i in zip(tasks, task_names, obs):
-            all_init_states.append(self.env.get_init_state(task))
+            init_state = self.env.get_init_state(task_i)
+            all_init_states.append(init_state)
             all_obs_ws.append(obs_i.weights[0])
             all_user_feats_sum.append(obs_i.get_features_sum(task_i, name_i))
             all_user_acs.append(obs_i.get_actions(task_i, name_i))
@@ -534,7 +539,7 @@ class DesignerInteractive(Designer):
         # By default, this is run from notebook
         # assert self.run_from_ipython()
         # nb directory: "/Users/jerry/Dropbox/Projects/SafeRew/rdb/examples/notebook"
-        savedir = f"../../data/interactive/{self._name}"
+        savedir = join(data_dir(), f"interactive/{self._name}")
         os.makedirs(savedir, exist_ok=True)
         return savedir
 
@@ -545,12 +550,8 @@ class DesignerInteractive(Designer):
     def name(self):
         return self._name
 
-    def normalize_weights(self, weights):
-        assert self._normalize_key in weights, "Normalize key misspecified"
-        factor = weights[self._normalize_key]
-        for key, val in weights.items():
-            weights[key] = val / factor
-        return weights
+    def _normalize_weights(self, weights):
+        return normalize_weights(weights, self._normalize_key)
 
     def simulate(self, task, task_name):
         """Interactively query weight input.
@@ -573,7 +574,7 @@ class DesignerInteractive(Designer):
         while True:
             print(f"Current task: {str(task)}")
             user_in = input("Type in weights or to accept (Y) last: ")
-            if user_in == "Y":
+            if user_in == "Y" or user_in == "y":
                 if len(self._user_inputs) == 0:
                     print("Need at least one input")
                     continue
@@ -581,7 +582,7 @@ class DesignerInteractive(Designer):
                     break
             try:
                 user_in_w = json.loads(user_in)
-                user_in_w = self.normalize_weights(user_in_w)
+                user_in_w = self._normalize_weights(user_in_w)
                 self._user_inputs.append(user_in_w)
                 # Visualize trajectory
                 acs = self._controller(init_state, weights=user_in_w)

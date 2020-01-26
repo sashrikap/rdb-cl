@@ -36,7 +36,7 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
         car_delta=0.2,
         obstacle_states=[],
         obs_ranges=[[-0.16, 0.16, -0.8, 0.8]],
-        obs_delta=[0.04, 0.2],
+        obs_delta=[0.04, 0.1],
         task_naturalness="all",
     ):
         # Define cars
@@ -234,17 +234,17 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
             cars_y_too_close = onp.logical_and(
                 diff_cars[:, :, 1] < head_length, diff_cars[:, :, 1] < -back_length
             )
-            cars_too_close = np.any(
+            cars_too_close = onp.any(
                 onp.logical_and(cars_x_too_close, cars_y_too_close), axis=-1
             )
             # Whether any object is too close
             objs_x_too_close = onp.logical_and(
-                diff_objs[:, :, 0] < car_width, diff_objs[:, :, 0] < -car_width
+                diff_objs[:, :, 0] < car_width, diff_objs[:, :, 0] > -car_width
             )
             objs_y_too_close = onp.logical_and(
-                diff_objs[:, :, 1] < head_length, diff_objs[:, :, 1] < -back_length
+                diff_objs[:, :, 1] < head_length, diff_objs[:, :, 1] > -back_length
             )
-            objs_too_close = np.any(
+            objs_too_close = onp.any(
                 onp.logical_or(objs_x_too_close, objs_y_too_close), axis=-1
             )
 
@@ -386,7 +386,7 @@ class Week6_02(HighwayDriveWorld_Week6):
             obs_ranges=obs_ranges,
             obs_delta=[0.08, 0.2],
             obstacle_states=obstacle_states,
-            task_naturalnes=task_naturalness,
+            task_naturalness=task_naturalness,
         )
 
 

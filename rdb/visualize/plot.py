@@ -36,9 +36,10 @@ def plot_weights(
     title=None,
     max_weight=8.0,
     bins=100,
+    figsize=(20, 10),
 ):
 
-    fig = plt.figure(figsize=(8, 6), dpi=80)
+    fig = plt.figure(figsize=figsize, dpi=80)
     n_values = len(weights_dicts[0].values())
     for i, key in enumerate(weights_dicts[0].keys()):
         values = [onp.log(s[key]) for s in weights_dicts]
@@ -80,6 +81,7 @@ def plot_rankings(
     normalize=False,
     delta=0.0,
     annotate_rankings=False,
+    figsize=(20, 10),
 ):
     """Plot main_val and auxiliary_vals based on ranking of main_val.
 
@@ -95,7 +97,7 @@ def plot_rankings(
         delta (float): avoid overlapping
     """
     idxs = onp.argsort(onp.array(main_val))
-    _, ax = plt.subplots()
+    _, ax = plt.subplots(figsize=figsize)
     all_vals = auxiliary_vals + [main_val]
     all_labels = auxiliary_labels + [main_label]
     # Sort based on keys (so that colors stay the same across plots)
@@ -104,10 +106,11 @@ def plot_rankings(
     all_vals = [all_vals[i] for i in label_idxs]
     # Plot
     n_delta = 0.0
+    eps = 1e-8
     for val, label in zip(all_vals, all_labels):
         val = onp.array(val)[idxs]
         if normalize:
-            val /= onp.max(onp.abs(val))
+            val /= onp.max(onp.abs(val)) + eps
         val += n_delta * delta  # avoid overlapping
         n_delta += 1
         xs = list(range(len(val)))
@@ -127,8 +130,8 @@ def plot_rankings(
         plt.show()
 
 
-def plot_3d(xs, ys, zs, xlabel="", ylabel="", title=""):
-    fig = plt.figure()
+def plot_3d(xs, ys, zs, xlabel="", ylabel="", title="", figsize=(20, 10)):
+    fig = plt.figure(figsize=figsize)
     ax = plt.axes(projection="3d")
     X, Y = onp.meshgrid(xs, ys)
     Z = onp.array(zs)
@@ -142,9 +145,9 @@ def plot_3d(xs, ys, zs, xlabel="", ylabel="", title=""):
     plt.show()
 
 
-def plot_episode(frames, name="Figure"):
+def plot_episode(frames, name="Figure", figsize=(20, 10)):
     nframes = len(frames)
-    fig, axes = plt.subplots(num=name)
+    fig, axes = plt.subplots(num=name, figsize=figsize)
     axes.axis("off")
 
     def view_image(i):

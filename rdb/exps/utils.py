@@ -1,11 +1,27 @@
+from os.path import join, expanduser, isdir, dirname
+from itertools import product
+from jax import random
 import matplotlib.pyplot as plt
 import jax.numpy as np
 import logging, time
 import numpy as onp
+import pathlib, os
 import copy
 import yaml
-from jax import random
-from itertools import product
+import rdb
+
+## ===============================================
+## ============== Save & Load Tools ==============
+## ===============================================
+PROJECT_DIR = dirname(rdb.__path__[0])
+
+
+def examples_dir():
+    return join(PROJECT_DIR, "examples")
+
+
+def data_dir():
+    return join(PROJECT_DIR, "data")
 
 
 def str_to_key(seed_str):
@@ -21,6 +37,7 @@ def str_to_key(seed_str):
 
 
 def load_params(filepath):
+    """Load experiment parameters from yaml"""
     with open(filepath, "r") as stream:
         try:
             params = yaml.safe_load(stream)
@@ -30,6 +47,7 @@ def load_params(filepath):
 
 
 def save_params(filepath, params):
+    """Save experiment parameters to yaml"""
     with open(filepath, "w+") as stream:
         try:
             yaml.dump(params, stream, default_flow_style=False)
@@ -64,6 +82,26 @@ def create_params(template, params):
                 tparam[key] = [val]
             all_params.append(tparam)
         return all_params
+
+
+## ===============================================
+## ============== Experiment Tools ===============
+## ===============================================
+
+
+def normalize_weights(weights, key=None):
+    assert key is not None and key in weights, "Normalize key misspecified"
+    eps = 1e-8
+    output = copy.deepcopy(weights)
+    factor = output[key] + eps
+    for k, v in output.items():
+        output[k] = round(v / factor, 5)
+    return output
+
+
+## ===============================================
+## ================= Speed Tools =================
+## ===============================================
 
 
 class Profiler(object):
