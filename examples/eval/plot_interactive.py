@@ -20,21 +20,18 @@ def read_seed(path):
 
 def cleanup(arr, max_len):
     if len(arr) == 1:
-        return np.array(arr)
+        return onp.array(arr)
     else:
-        # print([len(a) for a in arr])
-        # print(f"{len(arr)} seeds")
         arrs = []
         for a in arr:
-            # if len(a) == max_len:
-            #     arrs.append(a)
             if len(a) >= max_len + PADDING:
-                # arrs.append(a[PADDING : PADDING + max_len])
                 arrs.append(a)
-                # arrs.append(a[:3])
-        # return arrs[:2]
-        # print(np.array(arrs))
-        return np.array(arrs)[:, :]
+        try:
+            return onp.array(arrs)[:, :]
+        except:
+            import pdb
+
+            pdb.set_trace()
 
 
 def plot_vio(data_dir, data):
@@ -102,10 +99,10 @@ def plot_data():
 if __name__ == "__main__":
     N = -1
     # use_seeds = list(range(20))
-    use_seeds = [26]
-    not_seeds = [20, 21, 22, 23, 24]
-    # use_methods = ["infogain", "ratiomean", "ratiomin", "random"]
-    use_methods = ["random"]
+    use_seeds = [0]
+    not_seeds = []
+    use_methods = ["infogain", "ratiomean", "ratiomin", "random"]
+    # use_methods = ["random"]
     MAX_LEN = 0
     MAX_RANDOM_LEN = 20
     PADDING = 0
@@ -113,6 +110,6 @@ if __name__ == "__main__":
     use_seeds = [str(random.PRNGKey(si)) for si in use_seeds]
     not_seeds = [str(random.PRNGKey(si)) for si in not_seeds]
 
-    exp_dir = "data/200122"
-    exp_name = "interactive_ird_exp_one"
+    exp_dir = "data/test"
+    exp_name = "test_interactive_ird_exp_natural_one"
     plot_data()

@@ -54,7 +54,7 @@ class DriveWorld(gym.Env):
         dt,
         objects=[],
         subframes=3,
-        car_length=0.1,
+        car_length=0.16,
         car_width=0.075,
         speed_factor=100,
     ):

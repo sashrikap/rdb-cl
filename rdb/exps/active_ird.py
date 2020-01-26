@@ -304,8 +304,8 @@ class ExperimentActiveIRD(object):
 
             avg_violate = float(num_violate / len(eval_tasks))
             avg_perform = float(performance / len(eval_tasks))
-            print(f">>> Average Violation diff {avg_violate:.2f}")
-            print(f">>> Average Performance diff {avg_perform:.2f}")
+            print(f"    Average Violation diff {avg_violate:.2f}")
+            print(f"    Average Performance diff {avg_perform:.2f}")
         self._active_eval_hist[fn_name].append(
             {"violation": avg_violate, "perform": avg_perform}
         )
@@ -407,10 +407,12 @@ class ExperimentActiveIRD(object):
             true_ws = [eval_data["true_w"].item()]
             self._model.designer.truth.weights = true_ws
         # Load parameters and check
-        # if "exp_params" in eval_data:
-        #     exp_params = eval_data["exp_params"].item()
-        #     for key, val in exp_params.items():
-        #         assert key in self._exp_params and self._exp_params == val
+        if "exp_params" in eval_data:
+            exp_params = eval_data["exp_params"].item()
+            for key, val in exp_params.items():
+                assert (
+                    key in self._exp_params and self._exp_params[key] == val
+                ), f"Parameter changed {key}: {val}"
 
         # Load beliefs
         weight_dir = f"{load_dir}/{self._exp_name}/save"
@@ -503,7 +505,7 @@ class ExperimentActiveIRD(object):
             h = secs // (60 * 60)
             m = (secs - h * 60 * 60) // 60
             s = secs - (h * 60 * 60) - (m * 60)
-            print(f"Active IRD {caption} Time: {int(h)}h {int(m)}m {s:.2f}s")
+            print(f">>> Active IRD {caption} Time: {int(h)}h {int(m)}m {s:.2f}s")
         self._last_time = time()
 
     def run_evaluation(self, override=False):

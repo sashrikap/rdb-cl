@@ -24,11 +24,16 @@ class objectview(object):
         self.__dict__ = d
 
 
-def run_interactive(active_fn_name, load_design=-1, evaluate=False):
+def run_interactive(active_fn_name, random_keys=None, load_design=-1, evaluate=False):
     ## Load parameters
     PARAMS = load_params(join(examples_dir(), "params/interactive_template.yaml"))
-    PARAMS["EXP_NAME"] = f"{PARAMS['EXP_NAME']}_{active_fn_name}"
+    PARAMS["EXP_NAME"] = f"{PARAMS['EXP_NAME']}_{active_fn_name}_design_{load_design}"
     PARAMS["INTERACTIVE_NAME"] = f"{PARAMS['INTERACTIVE_NAME']}_{active_fn_name}"
+
+    ## Override Parameters
+    if random_keys is not None:
+        PARAMS["RANDOM_KEYS"] = random_keys
+
     p = objectview(PARAMS)
     print(f"Interactive Experiment Random Key {p.RANDOM_KEYS}")
 

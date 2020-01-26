@@ -32,8 +32,8 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
         horizon=10,
         num_lanes=3,
         lane_width=0.13,
-        car_ranges=[[-0.8, 0.8], [-0.8, 0.8]],
-        car_delta=0.2,
+        car_ranges=[[-0.4, 1.2], [-0.4, 1.2]],
+        car_delta=0.1,
         obstacle_states=[],
         obs_ranges=[[-0.16, 0.16, -0.8, 0.8]],
         obs_delta=[0.04, 0.1],
@@ -367,6 +367,7 @@ class Week6_02(HighwayDriveWorld_Week6):
         car_ranges = [[-0.4, 1.2], [-0.4, 1.2]]
         # Obstacle states
         obstacle_states = np.array([[0.0, 0.3], [-lane_width, 0.3]])
+        # [x_min, x_max, y_min, y_max]
         obs_ranges = [[-0.16, 0.0, -0.4, 1.2], [0.0, 0.16, -0.4, 1.2]]
         # Don't filter any task
         task_naturalness = "all"
@@ -384,7 +385,7 @@ class Week6_02(HighwayDriveWorld_Week6):
             lane_width=lane_width,
             car_ranges=car_ranges,
             obs_ranges=obs_ranges,
-            obs_delta=[0.08, 0.2],
+            obs_delta=[0.04, 0.1],
             obstacle_states=obstacle_states,
             task_naturalness=task_naturalness,
         )
