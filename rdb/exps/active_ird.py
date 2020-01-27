@@ -12,8 +12,19 @@ Full Active-IRD Evaluation:
     4) Evaluate current MAP w
     5) Go back to step 2)
 
+How to tune hyperparameters in Active IRD (By Jerry)
+    1) IRD_PROPOSAL_VAR and DESIGNER_VAR are most sensitive for sampling
+    2) Tune BETA with `rdb/examples/run_dsigner.py`
+    3) Control for randomness with `rdb/examples/run_active.py`
+
+How to control randomness (By Jerry)
+    1) In general, run with >=4 different seeds
+    2) Evaluation: # MAP, # Tasks
+    3) Active: # Candidates, # Histogram bins
+    4) MH Sampling: # Designer, # IRD Samples
+
 Note:
-    * see (rdb.exps.active.py) for acquisition functions
+    * see rdb/exps/active.py for acquisition functions
 
 Credits:
     * Jerry Z. He 2019-2020
@@ -26,6 +37,7 @@ from numpyro.handlers import seed
 from rdb.visualize.plot import *
 from rdb.exps.utils import *
 from tqdm.auto import tqdm
+from jax import random
 from time import time
 import jax.numpy as np
 import numpy as onp
@@ -59,6 +71,7 @@ class ExperimentActiveIRD(object):
         num_eval_sample=5,
         num_active_tasks=4,
         num_active_sample=-1,
+        fixed_task_seed=None,
         fixed_candidates=None,
         fixed_belief_tasks=None,
         max_visualize_weights=8.0,
@@ -75,7 +88,8 @@ class ExperimentActiveIRD(object):
         # Random key & function
         self._rng_key = None
         self._random_choice = None
-        # self._random_choice = random_choice
+        self._random_task_choice = None
+        self._fixed_task_seed = fixed_task_seed
         self._iterations = iterations
         # Evaluation
         self._num_eval_map = num_eval_map
@@ -116,6 +130,10 @@ class ExperimentActiveIRD(object):
         self._rng_key = rng_key
         self._model.update_key(rng_key)
         self._random_choice = seed(random_choice, rng_key)
+        if self._fixed_task_seed is not None:
+            self._random_task_choice = seed(random_choice, self._fixed_task_seed)
+        else:
+            self._random_task_choice = self._random_choice
         for fn in self._active_fns.values():
             fn.update_key(rng_key)
 
@@ -133,9 +151,10 @@ class ExperimentActiveIRD(object):
         self._log_time("Begin")
         self._build_cache()
         self._load_design()
-        self._eval_tasks = self._random_choice(
-            self._model.env.all_tasks, self._num_eval_tasks
-        )
+        num_eval = self._num_eval_tasks
+        if self._num_eval_tasks > len(self._model.env.all_tasks):
+            num_eval = -1
+        self._eval_tasks = self._random_task_choice(self._model.env.all_tasks, num_eval)
 
         ### Main Experiment Loop ###
         for itr in range(0, self._iterations):
@@ -143,7 +162,7 @@ class ExperimentActiveIRD(object):
             if self._fixed_candidates is not None:
                 candidates = self._fixed_candidates
             else:
-                candidates = self._random_choice(
+                candidates = self._random_task_choice(
                     self._model.env.all_tasks, self._num_active_tasks
                 )
             self._all_candidates.append(candidates)
@@ -199,7 +218,7 @@ class ExperimentActiveIRD(object):
             self._num_load_design < 0
         ), "Should not propose random task if user design is provided"
         if self._initial_task is None:
-            task = self._random_choice(self._model.env.all_tasks, 1)[0]
+            task = self._random_task_choice(self._model.env.all_tasks, 1)[0]
             self._initial_task = task
         else:
             task = self._initial_task
@@ -358,6 +377,7 @@ class ExperimentActiveIRD(object):
                 self._all_tasks[key].append(task)
                 self._all_task_names[key].append(task_name)
 
+        print(f"Loaded {len(load_designs)} prior designs.")
         ## Compute IRD Belief based on loaded data
         belief = self._model.sample(
             self._all_tasks[key], self._all_task_names[key], obs=self._all_obs[key]
@@ -389,10 +409,6 @@ class ExperimentActiveIRD(object):
         if len(self._eval_tasks) == 0:
             self._eval_tasks = self._model.env.all_tasks
         self._all_tasks = eval_data["curr_tasks"].item()
-
-        ## TODO: remove this
-        # print("Remove this for debugging purpose")
-        # self._eval_tasks = self._random_choice(self._eval_tasks, 8)
 
         # Load observations
         np_obs = eval_data["curr_obs"].item()
@@ -452,6 +468,8 @@ class ExperimentActiveIRD(object):
         """
         exp_dir = f"{self._save_dir}/{self._exp_name}"
         os.makedirs(exp_dir, exist_ok=True)
+        ## Save experiment parameters
+        save_params(f"{exp_dir}/params_{str(self._rng_key)}.yaml", self._exp_params)
         ## Save evaluation history
         np_obs = {}
         for key in self._all_obs.keys():
@@ -490,6 +508,9 @@ class ExperimentActiveIRD(object):
                 else:
                     obs_w = None
                 if not skip_weights:
+                    import pdb
+
+                    pdb.set_trace()
                     belief.save(savepath)
                     belief.visualize(
                         figpath,
@@ -533,7 +554,7 @@ class ExperimentActiveIRD(object):
                     continue
                 belief = all_beliefs[key][itr]
                 if override or len(self._active_eval_hist[key]) <= itr:
-                    self._evaluate(key, belief, eval_tasks)
+                    # self._evaluate(key, belief, eval_tasks)
                     self._save(itr=itr)
                     self._log_time(f"Itr {itr} Method {key} Eval & Save")
 

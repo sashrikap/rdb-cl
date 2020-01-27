@@ -162,7 +162,7 @@ class Particles(object):
         return self._sample_feats_sum[task_name]
 
     def get_violations(self, task, task_name, desc=None):
-        """Compute violations (cached) for sample weights on task."""
+        """Compute violations sum (cached) for sample weights on task."""
         if task_name not in self.cached_names:
             self._cache_task(task, task_name, desc)
         violations = self._sample_violations[task_name]
@@ -282,7 +282,7 @@ class Particles(object):
         else:
             this_vios = self.get_violations(task, task_name)
             this_vios = onp.sum(list(this_vios.values()), axis=0)
-            diff_rews = np.zeros(1)
+            diff_rews = onp.zeros(1)
             return diff_rews, this_vios
 
     def resample(self, probs):
@@ -302,6 +302,7 @@ class Particles(object):
             self._runner,
             sample_concate_ws=new_concate_ws,
             test_mode=self._test_mode,
+            env=self._env,
         )
         return new_ps
 
@@ -464,11 +465,15 @@ class Particles(object):
         """
         if self._test_mode:
             return
-        map_w = self.map_estimate().weights[0]
+        num_map = 4  # Magic number for now
+        map_ws = self.map_estimate(num_map).weights
+        map_ls = [str(i) for i in range(1, 1 + num_map)]
+        # Visualize multiple map weights in magenta with ranking labels
         plot_weights(
             self.weights,
-            highlight_dicts=[true_w, obs_w, map_w],
-            highlight_colors=["r", "k", "m"],
+            highlight_dicts=[true_w, obs_w] + map_ws,
+            highlight_colors=["r", "k"] + ["m"] * num_map,
+            highlight_labels=["l", "o"] + map_ls,
             path=path + ".png",
             title="Proxy Reward; true (red), obs (black) map (magenta)",
             max_weight=max_weight,
@@ -487,10 +492,12 @@ class Particles(object):
 
         Args:
             perfs (list): performance, ususally output from self.compare_with
+
         """
         assert len(self.weights) == 1, "Can only visualize one weight sample"
         vios = concate_dict_by_keys(list(self._sample_violations.values()))
-        num_violates = np.array(list(vios.values())).sum(axis=(0, 2, 3))
+        # Dims: (n_keys, n_tasks, 1)
+        num_violates = onp.array(list(vios.values())).sum(axis=(0, 2))
         # Ranking violations and performance (based on violation)
         plot_rankings(
             num_violates,

@@ -1,8 +1,12 @@
 """Inverse Reward Design Module for Optimal Control.
 
 Includes:
-    [1] Pyro Implementation
-    [2] Custon Implementation
+    [1] General PGM inference API
+    [2] Reward Design with Divide and Conquer
+    [3] Different ways (max_norm/sample/hybrid) to approximate IRD normalizer
+    [4] Designer Class
+    [5] Informed Designer with prior tasks, see `rdb/exps/designer_prior.py`
+
 Note:
     * We use `init_state/task` interchangably. In drive2d
      `env.set_task(init_state)` specifies a task to run.
@@ -16,9 +20,9 @@ import json
 import os
 import jax
 import jax.numpy as np
+from rdb.optim.utils import multiply_dict_by_keys, append_dict_by_keys
 from numpyro.handlers import scale, condition, seed
 from rdb.infer.utils import random_choice, logsumexp
-from rdb.optim.utils import multiply_dict_by_keys
 from rdb.visualize.plot import plot_weights
 from rdb.infer.particles import Particles
 from tqdm.auto import tqdm, trange
@@ -38,22 +42,20 @@ class PGM(object):
 
     """
 
-    def __init__(
-        self, rng_key, kernel, proposal_fn, sample_method="mh", sample_args={}
-    ):
+    def __init__(self, rng_key, kernel, proposal, sample_method="mh", sample_args={}):
         self._rng_key = rng_key
         self._sampler = self._build_sampler(
-            kernel, proposal_fn, sample_method, sample_args
+            kernel, proposal, sample_method, sample_args
         )
 
     def update_key(self, rng_key):
         self._rng_key = rng_key
         # self._sampler.update_key(rng_key)
 
-    def _build_sampler(self, kernel, proposal_fn, sample_method, sample_args):
+    def _build_sampler(self, kernel, proposal, sample_method, sample_args):
         if sample_method == "mh":
             return MetropolisHasting(
-                self._rng_key, kernel, proposal_fn=proposal_fn, **sample_args
+                self._rng_key, kernel, proposal=proposal, **sample_args
             )
         else:
             raise NotImplementedError
@@ -75,8 +77,8 @@ class IRDOptimalControl(PGM):
             runner: `traj, cost, info = runner(state, actions)`
         beta (float): temperature param
             `p ~ exp(beta * reward)`
-        prior_log_prob (fn): log probability of prior
-        normalizer_fn (fn): sample fixed number of normalizers
+        prior (Prior): sampling prior
+        num_normalizers (int): fixed number of normalizers
         true_w (dict):
         use_true_w (bool): debug designer with true w
 
@@ -88,8 +90,7 @@ class IRDOptimalControl(PGM):
         infer (fn): infer p`(w* | obs)`
 
     Example:
-        >>> ird_oc = IRDOptimalControl(driving_env, runner, beta, prior_fn)
-        >>> _, samples = ird_oc.posterior()
+        * see rdb/examples/run_active.py
 
     """
 
@@ -102,11 +103,12 @@ class IRDOptimalControl(PGM):
         eval_server,
         beta,
         true_w,
-        prior_log_prob_fn,
-        normalizer_fn,
-        proposal_fn,
+        prior,
+        proposal,
+        num_normalizers=-1,
         sample_method="mh",
         sample_args={},  # "num_warmups": 100, "num_samples": 200
+        designer_proposal=None,
         designer_args={},
         num_prior_tasks=0,
         use_true_w=False,
@@ -125,41 +127,42 @@ class IRDOptimalControl(PGM):
         # Rationality
         self._beta = beta
         # Sampling functions
-        self._prior_raw_fn = prior_log_prob_fn
-        self._prior_log_prob = None
-        self._normalizer_raw_fn = normalizer_fn
-        self._normalizer_fn = None
+        self._prior = prior
+        self._num_normalizers = num_normalizers
         ## Caching normalizers, samples and features
         self._normalizer = None
-        self._samples = {}
+        self._task_samples = {}
         self._user_actions = {}
         self._user_feats = {}
         self._debug_true_w = debug_true_w
         self._test_mode = test_mode
         kernel = self._build_kernel(beta)
-        super().__init__(rng_key, kernel, proposal_fn, sample_method, sample_args)
+        super().__init__(rng_key, kernel, proposal, sample_method, sample_args)
         # assume designer uses the same beta, prior and prior proposal
         self._interactive_mode = interactive_mode
         if not interactive_mode:
-            truth = self.create_particles([true_w])
             self._designer = Designer(
-                rng_key,
-                self.env_fn,
-                self._controller,
-                self._runner,
-                beta,
-                truth,
-                prior_log_prob_fn,
-                proposal_fn,
-                sample_method,
-                designer_args,
+                rng_key=rng_key,
+                env_fn=self.env_fn,
+                controller=self._controller,
+                runner=self._runner,
+                beta=beta,
+                truth=self.create_particles([true_w]),
+                prior=prior,
+                proposal=designer_proposal,
+                sample_method=sample_method,
+                sampler_args=designer_args,
                 use_true_w=use_true_w,
                 num_prior_tasks=num_prior_tasks,
             )
         else:
             # Interactive Mode
             self._designer = DesignerInteractive(
-                rng_key, self.env_fn, self._controller, self._runner, interactive_name
+                rng_key=rng_key,
+                env_fn=self.env_fn,
+                controller=self._controller,
+                runner=self._runner,
+                name=interactive_name,
             )
 
     @property
@@ -191,8 +194,7 @@ class IRDOptimalControl(PGM):
         super().update_key(rng_key)
         self._sampler.update_key(rng_key)
         self._designer.update_key(rng_key)
-        self._prior_log_prob = seed(self._prior_raw_fn, rng_key)
-        self._normalizer_fn = seed(self._normalizer_raw_fn, rng_key)
+        self._prior.update_key(rng_key)
 
     def load_samples(self,):
         pass
@@ -200,8 +202,8 @@ class IRDOptimalControl(PGM):
     def get_samples(self, task, task_name):
         """Sample features for belief weights on a task
         """
-        assert task_name in self._samples.keys(), f"{task_name} not found"
-        return self._samples[task_name]
+        assert task_name in self._task_samples.keys(), f"{task_name} not found"
+        return self._task_samples[task_name]
 
     def update(self, obs):
         """ Incorporate new observation """
@@ -211,14 +213,17 @@ class IRDOptimalControl(PGM):
         """Sample one w from b(w) on task"""
         return self._designer.simulate(task, task_name)
 
-    def sample(self, tasks, task_names, obs, verbose=True, max_norm=True):
+    def sample(self, tasks, task_names, obs, verbose=True, mode="hybrid"):
         """Sample b(w) for true weights given obs.weights.
 
         Args:
             tasks (list): list of tasks so far
             task_names (list): list of task names so far
             obs (list): list of observation particles, each for 1 task
-            max_norm (bool): use max trajectory as normalizer
+            mode (string): how to estimate normalizer (doubly-intractable)
+                `sample`: use random samples for normalizer;
+                `max_norm`: use max trajectory as normalizer;
+                `hybrid`: use random samples mixed with max trajectory
 
         Note:
             * Samples are cached by the last task name to date (`task_names[-1]`)
@@ -230,6 +235,12 @@ class IRDOptimalControl(PGM):
         assert (
             len(tasks) == len(task_names) == len(obs)
         ), "Tasks and observations mismatch"
+        assert mode in [
+            "hybrid",
+            "max_norm",
+            "sample",
+        ], "Must specify IRD sampling mode"
+
         all_obs_ws = []
         all_user_acs = []
         all_init_states = []
@@ -242,17 +253,19 @@ class IRDOptimalControl(PGM):
             all_user_feats_sum.append(obs_i.get_features_sum(task_i, name_i))
             all_user_acs.append(obs_i.get_actions(task_i, name_i))
 
-        if max_norm:
+        if mode == "max_norm":
             all_norm_feats_sum = [None for _ in range(len(tasks))]
-        else:
+        elif mode == "sample" or mode == "hybrid":
             if self._normalizer is None:
-                self._normalizer = self._build_normalizer(tasks[0], task_names[0])
+                self._normalizer = self._build_normalizer()
             for task_i, name_i, obs_i in zip(tasks, task_names, obs):
                 all_norm_feats_sum.append(
                     self._normalizer.get_features_sum(
-                        task_i, name_i, "Computing Normalizers"
+                        task_i, name_i, "Computing Normalizer Features"
                     )
                 )
+        else:
+            raise NotImplementedError
 
         last_obs_w = obs[-1].weights[0]
         last_name = task_names[-1]
@@ -272,10 +285,11 @@ class IRDOptimalControl(PGM):
                 all_init_states=all_init_states,
                 all_user_acs=all_user_acs,
                 verbose=verbose,
+                mode=mode,
             )
         samples = self.create_particles(sample_ws, self._test_mode)
-        self._samples[last_name] = samples
-        return self._samples[last_name]
+        self._task_samples[last_name] = samples
+        return self._task_samples[last_name]
 
     def create_particles(self, weights, test_mode=False):
         return Particles(
@@ -283,19 +297,15 @@ class IRDOptimalControl(PGM):
             self._env_fn,
             self._controller,
             self._runner,
-            weights,
+            sample_ws=weights,
             test_mode=test_mode,
+            env=self._env,
         )
 
-    def _build_normalizer(self, task, task_name):
-        """For new tasks, need to build normalizer."""
-        assert self._normalizer_fn is not None, "Need to set random seed"
-        norm_ws = self._normalizer_fn()
-        state = self.env.get_init_state(task)
+    def _build_normalizer(self):
+        """Build sampling-based normalizer by randomly sampling weights."""
+        norm_ws = self._prior.sample(self._num_normalizers)
         normalizer = self.create_particles(norm_ws, test_mode=False)
-        norm_feats = normalizer.get_features(
-            task, task_name, desc="Collecting Normalizer Features"
-        )
         return normalizer
 
     def _build_kernel(self, beta):
@@ -327,45 +337,66 @@ class IRDOptimalControl(PGM):
             user_feats_sums,
             all_init_states,
             all_user_acs,
+            mode="hybrid",
         ):
             """Main likelihood logic.
 
             Runs `p(w_obs | w)`
 
             """
-            assert self._prior_log_prob is not None, "need to set random seed"
 
             log_probs = []
             # Iterate over list of previous tasks
             for n_feats_sum, u_feats_sum, init_state, user_acs in zip(
                 norm_feats_sums, user_feats_sums, all_init_states, all_user_acs
             ):
-
                 for val in u_feats_sum.values():
                     assert len(val) == 1, "Only can take 1 user sample"
                 sample_costs = multiply_dict_by_keys(sample_w, u_feats_sum)
                 ## Numerator
                 sample_rew = -beta * np.sum(list(sample_costs.values()))
-                ## Normalizing constant
-                if n_feats_sum is None:
-                    # Use max trajectory to replace norm
+
+                ## Estimating Normalizing constant
+                if mode == "max_norm":
+                    # Use max trajectory to replace normalizer
                     # Important to initialize from observation actions
-                    acs = self._controller(init_state, us0=user_acs, weights=sample_w)
-                    _, normal_costs, info = self._runner(
-                        init_state, acs, weights=sample_w
+                    assert n_feats_sum is None
+                    sample_acs = self._controller(
+                        init_state, us0=user_acs, weights=sample_w
                     )
-                    sum_normal_rew = -beta * normal_costs
-                else:
-                    # Use weight samples of approximate norm
+                    _, sample_costs, info = self._runner(
+                        init_state, sample_acs, weights=sample_w
+                    )
+                    sum_normal_rew = -beta * sample_costs
+
+                elif mode == "sample":
+                    # Use weight samples of approximate normalizer
                     normal_costs = multiply_dict_by_keys(sample_w, n_feats_sum)
                     normal_rews = -beta * np.sum(list(normal_costs.values()), axis=0)
                     sum_normal_rew = -np.log(len(normal_rews)) + logsumexp(normal_rews)
+
+                elif mode == "hybrid":
+                    # Use both max trajectory and weight samples to approximate normalizer
+                    sample_acs = self._controller(
+                        init_state, us0=user_acs, weights=sample_w
+                    )
+                    _, _, sample_info = self._runner(
+                        init_state, sample_acs, weights=sample_w
+                    )
+                    n_feats_sum = append_dict_by_keys(
+                        n_feats_sum, sample_info["feats_sum"]
+                    )
+                    normal_costs = multiply_dict_by_keys(sample_w, n_feats_sum)
+                    normal_rews = -beta * np.sum(list(normal_costs.values()), axis=0)
+                    sum_normal_rew = -np.log(len(normal_rews)) + logsumexp(normal_rews)
+                else:
+                    raise NotImplementedError
 
                 if self._debug_true_w:
                     print(f"sample - normal {sample_rew - sum_normal_rew:.3f}")
 
                 log_probs.append(sample_rew - sum_normal_rew)
-            log_probs.append(self._prior_log_prob(sample_w))
+            log_probs.append(self._prior.log_prob(sample_w))
             return sum(log_probs)
 
         return likelihood_fn
@@ -393,8 +424,8 @@ class Designer(PGM):
         runner,
         beta,
         truth,
-        prior_log_prob_fn,
-        proposal_fn,
+        prior,
+        proposal,
         sample_method="mh",
         sampler_args={},
         use_true_w=False,
@@ -411,13 +442,12 @@ class Designer(PGM):
         else:
             self._true_w = None
         self._use_true_w = use_true_w
-        # Prior function
-        self._prior_raw_fn = prior_log_prob_fn
-        self._prior_log_prob = None
-        # Sampling kernel
-        kernel = self._build_kernel(beta)
-        self._samples = {}
-        super().__init__(rng_key, kernel, proposal_fn, sample_method, sampler_args)
+        # Sampling Prior and kernel
+        self._prior = prior
+        self._kernel = self._build_kernel(beta)
+        # Cache
+        self._task_samples = {}
+        super().__init__(rng_key, self._kernel, proposal, sample_method, sampler_args)
         # Designer Prior
         self._random_choice = None
         self._prior_tasks = []
@@ -425,17 +455,22 @@ class Designer(PGM):
 
     def sample(self, task, task_name, verbose=True):
         """Sample 1 set of weights from b(design_w) given true_w"""
-        if task_name not in self._samples.keys():
+        if task_name not in self._task_samples.keys():
             print(f"Sampling Designer (prior={len(self._prior_tasks)})")
             if self._use_true_w:
                 sample_ws = [self._true_w]
             else:
                 sample_ws = self._sampler.sample(self._true_w, task=task)
             samples = Particles(
-                self._rng_key, self._env_fn, self._controller, self._runner, sample_ws
+                self._rng_key,
+                self._env_fn,
+                self._controller,
+                self._runner,
+                sample_ws=sample_ws,
+                env=self._env,
             )
-            self._samples[task_name] = samples
-        return self._samples[task_name]
+            self._task_samples[task_name] = samples
+        return self._task_samples[task_name]
 
     def simulate(self, task, task_name):
         """Give 1 sample"""
@@ -475,19 +510,22 @@ class Designer(PGM):
         super().update_key(rng_key)
         self._truth.update_key(rng_key)
         self._sampler.update_key(rng_key)
-        self._prior_log_prob = seed(self._prior_raw_fn, rng_key)
+        self._prior.update_key(rng_key)
         self._random_choice = seed(random_choice, rng_key)
         self.reset_prior_tasks()
 
     def _build_kernel(self, beta):
         def likelihood_fn(true_w, sample_w, task):
-            assert self._prior_log_prob is not None, "Need to set random seed"
-            state = self.env.get_init_state(task)
-            actions = self._controller(state, weights=sample_w)
-            _, cost, info = self._runner(state, actions, weights=true_w)
-            rew = -1 * cost
-            log_prob = beta * rew
-            log_prob += self._prior_log_prob(sample_w)
+            assert self._prior_tasks is not None, "Need >=0 prior tasks."
+            all_tasks = self._prior_tasks + [task]
+            log_prob = 0.0
+            for task_i in all_tasks:
+                state = self.env.get_init_state(task)
+                actions = self._controller(state, weights=sample_w)
+                _, cost, info = self._runner(state, actions, weights=true_w)
+                rew = -1 * cost
+                log_prob += beta * rew
+            log_prob += self._prior.log_prob(sample_w)
             return log_prob
 
         return likelihood_fn
@@ -517,8 +555,8 @@ class DesignerInteractive(Designer):
             runner=runner,
             beta=None,
             truth=None,
-            prior_log_prob_fn=None,
-            proposal_fn=None,
+            prior=None,
+            proposal=None,
             sample_method=None,
         )
         self._name = name
@@ -568,7 +606,9 @@ class DesignerInteractive(Designer):
         self.env.set_task(task)
         init_state = self.env.get_init_state(task)
         # Visualize task
-        image_path = f"{self._savedir}/user_trial_0_task_{str(task)}.png"
+        image_path = (
+            f"{self._savedir}/key_{self._rng_key}_user_trial_0_task_{str(task)}.png"
+        )
         self._runner.nb_show_thumbnail(init_state, image_path, clear=False)
         # Query user input
         while True:
@@ -587,9 +627,7 @@ class DesignerInteractive(Designer):
                 # Visualize trajectory
                 acs = self._controller(init_state, weights=user_in_w)
                 num_weights = len(self._user_inputs)
-                video_path = (
-                    f"{self._savedir}/user_trial_{num_weights}_task_{str(task)}.mp4"
-                )
+                video_path = f"{self._savedir}/key_{self._rng_key}_user_trial_{num_weights}_task_{str(task)}.mp4"
                 print("Received Weights")
                 pp.pprint(user_in_w)
                 self._runner.nb_show_mp4(init_state, acs, path=video_path, clear=False)
@@ -602,7 +640,8 @@ class DesignerInteractive(Designer):
             self._env_fn,
             self._controller,
             self._runner,
-            [self._user_inputs[-1]],
+            sample_ws=[self._user_inputs[-1]],
+            env=self._env,
         )
 
     def reset_prior_tasks(self):
@@ -627,7 +666,7 @@ class DesignerInteractive(Designer):
     def update_key(self, rng_key):
         self._rng_key = rng_key
 
-    def _build_sampler(self, kernel, proposal_fn, sample_method, sample_args):
+    def _build_sampler(self, kernel, proposal, sample_method, sample_args):
         """Dummy sampler."""
         pass
 

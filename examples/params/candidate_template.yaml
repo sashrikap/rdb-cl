@@ -76,6 +76,16 @@ PROPOSAL_VAR: 1.25
 HORIZON: 10
 
 
+## Task and weight specific
+NORMALIZED_KEY: "dist_cars"
+FEATURE_KEYS:
+- "dist_cars"
+- "dist_lanes"
+- "dist_fences"
+- "dist_objects"
+- "speed"
+- "control"
+
 TRUE_W:
     dist_cars: 1.0
     dist_lanes: 0.1

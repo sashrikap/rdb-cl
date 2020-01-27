@@ -91,6 +91,20 @@ def unconcate_dict_by_keys(dict_):
     return out_dicts
 
 
+def append_dict_by_keys(dict_, item):
+    """Append single item to dict (multiple items).
+
+    Example:
+        >>> input: {'a': [1, 2, 3]}, {'a': 4}
+        >>> output: {'a': [1, 2, 3, 4]}
+
+    """
+    for k, v in dict_.items():
+        assert k in item
+        dict_[k] = onp.concatenate([dict_[k], [item[k]]])
+    return dict_
+
+
 def multiply_dict_by_keys(da, db):
     """Multiply key-value pairs.
 

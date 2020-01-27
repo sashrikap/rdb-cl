@@ -20,6 +20,10 @@ import yaml, argparse
 
 
 class objectview(object):
+    """Load dict params into object, because notebook doesn't support
+    `local().update(params)`
+    """
+
     def __init__(self, d):
         self.__dict__ = d
 
@@ -57,28 +61,28 @@ def run_interactive(active_fn_name, random_keys=None, load_design=-1, evaluate=F
         )
         return controller, runner
 
-    """ Prior sampling & likelihood functions for PGM """
-    log_prior_dict = {
-        "dist_cars": dist.Uniform(-0.05, 0.05),
-        "dist_lanes": dist.Uniform(-p.MAX_WEIGHT, p.MAX_WEIGHT),
-        "dist_fences": dist.Uniform(-p.MAX_WEIGHT, p.MAX_WEIGHT),
-        "dist_objects": dist.Uniform(-p.MAX_WEIGHT, p.MAX_WEIGHT),
-        "speed": dist.Uniform(-p.MAX_WEIGHT, p.MAX_WEIGHT),
-        "control": dist.Uniform(-p.MAX_WEIGHT, p.MAX_WEIGHT),
-    }
-    proposal_std_dict = {
-        "dist_cars": 1e-6,
-        "dist_lanes": p.PROPOSAL_VAR,
-        "dist_fences": p.PROPOSAL_VAR,
-        "dist_objects": p.PROPOSAL_VAR,
-        "speed": p.PROPOSAL_VAR,
-        "control": p.PROPOSAL_VAR,
-    }
-    prior_log_prob_fn = build_log_prob_fn(log_prior_dict)
-    prior_sample_fn = build_prior_sample_fn(log_prior_dict)
-    proposal_fn = build_gaussian_proposal(proposal_std_dict)
+    ## Prior sampling & likelihood functions for PGM
     norm_sample_fn = build_normalizer_sampler(prior_sample_fn, p.NUM_NORMALIZERS)
+    prior = LogUniformPrior(
+        rng_key=None,
+        normalized_key=p.NORMALIZED_KEY,
+        feature_keys=p.FEATURE_KEYS,
+        log_max=p.MAX_WEIGHT,
+    )
+    ird_proposal = IndGaussianProposal(
+        rng_key=None,
+        normalized_key=p.NORMALIZED_KEY,
+        feature_keys=p.FEATURE_KEYS,
+        proposal_var=p.IRD_PROPOSAL_VAR,
+    )
+    designer_proposal = IndGaussianProposal(
+        rng_key=None,
+        normalized_key=p.NORMALIZED_KEY,
+        feature_keys=p.FEATURE_KEYS,
+        proposal_var=p.DESIGNER_PROPOSAL_VAR,
+    )
 
+    ## Evaluation Server
     eval_server = ParticleServer(
         env_fn, controller_fn, num_workers=p.NUM_EVAL_WORKERS, parallel=p.PARALLEL
     )
@@ -91,10 +95,11 @@ def run_interactive(active_fn_name, random_keys=None, load_design=-1, evaluate=F
         eval_server=eval_server,
         beta=p.BETA,
         true_w=None,
-        prior_log_prob_fn=prior_log_prob_fn,
-        normalizer_fn=norm_sample_fn,
-        proposal_fn=proposal_fn,
+        prior=prior,
+        num_normalizers=NUM_NORMALIZERS,
+        proposal=proposal,
         sample_args={"num_warmups": p.NUM_WARMUPS, "num_samples": p.NUM_SAMPLES},
+        designer_proposal=designer_proposal,
         designer_args={
             "num_warmups": p.NUM_DESIGNER_WARMUPS,
             "num_samples": p.NUM_DESIGNERS,
@@ -122,6 +127,12 @@ def run_interactive(active_fn_name, random_keys=None, load_design=-1, evaluate=F
             del active_fns[key]
     assert len(list(active_fns)) == 1
 
+    # Task Sampling seed
+    if p.FIXED_TASK_SEED is not None:
+        fixed_task_seed = random.PRNGKey(p.FIXED_TASK_SEED)
+    else:
+        fixed_task_seed = None
+
     SAVE_ROOT = data_dir()
     experiment = ExperimentActiveIRD(
         ird_model,
@@ -134,6 +145,7 @@ def run_interactive(active_fn_name, random_keys=None, load_design=-1, evaluate=F
         num_active_tasks=p.NUM_ACTIVE_TASKS,
         num_active_sample=p.NUM_ACTIVE_SAMPLES,
         max_visualize_weights=p.MAX_WEIGHT,
+        fixed_task_seed=fixed_task_seed,
         design_data=design_data,
         num_load_design=load_design,
         save_dir=f"{SAVE_ROOT}/{p.SAVE_NAME}",

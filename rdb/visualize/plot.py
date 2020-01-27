@@ -32,6 +32,7 @@ def plot_weights(
     weights_dicts,
     highlight_dicts=[],
     highlight_colors=[],
+    highlight_labels=[],
     path=None,
     title=None,
     max_weight=8.0,
@@ -39,12 +40,11 @@ def plot_weights(
     figsize=(20, 10),
 ):
 
-    fig = plt.figure(figsize=figsize, dpi=80)
+    fig, axs = plt.subplot(n_values, 1, figsize=figsize, dpi=80)
     n_values = len(weights_dicts[0].values())
     for i, key in enumerate(weights_dicts[0].keys()):
         values = [onp.log(s[key]) for s in weights_dicts]
-        plt.subplot(n_values, 1, i + 1)
-        n, bins, patches = plt.hist(
+        n, bins, patches = axs[i].hist(
             values,
             bins,
             range=(-max_weight, max_weight),
@@ -52,13 +52,15 @@ def plot_weights(
             facecolor="b",
             alpha=0.75,
         )
+        _, ytop = axs[i].ylim()
         ## Highlight value
-        for d, c in zip(highlight_dicts, highlight_colors):
+        for d, c, lb in zip(highlight_dicts, highlight_colors, highlight_labels):
             if d is None:
                 continue
             val = d[key]
-            plt.axvline(x=onp.log(val), c=c)
-        plt.xlabel(key)
+            axs[i].axvline(x=onp.log(val), c=c)
+            axs[i].text(xy[0], xy[1], idxs[i], size=7)
+        axs[i].xlabel(key)
     plt.tight_layout()
     if title is not None:
         fig.suptitle(title)
@@ -108,7 +110,7 @@ def plot_rankings(
     n_delta = 0.0
     eps = 1e-8
     for val, label in zip(all_vals, all_labels):
-        val = onp.array(val)[idxs]
+        val = onp.array(val, dtype=float)[idxs]
         if normalize:
             val /= onp.max(onp.abs(val)) + eps
         val += n_delta * delta  # avoid overlapping

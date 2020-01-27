@@ -92,25 +92,26 @@ class MetropolisHasting(Inference):
     Args:
         num_samples (int): number of samples to return
         num_warmups (int): number of warmup iterations
-        proposal_fn (fn): given one sample, return next
+        proposal (Proposal): given one sample, return next
 
     """
 
-    def __init__(self, rng_key, kernel, num_samples, num_warmups, proposal_fn):
+    def __init__(self, rng_key, kernel, num_samples, num_warmups, proposal):
         super().__init__(rng_key, kernel, num_samples, num_warmups)
-        self._proposal_raw_fn = proposal_fn
-        self._proposal = None
+        self._proposal = proposal
         self._coin_flip = None
 
     def _mh_step(self, obs, state, log_prob, verbose=False, *args, **kwargs):
         assert self._rng_key is not None, "Need to initialize with random key"
 
-        assert self._proposal is not None, "Need to set random seed"
         next_state = self._proposal(state)
         next_log_prob = self._kernel(obs, next_state, **kwargs)
         log_ratio = next_log_prob - log_prob
         if verbose:
-            print(f"log next {next_log_prob:.2f} log current {log_prob:.2f}")
+            # if True
+            print(
+                f"log next {next_log_prob:.2f} log current {log_prob:.2f} prob {np.exp(log_ratio):.2f}"
+            )
         # if next_log_prob < -1e5:
         #     import pdb; pdb.set_trace()
         accept = self._coin_flip() < np.exp(log_ratio)
@@ -127,7 +128,7 @@ class MetropolisHasting(Inference):
 
     def update_key(self, rng_key):
         self._rng_key = rng_key
-        self._proposal = seed(self._proposal_raw_fn, rng_seed=rng_key)
+        self._proposal.update_key(rng_key)
         self._coin_flip = self._create_coin_flip()
 
     def sample(

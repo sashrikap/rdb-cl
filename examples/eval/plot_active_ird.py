@@ -54,6 +54,7 @@ def plot_data():
     seedpaths = []
     seeddata = []
     if os.path.isdir(os.path.join(exp_dir, exp_name)):
+        print("normal found")
         for file in sorted(os.listdir(os.path.join(exp_dir, exp_name))):
             if exp_name in file:
                 exp_path = os.path.join(exp_dir, exp_name, file)
@@ -64,6 +65,7 @@ def plot_data():
                         seedpaths.append(exp_path)
 
     if os.path.isdir(os.path.join(rand_dir, rand_name)):
+        print("random found")
         for file in sorted(os.listdir(os.path.join(rand_dir, rand_name))):
             if rand_name in file:
                 exp_path = os.path.join(rand_dir, rand_name, file)
@@ -79,8 +81,8 @@ def plot_data():
 
     data = {}
     for idx, (sd, spath) in enumerate(zip(seeddata, seedpaths)):
-        if not all([len(h) > PADDING + MAX_LEN for h in sd.values()]):
-            continue
+        # if not all([len(h) > PADDING + MAX_LEN or len(h) > PADDING + MAX_RANDOM_LEN for h in sd.values()]):
+        #    continue
         for method, hist in sd.items():
             if method not in data.keys():
                 data[method] = {"perform": []}
@@ -104,11 +106,11 @@ def plot_data():
 
 if __name__ == "__main__":
     N = -1
-    use_seeds = [1]  # list(range(20))
+    use_seeds = [2]  # list(range(20))
     # use_seeds = list(range(1))
     not_seeds = [20, 21, 22, 23, 24]
-    MAX_LEN = 4
-    MAX_RANDOM_LEN = 20
+    MAX_LEN = 3
+    MAX_RANDOM_LEN = 6
     PADDING = 0
 
     use_seeds = [str(random.PRNGKey(si)) for si in use_seeds]
@@ -117,8 +119,8 @@ if __name__ == "__main__":
     # exp_name = "active_ird_exp_mid"
 
     # exp_dir = "data/200118"
-    exp_dir = "data/200120"
-    exp_name = "active_ird_exp_two"
-    rand_dir = "data/200116_nope"
-    rand_name = "random_ird_exp_mid"
+    exp_dir = "data/200126"
+    exp_name = "active_ird_exp_natural_one_hybrid"
+    rand_dir = "data/200126"
+    rand_name = "random_ird_exp_natural_one_hybrid"
     plot_data()

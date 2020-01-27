@@ -1,30 +1,65 @@
-ENV_NAME: Week6_01-v0
+ENV_NAME: Week6_01-v1
 EXP_ITERATIONS: 8
+RANDOM_KEYS: [3]
+FIXED_TASK_SEED: 0
 
 ## MPC Specific
 HORIZON: 10
 
 ## Plotting & weight scaling
+## Note: beta closely has to do with the scale of true_w
 MAX_WEIGHT: 20.0
 HIST_BINS: 200
-BETA: 0.5
+# BETA: 2
+# DESIGNER_PROPOSAL_VAR: 1
+# EXP_NAME: "designer_informed_beta_2"
+# BETA: 4
+# DESIGNER_PROPOSAL_VAR: 1
+# EXP_NAME: "designer_informed_beta_4"
+# BETA: 6
+# DESIGNER_PROPOSAL_VAR: 1
+# EXP_NAME: "designer_informed_beta_6"
+# BETA: 8
+# DESIGNER_PROPOSAL_VAR: 1
+# EXP_NAME: "designer_informed_beta_8"
+BETA: 16
+DESIGNER_PROPOSAL_VAR: 0.5
+EXP_NAME: "designer_informed_beta_16"
+# BETA: 32
+# DESIGNER_PROPOSAL_VAR: 0.5
+# EXP_NAME: "designer_informed_beta_32"
 
-SAVE_NAME: "200115"
-EXP_NAME: "designer_informed"
 
+SAVE_NAME: "200126"
+
+# ## Full Params
 NUM_DESIGNERS: 200
 # NUM_DESIGNERS: 50
-NUM_WARMUPS: 400
-
+NUM_WARMUPS: 200
 PARALLEL: true
 NUM_ITERATIONS: 8
-NUM_EVAL_WORKERS: 4
+NUM_EVAL_WORKERS: 16
 # NUM_EVAL_TASKS: 10
-NUM_EVAL_TASKS: -1
+NUM_EVAL_TASKS: 16384
 
-PROPOSAL_VAR: 1.25
-RANDOM_KEYS: [23]
 
+## Test Params
+# NUM_DESIGNERS: 20
+# NUM_WARMUPS: 20
+# PARALLEL: true
+# NUM_ITERATIONS: 8
+# NUM_EVAL_WORKERS: 4
+# NUM_EVAL_TASKS: 12
+
+## Task and weight specific
+NORMALIZED_KEY: "dist_cars"
+FEATURE_KEYS:
+- "dist_cars"
+- "dist_lanes"
+- "dist_fences"
+- "dist_objects"
+- "speed"
+- "control"
 
 TASK: [0.2, -0.7, 0.0, 0.4]
 TRUE_W:

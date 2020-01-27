@@ -12,7 +12,7 @@ from rdb.optim.mpc import shooting_method
 from rdb.infer.particles import Particles
 from rdb.exps.utils import load_params
 from functools import partial
-from rdb.infer.utils import *
+from rdb.infer import *
 from jax import random
 import numpyro.distributions as dist
 import yaml, argparse
@@ -33,26 +33,21 @@ def main():
         )
         return controller, runner
 
-    log_prior_dict = {
-        "dist_cars": dist.Uniform(-0.01, 0.01),
-        "dist_lanes": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
-        "dist_fences": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
-        "dist_objects": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
-        "speed": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
-        "control": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
-    }
-    proposal_std_dict = {
-        "dist_cars": 1e-6,
-        "dist_lanes": PROPOSAL_VAR,
-        "dist_fences": PROPOSAL_VAR,
-        "dist_objects": PROPOSAL_VAR,
-        "speed": PROPOSAL_VAR,
-        "control": PROPOSAL_VAR,
-    }
-    prior_log_prob_fn = build_log_prob_fn(log_prior_dict)
-    prior_sample_fn = build_prior_sample_fn(log_prior_dict)
-    proposal_fn = build_gaussian_proposal(proposal_std_dict)
+    ## Prior sampling & likelihood functions for PGM
+    prior = LogUniformPrior(
+        rng_key=None,
+        normalized_key=NORMALIZED_KEY,
+        feature_keys=FEATURE_KEYS,
+        log_max=MAX_WEIGHT,
+    )
+    proposal = IndGaussianProposal(
+        rng_key=None,
+        normalized_key=NORMALIZED_KEY,
+        feature_keys=FEATURE_KEYS,
+        proposal_var=DESIGNER_PROPOSAL_VAR,
+    )
 
+    ## Evaluation Server
     eval_server = ParticleServer(
         env_fn, controller_fn, num_workers=NUM_EVAL_WORKERS, parallel=PARALLEL
     )
@@ -68,11 +63,15 @@ def main():
         runner=_runner,
         beta=BETA,
         truth=_truth,
-        prior_log_prob_fn=prior_log_prob_fn,
-        proposal_fn=proposal_fn,
+        prior=prior,
+        proposal=proposal,
         sampler_args={"num_warmups": NUM_WARMUPS, "num_samples": NUM_DESIGNERS},
         use_true_w=False,
     )
+    if FIXED_TASK_SEED is not None:
+        fixed_task_seed = random.PRNGKey(FIXED_TASK_SEED)
+    else:
+        fixed_task_seed = None
 
     SAVE_ROOT = "data" if not GCP_MODE else "/gcp_output"
     experiment = ExperimentDesignerPrior(
@@ -82,6 +81,7 @@ def main():
         num_eval_tasks=NUM_EVAL_TASKS,
         save_dir=f"{SAVE_ROOT}/{SAVE_NAME}",
         exp_name=EXP_NAME,
+        fixed_task_seed=fixed_task_seed,
     )
     for ki in RANDOM_KEYS:
         key = random.PRNGKey(ki)

@@ -4,12 +4,11 @@
 # RANDOM_KEYS: [26]
 RANDOM_KEYS: [0]
 NUM_EVAL_WORKERS: 2
-
+FIXED_TASK_SEED: 0
 
 
 NUM_ACTIVE_TASKS: 72
 PARALLEL: True
-
 
 # EXP_NAME: "interactive_ird_exp_all_three"
 # ENV_NAME: "Week6_03-v0"
@@ -31,11 +30,13 @@ INTERACTIVE_NAME: "Jerry_01"
 
 ### Sampling sampling counts in interactive experiments
 ## We ramp up
-NUM_WARMUPS: 250
 NUM_NORMALIZERS: 2000
 # NUM_NORMALIZERS: 10
-NUM_SAMPLES: 1000
-NUM_ACTIVE_SAMPLES: 250
+# NUM_WARMUPS: 250
+# NUM_SAMPLES: 1000
+NUM_WARMUPS: 100
+NUM_SAMPLES: 500
+NUM_ACTIVE_SAMPLES: -1
 NUM_EVAL_SAMPLES: -1
 NUM_EVAL_MAP: 1
 # SAVE_NAME: "200120"
@@ -54,17 +55,27 @@ SAVE_NAME: "200125"
 # PARALLEL: False
 
 
-NUM_DESIGNER_WARMUPS: 100
+NUM_DESIGNER_WARMUPS: 200
 NUM_DESIGNERS: 200
 
 ## Plotting & weight scaling
 MAX_WEIGHT: 20.0
 HIST_BINS: 200
-BETA: 0.5
-PROPOSAL_VAR: 1.25
+BETA: 1
+PROPOSAL_VAR: 4
 # PROPOSAL_VAR: 1.25  # weird that 1.25 worked on 200120, but no longer after 200122
 
 
 ## MPC Specific
 HORIZON: 10
 TASK: [0.2, -0.7, 0.0, 0.4]
+
+## TASK & WEIGHT specific
+NORMALIZED_KEY: "dist_cars"
+FEATURE_KEYS:
+- "dist_cars"
+- "dist_lanes"
+- "dist_fences"
+- "dist_objects"
+- "speed"
+- "control"

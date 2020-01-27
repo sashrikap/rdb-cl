@@ -1,68 +1,72 @@
 # ENV_NAME: "Week6_01-v0"
 
 
-RANDOM_KEYS: [26]
-NUM_EVAL_WORKERS: 4
+# RANDOM_KEYS: [26]
+RANDOM_KEYS: [0, 1, 2, 3]
+NUM_EVAL_WORKERS: 16
+FIXED_TASK_SEED: 0
 
-
-NUM_ACTIVE_TASKS: 36
+NUM_ACTIVE_TASKS: 72
 PARALLEL: True
-ACTIVE_FNS: ["infogain", "ratiomean", "ratiomin", "random"]
 
 # ACTIVE_FNS: ["infogain", "ratiomean", "ratiomin"]
-# EXP_NAME: "active_ird_exp_one"
-# EXP_ITERATIONS: 12
-# ENV_NAME: "Week6_01-v0"
-# NUM_EVAL_TASKS: -1
+# EXP_NAME: "active_ird_exp_natural_one_hybrid"
+# EXP_ITERATIONS: 8
+# ENV_NAME: "Week6_01-v1"
+# NUM_EVAL_TASKS: 16384
 
+ACTIVE_FNS: ["random"]
+EXP_NAME: "random_ird_exp_natural_one_hybrid"
+EXP_ITERATIONS: 24
+ENV_NAME: "Week6_01-v1"
+NUM_EVAL_TASKS: 16384
 
 # ACTIVE_FNS: ["infogain", "ratiomean", "ratiomin"]
-EXP_NAME: "active_ird_exp_two"
-EXP_ITERATIONS: 6
-ENV_NAME: "Week6_02-v0"
-NUM_EVAL_TASKS: 4096
-
-# ACTIVE_FNS: ["infogain", "ratiomean", "ratiomin"]
-# EXP_NAME: "active_ird_exp_three"
-# EXP_ITERATIONS: 6
-# ENV_NAME: "Week6_03-v0"
-# NUM_EVAL_TASKS: 4096
-
+# EXP_NAME: "active_ird_exp_natural_two_hybrid"
+# EXP_ITERATIONS: 8
+# ENV_NAME: "Week6_02-v1"
+# NUM_EVAL_TASKS: 16384
 
 # ACTIVE_FNS: ["random"]
-# EXP_NAME: "random_ird_exp_mid"
-# EXP_ITERATIONS: 64
-# ENV_NAME: "Week6_01-v0"
-# NUM_EVAL_TASKS: -1
+# EXP_NAME: "random_ird_exp_natural_two_hybrid"
+# EXP_ITERATIONS: 24
+# ENV_NAME: "Week6_02-v1"
+# NUM_EVAL_TASKS: 16384
+
+# ACTIVE_FNS: ["infogain", "ratiomean", "ratiomin"]
+# EXP_NAME: "active_ird_exp_natural_three"
+# EXP_ITERATIONS: 8
+# ENV_NAME: "Week6_03-v0"
+# NUM_EVAL_TASKS: 16384
 
 
 ## Designer settigns
 NUM_PRIOR_TASKS: 3
 USER_TRUE_W: False
 
-## Faster sampling
-# NUM_WARMUPS: 1000
-# NUM_NORMALIZERS: 1000
-# NUM_SAMPLES: 1000
-# NUM_ACTIVE_SAMPLES: 500
-# NUM_EVAL_SAMPLES: -1
-# NUM_EVAL_MAP: 4
-# SAVE_NAME: "200125"
-# NUM_DESIGNER_WARMUPS: 400
-# NUM_DESIGNERS: 200
+## Full sampling
+NUM_WARMUPS: 500
+NUM_NORMALIZERS: 1000
+NUM_SAMPLES: 1000
+NUM_ACTIVE_SAMPLES: 250
+NUM_EVAL_SAMPLES: -1
+NUM_EVAL_MAP: 2
+SAVE_NAME: "200126"
+NUM_DESIGNER_WARMUPS: 200
+NUM_DESIGNERS: 200
 
 
 ## Testing
-NUM_WARMUPS: 10
-NUM_NORMALIZERS: 50
-NUM_SAMPLES: 10
-NUM_DESIGNER_WARMUPS: 40
-NUM_DESIGNERS: 20
-NUM_ACTIVE_SAMPLES: 5
-NUM_EVAL_SAMPLES: 7
-NUM_EVAL_TASKS: 2
-NUM_EVAL_MAP: 1
-SAVE_NAME: "test"
+# NUM_WARMUPS: 10
+# NUM_NORMALIZERS: 50
+# NUM_SAMPLES: 10
+# NUM_DESIGNER_WARMUPS: 40
+# NUM_DESIGNERS: 20
+# NUM_ACTIVE_SAMPLES: 5
+# NUM_EVAL_SAMPLES: 7
+# NUM_EVAL_TASKS: 2
+# NUM_EVAL_MAP: 1
+# SAVE_NAME: "test"
 
 
 # NUM_EVAL_WORKERS: 1
@@ -71,12 +75,23 @@ SAVE_NAME: "test"
 ## Plotting & weight scaling
 MAX_WEIGHT: 20.0
 HIST_BINS: 200
-BETA: 0.5
-PROPOSAL_VAR: 1.25
+BETA: 16
+DESIGNER_PROPOSAL_VAR: 0.5
+IRD_PROPOSAL_VAR: 0.5
 
 ## MPC Specific
 HORIZON: 10
 
+
+## Weight and task specific
+NORMALIZED_KEY: "dist_cars"
+FEATURE_KEYS:
+- "dist_cars"
+- "dist_lanes"
+- "dist_fences"
+- "dist_objects"
+- "speed"
+- "control"
 
 TRUE_W:
     dist_cars: 1.0

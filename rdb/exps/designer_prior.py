@@ -30,7 +30,14 @@ class ExperimentDesignerPrior(object):
     """
 
     def __init__(
-        self, rng_key, designer, eval_server, num_eval_tasks, save_dir, exp_name
+        self,
+        rng_key,
+        designer,
+        eval_server,
+        num_eval_tasks,
+        save_dir,
+        exp_name,
+        fixed_task_seed=None,
     ):
         self._rng_key = rng_key
         self._designer = designer
@@ -39,6 +46,8 @@ class ExperimentDesignerPrior(object):
         # For designer
         self._max_prior_tasks = 8
         self._random_choice = None
+        self._random_task_choice = None
+        self._fixed_task_seed = fixed_task_seed
         # For checkpointing
         self._save_dir = save_dir
         self._exp_name = exp_name
@@ -47,6 +56,10 @@ class ExperimentDesignerPrior(object):
         self._rng_key = rng_key
         self._designer.update_key(rng_key)
         self._random_choice = seed(random_choice, rng_key)
+        if self._fixed_task_seed is not None:
+            self._random_task_choice = seed(random_choice, self._fixed_task_seed)
+        else:
+            self._random_task_choice = self._random_choice
 
     def run(self, task, num_prior_tasks):
         """Simulate designer on `task`. Varying the number of latent
@@ -60,9 +73,12 @@ class ExperimentDesignerPrior(object):
         self._designer.prior_tasks = all_tasks[:num_prior_tasks]
 
         ## Find evaluation tasks
-        assert self._random_choice is not None
-        all_tasks = self._random_choice(
-            self._designer.env.all_tasks, self._num_eval_tasks, replacement=False
+        assert self._random_task_choice is not None
+        num_eval = self._num_eval_tasks
+        if self._num_eval_tasks > len(self._designer.env.all_tasks):
+            num_eval = -1
+        all_tasks = self._random_task_choice(
+            self._designer.env.all_tasks, num_eval, replacement=False
         )
         all_names = [f"eval_{task}" for task in all_tasks]
 

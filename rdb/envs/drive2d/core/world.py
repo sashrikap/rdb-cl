@@ -98,7 +98,7 @@ class DriveWorld(gym.Env):
 
         # For sampling tasks
         self._rng_key = None
-        self._all_tasks = []
+        self._all_tasks = None
         self._grid_tasks = []
 
     @property
@@ -385,8 +385,13 @@ class DriveWorld(gym.Env):
     def update_key(self, rng_key):
         self._rng_key = rng_key
 
+    def _setup_tasks(self):
+        raise NotImplementedError
+
     @property
     def all_tasks(self):
+        if self._all_tasks is None:
+            self._setup_tasks()
         return self._all_tasks
 
     @property

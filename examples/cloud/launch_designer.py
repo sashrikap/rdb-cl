@@ -18,6 +18,11 @@ def launch(params_dict):
         )  ## Having a 2nd output mount in local mode seems to cause file race condition
         mounts = [local_mnt]
     else:
+        gcp_label = ""
+        if "RANDOM_KEYS" in params_dict and "EXP_NAME" in params_dict:
+            key_str = "_".join([str(k) for k in params_dict["RANDOM_KEYS"]])
+            gcp_label = f"{params_dict['EXP_NAME']}_{key_str}"
+
         launch_mode = mode.GCPMode(
             zone="us-west2-a",  # 40 c2 isntance
             instance_type="c2-standard-4",
@@ -28,6 +33,7 @@ def launch(params_dict):
             gcp_bucket="active-ird-experiments",
             gcp_log_path="rss-logs",  # Folder to store log files under
             terminate_on_end=True,
+            gcp_label=gcp_label,
         )
         # By default, /rdb/rdb -> /dar_payload/rdb/rdb
         gcp_mnt = mount.MountLocal(
@@ -59,7 +65,7 @@ if __name__ == "__main__":
     else:
         params = {
             # "RANDOM_KEYS": list(range(6)),
-            "RANDOM_KEYS": list(range(8)),
+            "RANDOM_KEYS": list(range(4)),
             "NUM_EVAL_WORKERS": 16,
         }
         all_params = create_params(template, params)

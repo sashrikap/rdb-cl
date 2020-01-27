@@ -28,28 +28,27 @@ def debug_candidate(debug_dir, exp_name):
         )
         return controller, runner
 
-    """ Prior sampling & likelihood functions for PGM """
-    log_prior_dict = {
-        "dist_cars": dist.Uniform(-0.01, 0.01),
-        "dist_lanes": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
-        "dist_fences": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
-        "dist_objects": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
-        "speed": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
-        "control": dist.Uniform(-MAX_WEIGHT, MAX_WEIGHT),
-    }
-    proposal_std_dict = {
-        "dist_cars": 1e-6,
-        "dist_lanes": PROPOSAL_VAR,
-        "dist_fences": PROPOSAL_VAR,
-        "dist_objects": PROPOSAL_VAR,
-        "speed": PROPOSAL_VAR,
-        "control": PROPOSAL_VAR,
-    }
-    prior_log_prob_fn = build_log_prob_fn(log_prior_dict)
-    prior_sample_fn = build_prior_sample_fn(log_prior_dict)
-    proposal_fn = build_gaussian_proposal(proposal_std_dict)
-    norm_sample_fn = build_normalizer_sampler(prior_sample_fn, NUM_NORMALIZERS)
+    ## Prior sampling & likelihood functions for PGM
+    prior = LogUniformPrior(
+        rng_key=None,
+        normalized_key=NORMALIZED_KEY,
+        feature_keys=FEATURE_KEYS,
+        log_max=MAX_WEIGHT,
+    )
+    ird_proposal = IndGaussianProposal(
+        rng_key=None,
+        normalized_key=NORMALIZED_KEY,
+        feature_keys=FEATURE_KEYS,
+        proposal_var=IRD_PROPOSAL_VAR,
+    )
+    designer_proposal = IndGaussianProposal(
+        rng_key=None,
+        normalized_key=NORMALIZED_KEY,
+        feature_keys=FEATURE_KEYS,
+        proposal_var=DESIGNER_PROPOSAL_VAR,
+    )
 
+    ## Evaluation Server
     eval_server = ParticleServer(
         env_fn, controller_fn, num_workers=NUM_EVAL_WORKERS, parallel=PARALLEL
     )
@@ -62,10 +61,11 @@ def debug_candidate(debug_dir, exp_name):
         eval_server=eval_server,
         beta=BETA,
         true_w=TRUE_W,
-        prior_log_prob_fn=prior_log_prob_fn,
-        normalizer_fn=norm_sample_fn,
-        proposal_fn=proposal_fn,
+        prior=prior,
+        num_normalizers=NUM_NORMALIZERS,
+        proposal=ird_proposal,
         sample_args={"num_warmups": NUM_WARMUPS, "num_samples": NUM_SAMPLES},
+        designer_proposal=designer_proposal,
         designer_args={
             "num_warmups": NUM_DESIGNER_WARMUPS,
             "num_samples": NUM_DESIGNERS,
