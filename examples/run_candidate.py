@@ -63,6 +63,7 @@ def debug_candidate(debug_dir, exp_name):
         true_w=TRUE_W,
         prior=prior,
         num_normalizers=NUM_NORMALIZERS,
+        normalized_key=NORMALIZED_KEY,
         proposal=ird_proposal,
         sample_args={"num_warmups": NUM_WARMUPS, "num_samples": NUM_SAMPLES},
         designer_proposal=designer_proposal,
@@ -105,6 +106,7 @@ def debug_candidate(debug_dir, exp_name):
         num_eval_map=NUM_EVAL_MAP,
         num_active_tasks=NUM_ACTIVE_TASKS,
         num_active_sample=NUM_ACTIVE_SAMPLES,
+        normalized_key=NORMALIZED_KEY,
         exp_name=f"{EXP_NAME}",
         exp_params=PARAMS,
     )

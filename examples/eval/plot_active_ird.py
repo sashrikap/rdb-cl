@@ -106,10 +106,13 @@ def plot_data():
 
 if __name__ == "__main__":
     N = -1
-    use_seeds = [2]  # list(range(20))
-    # use_seeds = list(range(1))
+    use_seeds = [0]
+    # 200128, bad for random: 0 (2, 3), 3 (2), 4 (2, 5, 8), 6 (1, 2, 4), 7 (2, 3, 4)
+    # 200128, bad for infogain: 4 (1)
+    # 200128, bad for ratiomean: 1
+    # 200128, bad for ratiomin: 4 (1)
     not_seeds = [20, 21, 22, 23, 24]
-    MAX_LEN = 3
+    MAX_LEN = 2
     MAX_RANDOM_LEN = 6
     PADDING = 0
 
@@ -119,8 +122,8 @@ if __name__ == "__main__":
     # exp_name = "active_ird_exp_mid"
 
     # exp_dir = "data/200118"
-    exp_dir = "data/200126"
-    exp_name = "active_ird_exp_natural_one_hybrid"
-    rand_dir = "data/200126"
-    rand_name = "random_ird_exp_natural_one_hybrid"
+    exp_dir = "data/200128"
+    exp_name = "active_ird_exp_natural_one_hybrid_ird_1000_1000"
+    rand_dir = "data/200128"
+    rand_name = "random_ird_exp_natural_one_hybrid_ird_1000_1000"
     plot_data()

@@ -65,6 +65,7 @@ def main():
         truth=_truth,
         prior=prior,
         proposal=proposal,
+        normalized_key=NORMALIZED_KEY,
         sampler_args={"num_warmups": NUM_WARMUPS, "num_samples": NUM_DESIGNERS},
         use_true_w=False,
     )

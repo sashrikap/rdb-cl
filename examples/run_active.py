@@ -14,10 +14,27 @@ from functools import partial
 from rdb.infer import *
 from jax import random
 import numpyro.distributions as dist
-import yaml, argparse
+import yaml, argparse, os
+import copy
+import ray
 
 
-def main(evaluate=False):
+def main(random_key, evaluate=False):
+    SAVE_ROOT = "data" if not GCP_MODE else "/gcp_output"  # Don'tchange this line
+    DEBUG_ROOT = "data" if not GCP_MODE else "/gcp_input"
+
+    # Define random key
+    rng_key = random.PRNGKey(random_key)
+    if evaluate:
+        # Load pre-saved parameters and update
+        print(
+            f"\n======== Evaluating exp {EXP_NAME} from {SAVE_ROOT}/{SAVE_NAME}========\n"
+        )
+        params_path = f"{SAVE_ROOT}/{SAVE_NAME}/{EXP_NAME}/params_{str(rng_key)}.yaml"
+        assert os.path.isfile(params_path)
+        eval_params = load_params(params_path)
+        locals().update(eval_params)
+
     def env_fn():
         import gym, rdb.envs.drive2d
 
@@ -76,6 +93,7 @@ def main(evaluate=False):
         use_true_w=USER_TRUE_W,
         num_prior_tasks=NUM_PRIOR_TASKS,
         test_mode=TEST_MODE,
+        normalized_key=NORMALIZED_KEY,
     )
 
     ## Active acquisition function for experiment
@@ -102,9 +120,6 @@ def main(evaluate=False):
     else:
         fixed_task_seed = None
 
-    SAVE_ROOT = "data" if not GCP_MODE else "/gcp_output"  # Don'tchange this line
-    DEBUG_ROOT = "data" if not GCP_MODE else "/gcp_input"
-
     experiment = ExperimentActiveIRD(
         ird_model,
         active_fns,
@@ -115,31 +130,30 @@ def main(evaluate=False):
         num_eval_map=NUM_EVAL_MAP,
         num_active_tasks=NUM_ACTIVE_TASKS,
         num_active_sample=NUM_ACTIVE_SAMPLES,
-        max_visualize_weights=MAX_WEIGHT,
         fixed_task_seed=fixed_task_seed,
         save_dir=f"{SAVE_ROOT}/{SAVE_NAME}",
         exp_name=f"{EXP_NAME}",
         exp_params=PARAMS,
+        normalized_key=NORMALIZED_KEY,
     )
 
     """ Experiment """
-    for ki in RANDOM_KEYS:
-        key = random.PRNGKey(ki)
-        experiment.update_key(key)
-        if evaluate:
-            experiment.run_evaluation(override=True)
-        else:
-            experiment.run()
+    experiment.update_key(rng_key)
+    if evaluate:
+        experiment.run_evaluation(override=True)
+    else:
+        experiment.run()
+    ray.shutdown()  # Prepare for next run, which reinitialize ray with different seed
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process some integers.")
     parser.add_argument("--GCP_MODE", action="store_true")
-    parser.add_argument("--evaluate", action="store_true")
+    parser.add_argument("--EVALUATE", action="store_true")
     args = parser.parse_args()
 
     GCP_MODE = args.GCP_MODE
-    EVALUATE = args.evaluate
+    EVALUATE = args.EVALUATE
     TEST_MODE = False
 
     # Load parameters
@@ -148,10 +162,11 @@ if __name__ == "__main__":
     else:
         PARAMS = load_params("/dar_payload/rdb/examples/params/active_params.yaml")
     locals().update(PARAMS)
-    # if not GCP_MODE:
-    #     RANDOM_KEYS = [24]
-    #     NUM_EVAL_WORKERS = 4
-    main(evaluate=EVALUATE)
+    if not GCP_MODE:
+        # RANDOM_KEYS = [24]
+        NUM_EVAL_WORKERS = 4
+    for ki in copy.deepcopy(RANDOM_KEYS):
+        main(random_key=ki, evaluate=EVALUATE)
 
 
 # # TODO: find true w

@@ -12,8 +12,8 @@ from rdb.distrib.particles import ParticleServer
 from rdb.infer.ird_oc import IRDOptimalControl
 from rdb.optim.mpc import shooting_method
 from os.path import join, expanduser
-from rdb.infer.utils import *
 from functools import partial
+from rdb.infer import *
 from jax import random
 import numpyro.distributions as dist
 import yaml, argparse
@@ -62,7 +62,6 @@ def run_interactive(active_fn_name, random_keys=None, load_design=-1, evaluate=F
         return controller, runner
 
     ## Prior sampling & likelihood functions for PGM
-    norm_sample_fn = build_normalizer_sampler(prior_sample_fn, p.NUM_NORMALIZERS)
     prior = LogUniformPrior(
         rng_key=None,
         normalized_key=p.NORMALIZED_KEY,
@@ -74,12 +73,6 @@ def run_interactive(active_fn_name, random_keys=None, load_design=-1, evaluate=F
         normalized_key=p.NORMALIZED_KEY,
         feature_keys=p.FEATURE_KEYS,
         proposal_var=p.IRD_PROPOSAL_VAR,
-    )
-    designer_proposal = IndGaussianProposal(
-        rng_key=None,
-        normalized_key=p.NORMALIZED_KEY,
-        feature_keys=p.FEATURE_KEYS,
-        proposal_var=p.DESIGNER_PROPOSAL_VAR,
     )
 
     ## Evaluation Server
@@ -96,14 +89,10 @@ def run_interactive(active_fn_name, random_keys=None, load_design=-1, evaluate=F
         beta=p.BETA,
         true_w=None,
         prior=prior,
-        num_normalizers=NUM_NORMALIZERS,
-        proposal=proposal,
+        num_normalizers=p.NUM_NORMALIZERS,
+        normalized_key=p.NORMALIZED_KEY,
+        proposal=ird_proposal,
         sample_args={"num_warmups": p.NUM_WARMUPS, "num_samples": p.NUM_SAMPLES},
-        designer_proposal=designer_proposal,
-        designer_args={
-            "num_warmups": p.NUM_DESIGNER_WARMUPS,
-            "num_samples": p.NUM_DESIGNERS,
-        },
         interactive_mode=True,
         interactive_name=p.INTERACTIVE_NAME,
     )
@@ -144,7 +133,7 @@ def run_interactive(active_fn_name, random_keys=None, load_design=-1, evaluate=F
         num_eval_map=p.NUM_EVAL_MAP,
         num_active_tasks=p.NUM_ACTIVE_TASKS,
         num_active_sample=p.NUM_ACTIVE_SAMPLES,
-        max_visualize_weights=p.MAX_WEIGHT,
+        normalized_key=p.NORMALIZED_KEY,
         fixed_task_seed=fixed_task_seed,
         design_data=design_data,
         num_load_design=load_design,

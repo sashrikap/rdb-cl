@@ -3,21 +3,21 @@
 
 # RANDOM_KEYS: [26]
 RANDOM_KEYS: [0]
-NUM_EVAL_WORKERS: 2
+NUM_EVAL_WORKERS: 4
 FIXED_TASK_SEED: 0
 
 
 NUM_ACTIVE_TASKS: 72
 PARALLEL: True
 
-# EXP_NAME: "interactive_ird_exp_all_three"
+# EXP_NAME: "interactive_ird_exp_all_three_hybrid_ird_1000_1000"
 # ENV_NAME: "Week6_03-v0"
 # NUM_EVAL_TASKS: 8192
-# EXP_NAME: "interactive_ird_exp_all_one"
+# EXP_NAME: "interactive_ird_exp_all_one_hybrid_ird_1000_1000"
 # ENV_NAME: "Week6_01-v0"
-EXP_NAME: "interactive_ird_exp_natural_one"
+EXP_NAME: "interactive_ird_exp_natural_one_hybrid_ird_1000_1000"
 ENV_NAME: "Week6_01-v1"
-NUM_EVAL_TASKS: -1
+NUM_EVAL_TASKS: 16384
 # EXP_NAME: "interactive_ird_exp_all_two"
 # ENV_NAME: "Week6_02-v0"
 # NUM_EVAL_TASKS: 8192
@@ -31,16 +31,12 @@ INTERACTIVE_NAME: "Jerry_01"
 ### Sampling sampling counts in interactive experiments
 ## We ramp up
 NUM_NORMALIZERS: 2000
-# NUM_NORMALIZERS: 10
-# NUM_WARMUPS: 250
-# NUM_SAMPLES: 1000
-NUM_WARMUPS: 100
-NUM_SAMPLES: 500
+NUM_WARMUPS: 1000
+NUM_SAMPLES: 5000
 NUM_ACTIVE_SAMPLES: -1
 NUM_EVAL_SAMPLES: -1
-NUM_EVAL_MAP: 1
-# SAVE_NAME: "200120"
-SAVE_NAME: "200125"
+NUM_EVAL_MAP: 2
+SAVE_NAME: "200127"
 
 ## Testing
 # NUM_WARMUPS: 20
@@ -61,8 +57,9 @@ NUM_DESIGNERS: 200
 ## Plotting & weight scaling
 MAX_WEIGHT: 20.0
 HIST_BINS: 200
-BETA: 1
-PROPOSAL_VAR: 4
+BETA: 16
+IRD_PROPOSAL_VAR: 0.5
+DESIGNER_PROPOSAL_VAR: 0.5
 # PROPOSAL_VAR: 1.25  # weird that 1.25 worked on 200120, but no longer after 200122
 
 

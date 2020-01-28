@@ -35,32 +35,46 @@ def plot_weights(
     highlight_labels=[],
     path=None,
     title=None,
-    max_weight=8.0,
+    max_weights=8.0,
     bins=100,
     figsize=(20, 10),
 ):
+    """Plot weights for visualizing.
 
-    fig, axs = plt.subplot(n_values, 1, figsize=figsize, dpi=80)
+    Args:
+        highlight_dicts (list): list of weight dictionaries
+        highlight_colors (list): list of colors for highlighting these weights
+        highlight_labels (list): list of labels for denoting these weights
+        max_weights (float): log range of weights ~ (-max_weights, max_weights)
+
+    """
+
     n_values = len(weights_dicts[0].values())
-    for i, key in enumerate(weights_dicts[0].keys()):
+    fig, axs = plt.subplots(n_values, 1, figsize=figsize, dpi=80)
+    for i, key in enumerate(sorted(list(weights_dicts[0].keys()))):
         values = [onp.log(s[key]) for s in weights_dicts]
         n, bins, patches = axs[i].hist(
             values,
             bins,
-            range=(-max_weight, max_weight),
+            range=(-max_weights, max_weights),
             density=True,
             facecolor="b",
             alpha=0.75,
         )
-        _, ytop = axs[i].ylim()
+        ybottom, ytop = axs[i].get_ylim()
+        gap = (ytop - ybottom) / (len(highlight_dicts) - 1 + 1e-8)
         ## Highlight value
-        for d, c, lb in zip(highlight_dicts, highlight_colors, highlight_labels):
+        for j, (d, c, label) in enumerate(
+            zip(highlight_dicts, highlight_colors, highlight_labels)
+        ):
             if d is None:
                 continue
             val = d[key]
-            axs[i].axvline(x=onp.log(val), c=c)
-            axs[i].text(xy[0], xy[1], idxs[i], size=7)
-        axs[i].xlabel(key)
+            log_val = onp.log(val)
+            axs[i].axvline(x=log_val, c=c)
+            # add 0.05 gap so that labels don't overlap
+            axs[i].text(log_val, ybottom + gap * j, label, size=10)
+        axs[i].set_xlabel(key)
     plt.tight_layout()
     if title is not None:
         fig.suptitle(title)

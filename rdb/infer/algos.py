@@ -108,7 +108,7 @@ class MetropolisHasting(Inference):
         next_log_prob = self._kernel(obs, next_state, **kwargs)
         log_ratio = next_log_prob - log_prob
         if verbose:
-            # if True
+            # if True:
             print(
                 f"log next {next_log_prob:.2f} log current {log_prob:.2f} prob {np.exp(log_ratio):.2f}"
             )

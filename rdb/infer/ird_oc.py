@@ -106,6 +106,7 @@ class IRDOptimalControl(PGM):
         prior,
         proposal,
         num_normalizers=-1,
+        normalized_key=None,
         sample_method="mh",
         sample_args={},  # "num_warmups": 100, "num_samples": 200
         designer_proposal=None,
@@ -129,6 +130,7 @@ class IRDOptimalControl(PGM):
         # Sampling functions
         self._prior = prior
         self._num_normalizers = num_normalizers
+        self._normalized_key = normalized_key
         ## Caching normalizers, samples and features
         self._normalizer = None
         self._task_samples = {}
@@ -140,7 +142,19 @@ class IRDOptimalControl(PGM):
         super().__init__(rng_key, kernel, proposal, sample_method, sample_args)
         # assume designer uses the same beta, prior and prior proposal
         self._interactive_mode = interactive_mode
-        if not interactive_mode:
+        if interactive_mode:
+            # Interactive Mode
+            self._designer = DesignerInteractive(
+                rng_key=rng_key,
+                env_fn=self.env_fn,
+                controller=self._controller,
+                runner=self._runner,
+                name=interactive_name,
+                normalized_key=self._normalized_key,
+            )
+        else:
+            # Normal Mode
+            assert designer_proposal is not None, "Must specify designer proposal"
             self._designer = Designer(
                 rng_key=rng_key,
                 env_fn=self.env_fn,
@@ -154,15 +168,7 @@ class IRDOptimalControl(PGM):
                 sampler_args=designer_args,
                 use_true_w=use_true_w,
                 num_prior_tasks=num_prior_tasks,
-            )
-        else:
-            # Interactive Mode
-            self._designer = DesignerInteractive(
-                rng_key=rng_key,
-                env_fn=self.env_fn,
-                controller=self._controller,
-                runner=self._runner,
-                name=interactive_name,
+                normalized_key=self._normalized_key,
             )
 
     @property
@@ -380,7 +386,7 @@ class IRDOptimalControl(PGM):
                     sample_acs = self._controller(
                         init_state, us0=user_acs, weights=sample_w
                     )
-                    _, _, sample_info = self._runner(
+                    _, sample_cost, sample_info = self._runner(
                         init_state, sample_acs, weights=sample_w
                     )
                     n_feats_sum = append_dict_by_keys(
@@ -393,7 +399,10 @@ class IRDOptimalControl(PGM):
                     raise NotImplementedError
 
                 if self._debug_true_w:
-                    print(f"sample - normal {sample_rew - sum_normal_rew:.3f}")
+                    # if True:
+                    print(
+                        f"sample rew {sample_rew:.3f} normal costs {sum_normal_rew:.3f} diff {sample_rew - sum_normal_rew:.3f}"
+                    )
 
                 log_probs.append(sample_rew - sum_normal_rew)
             log_probs.append(self._prior.log_prob(sample_w))
@@ -430,6 +439,7 @@ class Designer(PGM):
         sampler_args={},
         use_true_w=False,
         num_prior_tasks=0,
+        normalized_key=None,
     ):
         self._rng_key = rng_key
         self._env_fn = env_fn
@@ -442,6 +452,7 @@ class Designer(PGM):
         else:
             self._true_w = None
         self._use_true_w = use_true_w
+        self._normalized_key = normalized_key
         # Sampling Prior and kernel
         self._prior = prior
         self._kernel = self._build_kernel(beta)
@@ -535,18 +546,12 @@ class DesignerInteractive(Designer):
     """Interactive Designer used in Jupyter Notebook interactive mode.
 
     Args:
-        normalize_key (str): used to normalize user-input, e.g. keep "dist_cars" weight 1.0.
+        normalized_key (str): used to normalize user-input, e.g. keep "dist_cars" weight 1.0.
 
     """
 
     def __init__(
-        self,
-        rng_key,
-        env_fn,
-        controller,
-        runner,
-        name="Default",
-        normalize_key="dist_cars",
+        self, rng_key, env_fn, controller, runner, name="Default", normalized_key=None
     ):
         super().__init__(
             rng_key=rng_key,
@@ -562,7 +567,7 @@ class DesignerInteractive(Designer):
         self._name = name
         self._savedir = self.init_savedir()
         self._user_inputs = []
-        self._normalize_key = normalize_key
+        self._normalized_key = normalized_key
 
     def run_from_ipython(self):
         try:
@@ -587,9 +592,6 @@ class DesignerInteractive(Designer):
     @property
     def name(self):
         return self._name
-
-    def _normalize_weights(self, weights):
-        return normalize_weights(weights, self._normalize_key)
 
     def simulate(self, task, task_name):
         """Interactively query weight input.
@@ -622,7 +624,7 @@ class DesignerInteractive(Designer):
                     break
             try:
                 user_in_w = json.loads(user_in)
-                user_in_w = self._normalize_weights(user_in_w)
+                user_in_w = normalize_weights(user_in_w, self._normalized_key)
                 self._user_inputs.append(user_in_w)
                 # Visualize trajectory
                 acs = self._controller(init_state, weights=user_in_w)

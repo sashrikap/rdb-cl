@@ -15,13 +15,14 @@ Full Active-IRD Evaluation:
 How to tune hyperparameters in Active IRD (By Jerry)
     1) IRD_PROPOSAL_VAR and DESIGNER_VAR are most sensitive for sampling
     2) Tune BETA with `rdb/examples/run_dsigner.py`
-    3) Control for randomness with `rdb/examples/run_active.py`
+    3) Tun NUM_WARMUPS/NUM_SAMPLES with different combinations
+    4) Control for randomness with `rdb/examples/run_active.py`
 
 How to control randomness (By Jerry)
     1) In general, run with >=4 different seeds
     2) Evaluation: # MAP, # Tasks
     3) Active: # Candidates, # Histogram bins
-    4) MH Sampling: # Designer, # IRD Samples
+    4) MH Sampling: # Designer, # IRD Samples, # Warmup
 
 Note:
     * see rdb/exps/active.py for acquisition functions
@@ -74,7 +75,7 @@ class ExperimentActiveIRD(object):
         fixed_task_seed=None,
         fixed_candidates=None,
         fixed_belief_tasks=None,
-        max_visualize_weights=8.0,
+        normalized_key=None,
         design_data={},
         num_load_design=-1,
         save_dir="data/active_ird_exp1",
@@ -91,6 +92,7 @@ class ExperimentActiveIRD(object):
         self._random_task_choice = None
         self._fixed_task_seed = fixed_task_seed
         self._iterations = iterations
+        self._normalized_key = normalized_key
         # Evaluation
         self._num_eval_map = num_eval_map
         self._num_eval_tasks = num_eval_tasks
@@ -100,9 +102,12 @@ class ExperimentActiveIRD(object):
         self._fixed_candidates = fixed_candidates
         self._num_active_sample = num_active_sample
         self._fixed_belief_tasks = fixed_belief_tasks
-        self._max_visualize_weights = max_visualize_weights
         # Save path
         self._exp_params = exp_params
+        self._hist_params = {
+            "bins": exp_params["HIST_BINS"],
+            "max_weights": exp_params["MAX_WEIGHT"],
+        }
         self._save_dir = save_dir
         self._exp_name = exp_name
         self._last_time = time()
@@ -202,6 +207,7 @@ class ExperimentActiveIRD(object):
                 )
                 self._all_beliefs[key].append(belief)
                 self._curr_belief[key] = belief
+                self._save(itr=itr)
                 self._log_time(f"Itr {itr} {key} IRD Divide & Conquer")
 
                 ## Evaluate, plot and Save
@@ -271,7 +277,7 @@ class ExperimentActiveIRD(object):
                     belief,
                     all_obs,
                     verbose=False,
-                    params=self._exp_params,  # Hyperparameters
+                    params=self._hist_params,  # Hyperparameters
                 )
             )
         scores = onp.array(scores)
@@ -298,7 +304,7 @@ class ExperimentActiveIRD(object):
             # Compute belief features
             eval_names = [f"eval_{task}" for task in eval_tasks]
             if self._num_eval_map > 0:
-                belief = belief.map_estimate(self._num_eval_map)
+                belief = belief.map_estimate(self._num_eval_map, **self._hist_params)
             else:
                 belief = belief.subsample(self._num_eval_sample)
             target = self._model.designer.truth
@@ -364,7 +370,7 @@ class ExperimentActiveIRD(object):
             # Load previous design
             task = design_i["TASK"]
             task_name = f"design_{task}"
-            weights = design_i["WEIGHTS"]
+            weights = normalize_weights(design_i["WEIGHTS"], self._normalized_key)
             obs = self._model.create_particles([weights])
 
             # Cache previous designs for active functions
@@ -508,16 +514,12 @@ class ExperimentActiveIRD(object):
                 else:
                     obs_w = None
                 if not skip_weights:
-                    import pdb
-
-                    pdb.set_trace()
                     belief.save(savepath)
                     belief.visualize(
                         figpath,
                         true_w=self._model.designer.true_w,
                         obs_w=obs_w,
-                        max_weight=self._max_visualize_weights,
-                        bins=self._exp_params["HIST_BINS"],
+                        **self._hist_params,
                     )
 
     def _log_time(self, caption=""):
@@ -602,6 +604,7 @@ class ExperimentActiveIRD(object):
                         prefix=prefix,
                         thumbnail=True,
                         video=False,
+                        params=self._exp_params,  # Hyperparameters
                     )
 
     def _plot_candidate_scores(self, itr, debug_dir=None):

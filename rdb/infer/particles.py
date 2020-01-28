@@ -306,8 +306,12 @@ class Particles(object):
         )
         return new_ps
 
-    def entropy(self, method="histogram", bins=50, max_weight=5.0, verbose=True):
+    def entropy(self, bins, max_weights, verbose=True, method="histogram"):
         """Estimate entropy.
+
+        Args:
+            bins (int): number of bins
+            max_weights (float): log range of weights ~ (-max_weights, max_weights)
 
         Note:
             * Gaussian histogram may cause instability
@@ -319,7 +323,7 @@ class Particles(object):
         """
         FAST_HISTOGRAM = True
 
-        ranges = (-max_weight, max_weight)
+        ranges = (-max_weights, max_weights)
         data = onp.array(list(self.concate_weights.values()))
         # Omit first weight
         data = onp.log(data[1:, :])
@@ -349,18 +353,20 @@ class Particles(object):
             #    print(f"Entropy {entropy:.3f}")
         return entropy
 
-    def map_estimate(self, num_map=1, method="histogram", bins=50, ranges=(-5.0, 5.0)):
+    def map_estimate(self, num_map, bins, max_weights, method="histogram"):
         """Find maximum a posteriori estimate from current samples.
 
         Note:
             * weights are high dimensional. We approximately estimate
             density by summing bucket counts.
+
         """
         data = onp.array(list(self.concate_weights.values()))
         # Omit first weight
         data = onp.log(data[1:, :])
 
         if method == "histogram":
+            ranges = (-max_weights, max_weights)
             bins = onp.linspace(*ranges, bins)
             probs = onp.zeros(data.shape[1])
             for row in data:
@@ -396,11 +402,16 @@ class Particles(object):
         thumbnail=False,
         desc=None,
         video=True,
+        params={},
     ):
         """ Look at top/mid/bottom * diagnose_N particles and their performance. Record videos.
 
+        Note:
+            * A somewhat brittle function for debugging. May be subject to changes
+
         Args:
             prefix: include directory info e.g. "data/exp_xxx/save_"
+            params (dict) : experiment parameters
 
         """
         if self._env is None:
@@ -433,7 +444,9 @@ class Particles(object):
             low_rews, low_acs = diff_rews[low_N_idx], actions[low_N_idx]
             mean_diff = diff_rews.mean()
 
-            map_particles = self.map_estimate(diagnose_N)
+            map_particles = self.map_estimate(
+                diagnose_N, bins=params["HIST_BINS"], max_weights=params["MAX_WEIGHT"]
+            )
             map_acs = np.array(map_particles.get_actions(task, task_name))
             map_rews, map_vios = map_particles.compare_with(task, task_name, target)
 
@@ -456,7 +469,7 @@ class Particles(object):
     def record(self, task, task_name, actions, filepath):
         pass
 
-    def visualize(self, path, true_w, obs_w, max_weight=8.0, bins=50):
+    def visualize(self, path, true_w, obs_w, max_weights, bins):
         """Visualize weight belief distribution in histogram.
 
         TODO:
@@ -466,7 +479,7 @@ class Particles(object):
         if self._test_mode:
             return
         num_map = 4  # Magic number for now
-        map_ws = self.map_estimate(num_map).weights
+        map_ws = self.map_estimate(num_map, max_weights=max_weights, bins=bins).weights
         map_ls = [str(i) for i in range(1, 1 + num_map)]
         # Visualize multiple map weights in magenta with ranking labels
         plot_weights(
@@ -476,7 +489,7 @@ class Particles(object):
             highlight_labels=["l", "o"] + map_ls,
             path=path + ".png",
             title="Proxy Reward; true (red), obs (black) map (magenta)",
-            max_weight=max_weight,
+            max_weights=max_weights,
         )
 
     def save(self, path):
@@ -489,6 +502,9 @@ class Particles(object):
 
     def visualize_tasks(self, path, suffix, task_names, perfs):
         """Visualize task distribution.
+
+        Note:
+            * A somewhat brittle function for debugging. May be subject to changes
 
         Args:
             perfs (list): performance, ususally output from self.compare_with

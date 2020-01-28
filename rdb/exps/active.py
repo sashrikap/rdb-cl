@@ -78,9 +78,9 @@ class ActiveInfoGain(object):
                 # currently uses onp.ma.log which is non-differentiable
                 ent = float(
                     next_belief.entropy(
-                        "histogram",
-                        max_weight=params["MAX_WEIGHT"],
-                        bins=params["HIST_BINS"],
+                        bins=params["bins"],
+                        method="histogram",
+                        max_weights=params["max_weights"],
                     )
                 )
                 if onp.isnan(ent):

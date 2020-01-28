@@ -99,10 +99,11 @@ def append_dict_by_keys(dict_, item):
         >>> output: {'a': [1, 2, 3, 4]}
 
     """
+    output = {}
     for k, v in dict_.items():
         assert k in item
-        dict_[k] = onp.concatenate([dict_[k], [item[k]]])
-    return dict_
+        output[k] = onp.concatenate([dict_[k], [item[k]]])
+    return output
 
 
 def multiply_dict_by_keys(da, db):

@@ -90,7 +90,8 @@ def create_params(template, params):
 
 
 def normalize_weights(weights, key=None):
-    assert key is not None and key in weights, "Normalize key misspecified"
+    assert key is not None, "Normalized key not provided"
+    assert key in weights, "Normalized key not included in weights"
     eps = 1e-8
     output = copy.deepcopy(weights)
     factor = output[key] + eps

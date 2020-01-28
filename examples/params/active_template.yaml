@@ -10,31 +10,31 @@ NUM_ACTIVE_TASKS: 72
 PARALLEL: True
 
 # ACTIVE_FNS: ["infogain", "ratiomean", "ratiomin"]
-# EXP_NAME: "active_ird_exp_natural_one_hybrid"
+# EXP_NAME: "active_ird_exp_natural_one_hybrid_ird_1000_1000"
 # EXP_ITERATIONS: 8
 # ENV_NAME: "Week6_01-v1"
 # NUM_EVAL_TASKS: 16384
 
 ACTIVE_FNS: ["random"]
-EXP_NAME: "random_ird_exp_natural_one_hybrid"
+EXP_NAME: "random_ird_exp_natural_one_hybrid_ird_1000_1000"
 EXP_ITERATIONS: 24
 ENV_NAME: "Week6_01-v1"
 NUM_EVAL_TASKS: 16384
 
 # ACTIVE_FNS: ["infogain", "ratiomean", "ratiomin"]
-# EXP_NAME: "active_ird_exp_natural_two_hybrid"
+# EXP_NAME: "active_ird_exp_natural_two_hybrid_ird_1000_1000"
 # EXP_ITERATIONS: 8
 # ENV_NAME: "Week6_02-v1"
 # NUM_EVAL_TASKS: 16384
 
 # ACTIVE_FNS: ["random"]
-# EXP_NAME: "random_ird_exp_natural_two_hybrid"
+# EXP_NAME: "random_ird_exp_natural_two_hybrid_ird_1000_1000"
 # EXP_ITERATIONS: 24
 # ENV_NAME: "Week6_02-v1"
 # NUM_EVAL_TASKS: 16384
 
 # ACTIVE_FNS: ["infogain", "ratiomean", "ratiomin"]
-# EXP_NAME: "active_ird_exp_natural_three"
+# EXP_NAME: "active_ird_exp_natural_three_ird_1000_1000"
 # EXP_ITERATIONS: 8
 # ENV_NAME: "Week6_03-v0"
 # NUM_EVAL_TASKS: 16384
@@ -45,18 +45,18 @@ NUM_PRIOR_TASKS: 3
 USER_TRUE_W: False
 
 ## Full sampling
-NUM_WARMUPS: 500
-NUM_NORMALIZERS: 1000
+NUM_WARMUPS: 1000
+NUM_NORMALIZERS: 2000
 NUM_SAMPLES: 1000
 NUM_ACTIVE_SAMPLES: 250
 NUM_EVAL_SAMPLES: -1
 NUM_EVAL_MAP: 2
-SAVE_NAME: "200126"
+SAVE_NAME: "200128"
 NUM_DESIGNER_WARMUPS: 200
 NUM_DESIGNERS: 200
 
 
-## Testing
+# ## Testing
 # NUM_WARMUPS: 10
 # NUM_NORMALIZERS: 50
 # NUM_SAMPLES: 10
