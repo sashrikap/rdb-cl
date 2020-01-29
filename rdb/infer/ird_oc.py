@@ -84,7 +84,6 @@ class IRDOptimalControl(PGM):
 
     Methods:
         sample (fn): sample b(w) given obs_w
-        get_samples (fn): get sample features on new task
         update (fn): incorporate user's obs_w
             next likelihood `p(w | obs_w1) p(w | obs_w2)...`
         infer (fn): infer p`(w* | obs)`
@@ -133,7 +132,6 @@ class IRDOptimalControl(PGM):
         self._normalized_key = normalized_key
         ## Caching normalizers, samples and features
         self._normalizer = None
-        self._task_samples = {}
         self._user_actions = {}
         self._user_feats = {}
         self._debug_true_w = debug_true_w
@@ -202,22 +200,15 @@ class IRDOptimalControl(PGM):
         self._designer.update_key(rng_key)
         self._prior.update_key(rng_key)
 
-    def load_samples(self,):
-        pass
+    def simulate_designer(self, task, task_name, path=None, params={}):
+        """Sample one w from b(w) on task
 
-    def get_samples(self, task, task_name):
-        """Sample features for belief weights on a task
+        Args:
+            path (str): path to save png
+            params (dict): visualization params
+
         """
-        assert task_name in self._task_samples.keys(), f"{task_name} not found"
-        return self._task_samples[task_name]
-
-    def update(self, obs):
-        """ Incorporate new observation """
-        pass
-
-    def simulate_designer(self, task, task_name):
-        """Sample one w from b(w) on task"""
-        return self._designer.simulate(task, task_name)
+        return self._designer.simulate(task, task_name, path=path, params=params)
 
     def sample(self, tasks, task_names, obs, verbose=True, mode="hybrid"):
         """Sample b(w) for true weights given obs.weights.
@@ -292,10 +283,10 @@ class IRDOptimalControl(PGM):
                 all_user_acs=all_user_acs,
                 verbose=verbose,
                 mode=mode,
+                name="IRD",
             )
         samples = self.create_particles(sample_ws, self._test_mode)
-        self._task_samples[last_name] = samples
-        return self._task_samples[last_name]
+        return samples
 
     def create_particles(self, weights, test_mode=False):
         return Particles(
@@ -350,7 +341,6 @@ class IRDOptimalControl(PGM):
             Runs `p(w_obs | w)`
 
             """
-
             log_probs = []
             # Iterate over list of previous tasks
             for n_feats_sum, u_feats_sum, init_state, user_acs in zip(
@@ -389,6 +379,7 @@ class IRDOptimalControl(PGM):
                     _, sample_cost, sample_info = self._runner(
                         init_state, sample_acs, weights=sample_w
                     )
+                    print("Sample cost", sample_cost)
                     n_feats_sum = append_dict_by_keys(
                         n_feats_sum, sample_info["feats_sum"]
                     )
@@ -398,8 +389,8 @@ class IRDOptimalControl(PGM):
                 else:
                     raise NotImplementedError
 
-                if self._debug_true_w:
-                    # if True:
+                # if self._debug_true_w:
+                if True:
                     print(
                         f"sample rew {sample_rew:.3f} normal costs {sum_normal_rew:.3f} diff {sample_rew - sum_normal_rew:.3f}"
                     )
@@ -464,14 +455,16 @@ class Designer(PGM):
         self._prior_tasks = []
         self._num_prior_tasks = num_prior_tasks
 
-    def sample(self, task, task_name, verbose=True):
+    def sample(self, task, task_name, name=""):
         """Sample 1 set of weights from b(design_w) given true_w"""
         if task_name not in self._task_samples.keys():
-            print(f"Sampling Designer (prior={len(self._prior_tasks)})")
+            print(f"Sampling Designer (prior={len(self._prior_tasks)}): {name}")
             if self._use_true_w:
                 sample_ws = [self._true_w]
             else:
-                sample_ws = self._sampler.sample(self._true_w, task=task)
+                sample_ws = self._sampler.sample(
+                    self._true_w, task=task, name=f"Designer {name}"
+                )
             samples = Particles(
                 self._rng_key,
                 self._env_fn,
@@ -483,9 +476,15 @@ class Designer(PGM):
             self._task_samples[task_name] = samples
         return self._task_samples[task_name]
 
-    def simulate(self, task, task_name):
-        """Give 1 sample"""
+    def simulate(self, task, task_name, path=None, params={}):
+        """Give 1 sample
+
+        Args:
+            path (str): path to visualize designer weights
+
+        """
         particles = self.sample(task, task_name)
+        particles.visualize(path, true_w=self.true_w, obs_w=None, **params)
         return particles.subsample(1)
 
     def reset_prior_tasks(self):

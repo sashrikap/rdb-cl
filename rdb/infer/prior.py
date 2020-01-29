@@ -100,9 +100,10 @@ class LogUniformPrior(Prior):
         log_val = np.log(val)
         low = dist_.low
         high = dist_.high
-        return np.where(
-            log_val < low or log_val > high, -np.inf, dist_.log_prob(log_val)
-        )
+        # return np.where(
+        #     log_val < low or log_val > high, -np.inf, dist_.log_prob(log_val)
+        # )
+        return dist_.log_prob(log_val)
 
     def log_prob(self, state):
         """Log probability of the reiceived state."""

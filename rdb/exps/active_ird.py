@@ -195,7 +195,12 @@ class ExperimentActiveIRD(object):
                 self._log_time(f"Itr {itr} {key} Propose")
 
                 ## Simulate Designer
-                obs = self._model.simulate_designer(task, task_name)
+                fig_dir = f"{self._save_dir}/{self._exp_name}/designer"
+                fname = f"weights_seed_{str(self._rng_key)}_itr_{itr:02d}"
+                os.makedirs(fig_dir, exist_ok=True)
+                obs = self._model.simulate_designer(
+                    task, task_name, path=f"{fig_dir}/{fname}", params=self._hist_params
+                )
                 self._all_obs[key].append(obs)
                 self._log_time(f"Itr {itr} {key} Designer")
 
@@ -204,6 +209,7 @@ class ExperimentActiveIRD(object):
                     self._all_tasks[key],
                     self._all_task_names[key],
                     obs=self._all_obs[key],
+                    name=f"Itr {itr}",
                 )
                 self._all_beliefs[key].append(belief)
                 self._curr_belief[key] = belief
@@ -386,7 +392,10 @@ class ExperimentActiveIRD(object):
         print(f"Loaded {len(load_designs)} prior designs.")
         ## Compute IRD Belief based on loaded data
         belief = self._model.sample(
-            self._all_tasks[key], self._all_task_names[key], obs=self._all_obs[key]
+            self._all_tasks[key],
+            self._all_task_names[key],
+            obs=self._all_obs[key],
+            name="Design",
         )
         for i in range(num_load):
             # Pack the same beliefs into belief history

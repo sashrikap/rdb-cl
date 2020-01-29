@@ -138,6 +138,7 @@ class MetropolisHasting(Inference):
         init_state=None,
         num_warmups=None,
         num_samples=None,
+        name="",
         *args,
         **kwargs,
     ):
@@ -156,17 +157,15 @@ class MetropolisHasting(Inference):
         warmup_accepts = []
         range_ = range(self._num_warmups)
         if verbose:
-            range_ = trange(self._num_warmups, desc="MH Warmup")
+            range_ = trange(self._num_warmups, desc=f"{name} MH Warmup")
         for i in range_:
-            accept = False
-            while not accept:
-                accept, state, log_prob = self._mh_step(
-                    obs, state, log_prob, verbose=False, *args, **kwargs
-                )
-                warmup_accepts.append(accept)
+            accept, state, log_prob = self._mh_step(
+                obs, state, log_prob, verbose=False, *args, **kwargs
+            )
+            warmup_accepts.append(accept)
             ratio = float(np.sum(warmup_accepts)) / len(warmup_accepts)
             if verbose:
-                range_.set_description(f"MH Warmup; Accept {100 * ratio:.1f}%")
+                range_.set_description(f"{name} MH Warmup; Accept {100 * ratio:.1f}%")
 
         # Actual sampling phase (idential to warmup)
         samples = []
@@ -183,7 +182,7 @@ class MetropolisHasting(Inference):
                 accepts.append(accept)
             ratio = float(np.sum(accepts)) / len(accepts)
             if verbose:
-                range_.set_description(f"MH Sampling; Accept {100 * ratio:.1f}%")
+                range_.set_description(f"{name} MH Sampling; Accept {100 * ratio:.1f}%")
             samples.append(state)
         # if verbose:
         #    print(f"Acceptance ratio {ratio:.3f}")

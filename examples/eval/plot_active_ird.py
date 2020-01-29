@@ -106,7 +106,7 @@ def plot_data():
 
 if __name__ == "__main__":
     N = -1
-    use_seeds = [0]
+    use_seeds = [4]
     # 200128, bad for random: 0 (2, 3), 3 (2), 4 (2, 5, 8), 6 (1, 2, 4), 7 (2, 3, 4)
     # 200128, bad for infogain: 4 (1)
     # 200128, bad for ratiomean: 1
