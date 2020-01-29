@@ -25,8 +25,9 @@ from tqdm.auto import tqdm, trange
 import jax
 import copy
 import numpyro
-import numpyro.distributions as dist
+import numpy as onp
 import jax.numpy as np
+import numpyro.distributions as dist
 
 
 class Inference(object):
@@ -43,11 +44,16 @@ class Inference(object):
 
     """
 
-    def __init__(self, rng_key, kernel, num_samples, num_warmups):
+    def __init__(self, rng_key, kernel, num_samples, num_warmups, num_chains=1):
         self._rng_key = rng_key
         self._kernel = kernel
         self._num_samples = num_samples
         self._num_warmups = num_warmups
+        assert (
+            isinstance(num_chains, int) and num_chains > 0
+        ), f"Cannot use {num_chains} chains"
+        self._num_chains = num_chains
+        self._is_multi_chains = num_chains > 1
 
     @property
     def num_samples(self):
@@ -93,11 +99,16 @@ class MetropolisHasting(Inference):
         num_samples (int): number of samples to return
         num_warmups (int): number of warmup iterations
         proposal (Proposal): given one sample, return next
+        num_chains (int): if >=1, use 1st chain for sampling, others for convergence checking
 
     """
 
-    def __init__(self, rng_key, kernel, num_samples, num_warmups, proposal):
-        super().__init__(rng_key, kernel, num_samples, num_warmups)
+    def __init__(
+        self, rng_key, kernel, num_samples, num_warmups, proposal, num_chains=1
+    ):
+        super().__init__(
+            rng_key, kernel, num_samples, num_warmups, num_chains=num_chains
+        )
         self._proposal = proposal
         self._coin_flip = None
 
@@ -110,26 +121,44 @@ class MetropolisHasting(Inference):
         if verbose:
             # if True:
             print(
-                f"log next {next_log_prob:.2f} log current {log_prob:.2f} prob {np.exp(log_ratio):.2f}"
+                "log next",
+                next_log_prob,
+                "log current",
+                log_prob,
+                "prob",
+                onp.exp(log_ratio),
             )
-        # if next_log_prob < -1e5:
-        #     import pdb; pdb.set_trace()
-        accept = self._coin_flip() < np.exp(log_ratio)
-        if not accept:
-            next_state = state
-            next_log_prob = log_prob
+        accept = onp.logical_or(log_ratio > 0, onp.log(self._coin_flip()) < log_ratio)
+        next_state = onp.where(accept, next_state, state)
+        next_log_prob = onp.where(accept, next_log_prob, log_prob)
         return accept, next_state, next_log_prob
 
     def _create_coin_flip(self):
+        @jax.jit
         def raw_fn():
             return numpyro.sample("accept", dist.Uniform(0, 1))
 
-        return seed(raw_fn, self._rng_key)
+        @jax.jit
+        def raw_fn_multi():
+            return numpyro.sample(
+                "accept", dist.Uniform(0, 1), sample_shape=(self._num_chains,)
+            )
+
+        if self._is_multi_chains:
+            return seed(raw_fn, self._rng_key)
+        else:
+            return seed(raw_fn_multi, self._rng_key)
 
     def update_key(self, rng_key):
         self._rng_key = rng_key
         self._proposal.update_key(rng_key)
         self._coin_flip = self._create_coin_flip()
+
+    def _vectorize_state(self, state):
+        if self._is_multi_chains:
+            return np.array([state] * self._num_chains)
+        else:
+            return state
 
     def sample(
         self,
@@ -142,10 +171,11 @@ class MetropolisHasting(Inference):
         *args,
         **kwargs,
     ):
-        if init_state is None:
-            state = obs
+        if init_state is not None:
+            state = self._vectorize_state(init_state)
         else:
-            state = init_state
+            state = self._vectorize_state(obs)
+        obs = self._vectorize_state(obs)
         if num_warmups is None:
             num_warmups = self._num_warmups
         if num_samples is None:
@@ -163,30 +193,76 @@ class MetropolisHasting(Inference):
                 obs, state, log_prob, verbose=False, *args, **kwargs
             )
             warmup_accepts.append(accept)
-            ratio = float(np.sum(warmup_accepts)) / len(warmup_accepts)
+            rate, num = self._get_counts(warmup_accepts, row=0)
             if verbose:
-                range_.set_description(f"{name} MH Warmup; Accept {100 * ratio:.1f}%")
+                range_.set_description(f"{name} MH Warmup; Accept {100 * rate:.1f}%")
 
         # Actual sampling phase (idential to warmup)
         samples = []
         accepts = []
-        range_ = range(num_samples)
-        if verbose:
-            range_ = trange(num_samples, desc="MH Sampling")
-        for i in range_:
-            accept = False
-            while not accept:
-                accept, state, log_prob = self._mh_step(
-                    obs, state, log_prob, verbose=False, *args, **kwargs
-                )
-                accepts.append(accept)
-            ratio = float(np.sum(accepts)) / len(accepts)
-            if verbose:
-                range_.set_description(f"{name} MH Sampling; Accept {100 * ratio:.1f}%")
+        pbar = tqdm(total=num_samples, desc="MH Sampling")
+        num = 0
+        while not num == num_samples:
+            accept, state, log_prob = self._mh_step(
+                obs, state, log_prob, verbose=False, *args, **kwargs
+            )
+            accepts.append(accept)
             samples.append(state)
-        # if verbose:
-        #    print(f"Acceptance ratio {ratio:.3f}")
-        return samples
+            rate, num = self._get_counts(accepts, row=0)
+            pbar.n = num
+            pbar.last_print_n = num
+            pbar.refresh()
+            pbar.set_description(f"{name} MH Sampling; Accept {100 * rate:.1f}%")
+        self._summarize(accepts, samples, name)
+        return self._select_samples(accepts, samples)
+
+    def _get_counts(self, accepts, row=0):
+        """Calculate acceptance rate.
+
+        Args:
+            accepts (list): one or multiple chains.
+
+        """
+        accepts = onp.array(accepts)
+        if self._is_multi_chains:
+            # Take first row
+            assert row < accepts.shape[0]
+            rate = accepts[:, row].sum() / len(accepts[:, row])
+            num = accepts[:, row].sum()
+            return rate, num
+        else:
+            rate = accepts.sum() / len(accepts)
+            num = accepts.sum()
+        return rate, num
+
+    def _summarize(self, accepts, samples, name):
+        """Summary after one MCMC sample round.
+
+        Args:
+            accepts (list): one or multiple chains.
+
+        """
+        accepts = onp.array(accepts)
+        if self._is_multi_chains:
+            for ir in range(accepts.shape[1]):
+                rate, num = self._get_counts(accepts, row=ir)
+                print(f"{name} MH chain {ir} rate {rate:.3f} accept {num}")
+        else:
+            rate, num = self._get_counts(accepts, row=ir)
+            print(f"{name} MH chain (single) rate {rate:.3f} accept {num}")
+
+    def _select_samples(self, accepts, samples):
+        accepts = onp.array(accepts)
+        samples = onp.array(samples)
+        if self._is_multi_chains:
+            # Take first row
+            samples = samples[accepts[:, 0]]
+            assert samples.shape[0] == self._num_samples
+            return samples
+        else:
+            samples = samples[accepts]
+            assert len(samples) == self._num_samples
+            return samples
 
 
 class NUTSMonteCarlo(Inference):
@@ -198,11 +274,14 @@ class NUTSMonteCarlo(Inference):
 
     """
 
-    def __init__(self, rng_key, kernel, num_samples, num_warmups, step_size=1.0):
-        super().__init__(rng_key, kernel, num_samples, num_warmups)
+    def __init__(
+        self, rng_key, kernel, num_samples, num_warmups, step_size=1.0, num_chains=1
+    ):
+        super().__init__(rng_key, kernel, num_samples, num_warmups, num_chains=1)
         self._step_size = step_size
 
     def sample(self, obs, *args, **kwargs):
+        raise NotImplementedError("Not completed")
         mcmc = MCMC(
             NUTS(self._kernel, step_size=self._step_size),
             num_warmup=self._num_warmups,
@@ -227,6 +306,7 @@ class HamiltonionMonteCarlo(Inference):
         self._step_size = step_size
 
     def sample(self, obs, *args, **kwargs):
+        raise NotImplementedError("Not completed")
         mcmc = MCMC(
             HMC(self._kernel, step_size=self._step_size),
             num_warmup=self._num_warmups,
@@ -242,4 +322,4 @@ class RejectionSampling(Inference):
         super().__init__(rng_key, kernel, num_samples, num_warmups)
 
     def sample(self, obs, *args, **kargs):
-        raise NotImplementedError
+        raise NotImplementedError("Not completed")
