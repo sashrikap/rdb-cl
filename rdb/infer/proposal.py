@@ -5,6 +5,7 @@ Includes:
 
 """
 from numpyro.handlers import seed
+from rdb.optim.utils import concate_dict_by_keys, unconcate_dict_by_keys
 import numpyro.distributions as dist
 import jax.numpy as np
 import numpyro
@@ -108,7 +109,15 @@ class IndGaussianProposal(Proposal):
             self._proposal_fn is not None
         ), "Need to initialize with random seed by `update_key`"
         updated = False
-        for key in state.keys():
-            self.add_feature(key)
 
-        return self._proposal_fn(state)
+        if isinstance(state, dict):
+            for key in state.keys():
+                self.add_feature(key)
+            return self._proposal_fn(state)
+        else:
+            state = concate_dict_by_keys(state)
+            for key in state.keys():
+                self.add_feature(key)
+            state = self._proposal_fn(state)
+            state = unconcate_dict_by_keys(state)
+            return state

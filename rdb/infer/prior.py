@@ -5,8 +5,10 @@ Includes:
 
 """
 from numpyro.handlers import seed
+from rdb.optim.utils import concate_dict_by_keys, unconcate_dict_by_keys
 import numpyro.distributions as dist
 import jax.numpy as np
+import numpy as onp
 import numpyro
 import copy
 
@@ -95,23 +97,36 @@ class LogUniformPrior(Prior):
             dist_, dist.Uniform
         ), "Only uniform distribution currently supported"
 
-        log_val = np.log(val)
+        log_val = onp.log(val)
         low = dist_.low
         high = dist_.high
-        # return np.where(
-        #     log_val < low or log_val > high, -np.inf, dist_.log_prob(log_val)
-        # )
-        return dist_.log_prob(log_val)
+        outside = onp.logical_or(log_val < low, log_val > high)
+        return onp.where(outside, -onp.inf, dist_.log_prob(log_val))
 
     def log_prob(self, state):
         """Log probability of the reiceived state."""
         assert self._log_prior_dict is not None, "Must initialize with random seed"
+        if isinstance(state, dict):
+            return self._log_prob(state)
+        else:
+            return self._log_prob_vec(state)
+
+    def _log_prob(self, state):
         for key in state.keys():
             self.add_feature(key)
         log_prob = 0.0
         for key, dist_ in self._log_prior_dict.items():
             val = state[key]
-            log_prob += self._check_range(key, val, dist_)
+            pkey = self._check_range(key, val, dist_)
+            if key == self._normalized_key and onp.any(onp.isinf(pkey)):
+                assert False, "Not properly normalized"
+            log_prob += pkey
+        return log_prob
+
+    def _log_prob_vec(self, state):
+        n_chains = len(state)
+        state = concate_dict_by_keys(state)
+        log_prob = self._log_prob(state)
         return log_prob
 
     def _build_function(self):
@@ -121,7 +136,7 @@ class LogUniformPrior(Prior):
             output = {}
             for key, dist_ in self._log_prior_dict.items():
                 val = numpyro.sample(key, dist_)
-                output[key] = np.exp(val)
+                output[key] = onp.exp(val)
             return output
 
         return seed(prior_fn, self._rng_key)

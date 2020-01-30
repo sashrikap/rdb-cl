@@ -9,11 +9,11 @@ from jax import random, vmap
 from numpyro.handlers import scale, condition, seed
 
 
-def run_nuts():
-    def kernel(obs):
-        s = numpyro.sample("s", dist.Uniform(0.0, 10.0))
-        z_fn = dist.Normal(s, 0.1)
-        numpyro.sample(f"obs", z_fn, obs=obs)
+# def run_nuts():
+#     def kernel(obs):
+#         s = numpyro.sample("s", dist.Uniform(0.0, 10.0))
+#         z_fn = dist.Normal(s, 0.1)
+#         numpyro.sample(f"obs", z_fn, obs=obs)
 
 
 class TestPrior(object):
@@ -87,7 +87,7 @@ def test_mh_2_chainz():
 
     prior = TestPrior()
 
-    def kernel(obs, state):
+    def vec_kernel(obs, state):
         """ Likelihood p(obs | s) """
         z_fn = dist.Normal(state, 0.1)
         log_prob = z_fn.log_prob(obs) + prior.log_prob(state)
@@ -97,7 +97,7 @@ def test_mh_2_chainz():
     key = random.PRNGKey(1)
     sampler = MetropolisHasting(
         None,
-        kernel,
+        vec_kernel,
         num_warmups=40,
         num_samples=20,
         proposal=TestProposal(),
@@ -112,7 +112,7 @@ def test_mh_3_chainz():
 
     prior = TestPrior()
 
-    def kernel(obs, state):
+    def vec_kernel(obs, state):
         """ Likelihood p(obs | s)
 
         Args:
@@ -127,7 +127,7 @@ def test_mh_3_chainz():
     key = random.PRNGKey(1)
     sampler = MetropolisHasting(
         None,
-        kernel,
+        vec_kernel,
         num_warmups=10,
         num_samples=20,
         proposal=TestProposal(),

@@ -20,8 +20,8 @@ import json
 import os
 import jax
 import jax.numpy as np
+import numpy as onp
 from rdb.optim.utils import multiply_dict_by_keys, append_dict_by_keys
-from rdb.visualize.plot import plot_weights, plot_weights_comparison
 from numpyro.handlers import scale, condition, seed
 from rdb.infer.utils import random_choice, logsumexp
 from rdb.infer.particles import Particles
@@ -232,7 +232,7 @@ class IRDOptimalControl(PGM):
         """
 
         def fn(samples, accepts):
-            fig_dir = f"{self._save_dir}/plot"
+            fig_dir = f"{self._save_dir}/mcmc"
             visualize_chains(
                 samples, accepts, num_plots=num_plots, fig_dir=fig_dir, title=save_name
             )
@@ -426,7 +426,17 @@ class IRDOptimalControl(PGM):
             log_probs.append(self._prior.log_prob(sample_w))
             return sum(log_probs)
 
-        return likelihood_fn
+        def _kernel(user_ws, sample_w, **kwargs):
+            """Vectorized"""
+            if isinstance(sample_w, dict):
+                return likelihood_fn(user_ws, sample_w, **kwargs)
+            else:
+                probs = []
+                for uw, sw in zip(user_ws, sample_w):
+                    probs.append(likelihood_fn(us, sw, **kwargs))
+                return onp.array(probs)
+
+        return _kernel
 
 
 class Designer(PGM):
@@ -494,7 +504,7 @@ class Designer(PGM):
         """
 
         def fn(samples, accepts):
-            fig_dir = (f"{self._save_dir}/plot",)
+            fig_dir = f"{self._save_dir}/mcmc"
             visualize_chains(
                 samples, accepts, num_plots=num_plots, fig_dir=fig_dir, title=save_name
             )
@@ -610,9 +620,22 @@ class Designer(PGM):
                 rew = -1 * cost
                 log_prob += beta * rew
             log_prob += self._prior.log_prob(sample_w)
+            # if True:
+            if False:
+                print(f"Designer prob {log_prob:.3f}", actions.mean())
             return log_prob
 
-        return likelihood_fn
+        def _kernel(true_w, sample_w, **kwargs):
+            """Vectorized"""
+            if isinstance(sample_w, dict):
+                return likelihood_fn(true_w, sample_w, **kwargs)
+            else:
+                probs = []
+                for tw, w in zip(true_w, sample_w):
+                    probs.append(likelihood_fn(tw, w, **kwargs))
+                return onp.array(probs)
+
+        return _kernel
 
 
 class DesignerInteractive(Designer):
@@ -651,13 +674,6 @@ class DesignerInteractive(Designer):
         os.makedirs(self._save_dir)
         self._user_inputs = []
         self._normalized_key = normalized_key
-
-    def run_from_ipython(self):
-        try:
-            __IPYTHON__
-            return True
-        except NameError:
-            return False
 
     def sample(self, task, task_name, verbose=True, itr=0):
         raise NotImplementedError

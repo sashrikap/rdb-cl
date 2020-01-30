@@ -108,7 +108,12 @@ class Particles(object):
             assert (
                 self._sample_ws is not None
             ), "Must properly initialize particle weights"
-            self._sample_concate_ws = concate_dict_by_keys(self._sample_ws)
+            try:
+                self._sample_concate_ws = concate_dict_by_keys(self._sample_ws)
+            except:
+                import pdb
+
+                pdb.set_trace()
         return self._sample_concate_ws
 
     @property

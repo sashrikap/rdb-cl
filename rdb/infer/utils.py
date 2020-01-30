@@ -172,6 +172,6 @@ def visualize_chains(samples, accepts, num_plots, fig_dir, title):
         title_i = f"{title}_{i:02d}"
         path = f"{fig_dir}/{title_i}.png"
         for wi in range(samples.shape[1]):
-            all_weights.append(samples_i[accepts_i[:, wi]])
+            all_weights.append(samples_i[accepts_i[:, wi], wi])
             all_colors.append(colors[wi])
         plot_weights_comparison(all_weights, all_colors, path=path, title=title_i)

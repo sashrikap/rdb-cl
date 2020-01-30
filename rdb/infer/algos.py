@@ -164,7 +164,7 @@ class MetropolisHasting(Inference):
 
     def _vectorize_state(self, state):
         if self._is_multi_chains:
-            return np.array([state] * self._num_chains)
+            return onp.array([state] * self._num_chains)
         else:
             return state
 
@@ -278,7 +278,7 @@ class MetropolisHasting(Inference):
             if chain_viz is not None:
                 chain_viz(samples, accepts)
             # Take first row
-            samples = samples[accepts[:, 0]]
+            samples = samples[accepts[:, 0], 0]
             assert samples.shape[0] == self._num_samples
             return samples
         else:
