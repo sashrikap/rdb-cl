@@ -29,16 +29,18 @@ class ActiveInfoGain(object):
 
     Args:
         model (object): IRD Model
+        params (dict): parameters (e.g. histogram) for calling.
 
     """
 
-    def __init__(self, rng_key, model, beta, debug=False):
+    def __init__(self, rng_key, model, beta, params={}, debug=False):
         self._rng_key = rng_key
         self._model = model
         self._beta = beta
         self._tasks = []
         self._debug = debug
         self._method = "InfoGain"
+        self._params = params
 
     def update_key(self, rng_key):
         self._rng_key = rng_key
@@ -52,9 +54,7 @@ class ActiveInfoGain(object):
         probs = np.exp(log_probs - denom)
         return probs
 
-    def __call__(
-        self, next_task, next_task_name, belief, all_obs, verbose=True, params={}
-    ):
+    def __call__(self, next_task, next_task_name, belief, all_obs, verbose=True):
         """Information gain (negative entropy) criteria.
 
         Note:
@@ -78,9 +78,9 @@ class ActiveInfoGain(object):
                 # currently uses onp.ma.log which is non-differentiable
                 ent = float(
                     next_belief.entropy(
-                        bins=params["bins"],
+                        bins=self._params["bins"],
                         method="histogram",
-                        max_weights=params["max_weights"],
+                        max_weights=self._params["max_weights"],
                     )
                 )
                 if onp.isnan(ent):
@@ -124,9 +124,7 @@ class ActiveRatioTest(ActiveInfoGain):
         log_ratios = -1 * np.sum(list(diff_costs.values()), axis=0)
         return np.array(log_ratios)
 
-    def __call__(
-        self, next_task, next_task_name, belief, all_obs, verbose=True, params={}
-    ):
+    def __call__(self, next_task, next_task_name, belief, all_obs, verbose=True):
         """Disagreement criteria.
 
         Score = -1 * rew(sample_w, traj_user)/rew(sample_w, traj_sample).
@@ -181,9 +179,7 @@ class ActiveRandom(ActiveInfoGain):
         self._rng_key = rng_key
         self._random_uniform = seed(random_uniform, self._rng_key)
 
-    def __call__(
-        self, next_task, next_task_name, belief, all_obs, verbose=True, params={}
-    ):
+    def __call__(self, next_task, next_task_name, belief, all_obs, verbose=True):
         """Random score
 
         """

@@ -7,7 +7,7 @@ from rdb.infer.ird_oc import IRDOptimalControl
 from rdb.optim.mpc import shooting_method
 from rdb.distrib.particles import ParticleServer
 from rdb.infer.utils import *
-from rdb.exps.utils import load_params
+from rdb.exps.utils import *
 from functools import partial
 from jax import random
 import numpyro.distributions as dist
@@ -73,7 +73,8 @@ def debug_candidate(debug_dir, exp_name):
         },
         use_true_w=USER_TRUE_W,
         num_prior_tasks=NUM_PRIOR_TASKS,
-        test_mode=False,
+        save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
+        exp_name=f"{EXP_NAME}",
     )
 
     """ Active acquisition function for experiment """
@@ -94,8 +95,8 @@ def debug_candidate(debug_dir, exp_name):
         if key not in ACTIVE_FNS:
             del active_fns[key]
 
-    SAVE_ROOT = "data"
-    DEBUG_ROOT = "data"
+    SAVE_ROOT = data_dir()
+    DEBUG_ROOT = data_dir()
     experiment = ExperimentActiveIRD(
         ird_model,
         active_fns,
@@ -107,6 +108,7 @@ def debug_candidate(debug_dir, exp_name):
         num_active_tasks=NUM_ACTIVE_TASKS,
         num_active_sample=NUM_ACTIVE_SAMPLES,
         normalized_key=NORMALIZED_KEY,
+        save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
         exp_name=f"{EXP_NAME}",
         exp_params=PARAMS,
     )

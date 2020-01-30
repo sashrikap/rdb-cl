@@ -77,9 +77,7 @@ class LogUniformPrior(Prior):
 
     def add_feature(self, key):
         if key not in self._feature_keys:
-            updated = True
             print(f"Proposal Updated for key: {key}")
-            self.add_feature(key)
             self._feature_keys.append(key)
             self._log_prior_dict[key] = dist.Uniform(-self._log_max, self._log_max)
             self._prior_fn = self._build_function()
@@ -108,6 +106,8 @@ class LogUniformPrior(Prior):
     def log_prob(self, state):
         """Log probability of the reiceived state."""
         assert self._log_prior_dict is not None, "Must initialize with random seed"
+        for key in state.keys():
+            self.add_feature(key)
         log_prob = 0.0
         for key, dist_ in self._log_prior_dict.items():
             val = state[key]

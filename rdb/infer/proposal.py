@@ -108,7 +108,7 @@ class IndGaussianProposal(Proposal):
             self._proposal_fn is not None
         ), "Need to initialize with random seed by `update_key`"
         updated = False
-        for key in state:
+        for key in state.keys():
             self.add_feature(key)
 
         return self._proposal_fn(state)

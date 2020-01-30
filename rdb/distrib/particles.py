@@ -22,10 +22,11 @@ class ParticleWorkerSingle(object):
         self._compute_result = None
         self._initialized = False
         self._particles = Particles(
-            None,
-            self._env_fn,
-            self._controller,
-            self._runner,
+            rng_key=None,
+            env_fn=self._env_fn,
+            controller=self._controller,
+            runner=self._runner,
+            save_name=None,
             sample_ws=[],
             env=self._env,
         )
@@ -41,8 +42,7 @@ class ParticleWorkerSingle(object):
     def initialize_done(self):
         return self._initialized
 
-    def compute(self, rng_key, weights, task, task_name, test_mode=False):
-        self._particles.test_mode = test_mode
+    def compute(self, rng_key, weights, task, task_name):
         self._particles.update_key(rng_key)
         self._particles.update_weights(weights)
         self._particles.get_features(task, task_name)
@@ -120,7 +120,6 @@ class ParticleServer(object):
                         particles.weights,
                         itr_tasks[wi],
                         itr_names[wi],
-                        test_mode=particles.test_mode,
                     )
                 # Retrieve
                 for wi in range(idx_end - idx_start):
@@ -136,7 +135,6 @@ class ParticleServer(object):
                         particles.weights,
                         itr_tasks[wi],
                         itr_names[wi],
-                        test_mode=particles.test_mode,
                     )
                     particles.merge(result)
                     if verbose:

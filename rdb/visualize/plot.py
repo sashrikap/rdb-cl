@@ -37,6 +37,7 @@ def plot_weights(
     title=None,
     max_weights=8.0,
     bins=100,
+    log_scale=True,
     figsize=(20, 10),
 ):
     """Plot weights for visualizing.
@@ -48,18 +49,21 @@ def plot_weights(
         max_weights (float): log range of weights ~ (-max_weights, max_weights)
 
     """
+    assert len(highlight_dicts) == len(highlight_colors) == len(highlight_labels)
 
     n_values = len(weights_dicts[0].values())
     fig, axs = plt.subplots(n_values, 1, figsize=figsize, dpi=80)
     for i, key in enumerate(sorted(list(weights_dicts[0].keys()))):
-        values = [onp.log(s[key]) for s in weights_dicts]
+        values = [onp.log(s[key]) if log_scale else s[key] for s in weights_dicts]
         n, bins, patches = axs[i].hist(
             values,
             bins,
+            histtype="stepfilled",  # no vertical border
             range=(-max_weights, max_weights),
             density=True,
             facecolor="b",
-            alpha=0.75,
+            ec="k",  # border
+            alpha=0.3,
         )
         ybottom, ytop = axs[i].get_ylim()
         gap = (ytop - ybottom) / (len(highlight_dicts) - 1 + 1e-8)
@@ -70,10 +74,63 @@ def plot_weights(
             if d is None:
                 continue
             val = d[key]
-            log_val = onp.log(val)
-            axs[i].axvline(x=log_val, c=c)
+            if log_scale:
+                val = onp.log(val)
+            axs[i].axvline(x=val, c=c)
             # add 0.05 gap so that labels don't overlap
-            axs[i].text(log_val, ybottom + gap * j, label, size=10)
+            axs[i].text(val, ybottom + gap * j, label, size=10)
+        axs[i].set_xlabel(key)
+    plt.tight_layout()
+    if title is not None:
+        fig.suptitle(title)
+    if path is not None:
+        plt.savefig(path)
+        plt.close()
+    else:
+        plt.show()
+
+
+def plot_weights_comparison(
+    all_weights_dicts,
+    all_weights_colors,
+    path=None,
+    title=None,
+    max_weights=8.0,
+    bins=100,
+    log_scale=True,
+    figsize=(20, 10),
+):
+    """Plot different lists weights for visualizing (e.g. MCMC convergence).
+
+    Args:
+        highlight_dicts (list): list of weight dictionaries
+        highlight_colors (list): list of colors for highlighting these weights
+        highlight_labels (list): list of labels for denoting these weights
+        max_weights (float): log range of weights ~ (-max_weights, max_weights)
+
+    """
+
+    assert len(all_weights_dicts) == len(all_weights_colors)
+    axs = None
+    for weights_dicts, color in zip(all_weights_dicts, all_weights_colors):
+        if len(weights_dicts) == 0:
+            continue
+
+        n_values = len(weights_dicts[0].values())
+        if axs is None:
+            fig, axs = plt.subplots(n_values, 1, figsize=figsize, dpi=80)
+        for i, key in enumerate(sorted(list(weights_dicts[0].keys()))):
+            values = [onp.log(s[key]) if log_scale else s[key] for s in weights_dicts]
+            n, bins, patches = axs[i].hist(
+                values,
+                bins,
+                histtype="stepfilled",  # no vertical border
+                range=(-max_weights, max_weights),
+                density=True,
+                facecolor=color,
+                ec="k",  # border
+                alpha=0.25,
+            )
         axs[i].set_xlabel(key)
     plt.tight_layout()
     if title is not None:

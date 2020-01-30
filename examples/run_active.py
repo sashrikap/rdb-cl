@@ -9,7 +9,7 @@ from rdb.exps.active import ActiveInfoGain, ActiveRatioTest, ActiveRandom
 from rdb.infer.ird_oc import IRDOptimalControl
 from rdb.optim.mpc import shooting_method
 from rdb.distrib.particles import ParticleServer
-from rdb.exps.utils import load_params
+from rdb.exps.utils import *
 from functools import partial
 from rdb.infer import *
 from jax import random
@@ -20,8 +20,8 @@ import ray
 
 
 def main(random_key, evaluate=False):
-    SAVE_ROOT = "data" if not GCP_MODE else "/gcp_output"  # Don'tchange this line
-    DEBUG_ROOT = "data" if not GCP_MODE else "/gcp_input"
+    SAVE_ROOT = data_dir() if not GCP_MODE else "/gcp_output"  # Don'tchange this line
+    DEBUG_ROOT = data_dir() if not GCP_MODE else "/gcp_input"
 
     # Define random key
     rng_key = random.PRNGKey(random_key)
@@ -72,6 +72,7 @@ def main(random_key, evaluate=False):
     eval_server = ParticleServer(
         env_fn, controller_fn, num_workers=NUM_EVAL_WORKERS, parallel=PARALLEL
     )
+    weight_params = {"bins": HIST_BINS, "max_weights": MAX_WEIGHT}
 
     ird_model = IRDOptimalControl(
         rng_key=None,
@@ -84,22 +85,29 @@ def main(random_key, evaluate=False):
         prior=prior,
         proposal=ird_proposal,
         num_normalizers=NUM_NORMALIZERS,
-        sample_args={"num_warmups": NUM_WARMUPS, "num_samples": NUM_SAMPLES},
+        sample_args={
+            "num_warmups": NUM_WARMUPS,
+            "num_samples": NUM_SAMPLES,
+            "num_chains": NUM_IRD_CHAINS,
+        },
         designer_proposal=designer_proposal,
         designer_args={
             "num_warmups": NUM_DESIGNER_WARMUPS,
             "num_samples": NUM_DESIGNERS,
+            "num_chains": NUM_DESIGNER_CHAINS,
         },
+        weight_params=weight_params,
         use_true_w=USER_TRUE_W,
         num_prior_tasks=NUM_PRIOR_TASKS,
-        test_mode=TEST_MODE,
         normalized_key=NORMALIZED_KEY,
+        save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
+        exp_name=f"{EXP_NAME}",
     )
 
     ## Active acquisition function for experiment
     active_fns = {
         "infogain": ActiveInfoGain(
-            rng_key=None, model=ird_model, beta=BETA, debug=False
+            rng_key=None, model=ird_model, beta=BETA, params=weight_params, debug=False
         ),
         "ratiomean": ActiveRatioTest(
             rng_key=None, model=ird_model, method="mean", debug=False
@@ -131,7 +139,7 @@ def main(random_key, evaluate=False):
         num_active_tasks=NUM_ACTIVE_TASKS,
         num_active_sample=NUM_ACTIVE_SAMPLES,
         fixed_task_seed=fixed_task_seed,
-        save_dir=f"{SAVE_ROOT}/{SAVE_NAME}",
+        save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
         exp_name=f"{EXP_NAME}",
         exp_params=PARAMS,
         normalized_key=NORMALIZED_KEY,
@@ -154,7 +162,6 @@ if __name__ == "__main__":
 
     GCP_MODE = args.GCP_MODE
     EVALUATE = args.EVALUATE
-    TEST_MODE = False
 
     # Load parameters
     if not GCP_MODE:

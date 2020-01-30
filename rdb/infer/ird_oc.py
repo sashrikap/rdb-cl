@@ -21,14 +21,15 @@ import os
 import jax
 import jax.numpy as np
 from rdb.optim.utils import multiply_dict_by_keys, append_dict_by_keys
+from rdb.visualize.plot import plot_weights, plot_weights_comparison
 from numpyro.handlers import scale, condition, seed
 from rdb.infer.utils import random_choice, logsumexp
-from rdb.visualize.plot import plot_weights
 from rdb.infer.particles import Particles
 from tqdm.auto import tqdm, trange
-from rdb.infer.algos import *
 from rdb.exps.utils import *
 from os.path import join
+from rdb.infer.algos import *
+from rdb.infer.utils import *
 from time import time
 
 pp = pprint.PrettyPrinter(indent=4)
@@ -104,18 +105,26 @@ class IRDOptimalControl(PGM):
         true_w,
         prior,
         proposal,
+        ## Weight parameters
         num_normalizers=-1,
         normalized_key=None,
+        ## Sampling
         sample_method="mh",
         sample_args={},  # "num_warmups": 100, "num_samples": 200
+        ## Designer
         designer_proposal=None,
         designer_args={},
         num_prior_tasks=0,
         use_true_w=False,
+        ## Parameter for histogram
+        weight_params={},
         interactive_mode=False,
         interactive_name="Default",
+        ## Saving options
+        save_root="data",
+        exp_name="active_ird_exp1",
+        ## Debugging options
         debug_true_w=False,
-        test_mode=False,  # Skip _cache_task part if true
     ):
         self._rng_key = rng_key
         # Environment settings
@@ -135,9 +144,13 @@ class IRDOptimalControl(PGM):
         self._user_actions = {}
         self._user_feats = {}
         self._debug_true_w = debug_true_w
-        self._test_mode = test_mode
-        kernel = self._build_kernel(beta)
-        super().__init__(rng_key, kernel, proposal, sample_method, sample_args)
+        self._weight_params = weight_params
+        self._kernel = self._build_kernel(beta)
+        ## Saving
+        self._save_root = save_root
+        self._exp_name = exp_name
+        self._save_dir = f"{save_root}/{exp_name}"
+        super().__init__(rng_key, self._kernel, proposal, sample_method, sample_args)
         # assume designer uses the same beta, prior and prior proposal
         self._interactive_mode = interactive_mode
         if interactive_mode:
@@ -159,14 +172,17 @@ class IRDOptimalControl(PGM):
                 controller=self._controller,
                 runner=self._runner,
                 beta=beta,
-                truth=self.create_particles([true_w]),
+                truth=self.create_particles([true_w], save_name="true_w"),
                 prior=prior,
                 proposal=designer_proposal,
                 sample_method=sample_method,
                 sampler_args=designer_args,
                 use_true_w=use_true_w,
+                weight_params=weight_params,
                 num_prior_tasks=num_prior_tasks,
                 normalized_key=self._normalized_key,
+                save_root=save_root,
+                exp_name=exp_name,
             )
 
     @property
@@ -200,17 +216,30 @@ class IRDOptimalControl(PGM):
         self._designer.update_key(rng_key)
         self._prior.update_key(rng_key)
 
-    def simulate_designer(self, task, task_name, path=None, params={}):
+    def simulate_designer(self, task, task_name, save_name):
         """Sample one w from b(w) on task
 
         Args:
             path (str): path to save png
             params (dict): visualization params
+            save_name (str)
 
         """
-        return self._designer.simulate(task, task_name, path=path, params=params)
+        return self._designer.simulate(task, task_name, save_name=save_name)
 
-    def sample(self, tasks, task_names, obs, verbose=True, mode="hybrid"):
+    def _get_chain_viz(self, save_name, num_plots=10):
+        """Visualize multiple MCMC chains to check convergence.
+        """
+
+        def fn(samples, accepts):
+            fig_dir = f"{self._save_dir}/plot"
+            visualize_chains(
+                samples, accepts, num_plots=num_plots, fig_dir=fig_dir, title=save_name
+            )
+
+        return fn
+
+    def sample(self, tasks, task_names, obs, save_name, verbose=True, mode="hybrid"):
         """Sample b(w) for true weights given obs.weights.
 
         Args:
@@ -268,41 +297,39 @@ class IRDOptimalControl(PGM):
         last_name = task_names[-1]
 
         print("Sampling IRD")
-        if self._test_mode:
-            sample_ws = [
-                copy.deepcopy(obs[0].weights[0])
-                for _ in range(self._sampler.num_samples)
-            ]
-        else:
-            sample_ws = self._sampler.sample(
-                obs=all_obs_ws,  # all obs so far
-                init_state=last_obs_w,  # initialize with last obs
-                user_feats_sums=all_user_feats_sum,
-                norm_feats_sums=all_norm_feats_sum,
-                all_init_states=all_init_states,
-                all_user_acs=all_user_acs,
-                verbose=verbose,
-                mode=mode,
-                name="IRD",
-            )
-        samples = self.create_particles(sample_ws, self._test_mode)
+        sample_ws = self._sampler.sample(
+            obs=all_obs_ws,  # all obs so far
+            init_state=last_obs_w,  # initialize with last obs
+            chain_viz=self._get_chain_viz(save_name=save_name),
+            user_feats_sums=all_user_feats_sum,
+            norm_feats_sums=all_norm_feats_sum,
+            all_init_states=all_init_states,
+            all_user_acs=all_user_acs,
+            verbose=verbose,
+            mode=mode,
+            name=save_name,
+        )
+        samples = self.create_particles(sample_ws, save_name=save_name)
         return samples
 
-    def create_particles(self, weights, test_mode=False):
+    def create_particles(self, weights, save_name):
         return Particles(
-            self._rng_key,
-            self._env_fn,
-            self._controller,
-            self._runner,
+            rng_key=self._rng_key,
+            env_fn=self._env_fn,
+            controller=self._controller,
+            runner=self._runner,
             sample_ws=weights,
-            test_mode=test_mode,
+            save_name=save_name,
+            weight_params=self._weight_params,
+            fig_dir=f"{self._save_dir}/plots",
+            save_dir=f"{self._save_dir}/save",
             env=self._env,
         )
 
     def _build_normalizer(self):
         """Build sampling-based normalizer by randomly sampling weights."""
         norm_ws = self._prior.sample(self._num_normalizers)
-        normalizer = self.create_particles(norm_ws, test_mode=False)
+        normalizer = self.create_particles(norm_ws, save_name="normalizer")
         return normalizer
 
     def _build_kernel(self, beta):
@@ -379,7 +406,7 @@ class IRDOptimalControl(PGM):
                     _, sample_cost, sample_info = self._runner(
                         init_state, sample_acs, weights=sample_w
                     )
-                    print("Sample cost", sample_cost)
+                    # print("Sample cost", sample_cost)
                     n_feats_sum = append_dict_by_keys(
                         n_feats_sum, sample_info["feats_sum"]
                     )
@@ -389,8 +416,8 @@ class IRDOptimalControl(PGM):
                 else:
                     raise NotImplementedError
 
-                # if self._debug_true_w:
-                if True:
+                if self._debug_true_w:
+                    # if True:
                     print(
                         f"sample rew {sample_rew:.3f} normal costs {sum_normal_rew:.3f} diff {sample_rew - sum_normal_rew:.3f}"
                     )
@@ -428,7 +455,10 @@ class Designer(PGM):
         proposal,
         sample_method="mh",
         sampler_args={},
+        save_root="",
+        exp_name="",
         use_true_w=False,
+        weight_params={},
         num_prior_tasks=0,
         normalized_key=None,
     ):
@@ -450,41 +480,85 @@ class Designer(PGM):
         # Cache
         self._task_samples = {}
         super().__init__(rng_key, self._kernel, proposal, sample_method, sampler_args)
+        self._save_root = save_root
+        self._exp_name = exp_name
+        self._save_dir = f"{save_root}/{exp_name}"
         # Designer Prior
         self._random_choice = None
         self._prior_tasks = []
+        self._weight_params = weight_params
         self._num_prior_tasks = num_prior_tasks
 
-    def sample(self, task, task_name, name=""):
-        """Sample 1 set of weights from b(design_w) given true_w"""
+    def _get_chain_viz(self, save_name, num_plots=5):
+        """Visualize multiple MCMC chains to check convergence.
+        """
+
+        def fn(samples, accepts):
+            fig_dir = (f"{self._save_dir}/plot",)
+            visualize_chains(
+                samples, accepts, num_plots=num_plots, fig_dir=fig_dir, title=save_name
+            )
+
+        return fn
+
+    def create_particles(self, weights, save_name):
+        return Particles(
+            rng_key=self._rng_key,
+            env_fn=self._env_fn,
+            controller=self._controller,
+            runner=self._runner,
+            sample_ws=weights,
+            save_name=save_name,
+            weight_params=self._weight_params,
+            fig_dir=f"{self._save_dir}/plots",
+            save_dir=f"{self._save_dir}/save",
+            env=self._env,
+        )
+
+    def sample(self, task, task_name, save_name):
+        """Sample 1 set of weights from b(design_w) given true_w
+
+        Args:
+            task: environment task
+            task_name (str):
+            save_name (save_name): name for saving parameters and visualizations
+
+        """
         if task_name not in self._task_samples.keys():
-            print(f"Sampling Designer (prior={len(self._prior_tasks)}): {name}")
+            print(f"Sampling Designer (prior={len(self._prior_tasks)}): {save_name}")
             if self._use_true_w:
                 sample_ws = [self._true_w]
             else:
                 sample_ws = self._sampler.sample(
-                    self._true_w, task=task, name=f"Designer {name}"
+                    self._true_w,
+                    task=task,
+                    chain_viz=self._get_chain_viz(save_name=save_name),
+                    name=save_name,
                 )
             samples = Particles(
-                self._rng_key,
-                self._env_fn,
-                self._controller,
-                self._runner,
+                rng_key=self._rng_key,
+                env_fn=self._env_fn,
+                controller=self._controller,
+                runner=self._runner,
+                weight_params=self._weight_params,
                 sample_ws=sample_ws,
+                save_name=save_name,
+                fig_dir=f"{self._save_dir}/plots",
+                save_dir=f"{self._save_dir}/save",
                 env=self._env,
             )
             self._task_samples[task_name] = samples
         return self._task_samples[task_name]
 
-    def simulate(self, task, task_name, path=None, params={}):
+    def simulate(self, task, task_name, save_name):
         """Give 1 sample
 
         Args:
-            path (str): path to visualize designer weights
+            save_name (str): for later saving output
 
         """
-        particles = self.sample(task, task_name)
-        particles.visualize(path, true_w=self.true_w, obs_w=None, **params)
+        particles = self.sample(task, task_name, save_name=save_name)
+        particles.visualize(true_w=self.true_w, obs_w=None)
         return particles.subsample(1)
 
     def reset_prior_tasks(self):
@@ -550,7 +624,14 @@ class DesignerInteractive(Designer):
     """
 
     def __init__(
-        self, rng_key, env_fn, controller, runner, name="Default", normalized_key=None
+        self,
+        rng_key,
+        env_fn,
+        controller,
+        runner,
+        name="Default",
+        save_dir="",
+        normalized_key=None,
     ):
         super().__init__(
             rng_key=rng_key,
@@ -562,9 +643,12 @@ class DesignerInteractive(Designer):
             prior=None,
             proposal=None,
             sample_method=None,
+            save_dir=save_dir,
+            exp_name="interactive",
         )
         self._name = name
-        self._savedir = self.init_savedir()
+        self._save_dir = f"{self._save_dir}/{self._exp_name}/{save_name}"
+        os.makedirs(self._save_dir)
         self._user_inputs = []
         self._normalized_key = normalized_key
 
@@ -575,24 +659,14 @@ class DesignerInteractive(Designer):
         except NameError:
             return False
 
-    def init_savedir(self):
-        """Create empty directory to dump interactive videos.
-        """
-        # By default, this is run from notebook
-        # assert self.run_from_ipython()
-        # nb directory: "/Users/jerry/Dropbox/Projects/SafeRew/rdb/examples/notebook"
-        savedir = join(data_dir(), f"interactive/{self._name}")
-        os.makedirs(savedir, exist_ok=True)
-        return savedir
-
-    def sample(self, task, task_name, verbose=True):
+    def sample(self, task, task_name, verbose=True, itr=0):
         raise NotImplementedError
 
     @property
     def name(self):
         return self._name
 
-    def simulate(self, task, task_name):
+    def simulate(self, task, task_name, save_name):
         """Interactively query weight input.
 
         In Jupyter Notebook:
@@ -608,7 +682,7 @@ class DesignerInteractive(Designer):
         init_state = self.env.get_init_state(task)
         # Visualize task
         image_path = (
-            f"{self._savedir}/key_{self._rng_key}_user_trial_0_task_{str(task)}.png"
+            f"{self._save_dir}/key_{self._rng_key}_user_trial_0_task_{str(task)}.png"
         )
         self._runner.nb_show_thumbnail(init_state, image_path, clear=False)
         # Query user input
@@ -628,7 +702,7 @@ class DesignerInteractive(Designer):
                 # Visualize trajectory
                 acs = self._controller(init_state, weights=user_in_w)
                 num_weights = len(self._user_inputs)
-                video_path = f"{self._savedir}/key_{self._rng_key}_user_trial_{num_weights}_task_{str(task)}.mp4"
+                video_path = f"{self._save_dir}/key_{self._rng_key}_user_trial_{num_weights}_task_{str(task)}.mp4"
                 print("Received Weights")
                 pp.pprint(user_in_w)
                 self._runner.nb_show_mp4(init_state, acs, path=video_path, clear=False)
@@ -637,11 +711,13 @@ class DesignerInteractive(Designer):
                 print("Invalid input.")
                 continue
         return Particles(
-            self._rng_key,
-            self._env_fn,
-            self._controller,
-            self._runner,
+            rng_key=self._rng_key,
+            env_fn=self._env_fn,
+            controller=self._controller,
+            runner=self._runner,
             sample_ws=[self._user_inputs[-1]],
+            save_name=f"designer_interactive_{self._name}",
+            weight_params=self._weight_params,
             env=self._env,
         )
 

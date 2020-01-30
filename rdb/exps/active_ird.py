@@ -78,7 +78,7 @@ class ExperimentActiveIRD(object):
         normalized_key=None,
         design_data={},
         num_load_design=-1,
-        save_dir="data/active_ird_exp1",
+        save_root="data/active_ird_exp1",
         exp_name="active_ird_exp1",
         exp_params={},
     ):
@@ -104,11 +104,7 @@ class ExperimentActiveIRD(object):
         self._fixed_belief_tasks = fixed_belief_tasks
         # Save path
         self._exp_params = exp_params
-        self._hist_params = {
-            "bins": exp_params["HIST_BINS"],
-            "max_weights": exp_params["MAX_WEIGHT"],
-        }
-        self._save_dir = save_dir
+        self._save_root = save_root
         self._exp_name = exp_name
         self._last_time = time()
         # Load design and cache
@@ -195,21 +191,20 @@ class ExperimentActiveIRD(object):
                 self._log_time(f"Itr {itr} {key} Propose")
 
                 ## Simulate Designer
-                fig_dir = f"{self._save_dir}/{self._exp_name}/designer"
-                fname = f"weights_seed_{str(self._rng_key)}_itr_{itr:02d}"
-                os.makedirs(fig_dir, exist_ok=True)
                 obs = self._model.simulate_designer(
-                    task, task_name, path=f"{fig_dir}/{fname}", params=self._hist_params
+                    task=task,
+                    task_name=task_name,
+                    save_name=f"designer_seed_{str(self._rng_key)}_method_{key}_itr_{itr:02d}",
                 )
                 self._all_obs[key].append(obs)
                 self._log_time(f"Itr {itr} {key} Designer")
 
                 ## IRD Sampling w/ Divide And Conquer
                 belief = self._model.sample(
-                    self._all_tasks[key],
-                    self._all_task_names[key],
+                    tasks=self._all_tasks[key],
+                    task_names=self._all_task_names[key],
                     obs=self._all_obs[key],
-                    name=f"Itr {itr}",
+                    save_name=f"weights_seed_{str(self._rng_key)}_method_{key}_itr_{itr:02d}",
                 )
                 self._all_beliefs[key].append(belief)
                 self._curr_belief[key] = belief
@@ -278,12 +273,7 @@ class ExperimentActiveIRD(object):
         ):
             scores.append(
                 self._active_fns[fn_key](
-                    next_task,
-                    next_task_name,
-                    belief,
-                    all_obs,
-                    verbose=False,
-                    params=self._hist_params,  # Hyperparameters
+                    next_task, next_task_name, belief, all_obs, verbose=False
                 )
             )
         scores = onp.array(scores)
@@ -310,7 +300,7 @@ class ExperimentActiveIRD(object):
             # Compute belief features
             eval_names = [f"eval_{task}" for task in eval_tasks]
             if self._num_eval_map > 0:
-                belief = belief.map_estimate(self._num_eval_map, **self._hist_params)
+                belief = belief.map_estimate(self._num_eval_map)
             else:
                 belief = belief.subsample(self._num_eval_sample)
             target = self._model.designer.truth
@@ -377,7 +367,10 @@ class ExperimentActiveIRD(object):
             task = design_i["TASK"]
             task_name = f"design_{task}"
             weights = normalize_weights(design_i["WEIGHTS"], self._normalized_key)
-            obs = self._model.create_particles([weights])
+            obs = self._model.create_particles(
+                [weights],
+                save_name=f"weights_seed_{str(self._rng_key)}_prior_design_{i:02d}",
+            )
 
             # Cache previous designs for active functions
             for key in self._active_fns.keys():
@@ -395,7 +388,7 @@ class ExperimentActiveIRD(object):
             self._all_tasks[key],
             self._all_task_names[key],
             obs=self._all_obs[key],
-            name="Design",
+            save_name=f"weights_seed_{str(self._rng_key)}_prior_belief",
         )
         for i in range(num_load):
             # Pack the same beliefs into belief history
@@ -429,7 +422,8 @@ class ExperimentActiveIRD(object):
         np_obs = eval_data["curr_obs"].item()
         for key in np_obs.keys():
             self._all_obs[key] = [
-                self._model.create_particles([ws]) for ws in np_obs[key]
+                self._model.create_particles([ws], save_name="observation")
+                for ws in np_obs[key]
             ]
         if "env_id" in eval_data:
             assert self._model.env_id == eval_data["env_id"].item()
@@ -457,7 +451,7 @@ class ExperimentActiveIRD(object):
             )
             for file in weight_files:
                 weight_filepath = os.path.join(weight_dir, file)
-                belief = self._model.create_particles([])
+                belief = self._model.create_particles([], save_name="belief")
                 belief.load(weight_filepath)
                 self._all_beliefs[key].append(belief)
         # Load random seed
@@ -469,7 +463,7 @@ class ExperimentActiveIRD(object):
         """Save checkpoint.
 
         Format:
-            * data/save_dir/exp_name/{exp_name}_seed.npz
+            * data/save_root/exp_name/{exp_name}_seed.npz
               - seed (str): rng_key
               - curr_obs (dict): {method: [obs_w] * num_itr}
               - curr_tasks (dict): {method: [task] * num_eval}
@@ -477,11 +471,11 @@ class ExperimentActiveIRD(object):
               - eval_hist (dict): {method: [
                     {"violation": ..., "perform": ...}
                 )] * num_itr}
-            * data/save_dir/exp_name/save/weights_seed_method_itr.npz
+            * data/save_root/exp_name/save/weights_seed_method_itr.npz
               - see `rdb.infer.particles.save()`
 
         """
-        exp_dir = f"{self._save_dir}/{self._exp_name}"
+        exp_dir = f"{self._save_root}/{self._exp_name}"
         os.makedirs(exp_dir, exist_ok=True)
         ## Save experiment parameters
         save_params(f"{exp_dir}/params_{str(self._rng_key)}.yaml", self._exp_params)
@@ -503,33 +497,22 @@ class ExperimentActiveIRD(object):
             if self._num_eval_tasks > 0
             else [],  # do not save when eval onall tasks (too large)
         )
-        path = f"{self._save_dir}/{self._exp_name}/{self._exp_name}_seed_{str(self._rng_key)}.npz"
+        path = f"{self._save_root}/{self._exp_name}/{self._exp_name}_seed_{str(self._rng_key)}.npz"
         with open(path, "wb+") as f:
             np.savez(f, **data)
         print("save", exp_dir)
 
         ## Save belief sample information
-        fig_dir = f"{self._save_dir}/{self._exp_name}/plots"
-        save_dir = f"{self._save_dir}/{self._exp_name}/save"
-        os.makedirs(fig_dir, exist_ok=True)
-        os.makedirs(save_dir, exist_ok=True)
+        true_w = self._model.designer.true_w
         for key in self._all_beliefs.keys():
             for itr, belief in enumerate(self._all_beliefs[key]):
-                fname = f"weights_seed_{str(self._rng_key)}_method_{key}_itr_{itr:02d}"
-                savepath = f"{save_dir}/{fname}.npz"
-                figpath = f"{fig_dir}/{fname}"
                 if itr < len(np_obs[key]):
                     obs_w = np_obs[key][itr]
                 else:
                     obs_w = None
                 if not skip_weights:
-                    belief.save(savepath)
-                    belief.visualize(
-                        figpath,
-                        true_w=self._model.designer.true_w,
-                        obs_w=obs_w,
-                        **self._hist_params,
-                    )
+                    belief.save()
+                    belief.visualize(true_w=true_w, obs_w=obs_w)
 
     def _log_time(self, caption=""):
         if self._last_time is not None:
@@ -549,9 +532,9 @@ class ExperimentActiveIRD(object):
 
         """
         print(
-            f"\n============= Evaluate Candidates ({self._rng_key}): {self._save_dir} {self._exp_name} ============="
+            f"\n============= Evaluate Candidates ({self._rng_key}): {self._save_root} {self._exp_name} ============="
         )
-        if not self._load_cache(self._save_dir):
+        if not self._load_cache(self._save_root):
             return
         all_cands = self._all_candidates
         all_scores = self._all_cand_scores
@@ -613,12 +596,11 @@ class ExperimentActiveIRD(object):
                         prefix=prefix,
                         thumbnail=True,
                         video=False,
-                        params=self._exp_params,  # Hyperparameters
                     )
 
     def _plot_candidate_scores(self, itr, debug_dir=None):
         if debug_dir is None:
-            debug_dir = self._save_dir
+            debug_dir = self._save_root
         all_scores = self._all_cand_scores
         ranking_dir = os.path.join(debug_dir, self._exp_name, "candidates")
         os.makedirs(ranking_dir, exist_ok=True)

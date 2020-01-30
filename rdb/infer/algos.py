@@ -128,9 +128,17 @@ class MetropolisHasting(Inference):
                 "prob",
                 onp.exp(log_ratio),
             )
-        accept = onp.logical_or(log_ratio > 0, onp.log(self._coin_flip()) < log_ratio)
-        next_state = onp.where(accept, next_state, state)
-        next_log_prob = onp.where(accept, next_log_prob, log_prob)
+        if self._is_multi_chains:
+            accept = onp.log(self._coin_flip()) < log_ratio
+            next_state = onp.where(accept, next_state, state)
+            next_log_prob = onp.where(accept, next_log_prob, log_prob)
+        else:
+            # onp.where messes up with dictionary in single chain
+            accept = onp.log(self._coin_flip()) < log_ratio
+            if not accept:
+                next_state = state
+                next_log_prob = log_prob
+
         return accept, next_state, next_log_prob
 
     def _create_coin_flip(self):
@@ -145,9 +153,9 @@ class MetropolisHasting(Inference):
             )
 
         if self._is_multi_chains:
-            return seed(raw_fn, self._rng_key)
-        else:
             return seed(raw_fn_multi, self._rng_key)
+        else:
+            return seed(raw_fn, self._rng_key)
 
     def update_key(self, rng_key):
         self._rng_key = rng_key
@@ -168,9 +176,17 @@ class MetropolisHasting(Inference):
         num_warmups=None,
         num_samples=None,
         name="",
+        chain_viz=None,
         *args,
         **kwargs,
     ):
+        """Vectorized MH Sample.
+
+        Args:
+            chain_viz (fn): visualize multiple chains, if provided. Called via `chain_viz(samples, accepts)`.
+
+        """
+
         if init_state is not None:
             state = self._vectorize_state(init_state)
         else:
@@ -185,17 +201,20 @@ class MetropolisHasting(Inference):
 
         # Warm-up phase
         warmup_accepts = []
-        range_ = range(self._num_warmups)
-        if verbose:
-            range_ = trange(self._num_warmups, desc=f"{name} MH Warmup")
+        range_ = trange(self._num_warmups, desc="MH Warmup")
         for i in range_:
-            accept, state, log_prob = self._mh_step(
-                obs, state, log_prob, verbose=False, *args, **kwargs
-            )
+            try:
+                accept, state, log_prob = self._mh_step(
+                    obs, state, log_prob, verbose=False, *args, **kwargs
+                )
+            except:
+                import pdb
+
+                pdb.set_trace()
             warmup_accepts.append(accept)
             rate, num = self._get_counts(warmup_accepts, row=0)
             if verbose:
-                range_.set_description(f"{name} MH Warmup; Accept {100 * rate:.1f}%")
+                range_.set_description(f"MH Warmup {name}; Accept {100 * rate:.1f}%")
 
         # Actual sampling phase (idential to warmup)
         samples = []
@@ -212,9 +231,9 @@ class MetropolisHasting(Inference):
             pbar.n = num
             pbar.last_print_n = num
             pbar.refresh()
-            pbar.set_description(f"{name} MH Sampling; Accept {100 * rate:.1f}%")
+            pbar.set_description(f"MH Sampling {name}; Accept {100 * rate:.1f}%")
         self._summarize(accepts, samples, name)
-        return self._select_samples(accepts, samples)
+        return self._select_samples(accepts, samples, chain_viz)
 
     def _get_counts(self, accepts, row=0):
         """Calculate acceptance rate.
@@ -248,13 +267,16 @@ class MetropolisHasting(Inference):
                 rate, num = self._get_counts(accepts, row=ir)
                 print(f"{name} MH chain {ir} rate {rate:.3f} accept {num}")
         else:
-            rate, num = self._get_counts(accepts, row=ir)
+            rate, num = self._get_counts(accepts)
             print(f"{name} MH chain (single) rate {rate:.3f} accept {num}")
 
-    def _select_samples(self, accepts, samples):
+    def _select_samples(self, accepts, samples, chain_viz=None):
         accepts = onp.array(accepts)
         samples = onp.array(samples)
         if self._is_multi_chains:
+            # Viz all rows
+            if chain_viz is not None:
+                chain_viz(samples, accepts)
             # Take first row
             samples = samples[accepts[:, 0]]
             assert samples.shape[0] == self._num_samples

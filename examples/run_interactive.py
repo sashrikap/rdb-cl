@@ -95,6 +95,8 @@ def run_interactive(active_fn_name, random_keys=None, load_design=-1, evaluate=F
         sample_args={"num_warmups": p.NUM_WARMUPS, "num_samples": p.NUM_SAMPLES},
         interactive_mode=True,
         interactive_name=p.INTERACTIVE_NAME,
+        save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
+        exp_name=f"{EXP_NAME}",
     )
 
     """ Active acquisition function for experiment """
@@ -137,7 +139,7 @@ def run_interactive(active_fn_name, random_keys=None, load_design=-1, evaluate=F
         fixed_task_seed=fixed_task_seed,
         design_data=design_data,
         num_load_design=load_design,
-        save_dir=f"{SAVE_ROOT}/{p.SAVE_NAME}",
+        save_root=f"{SAVE_ROOT}/{p.SAVE_NAME}",
         exp_name=f"{p.EXP_NAME}",
         exp_params=PARAMS,
     )

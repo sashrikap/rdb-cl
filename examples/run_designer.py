@@ -10,7 +10,7 @@ from rdb.distrib.particles import ParticleServer
 from rdb.infer.ird_oc import Designer
 from rdb.optim.mpc import shooting_method
 from rdb.infer.particles import Particles
-from rdb.exps.utils import load_params
+from rdb.exps.utils import *
 from functools import partial
 from rdb.infer import *
 from jax import random
@@ -74,13 +74,13 @@ def main():
     else:
         fixed_task_seed = None
 
-    SAVE_ROOT = "data" if not GCP_MODE else "/gcp_output"
+    SAVE_ROOT = data_dir() if not GCP_MODE else "/gcp_output"
     experiment = ExperimentDesignerPrior(
         rng_key=None,
         designer=designer,
         eval_server=eval_server,
         num_eval_tasks=NUM_EVAL_TASKS,
-        save_dir=f"{SAVE_ROOT}/{SAVE_NAME}",
+        save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
         exp_name=EXP_NAME,
         fixed_task_seed=fixed_task_seed,
     )

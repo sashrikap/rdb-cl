@@ -8,18 +8,20 @@ FIXED_TASK_SEED: 0
 
 NUM_ACTIVE_TASKS: 72
 PARALLEL: True
+NUM_IRD_CHAINS: 1
+NUM_DESIGNER_CHAINS: 1
 
-# ACTIVE_FNS: ["infogain", "ratiomean", "ratiomin"]
-# EXP_NAME: "active_ird_exp_natural_one_hybrid_ird_1000_1000"
-# EXP_ITERATIONS: 8
-# ENV_NAME: "Week6_01-v1"
-# NUM_EVAL_TASKS: 16384
-
-ACTIVE_FNS: ["random"]
-EXP_NAME: "random_ird_exp_natural_one_hybrid_ird_1000_1000"
-EXP_ITERATIONS: 24
+ACTIVE_FNS: ["infogain", "ratiomean", "ratiomin"]
+EXP_NAME: "active_ird_exp_natural_one_hybrid_ird_1000_1000"
+EXP_ITERATIONS: 8
 ENV_NAME: "Week6_01-v1"
 NUM_EVAL_TASKS: 16384
+
+# ACTIVE_FNS: ["random"]
+# EXP_NAME: "random_ird_exp_natural_one_hybrid_ird_1000_1000"
+# EXP_ITERATIONS: 24
+# ENV_NAME: "Week6_01-v1"
+# NUM_EVAL_TASKS: 16384
 
 # ACTIVE_FNS: ["infogain", "ratiomean", "ratiomin"]
 # EXP_NAME: "active_ird_exp_natural_two_hybrid_ird_1000_1000"

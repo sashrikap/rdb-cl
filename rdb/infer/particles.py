@@ -17,6 +17,7 @@ import jax.numpy as np
 import numpy as onp
 import copy
 import math
+import os
 
 
 class Particles(object):
@@ -26,6 +27,7 @@ class Particles(object):
         sample_ws (list)
         rng_key (jax.random): if None, need to call `particles.update_key()`
         env (object): provide to save time
+        save_name (str): save file name, e.g. "weights_seed_{str(self._rng_key)}_{name}"
 
     """
 
@@ -35,9 +37,12 @@ class Particles(object):
         env_fn,
         controller,
         runner,
+        save_name,
         sample_ws=None,
         sample_concate_ws=None,
-        test_mode=False,
+        weight_params={},
+        fig_dir=None,
+        save_dir=None,
         env=None,
     ):
         self._env_fn = env_fn
@@ -47,7 +52,16 @@ class Particles(object):
         self._sample_ws = sample_ws
         self._sample_concate_ws = sample_concate_ws
         self._rng_key = rng_key
-        self._test_mode = test_mode
+        self._weight_params = weight_params
+        self._expanded_name = f"weights_seed_{str(self._rng_key)}_{save_name}"
+        self._save_name = save_name
+        ## File system
+        self._fig_dir = fig_dir
+        self._save_dir = save_dir
+        if fig_dir is not None:
+            os.makedirs(fig_dir, exist_ok=True)
+        if save_dir is not None:
+            os.makedirs(save_dir, exist_ok=True)
         ## Cache data
         self.build_cache()
         ## Sampling function
@@ -74,14 +88,6 @@ class Particles(object):
     @property
     def rng_key(self):
         return self._rng_key
-
-    @property
-    def test_mode(self):
-        return self._test_mode
-
-    @test_mode.setter
-    def test_mode(self, mode):
-        self._test_mode = mode
 
     @property
     def weights(self):
@@ -125,12 +131,13 @@ class Particles(object):
             ), f"Not enough samples for {num_samples}."
             sub_ws = self._random_choice(self._sample_ws, num_samples, replacement=True)
             return Particles(
-                self._rng_key,
-                self._env_fn,
-                self._controller,
-                self._runner,
-                sub_ws,
-                test_mode=self._test_mode,
+                rng_key=self._rng_key,
+                env_fn=self._env_fn,
+                controller=self._controller,
+                runner=self._runner,
+                save_name=self._save_name,
+                sample_ws=sub_ws,
+                weight_params=self._weight_params,
                 env=self._env,
             )
 
@@ -180,18 +187,9 @@ class Particles(object):
         if self._env is None:
             self._env = self._env_fn()
         state = self._env.get_init_state(task)
-        if self._test_mode:
-            dummy_dict = concate_dict_by_keys(self.weights)
-            actions, feats, feats_sum, violations = (
-                None,
-                dummy_dict,
-                dummy_dict,
-                dummy_dict,
-            )
-        else:
-            actions, feats, feats_sum, violations = collect_trajs(
-                self.weights, state, self._controller, self._runner, desc=desc
-            )
+        actions, feats, feats_sum, violations = collect_trajs(
+            self.weights, state, self._controller, self._runner, desc=desc
+        )
         self._sample_actions[task_name] = actions
         self._sample_feats[task_name] = feats
         self._sample_feats_sum[task_name] = feats_sum
@@ -228,9 +226,6 @@ class Particles(object):
             * compute_features
 
         """
-        if self._test_mode:
-            return 0.0
-
         if self._env is None:
             self._env = self._env_fn()
         state = self._env.get_init_state(task)
@@ -255,9 +250,6 @@ class Particles(object):
             * compute_features
 
         """
-        if self._test_mode:
-            return 0.0
-
         if target is not None:
             target_w = target.weights[0]
 
@@ -296,12 +288,13 @@ class Particles(object):
         for key, value in self.concate_weights.items():
             new_concate_ws[key] = value[idxs]
         new_ps = Particles(
-            self._rng_key,
-            self._env_fn,
-            self._controller,
-            self._runner,
+            rng_key=self._rng_key,
+            env_fn=self._env_fn,
+            controller=self._controller,
+            runner=self._runner,
+            save_name=self._save_name,
             sample_concate_ws=new_concate_ws,
-            test_mode=self._test_mode,
+            weight_params=self._weight_params,
             env=self._env,
         )
         return new_ps
@@ -353,7 +346,7 @@ class Particles(object):
             #    print(f"Entropy {entropy:.3f}")
         return entropy
 
-    def map_estimate(self, num_map, bins, max_weights, method="histogram"):
+    def map_estimate(self, num_map, method="histogram"):
         """Find maximum a posteriori estimate from current samples.
 
         Note:
@@ -366,11 +359,16 @@ class Particles(object):
         data = onp.log(data[1:, :])
 
         if method == "histogram":
+            assert (
+                "bins" in self._weight_params and "max_weights" in self._weight_params
+            ), "Particle weight parameters not properly setup."
+            max_weights = self._weight_params["max_weights"]
+            bins = self._weight_params["bins"]
             ranges = (-max_weights, max_weights)
-            bins = onp.linspace(*ranges, bins)
+            m_bins = onp.linspace(*ranges, bins)
             probs = onp.zeros(data.shape[1])
             for row in data:
-                which_bins = onp.digitize(row, bins)
+                which_bins = onp.digitize(row, m_bins)
                 unique_vals, indices, counts = onp.unique(
                     which_bins, return_index=True, return_counts=True
                 )
@@ -381,11 +379,13 @@ class Particles(object):
             map_weights = [self.weights[idx] for idx in map_idxs]
             # MAP esimate usually used for evaluation; thread-safe to provide self._env
             map_particles = Particles(
-                self._rng_key,
-                self._env_fn,
-                self._controller,
-                self._runner,
+                rng_key=self._rng_key,
+                env_fn=self._env_fn,
+                controller=self._controller,
+                runner=self._runner,
+                save_name=self._save_name,
                 sample_ws=map_weights,
+                weight_params=self._weight_params,
                 env=self._env,
             )
             return map_particles
@@ -402,7 +402,6 @@ class Particles(object):
         thumbnail=False,
         desc=None,
         video=True,
-        params={},
     ):
         """ Look at top/mid/bottom * diagnose_N particles and their performance. Record videos.
 
@@ -444,9 +443,7 @@ class Particles(object):
             low_rews, low_acs = diff_rews[low_N_idx], actions[low_N_idx]
             mean_diff = diff_rews.mean()
 
-            map_particles = self.map_estimate(
-                diagnose_N, bins=params["HIST_BINS"], max_weights=params["MAX_WEIGHT"]
-            )
+            map_particles = self.map_estimate(diagnose_N)
             map_acs = np.array(map_particles.get_actions(task, task_name))
             map_rews, map_vios = map_particles.compare_with(task, task_name, target)
 
@@ -469,17 +466,19 @@ class Particles(object):
     def record(self, task, task_name, actions, filepath):
         pass
 
-    def visualize(self, path, true_w, obs_w, max_weights, bins):
+    def visualize(self, true_w, obs_w):
         """Visualize weight belief distribution in histogram.
 
         TODO:
             * Slow, takes ~5s for 1000 weight particles
 
         """
-        if self._test_mode:
-            return
+        assert self._fig_dir is not None, "Need to specify figure directory."
+        bins = self._weight_params["bins"]
+        max_weights = self._weight_params["max_weights"]
+
         num_map = 4  # Magic number for now
-        map_ws = self.map_estimate(num_map, max_weights=max_weights, bins=bins).weights
+        map_ws = self.map_estimate(num_map).weights
         map_ls = [str(i) for i in range(1, 1 + num_map)]
         # Visualize multiple map weights in magenta with ranking labels
         plot_weights(
@@ -487,13 +486,15 @@ class Particles(object):
             highlight_dicts=[true_w, obs_w] + map_ws,
             highlight_colors=["r", "k"] + ["m"] * num_map,
             highlight_labels=["l", "o"] + map_ls,
-            path=path + ".png",
+            path=f"{self._fig_dir}/{self._expanded_name}.png",
             title="Proxy Reward; true (red), obs (black) map (magenta)",
             max_weights=max_weights,
         )
 
-    def save(self, path):
+    def save(self):
         """Save weight belief particles as npz file."""
+        assert self._save_dir is not None, "Need to specify save directory."
+        path = f"{self._save_dir}/{self._expanded_name}.png"
         with open(path, "wb+") as f:
             np.savez(f, weights=self.weights)
 

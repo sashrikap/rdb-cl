@@ -3,15 +3,20 @@
 import numpy as onp
 import jax.numpy as np
 import jax
-import copy
+import copy, os
 import numpyro
 import numpyro.distributions as dist
+from rdb.visualize.plot import plot_weights_comparison
 from rdb.optim.utils import concate_dict_by_keys
-from numpyro.handlers import seed
 from scipy.stats import gaussian_kde
-from tqdm.auto import tqdm, trange
 from rdb.exps.utils import Profiler
+from tqdm.auto import tqdm, trange
+from numpyro.handlers import seed
 from functools import partial
+
+# ========================================================
+# ============== Dictionary Tools ========================
+# ========================================================
 
 
 def stack_dict_values(dicts, normalize=False):
@@ -52,6 +57,11 @@ def stack_dict_log_values(dicts):
         lists.append(onp.array(list(dict_.values())))
     output = onp.log(onp.stack(lists))
     return output
+
+
+# ========================================================
+# ============ Sampling & Numerical Tools ================
+# ========================================================
 
 
 def logsumexp(vs):
@@ -101,6 +111,11 @@ def random_uniform():
     return numpyro.sample("random", dist.Uniform(0, 1))
 
 
+# ========================================================
+# ================= Rollout Tools ========================
+# ========================================================
+
+
 def collect_trajs(list_ws, state, controller, runner, desc=None):
     """Utility for collecting features.
 
@@ -127,115 +142,36 @@ def collect_trajs(list_ws, state, controller, runner, desc=None):
     return actions, feats, feats_sum, violations
 
 
-# def build_prior_sample_fn(log_prior_dict):
-#     """Sample prior distribution.
-
-#     Args:
-#         log_prior_dict (dict): maps keyword -> log probability
-
-#     Note:
-#         * log_prior_dict is LOG VALUE
-#         * Need seed(fn, rng_key) to run
-
-#     """
-
-#     # @jax.jit
-#     def sample_fn():
-#         output = {}
-#         for key, dist_ in log_prior_dict.items():
-#             val = numpyro.sample(key, dist_)
-#             # print(f"key {key} val {val:.3f}")
-#             output[key] = np.exp(val)
-#         return output
-
-#     return sample_fn
+# ========================================================
+# ============== Visualization Tools =====================
+# ========================================================
 
 
-# def build_log_prob_fn(log_prior_dict):
-#     """Measure sample likelihood, based on prior.
+def visualize_chains(samples, accepts, num_plots, fig_dir, title):
+    """Visualize multiple MCMC chains to check convergence.
 
-#     Args:
-#         log_prior_dict (dict): maps keyword -> numpyro.dist
+    Args:
+        samples (ndim=2): array of samples
+        accepts (ndim=2, bool): array of acceptance
+        fig_dir (str): directory to save the figure
+        title (str): figure name, gets padded with plot index
 
-#     Input:
-#         sample_dict (dict): maps keyword -> value
-
-#     Note:
-#         * Sample dict is RAW VALUE
-#           log_prior_dict is LOG VALUE
-#         * Currently only supports uniform distribution
-
-#     """
-
-#     def check_log_range(sample_val, prior_dist):
-#         """Check the range of sample_val against prior dist.
-
-#             Note:
-#             * numpyro.dist does not handle range in a "quiet" way
-#               e.g. `dist.Uniform(0, 1).log_prob(10)` will not give 0.
-#             * Let's fix this
-
-#         """
-#         assert isinstance(
-#             prior_dist, dist.Uniform
-#         ), f"Type `{type(prior_dist)}` supported"
-#         log_val = np.log(sample_val)
-#         low = prior_dist.low
-#         high = prior_dist.high
-#         # print(f"prior log low {log_val < low} high {log_val > high} val {log_val}")
-#         return np.where(
-#             log_val < low or log_val > high, -np.inf, prior_dist.log_prob(log_val)
-#         )
-
-#     def log_prob_fn(sample_dict):
-#         log_prob = 0.0
-#         for key, dist_ in log_prior_dict.items():
-#             val = sample_dict[key]
-#             # log_val = np.log(val)
-#             # print(f"{key} log val {log_val:3f} check range {check_log_range(val, dist_):3f}")
-#             log_prob += check_log_range(val, dist_)
-#         # if log_prob < -100.:
-#         #     import pdb; pdb.set_trace()
-#         return log_prob
-
-#     return log_prob_fn
-
-
-# def build_gaussian_proposal(log_std_dict):
-#     """Propose next state given current state, based on Gaussian dist.
-
-#     Args:
-#         log_std_dict (dict): std of log(var)
-
-#     Note:
-#         * Need seed(fn, rng_key) to run
-
-#     """
-
-#     def gaussian_proposal(state):
-#         keys, vals = list(state.keys()), list(state.values())
-#         stds = list([log_std_dict[k] for k in keys])
-#         # next_vals = vf_sample_fn(np.array(stds), np.array(vals))
-#         next_vals = []
-#         for std, val in zip(stds, vals):
-#             log_val = np.log(val)
-#             next_log_val = numpyro.sample("next_log_val", dist.Normal(log_val, std))
-#             next_vals.append(np.exp(next_log_val))
-#         next_state = dict(zip(keys, next_vals))
-#         return next_state
-
-#     return gaussian_proposal
-
-
-# def build_normalizer_sampler(sample_fn, num):
-#     # @jax.jit
-#     def sampler():
-#         """Run sample function fixed number of times to generate samples.
-#         """
-#         samples = []
-#         for _ in range(num):
-#             # for _ in trange(num, desc="Normalizer weights"):
-#             samples.append(sample_fn())
-#         return samples
-
-#     return sampler
+    """
+    colors = ["b", "g", "r", "c", "m", "y", "k", "w"]
+    samples = onp.array(samples)
+    accepts = onp.array(accepts)
+    assert samples.shape[1] < len(colors), "Too many chains not enough colors"
+    num_samples = len(samples) // num_plots
+    os.makedirs(fig_dir, exist_ok=True)
+    for i in range(num_plots):
+        idxs = (num_samples * i, num_samples * (i + 1))
+        samples_i = samples[idxs[0] : idxs[1], :]
+        accepts_i = accepts[idxs[0] : idxs[1], :]
+        all_weights = []
+        all_colors = []
+        title_i = f"{title}_{i:02d}"
+        path = f"{fig_dir}/{title_i}.png"
+        for wi in range(samples.shape[1]):
+            all_weights.append(samples_i[accepts_i[:, wi]])
+            all_colors.append(colors[wi])
+        plot_weights_comparison(all_weights, all_colors, path=path, title=title_i)

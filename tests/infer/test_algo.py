@@ -63,7 +63,7 @@ class TestProposal(object):
         return self._proposal_fn(state)
 
 
-def atest_mh_single():
+def test_mh_single():
 
     prior = TestPrior()
 
