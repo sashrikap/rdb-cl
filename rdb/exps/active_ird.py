@@ -331,7 +331,7 @@ class ExperimentActiveIRD(object):
             {"violation": avg_violate, "perform": avg_perform}
         )
 
-    def _load_design(self):
+    def _load_design(self, compute_belief=True):
         """Load previous weight designs before experiment.
 
         In real applications, usually designers begin with a few (e.g. 5) environments
@@ -354,7 +354,7 @@ class ExperimentActiveIRD(object):
 
         """
         num_load, design_data = self._num_load_design, self._design_data
-        if num_load < 0:
+        if num_load <= 0:
             return
         assert (
             design_data["ENV_NAME"] == self._exp_params["ENV_NAME"]
@@ -384,16 +384,17 @@ class ExperimentActiveIRD(object):
 
         print(f"Loaded {len(load_designs)} prior designs.")
         ## Compute IRD Belief based on loaded data
-        belief = self._model.sample(
-            self._all_tasks[key],
-            self._all_task_names[key],
-            obs=self._all_obs[key],
-            save_name=f"weights_seed_{str(self._rng_key)}_prior_belief",
-        )
-        for i in range(num_load):
-            # Pack the same beliefs into belief history
-            assert len(self._all_beliefs[key]) == i
-            self._all_beliefs[key].append(belief)
+        if compute_belief:
+            belief = self._model.sample(
+                self._all_tasks[key],
+                self._all_task_names[key],
+                obs=self._all_obs[key],
+                save_name=f"weights_seed_{str(self._rng_key)}_prior_{num_load}",
+            )
+            for i in range(num_load):
+                # Pack the same beliefs into belief history
+                assert len(self._all_beliefs[key]) == i
+                self._all_beliefs[key].append(belief)
 
     def _load_cache(self, load_dir, load_eval=True):
         """Load previous experiment checkpoint.
@@ -597,6 +598,27 @@ class ExperimentActiveIRD(object):
                         thumbnail=True,
                         video=False,
                     )
+
+    def run_ird_mcmc(self):
+        """Study how many samples it needs for designer to converge.
+
+        Variables:
+            * num prior tasks
+
+        """
+        print(
+            f"\n============= Designer MCMC ({self._rng_key}): prior={self._num_load_design} ============="
+        )
+        self._log_time("Begin")
+        self._build_cache()
+        self._load_design(compute_belief=False)
+        belief = self._model.sample(
+            self._all_tasks[key],
+            self._all_task_names[key],
+            obs=self._all_obs[key],
+            save_name=f"weights_seed_{str(self._rng_key)}_prior_{num_load}",
+        )
+        self._log_time("End")
 
     def _plot_candidate_scores(self, itr, debug_dir=None):
         if debug_dir is None:

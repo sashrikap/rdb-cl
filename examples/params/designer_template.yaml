@@ -2,13 +2,19 @@ ENV_NAME: Week6_01-v1
 EXP_ITERATIONS: 8
 RANDOM_KEYS: [3]
 FIXED_TASK_SEED: 0
+EVALUATE: False
+NUM_EVAL_WORKERS: 1
+NUM_DESIGNER_CHAINS: 4
+
+# EVALUATE: True
+# NUM_EVAL_TASKS: 16
 
 ## MPC Specific
 HORIZON: 10
 
 ## Plotting & weight scaling
 ## Note: beta closely has to do with the scale of true_w
-MAX_WEIGHT: 20.0
+MAX_WEIGHT: 10.0
 HIST_BINS: 200
 # BETA: 2
 # DESIGNER_PROPOSAL_VAR: 1
@@ -30,20 +36,17 @@ EXP_NAME: "designer_informed_beta_16"
 # EXP_NAME: "designer_informed_beta_32"
 
 
-SAVE_NAME: "200126"
+SAVE_NAME: "200129"
 
-# ## Full Params
-NUM_DESIGNERS: 200
-# NUM_DESIGNERS: 50
-NUM_WARMUPS: 200
+## Full Params
+NUM_DESIGNERS: 400
+NUM_WARMUPS: 50
 PARALLEL: true
 NUM_ITERATIONS: 8
-NUM_EVAL_WORKERS: 16
-# NUM_EVAL_TASKS: 10
 NUM_EVAL_TASKS: 16384
 
 
-## Test Params
+# ## Test Params
 # NUM_DESIGNERS: 20
 # NUM_WARMUPS: 20
 # PARALLEL: true

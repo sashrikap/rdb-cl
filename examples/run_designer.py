@@ -54,7 +54,11 @@ def main():
 
     _env = env_fn()
     _controller, _runner = controller_fn(_env)
-    _truth = Particles(None, env_fn, _controller, _runner, [TRUE_W])
+    _truth = Particles(
+        None, env_fn, _controller, _runner, save_name="noname", sample_ws=[TRUE_W]
+    )
+    weight_params = {"bins": HIST_BINS, "max_weights": MAX_WEIGHT}
+    SAVE_ROOT = data_dir() if not GCP_MODE else "/gcp_output"
 
     designer = Designer(
         rng_key=None,
@@ -66,7 +70,14 @@ def main():
         prior=prior,
         proposal=proposal,
         normalized_key=NORMALIZED_KEY,
-        sampler_args={"num_warmups": NUM_WARMUPS, "num_samples": NUM_DESIGNERS},
+        save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
+        exp_name=f"{EXP_NAME}",
+        weight_params=weight_params,
+        sampler_args={
+            "num_warmups": NUM_WARMUPS,
+            "num_samples": NUM_DESIGNERS,
+            "num_chains": NUM_DESIGNER_CHAINS,
+        },
         use_true_w=False,
     )
     if FIXED_TASK_SEED is not None:
@@ -74,7 +85,6 @@ def main():
     else:
         fixed_task_seed = None
 
-    SAVE_ROOT = data_dir() if not GCP_MODE else "/gcp_output"
     experiment = ExperimentDesignerPrior(
         rng_key=None,
         designer=designer,
@@ -88,7 +98,7 @@ def main():
         key = random.PRNGKey(ki)
         experiment.update_key(key)
         for itr in range(NUM_ITERATIONS):
-            experiment.run(TASK, num_prior_tasks=itr)
+            experiment.run(TASK, num_prior_tasks=itr, evaluate=EVALUATE)
 
 
 if __name__ == "__main__":

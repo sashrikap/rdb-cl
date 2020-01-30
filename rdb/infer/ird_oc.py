@@ -370,6 +370,12 @@ class IRDOptimalControl(PGM):
             """
             log_probs = []
             # Iterate over list of previous tasks
+            assert (
+                len(norm_feats_sums)
+                == len(user_feats_sums)
+                == len(all_init_states)
+                == len(all_user_acs)
+            )
             for n_feats_sum, u_feats_sum, init_state, user_acs in zip(
                 norm_feats_sums, user_feats_sums, all_init_states, all_user_acs
             ):
@@ -377,7 +383,7 @@ class IRDOptimalControl(PGM):
                     assert len(val) == 1, "Only can take 1 user sample"
                 sample_costs = multiply_dict_by_keys(sample_w, u_feats_sum)
                 ## Numerator
-                sample_rew = -beta * np.sum(list(sample_costs.values()))
+                sample_rew = -beta * onp.sum(list(sample_costs.values()))
 
                 ## Estimating Normalizing constant
                 if mode == "max_norm":
@@ -395,8 +401,8 @@ class IRDOptimalControl(PGM):
                 elif mode == "sample":
                     # Use weight samples of approximate normalizer
                     normal_costs = multiply_dict_by_keys(sample_w, n_feats_sum)
-                    normal_rews = -beta * np.sum(list(normal_costs.values()), axis=0)
-                    sum_normal_rew = -np.log(len(normal_rews)) + logsumexp(normal_rews)
+                    normal_rews = -beta * onp.sum(list(normal_costs.values()), axis=0)
+                    sum_normal_rew = -onp.log(len(normal_rews)) + logsumexp(normal_rews)
 
                 elif mode == "hybrid":
                     # Use both max trajectory and weight samples to approximate normalizer
@@ -411,8 +417,8 @@ class IRDOptimalControl(PGM):
                         n_feats_sum, sample_info["feats_sum"]
                     )
                     normal_costs = multiply_dict_by_keys(sample_w, n_feats_sum)
-                    normal_rews = -beta * np.sum(list(normal_costs.values()), axis=0)
-                    sum_normal_rew = -np.log(len(normal_rews)) + logsumexp(normal_rews)
+                    normal_rews = -beta * onp.sum(list(normal_costs.values()), axis=0)
+                    sum_normal_rew = -onp.log(len(normal_rews)) + logsumexp(normal_rews)
                 else:
                     raise NotImplementedError
 
@@ -433,7 +439,7 @@ class IRDOptimalControl(PGM):
             else:
                 probs = []
                 for uw, sw in zip(user_ws, sample_w):
-                    probs.append(likelihood_fn(us, sw, **kwargs))
+                    probs.append(likelihood_fn(uw, sw, **kwargs))
                 return onp.array(probs)
 
         return _kernel
@@ -488,15 +494,14 @@ class Designer(PGM):
         self._prior = prior
         self._kernel = self._build_kernel(beta)
         # Cache
-        self._task_samples = {}
         super().__init__(rng_key, self._kernel, proposal, sample_method, sampler_args)
         self._save_root = save_root
         self._exp_name = exp_name
         self._save_dir = f"{save_root}/{exp_name}"
+        self._weight_params = weight_params
         # Designer Prior
         self._random_choice = None
         self._prior_tasks = []
-        self._weight_params = weight_params
         self._num_prior_tasks = num_prior_tasks
 
     def _get_chain_viz(self, save_name, num_plots=5):
@@ -506,7 +511,12 @@ class Designer(PGM):
         def fn(samples, accepts):
             fig_dir = f"{self._save_dir}/mcmc"
             visualize_chains(
-                samples, accepts, num_plots=num_plots, fig_dir=fig_dir, title=save_name
+                samples,
+                accepts,
+                num_plots=num_plots,
+                fig_dir=fig_dir,
+                title=save_name,
+                **self._weight_params,
             )
 
         return fn
@@ -534,31 +544,29 @@ class Designer(PGM):
             save_name (save_name): name for saving parameters and visualizations
 
         """
-        if task_name not in self._task_samples.keys():
-            print(f"Sampling Designer (prior={len(self._prior_tasks)}): {save_name}")
-            if self._use_true_w:
-                sample_ws = [self._true_w]
-            else:
-                sample_ws = self._sampler.sample(
-                    self._true_w,
-                    task=task,
-                    chain_viz=self._get_chain_viz(save_name=save_name),
-                    name=save_name,
-                )
-            samples = Particles(
-                rng_key=self._rng_key,
-                env_fn=self._env_fn,
-                controller=self._controller,
-                runner=self._runner,
-                weight_params=self._weight_params,
-                sample_ws=sample_ws,
-                save_name=save_name,
-                fig_dir=f"{self._save_dir}/plots",
-                save_dir=f"{self._save_dir}/save",
-                env=self._env,
+        print(f"Sampling Designer (prior={len(self._prior_tasks)}): {save_name}")
+        if self._use_true_w:
+            sample_ws = [self._true_w]
+        else:
+            sample_ws = self._sampler.sample(
+                self._true_w,
+                task=task,
+                chain_viz=self._get_chain_viz(save_name=save_name),
+                name=save_name,
             )
-            self._task_samples[task_name] = samples
-        return self._task_samples[task_name]
+        samples = Particles(
+            rng_key=self._rng_key,
+            env_fn=self._env_fn,
+            controller=self._controller,
+            runner=self._runner,
+            weight_params=self._weight_params,
+            sample_ws=sample_ws,
+            save_name=save_name,
+            fig_dir=f"{self._save_dir}/plots",
+            save_dir=f"{self._save_dir}/save",
+            env=self._env,
+        )
+        return samples
 
     def simulate(self, task, task_name, save_name):
         """Give 1 sample
@@ -587,6 +595,7 @@ class Designer(PGM):
     def prior_tasks(self, tasks):
         """ Modifies Underlying Designer Prior. Use very carefully."""
         self._prior_tasks = tasks
+        self._num_prior_tasks = len(tasks)
 
     @property
     def true_w(self):
@@ -611,7 +620,11 @@ class Designer(PGM):
     def _build_kernel(self, beta):
         def likelihood_fn(true_w, sample_w, task):
             assert self._prior_tasks is not None, "Need >=0 prior tasks."
-            all_tasks = self._prior_tasks + [task]
+            if self._num_prior_tasks == 0:
+                all_tasks = onp.array([task])
+            else:
+                all_tasks = onp.concatenate([self._prior_tasks, [task]])
+            assert len(all_tasks) == self._num_prior_tasks + 1
             log_prob = 0.0
             for task_i in all_tasks:
                 state = self.env.get_init_state(task)

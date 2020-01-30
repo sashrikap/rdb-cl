@@ -35,7 +35,7 @@ class ExperimentDesignerPrior(object):
         designer,
         eval_server,
         num_eval_tasks,
-        save_dir,
+        save_root,
         exp_name,
         fixed_task_seed=None,
     ):
@@ -49,8 +49,9 @@ class ExperimentDesignerPrior(object):
         self._random_task_choice = None
         self._fixed_task_seed = fixed_task_seed
         # For checkpointing
-        self._save_dir = save_dir
+        self._save_root = save_root
         self._exp_name = exp_name
+        self._save_dir = f"{save_root}/{exp_name}"
 
     def update_key(self, rng_key):
         self._rng_key = rng_key
@@ -61,7 +62,7 @@ class ExperimentDesignerPrior(object):
         else:
             self._random_task_choice = self._random_choice
 
-    def run(self, task, num_prior_tasks):
+    def run(self, task, num_prior_tasks, evaluate=True):
         """Simulate designer on `task`. Varying the number of latent
         tasks as prior
         """
@@ -82,23 +83,30 @@ class ExperimentDesignerPrior(object):
         )
         all_names = [f"eval_{task}" for task in all_tasks]
 
-        ## Simulate & Evaluate
+        ## Simulate
         task_name = f"designer_{task}"
-        obs = self._designer.simulate(task, task_name)
-        self._eval_server.compute_tasks(obs, all_tasks, all_names, verbose=True)
-        truth = self._designer.truth
-        self._eval_server.compute_tasks(truth, all_tasks, all_names, verbose=True)
+        obs = self._designer.simulate(
+            task,
+            task_name,
+            save_name=f"designer_seed_{str(self._rng_key)}_prior_{num_prior_tasks}",
+        )
 
-        ## Visualize performance
-        all_diff_rews = []
-        for task_, name_ in zip(all_tasks, all_names):
-            diff_rews, _ = obs.compare_with(task_, name_, truth)
-            all_diff_rews.append(diff_rews[0])
-        plot_dir = f"{self._save_dir}/{self._exp_name}/plots"
-        os.makedirs(plot_dir, exist_ok=True)
-        fig_path = f"{plot_dir}/designer_seed_{str(self._rng_key)}"
-        fig_suffix = f"_prior_{num_prior_tasks:02d}"
-        obs.visualize_tasks(fig_path, fig_suffix, all_names, all_diff_rews)
+        if evaluate:
+            ## Evaluate
+            self._eval_server.compute_tasks(obs, all_tasks, all_names, verbose=True)
+            truth = self._designer.truth
+            self._eval_server.compute_tasks(truth, all_tasks, all_names, verbose=True)
+
+            ## Visualize performance
+            all_diff_rews = []
+            for task_, name_ in zip(all_tasks, all_names):
+                diff_rews, _ = obs.compare_with(task_, name_, truth)
+                all_diff_rews.append(diff_rews[0])
+            plot_dir = f"{self._save_dir}/plots"
+            os.makedirs(plot_dir, exist_ok=True)
+            fig_path = f"{plot_dir}/designer_seed_{str(self._rng_key)}"
+            fig_suffix = f"_prior_{num_prior_tasks:02d}"
+            obs.visualize_tasks(fig_path, fig_suffix, all_names, all_diff_rews)
 
         ## Reset designer prior tasks
         self._designer.prior_tasks = all_tasks

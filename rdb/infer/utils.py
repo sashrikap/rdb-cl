@@ -147,7 +147,7 @@ def collect_trajs(list_ws, state, controller, runner, desc=None):
 # ========================================================
 
 
-def visualize_chains(samples, accepts, num_plots, fig_dir, title):
+def visualize_chains(samples, accepts, num_plots, fig_dir, title, **kwargs):
     """Visualize multiple MCMC chains to check convergence.
 
     Args:
@@ -164,14 +164,16 @@ def visualize_chains(samples, accepts, num_plots, fig_dir, title):
     num_samples = len(samples) // num_plots
     os.makedirs(fig_dir, exist_ok=True)
     for i in range(num_plots):
-        idxs = (num_samples * i, num_samples * (i + 1))
-        samples_i = samples[idxs[0] : idxs[1], :]
-        accepts_i = accepts[idxs[0] : idxs[1], :]
+        samples_i = samples[0 : num_samples * (i + 1), :]
+        accepts_i = accepts[0 : num_samples * (i + 1), :]
         all_weights = []
         all_colors = []
-        title_i = f"{title}_{i:02d}"
+        ratio = accepts_i[:, 0].sum() / accepts[:, 0].sum()
+        title_i = f"{title}_accept_{100 * ratio:06.2f}%"
         path = f"{fig_dir}/{title_i}.png"
         for wi in range(samples.shape[1]):
             all_weights.append(samples_i[accepts_i[:, wi], wi])
             all_colors.append(colors[wi])
-        plot_weights_comparison(all_weights, all_colors, path=path, title=title_i)
+        plot_weights_comparison(
+            all_weights, all_colors, path=path, title=title_i, **kwargs
+        )
