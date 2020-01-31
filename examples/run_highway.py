@@ -11,12 +11,12 @@ from rdb.optim.runner import Runner
 from rdb.visualize.render import render_env
 from rdb.visualize.preprocess import normalize_features
 
-DUMMY_ACTION = True
+DUMMY_ACTION = False
 DRAW_HEAT = False
 # DRAW_HEAT = False
 REPLAN = False
 # BENCHMARK = 100
-BENCHMARK = -1
+BENCHMARK = 50
 MAKE_MP4 = False
 # ENV_NAME = "Week3_02-v0"  # Highway
 # TASK = (0.2, -0.7)

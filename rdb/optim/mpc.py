@@ -10,7 +10,7 @@ Optional TODO:
 
 """
 
-from scipy.optimize import fmin_l_bfgs_b
+from scipy.optimize import minimize
 from functools import partial
 from time import time
 from rdb.optim.runner import Runner
@@ -18,21 +18,25 @@ from rdb.exps.utils import Profiler
 from rdb.optim.utils import *
 from jax.lax import fori_loop, scan
 from jax.ops import index_update
+from jax.config import config
 import jax
 import jax.numpy as np
 import jax.random as random
 import numpy as onp
 
 key = random.PRNGKey(0)
+config.update("jax_enable_x64", True)
 
 """
 Utility functions for rollout
 """
 
 
-def to_numpy(arr):
-    """ f(x) = onp.array(x) """
-    return onp.array(arr).astype(onp.float64)
+def numpy_fn(fn):
+    def _fn(*args):
+        return onp.array(fn(*args))
+
+    return _fn
 
 
 def build_forward(f_dyn, xdim, udim, dt):
@@ -219,14 +223,16 @@ class Optimizer(object):
             for t in range(self._T):
                 csum_u_x0 = lambda u: self.h_csum_u(x_t, u, weights)
                 grad_u_x0 = lambda u: self.h_grad_u(x_t, u, weights)
-                opt_u_t, cmin_t, info_t = fmin_l_bfgs_b(csum_u_x0, us0, grad_u_x0)
+                res = minimize(csum_u_x0, us0, method="L-BFGS-B", jac=grad_u_x0)
                 if not self._compiled:
                     self._compiled = True
                     print(f"First pass compile time {time() - t_start:.3f}")
-                opt_u_t = np.reshape(opt_u_t, (-1, self._udim))
+                opt_u_t = np.reshape(res["x"], (-1, self._udim))
+                cmin_t = res["fun"]
+                grad_u_t = res["jac"]
                 opt_u.append(opt_u_t[0])
                 xs_t = self.h_traj_u(x_t, opt_u_t)
-                du.append(info_t["grad"][0])
+                du.append(grad_u_t[0])
                 ## Forward 1 timestep, record 1st action
                 xs.append(x_t)
                 x_t = xs_t[1]
@@ -242,16 +248,14 @@ class Optimizer(object):
             # Runime cost function weights
             csum_u_x0 = lambda u: self.h_csum_u(x0, u, weights)
             grad_u_x0 = lambda u: self.h_grad_u(x0, u, weights)
-            opt_u, cmin, info = fmin_l_bfgs_b(csum_u_x0, us0, grad_u_x0)
+            res = minimize(csum_u_x0, us0, method="L-BFGS-B", jac=grad_u_x0)
+            opt_u = res["x"]
+            cmin = res["fun"]
+            grad = res["jac"]
             opt_u = np.reshape(opt_u, (-1, self._udim))
             xs = self.h_traj_u(x0, opt_u)
             costs = self.h_csum_u(x0, opt_u, weights)
-            u_info = {
-                "du": info["grad"],
-                "xs": xs,
-                "cost_fn": csum_u_x0,
-                "costs": costs,
-            }
+            u_info = {"du": grad, "xs": xs, "cost_fn": csum_u_x0, "costs": costs}
             if not self._compiled:
                 self._compiled = True
                 print(f"First pass compile time {time() - t_start:.3f}")
@@ -290,9 +294,10 @@ def shooting_method(env, f_cost, horizon, dt, replan=True, T=None):
     """Forward/cost/grad functions for Horizon, used in optimizer"""
     h_csum = jax.jit(lambda x0, us, weights: np.sum(h_costs(x0, us, weights)))
     h_grad = jax.jit(jax.grad(h_csum, argnums=(0, 1)))
+    h_grad_u = lambda x0, us, weights: h_grad(x0, us, weights)[1]
 
-    h_traj_u = lambda x0, us: to_numpy(h_forward(x0, us))
-    h_grad_u = lambda x0, us, weights: to_numpy(h_grad(x0, us, weights)[1])
+    h_traj_u = numpy_fn(h_forward)
+    h_grad_u = numpy_fn(h_grad_u)
     h_csum_u = lambda x0, us, weights: float(h_csum(x0, us, weights))
     h_costs_u = lambda x0, us, weights: h_costs(x0, us, weights)
 
@@ -307,7 +312,7 @@ def shooting_method(env, f_cost, horizon, dt, replan=True, T=None):
         t_costs = build_costs(roll_forward=t_forward, f_cost=f_cost, udim=udim)
         t_costs_u = lambda x0, us, weights: t_costs(x0, us, weights)
     t_csum = lambda x0, us, weights: np.sum(t_costs(x0, us, weights))
-    t_traj_u = lambda x0, us: to_numpy(t_forward(x0, us))
+    t_traj_u = numpy_fn(t_forward)
     t_csum_u = lambda x0, us, weights: float(t_csum(x0, us, weights))
     t_feats_u = build_features(roll_forward=t_forward, f_feat=f_feat, udim=udim)
 
