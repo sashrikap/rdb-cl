@@ -10,8 +10,8 @@ from rdb.exps.utils import load_params, examples_dir, data_dir
 from rdb.exps.active_ird import ExperimentActiveIRD
 from rdb.distrib.particles import ParticleServer
 from rdb.infer.ird_oc import IRDOptimalControl
-from rdb.optim.mpc import shooting_method
 from os.path import join, expanduser
+from rdb.optim.mpc import build_mpc
 from functools import partial
 from rdb.infer import *
 from jax import random
@@ -56,7 +56,7 @@ def run_interactive(active_fn_name, random_keys=None, load_design=-1, evaluate=F
         return env
 
     def controller_fn(env):
-        controller, runner = shooting_method(
+        controller, runner = build_mpc(
             env, env.main_car.cost_runtime, p.HORIZON, env.dt, replan=False
         )
         return controller, runner

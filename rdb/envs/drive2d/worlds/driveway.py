@@ -92,7 +92,7 @@ class EntranceDriveWorld(DriveWorld):
 
             def fence_dist_fn(state, actions, fence=fence, normal=normal):
                 main_pos = state[..., np.arange(*main_idx)]
-                return feature.dist_inside_fence(fence.center, normal, main_pos)
+                return feature.dist_inside_fence(main_pos, fence.center, normal)
                 # return feature.diff_to_fence(fence.center, normal, main_pos)
 
             fence_fns[f_i] = fence_dist_fn

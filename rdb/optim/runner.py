@@ -4,12 +4,12 @@ import time
 import numpy as np
 from imageio import imsave
 from functools import partial
+from rdb.optim.utils import *
 from scipy.misc import imresize
 from os.path import join, dirname
 from collections import OrderedDict
-from rdb.visualize.render import forward_env, render_env
-from rdb.optim.utils import *
 from rdb.exps.utils import Profiler
+from rdb.visualize.render import forward_env, render_env
 
 """
 Forward environments and collect trajectorys

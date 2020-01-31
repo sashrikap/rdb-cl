@@ -13,7 +13,7 @@ import numpy as onp
 import pyglet
 from rdb.envs.drive2d.core.car import centered_image
 from rdb.envs.drive2d.core.lane import StraightLane
-from rdb.envs.drive2d.core.dynamics import identity_dynamics_fn
+from rdb.envs.drive2d.core.dynamics import build_identity_dynamics
 from pyglet import gl, graphics
 
 
@@ -33,7 +33,7 @@ class Object(object):
         self._sprite = None
         self._scale = scale
         self._opacity = opacity
-        self.dynamics_fn = identity_dynamics_fn()
+        self.dynamics_fn = build_identity_dynamics()
 
     @property
     def name(self):

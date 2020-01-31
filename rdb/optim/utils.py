@@ -1,22 +1,25 @@
-"""
-==================================================
-================ Dictionary Tools ================
-==================================================
+"""Utility functions for optimization.
+
+Includes:
+    * Dictionary tools
+        - zero_fill_dict
+    * Functional tools
+
 """
 
+
+import numpy as onp
 import jax.numpy as np
 import functools, itertools
-import numpy as onp
 from collections import OrderedDict
 from functools import partial, reduce
 from toolz.functoolz import juxt
 from operator import mul, add
 
-"""
-==================================================
-================ Dictionary Tools ================
-==================================================
-"""
+
+# ==================================================
+# ================ Dictionary Tools ================
+# ==================================================
 
 
 def zero_fill_dict(dict_, keys):
@@ -173,25 +176,11 @@ def sum_funcs(funcs):
     return compose(add_op, juxt(funcs))
 
 
-# def weigh_funcs(funcs_dict, weights_dict):
-#     """Weigh multiple functions by predefined weights.
+def numpy_fn(fn):
+    def _fn(*args):
+        return onp.array(fn(*args))
 
-#     Functions & weights are organized by dict.
-
-#     Note:
-#         * MUST ensure that `funcs_dict` and `weights_dict` contain matching
-#         keys, e.g. when users' weights omit certain features
-
-#     """
-#     fns = []
-#     funcs_keys, weights_keys = list(funcs_dict.keys()), list(weights_dict.keys())
-#     assert len(funcs_keys) == len(
-#         weights_keys
-#     ), "Must keep funcs and weights the same length"
-#     for key in funcs_keys:
-#         fns.append(compose(partial(mul, weights_dict[key]), funcs_dict[key]))
-#     add_op = partial(reduce, add)
-#     return compose(add_op, juxt(fns))
+    return _fn
 
 
 def weigh_funcs_runtime(funcs_dict):

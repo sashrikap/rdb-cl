@@ -4,8 +4,8 @@ import jax.numpy as np
 import rdb.envs.drive2d
 
 from rdb.optim.runner import Runner
+from rdb.optim.mpc import build_mpc
 from rdb.visualize.render import render_env
-from rdb.optim.mpc import shooting_method
 from rdb.visualize.preprocess import normalize_features
 
 DRAW_HEAT = False
@@ -20,9 +20,7 @@ T = 30
 main_car = env.main_car
 
 if not DUMMY_ACTION:
-    optimizer, runner = shooting_method(
-        env, main_car.cost_runtime, horizon, env.dt, T=T
-    )
+    optimizer, runner = build_mpc(env, main_car.cost_runtime, horizon, env.dt, T=T)
 
     weights = {
         "dist_cars": 1.0,

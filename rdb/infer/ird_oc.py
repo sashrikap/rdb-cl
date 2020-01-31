@@ -1,11 +1,11 @@
 """Inverse Reward Design Module for Optimal Control.
 
 Includes:
-    [1] General PGM inference API
-    [2] Reward Design with Divide and Conquer
-    [3] Different ways (max_norm/sample/hybrid) to approximate IRD normalizer
-    [4] Designer Class
-    [5] Informed Designer with prior tasks, see `rdb/exps/designer_prior.py`
+[1] General PGM inference API
+[2] Reward Design with Divide and Conquer
+[3] Different ways (max_norm/sample/hybrid) to approximate IRD normalizer
+[4] Designer Class
+[5] Informed Designer with prior tasks, see `rdb/exps/designer_prior.py`
 
 Note:
     * We use `init_state/task` interchangably. In drive2d

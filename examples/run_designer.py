@@ -7,9 +7,9 @@ Note:
 
 from rdb.exps.designer_prior import ExperimentDesignerPrior
 from rdb.distrib.particles import ParticleServer
-from rdb.infer.ird_oc import Designer
-from rdb.optim.mpc import shooting_method
 from rdb.infer.particles import Particles
+from rdb.infer.ird_oc import Designer
+from rdb.optim.mpc import build_mpc
 from rdb.exps.utils import *
 from functools import partial
 from rdb.infer import *
@@ -28,7 +28,7 @@ def main():
         return env
 
     def controller_fn(env):
-        controller, runner = shooting_method(
+        controller, runner = build_mpc(
             env, env.main_car.cost_runtime, HORIZON, env.dt, replan=False
         )
         return controller, runner

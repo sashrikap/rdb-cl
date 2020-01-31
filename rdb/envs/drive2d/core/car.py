@@ -32,7 +32,7 @@ class Car(object):
         """
         self.env = env
         self.horizon = horizon
-        self.dynamics_fn = car_dynamics_fn(friction)
+        self.dynamics_fn = build_car_dynamics(friction)
         self._init_state = init_state
         self._state = init_state
         self._sprite = None
@@ -69,6 +69,11 @@ class Car(object):
         raise NotImplementedError
 
     def render(self, opacity=255):
+        """Render function.
+
+        Use ordinary numpy to save time.
+
+        """
         if self._sprite is None:
             self._sprite = car_sprite(self.color)
         self._sprite.x, self._sprite.y = self.state[0], self.state[1]
@@ -83,7 +88,7 @@ class FixSpeedCar(Car):
         self.env = env
         super().__init__(env, init_state, horizon, color)
         self.fix_speed = fix_speed
-        self.dynamics_fn = fixspeed_dynamics_fn(fix_speed)
+        self.dynamics_fn = build_fixspeed_dynamics(fix_speed)
 
     def control(self, dt):
         self._state += self.dynamics_fn(self._state, None) * dt

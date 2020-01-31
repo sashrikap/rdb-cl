@@ -5,9 +5,9 @@ import numpy as onp
 import rdb.envs.drive2d
 
 from tqdm import tqdm
-from rdb.infer.utils import collect_trajs
-from rdb.optim.mpc import shooting_method
+from rdb.optim.mpc import build_mpc
 from rdb.optim.runner import Runner
+from rdb.infer.utils import collect_trajs
 from rdb.visualize.render import render_env
 from rdb.visualize.preprocess import normalize_features
 
@@ -60,7 +60,7 @@ print(f"Task {TASK}")
 if not DUMMY_ACTION:
     if not REPLAN:
         T = horizon
-    optimizer, runner = shooting_method(
+    optimizer, runner = build_mpc(
         env, main_car.cost_runtime, horizon, env.dt, replan=REPLAN, T=T
     )
     state = copy.deepcopy(env.state)

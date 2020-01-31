@@ -1,4 +1,5 @@
-"""
+"""Lane object.
+
 TODO:
 [1] run by batch dist2
 """
@@ -14,13 +15,13 @@ class StraightLane(object):
 
     Utility functions for optimization
 
-    Note
+    Note:
     * Straight lane defined by
-      Forward
+         Forward
       |     |     |
       +pt1  |     +pt2
       |     |     |
-      Backward
+         Backward
 
     """
 
@@ -34,13 +35,20 @@ class StraightLane(object):
         self.normal = np.array([-self.forward[1], self.forward[0]])
 
     def shifted(self, num):
-        """ Shift in normal direction by num lanes """
+        """Shift in normal direction by num lanes.
+        """
+
         shift = self.normal * self.width * num
         pt1 = self.pt1 + shift
         pt2 = self.pt2 + shift
         return StraightLane(pt1, pt2, self.width)
 
     def render(self):
+        """Render function.
+
+        Use ordinary numpy to save time.
+
+        """
         gl.glColor3f(0.4, 0.4, 0.4)
         W = 1000
         normal, forward = self.normal, self.forward
