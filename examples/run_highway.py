@@ -1,13 +1,14 @@
 import gym
-import time, copy
+import copy
 import jax.numpy as np
 import numpy as onp
 import rdb.envs.drive2d
 
+from time import time, sleep
 from tqdm import tqdm
 from rdb.optim.mpc import build_mpc
 from rdb.optim.runner import Runner
-from rdb.infer.utils import collect_trajs
+from rdb.infer import *
 from rdb.visualize.render import render_env
 from rdb.visualize.preprocess import normalize_features
 
@@ -16,7 +17,7 @@ DRAW_HEAT = False
 # DRAW_HEAT = False
 REPLAN = False
 # BENCHMARK = 100
-BENCHMARK = 50
+BENCHMARK = -1
 MAKE_MP4 = False
 # ENV_NAME = "Week3_02-v0"  # Highway
 # TASK = (0.2, -0.7)
@@ -64,60 +65,72 @@ if not DUMMY_ACTION:
         env, main_car.cost_runtime, horizon, env.dt, replan=REPLAN, T=T
     )
     state = copy.deepcopy(env.state)
-    t1 = time.time()
-    actions = optimizer(state, weights=weights)
-    max_acs = onp.linalg.norm(actions, axis=1)
-    print(f"Max action norm {max(max_acs):.3f}")
-    traj, cost, info = runner(state, actions, weights=weights)
-    # trajs = collect_trajs([weights], state, optimizer, runner)
+    t1 = time()
+    actions = optimizer(state, weights=weights, batch=False)
+    traj, cost, info = runner(state, actions, weights=weights, batch=False)
     if BENCHMARK > 0:
-        t_compile = time.time() - t1
+        t_compile = time() - t1
         print(f"Compile time {t_compile:.3f}")
         print(f"Total cost {cost}")
         for k, v in info["violations"].items():
             print(f"Violations {k}: {v.sum()}")
         for k, v in info["feats_sum"].items():
-            print(f"Feats sum {k}: {v:.3f}")
+            print(f"Feats sum {k}: {v.sum():.3f}")
 
         N = BENCHMARK
-        t1 = time.time()
+        t1 = time()
         for _ in tqdm(range(N), total=N):
             env.reset()
-            acs_ = optimizer(state, weights=weights)
-            # runner(env.state, acs_, weights=weights)
-        t_opt = time.time() - t1
+            acs_ = optimizer(state, weights=weights, batch=False)
+        t_opt = time() - t1
         print(f"Optimizer fps {N/t_opt:.3f}")
 
-        t1 = time.time()
+        t1 = time()
         for _ in tqdm(range(N), total=N):
             env.reset()
-            runner(state, acs_, weights=weights)
-        t_run = time.time() - t1
+            runner(state, acs_, weights=weights, batch=False)
+        t_run = time() - t1
         print(f"Runner fps {N/t_run:.3f}")
 
-        print("Changing weights")
-        t1 = time.time()
+        t1 = time()
         for _ in tqdm(range(N), total=N):
             env.reset()
             for key in weights.keys():
                 weights[key] = onp.random.random()
-            acs_ = optimizer(state, weights=weights)
-            # runner(env.state, acs_, weights=weights)
-        t_opt = time.time() - t1
-        print(f"Optimizer fps {N/t_opt:.3f}")
+            acs_ = optimizer(state, weights=weights, batch=False)
+        t_opt = time() - t1
+        print(f"Optimizer (Changing weights) fps {N/t_opt:.3f}")
 
-        t1 = time.time()
+        t1 = time()
         for _ in tqdm(range(N), total=N):
             env.reset()
             for key in weights.keys():
                 weights[key] = onp.random.random()
-            runner(state, acs_, weights=weights)
-        t_run = time.time() - t1
-        print(f"Runner fps {N/t_run:.3f}")
+            runner(state, acs_, weights=weights, batch=False)
+        t_run = time() - t1
+        print(f"Runner (Changing weights) fps {N/t_run:.3f}")
 
-
+        optimizer2, runner2 = build_mpc(
+            env, main_car.cost_runtime, horizon, env.dt, replan=REPLAN, T=T
+        )
+        all_weights = []
+        for _ in range(N):
+            all_weights.append(weights)
+        ws = Weights(all_weights)
+        # re-compile once
+        state_N = state.repeat(N, axis=0)
+        acs = optimizer2(state_N, weights=ws)
+        runner2(state_N, acs, weights=ws)
+        t1 = time()
+        acs = optimizer2(state_N, weights=ws)
+        t_opt = time() - t1
+        print(f"Optimizer (batch) fps {N/t_opt:.3f}")
+        t1 = time()
+        runner2(state_N, acs, weights=ws)
+        t_run = time() - t1
+        print(f"Runner (batch) fps {N/t_run:.3f}")
 else:
-    actions = np.zeros((T, env.udim))
+    actions = np.zeros((T, 1, env.udim))
 
 
 env.reset()
@@ -126,7 +139,7 @@ env.render("human", draw_heat=DRAW_HEAT, weights=weights)
 for t in range(T):
     env.step(actions[t])
     env.render("human", draw_heat=DRAW_HEAT, weights=weights)
-    time.sleep(0.2)
+    sleep(0.2)
 
 
 if MAKE_MP4:

@@ -3,3 +3,4 @@ from rdb.infer.prior import *
 from rdb.infer.proposal import *
 from rdb.infer.utils import *
 from rdb.infer.algos import *
+from rdb.infer.weights import *

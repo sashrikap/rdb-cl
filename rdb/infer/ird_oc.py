@@ -390,9 +390,7 @@ class IRDOptimalControl(PGM):
                     # Use max trajectory to replace normalizer
                     # Important to initialize from observation actions
                     assert n_feats_sum is None
-                    sample_acs = self._controller(
-                        init_state, us0=user_acs, weights=sample_w
-                    )
+                    sample_acs = self._controller(init_state, sample_w, us0=user_acs)
                     _, sample_costs, info = self._runner(
                         init_state, sample_acs, weights=sample_w
                     )
@@ -406,9 +404,7 @@ class IRDOptimalControl(PGM):
 
                 elif mode == "hybrid":
                     # Use both max trajectory and weight samples to approximate normalizer
-                    sample_acs = self._controller(
-                        init_state, us0=user_acs, weights=sample_w
-                    )
+                    sample_acs = self._controller(init_state, sample_w, us0=user_acs)
                     _, sample_cost, sample_info = self._runner(
                         init_state, sample_acs, weights=sample_w
                     )
@@ -628,7 +624,7 @@ class Designer(PGM):
             log_prob = 0.0
             for task_i in all_tasks:
                 state = self.env.get_init_state(task)
-                actions = self._controller(state, weights=sample_w)
+                actions = self._controller(state, sample_w)
                 _, cost, info = self._runner(state, actions, weights=true_w)
                 rew = -1 * cost
                 log_prob += beta * rew
@@ -729,7 +725,7 @@ class DesignerInteractive(Designer):
                 user_in_w = normalize_weights(user_in_w, self._normalized_key)
                 self._user_inputs.append(user_in_w)
                 # Visualize trajectory
-                acs = self._controller(init_state, weights=user_in_w)
+                acs = self._controller(init_state, user_in_w)
                 num_weights = len(self._user_inputs)
                 video_path = f"{self._save_dir}/key_{self._rng_key}_user_trial_{num_weights}_task_{str(task)}.mp4"
                 print("Received Weights")

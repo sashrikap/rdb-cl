@@ -221,11 +221,18 @@ def weigh_funcs_runtime(funcs_dict):
     funcs_keys = list(funcs_dict.keys())
 
     def func(*args, weights):
+        """
+        Args:
+            weights (ndarray): Weights.numpy_array, (weights_dim, nbatch)
+
+        """
         assert isinstance(weights, list) or isinstance(weights, np.ndarray)
         assert len(funcs_list) == len(weights)
         output = 0.0
         for fn, w in zip(funcs_list, weights):
-            output += w * fn(*args)
+            val = fn(*args)
+            assert w.shape == val.shape, "Weight shape mismatches value shape"
+            output += w * val
         return output
 
     return func

@@ -3,11 +3,11 @@
 from rdb.envs.drive2d.core.dynamics import *
 from rdb.envs.drive2d.core import feature
 from rdb.optim.utils import *
+from rdb.infer import *
+import itertools
 import numpy as onp
+import pytest
 
-batch = 10
-xcar = np.array([0, 0, np.pi / 2, 0]).tile((batch, 1))
-ucar = np.array([0, 1]).tile((batch, 1))
 
 features_keys = ["dist_cars", "dist_lanes", "speed", "control", "control_thrust"]
 
@@ -93,18 +93,22 @@ def build_cost(nlr_dict):
     return cost_runtime
 
 
-def test_combined_full():
-    n_cars = 4
+@pytest.mark.parametrize("batch,n_cars", list(itertools.product([1, 2, 10], [2, 4, 5])))
+def test_combined_full(batch, n_cars):
     dyn_fn = build_dynamics(n_cars)
+    xcar = np.array([0, 0, np.pi / 2, 0]).tile((batch, 1))
+    ucar = np.array([0, 1]).tile((batch, 1))
     xn = xcar.repeat(n_cars, axis=1)
     out = dyn_fn(xn, ucar)
     assert out.shape == (batch, 4 * n_cars + 3)
 
 
-def test_raw_features_full():
-    n_cars = 4
+@pytest.mark.parametrize("batch,n_cars", list(itertools.product([1, 2, 10], [2, 4, 5])))
+def test_raw_features_full(batch, n_cars):
     dyn_fn = build_dynamics(n_cars)
     feats_dict, feats_fn = build_features(dyn_fn, n_cars)
+    xcar = np.array([0, 0, np.pi / 2, 0]).tile((batch, 1))
+    ucar = np.array([0, 1]).tile((batch, 1))
     xn = xcar.repeat(n_cars, axis=1)
     out = feats_fn(xn, ucar)
     for key, val in out.items():
@@ -112,11 +116,13 @@ def test_raw_features_full():
         assert len(val.shape) == 2
 
 
-def test_nonlinear_features_full():
-    n_cars = 4
+@pytest.mark.parametrize("batch,n_cars", list(itertools.product([1, 2, 10], [2, 4, 5])))
+def test_nonlinear_features_full(batch, n_cars):
     dyn_fn = build_dynamics(n_cars)
     feats_dict, feats_fn = build_features(dyn_fn, n_cars)
     nlr_dict, nlr_fn = build_nonlinear(feats_dict, n_cars)
+    xcar = np.array([0, 0, np.pi / 2, 0]).tile((batch, 1))
+    ucar = np.array([0, 1]).tile((batch, 1))
     xn = xcar.repeat(n_cars, axis=1)
     out = nlr_fn(xn, ucar)
     for key, val in out.items():
@@ -124,17 +130,20 @@ def test_nonlinear_features_full():
         assert len(val.shape) == 1
 
 
-def test_nonlinear_featrues_cost():
-    n_cars = 4
+@pytest.mark.parametrize("batch,n_cars", list(itertools.product([1, 2, 10], [2, 4, 5])))
+def test_nonlinear_featrues_cost(batch, n_cars):
     dyn_fn = build_dynamics(n_cars)
     feats_dict, feats_fn = build_features(dyn_fn, n_cars)
     nlr_dict, nlr_fn = build_nonlinear(feats_dict, n_cars)
+    xcar = np.array([0, 0, np.pi / 2, 0]).tile((batch, 1))
+    ucar = np.array([0, 1]).tile((batch, 1))
     xn = xcar.repeat(n_cars, axis=1)
     out_dict = nlr_fn(xn, ucar)
     weights = {}
     for key in out_dict.keys():
-        weights[key] = onp.random.random()
+        weights[key] = onp.random.random(batch)
+    weights_arr = Weights(weights).prepare(features_keys).numpy_array()
     cost_fn = build_cost(nlr_dict)
-    out = cost_fn(xn, ucar, weights=prepare_weights(weights, features_keys))
+    out = cost_fn(xn, ucar, weights=weights_arr)
     assert out.shape[0] == batch
     assert len(out.shape) == 1

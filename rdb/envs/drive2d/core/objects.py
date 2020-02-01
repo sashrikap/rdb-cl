@@ -27,13 +27,32 @@ def object_sprite(name, scale=1.0):
 
 
 class Object(object):
+    """Object class
+
+    Properties:
+        state: (nbatch, udim), by default nbatch = 1
+    """
+
     def __init__(self, state, name, scale=1.0, opacity=255):
         self._name = name
-        self._state = state
+        if len(state.shape) == 1:
+            self._state = state[None, :]
+        else:
+            self._state = state
         self._sprite = None
         self._scale = scale
         self._opacity = opacity
-        self.dynamics_fn = build_identity_dynamics()
+        self._xdim = 2
+        self._udim = 2
+        self.dynamics_fn = build_identity_dynamics(self._xdim, self._udim)
+
+    @property
+    def xdim(self):
+        return self._xdim
+
+    @property
+    def udim(self):
+        return self._udim
 
     @property
     def name(self):
@@ -45,6 +64,7 @@ class Object(object):
 
     @state.setter
     def state(self, s):
+        assert len(s.shape) == 2
         self._state = s
 
     def render(self):
@@ -52,11 +72,11 @@ class Object(object):
             self._sprite = object_sprite(self.name, self._scale)
         # self._sprite.x = self.state[1]
         # self._sprite.y = self.state[0]
-        self._sprite.x = self.state[0]
-        self._sprite.y = self.state[1]
+        self._sprite.x = self.state[0, 0]
+        self._sprite.y = self.state[0, 1]
         rotation = 0.0
         if len(self.state) >= 3:
-            rotation = self.state[2]
+            rotation = self.state[0, 2]
         self._sprite.rotation = rotation
         self._sprite.opacity = self._opacity
         self._sprite.draw()

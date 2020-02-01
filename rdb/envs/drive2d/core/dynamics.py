@@ -19,11 +19,8 @@ import jax.numpy as np
 import jax
 import abc
 
-XDIM = 4
-UDIM = 2
 
-
-def build_car_dynamics(friction):
+def build_car_dynamics(friction, xdim=4, udim=2):
     """Forward Dynamics.
 
     Example:
@@ -41,8 +38,8 @@ def build_car_dynamics(friction):
 
     @jax.jit
     def delta_x(x, u):
-        assert len(x.shape) == 2 and x.shape[1] == XDIM
-        assert len(u.shape) == 2 and u.shape[1] == UDIM
+        assert len(x.shape) == 2 and x.shape[1] == xdim
+        assert len(u.shape) == 2 and u.shape[1] == udim
         dx = np.stack(
             [
                 x[:, 3] * np.cos(x[:, 2]),
@@ -57,7 +54,7 @@ def build_car_dynamics(friction):
     return delta_x
 
 
-def build_speed_dynamics():
+def build_speed_dynamics(xdim=4, udim=2):
     """Speed control dynamics.
 
     Example:
@@ -74,8 +71,8 @@ def build_speed_dynamics():
 
     @jax.jit
     def delta_x(x, u):
-        assert len(x.shape) == 2 and x.shape[1] == XDIM
-        assert len(u.shape) == 2 and u.shape[1] == UDIM
+        assert len(x.shape) == 2 and x.shape[1] == xdim
+        assert len(u.shape) == 2 and u.shape[1] == udim
         diff_u = u - x[:, 2:]
         dx = np.concatenate([u, diff_u], axis=1)
         return dx
@@ -83,7 +80,7 @@ def build_speed_dynamics():
     return delta_x
 
 
-def build_identity_dynamics():
+def build_identity_dynamics(xdim=4, udim=2):
     """Idle dynamics.
 
     Args:
@@ -94,15 +91,15 @@ def build_identity_dynamics():
 
     @jax.jit
     def delta_x(x, u):
-        assert len(x.shape) == 2 and x.shape[1] == XDIM
-        assert len(u.shape) == 2 and u.shape[1] == UDIM
+        assert len(x.shape) == 2 and x.shape[1] == xdim
+        assert len(u.shape) == 2 and u.shape[1] == udim
         dx = np.zeros_like(x)
         return dx
 
     return delta_x
 
 
-def build_fixspeed_dynamics(speed):
+def build_fixspeed_dynamics(speed, xdim=4, udim=2):
     """Moving at fixed speed forward.
 
     Args:
@@ -112,10 +109,10 @@ def build_fixspeed_dynamics(speed):
 
     """
 
-    # @jax.jit
+    @jax.jit
     def delta_x(x, u):
-        assert len(x.shape) == 2 and x.shape[1] == XDIM
-        assert len(u.shape) == 2 and u.shape[1] == UDIM
+        assert len(x.shape) == 2 and x.shape[1] == xdim
+        assert len(u.shape) == 2 and u.shape[1] == udim
 
         diff_x = speed * np.stack([np.cos(x[:, 2]), np.sin(x[:, 2])], axis=1)
         diff_u = np.zeros_like(diff_x)

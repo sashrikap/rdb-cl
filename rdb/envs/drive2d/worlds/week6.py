@@ -109,52 +109,49 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
 
         """
         nlr_feats_dict = OrderedDict()
-        sum_keep = partial(np.sum, keepdims=True)
+        # Sum across state (nbatch, state)
+        sum_state = partial(np.sum, axis=1)
         # Gaussian
+        ncars = len(self._cars)
+        car_sigma = np.array([self._car_width / 2, self._car_length]).repeat(ncars)
         nlr_feats_dict["dist_cars"] = compose(
-            np.sum,
-            partial(
-                feature.gaussian_feat,
-                sigma=np.array([self._car_width / 2, self._car_length]),
-            ),
+            sum_state, partial(feature.gaussian_feat, sigma=car_sigma)
         )
         # Gaussian
         nlr_feats_dict["dist_lanes"] = compose(
-            np.sum,
+            sum_state,
             feature.neg_feat,
             partial(feature.gaussian_feat, sigma=self._car_length),
             partial(feature.index_feat, index=self._goal_lane),
         )
         nlr_feats_dict["dist_fences"] = compose(
-            np.sum,
+            sum_state,
             # feature.quadratic_feat,
             # feature.neg_relu_feat,
             feature.relu_feat,
             lambda dist: dist + (self._lane_width + self._car_length) / 2,
         )
+        nobjs = len(self._objects)
+        obj_sigma = np.array([self._car_width / 2, self._car_length * 2]).repeat(nobjs)
         nlr_feats_dict["dist_objects"] = compose(
-            np.sum,
-            partial(
-                feature.gaussian_feat,
-                sigma=np.array([self._car_width / 2, self._car_length * 2]),
-            ),
+            partial(np.sum, axis=1), partial(feature.gaussian_feat, sigma=obj_sigma)
         )
         bound = self._control_bound
-        nlr_feats_dict["control"] = compose(np.sum, feature.quadratic_feat)
-        nlr_feats_dict["control_thrust"] = compose(np.sum, feature.quadratic_feat)
-        nlr_feats_dict["control_brake"] = compose(np.sum, feature.quadratic_feat)
-        nlr_feats_dict["control_turn"] = compose(np.sum, feature.quadratic_feat)
+        nlr_feats_dict["control"] = compose(sum_state, feature.quadratic_feat)
+        nlr_feats_dict["control_thrust"] = compose(sum_state, feature.quadratic_feat)
+        nlr_feats_dict["control_brake"] = compose(sum_state, feature.quadratic_feat)
+        nlr_feats_dict["control_turn"] = compose(sum_state, feature.quadratic_feat)
 
         nlr_feats_dict["speed"] = compose(
-            np.sum, partial(feature.quadratic_feat, goal=self._goal_speed)
+            sum_state, partial(feature.quadratic_feat, goal=self._goal_speed)
         )
         nlr_feats_dict["speed_over"] = compose(
-            np.sum,
+            sum_state,
             feature.quadratic_feat,
             partial(feature.more_than, y=self._goal_speed),
         )
         nlr_feats_dict["speed_under"] = compose(
-            np.sum,
+            sum_state,
             feature.quadratic_feat,
             partial(feature.less_than, y=self._goal_speed),
         )

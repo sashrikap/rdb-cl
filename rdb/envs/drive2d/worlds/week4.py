@@ -56,11 +56,10 @@ class EntranceDriveWorld_Week4(EntranceDriveWorld):
         nlr_feats_dict = OrderedDict()
         sum_keep = partial(np.sum, keepdims=True)
         # Gaussian
+        ncars = len(self._cars)
+        car_sigma = np.array([self._car_width / 2, self._car_length]).repeat(ncars)
         nlr_feats_dict["dist_cars"] = compose(
-            np.sum,
-            partial(
-                gaussian_feat, sigma=np.array([self._car_width / 2, self._car_length])
-            ),
+            np.sum, partial(gaussian_feat, sigma=car_sigma)
         )
         # Gaussian
         nlr_feats_dict["dist_lanes"] = compose(

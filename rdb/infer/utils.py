@@ -59,6 +59,21 @@ def stack_dict_log_values(dicts):
     return output
 
 
+def select_from_dict(dict_, idx):
+    """
+    """
+    output = {}
+    for key, val in dict_.items():
+        assert len(val) > idx
+        output[key] = val[idx]
+    return output
+
+
+def random_choice_from_dict(dict_, random_choice_fn, num_samples, replacement=True):
+    """
+    """
+
+
 # ========================================================
 # ============ Sampling & Numerical Tools ================
 # ========================================================

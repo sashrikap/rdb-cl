@@ -119,38 +119,47 @@ class DriveWorld(gym.Env):
 
     @property
     def state(self):
+        """Current state
+
+        Output:
+            out (ndarray): (1, xdim)
+
+        """
         cars = self._cars + [self.main_car]
         state = []
         for car in cars:
             state.append(car.state)
         for obj in self._objects:
             state.append(obj.state)
-        return np.concatenate(state)
+        state = np.concatenate(state, axis=1)
+        return state
 
     @state.setter
     def state(self, state):
         cars = self._cars + [self.main_car]
         last_idx = 0
         for car in cars:
-            car.state = state[last_idx : last_idx + len(car.state)]
-            last_idx += len(car.state)
+            car.state = state[:, last_idx : last_idx + car.xdim]
+            last_idx += car.xdim
         for obj in self._objects:
-            obj.state = state[last_idx : last_idx + len(obj.state)]
-            last_idx += len(obj.state)
+            obj.state = state[:, last_idx : last_idx + obj.xdim]
+            last_idx += obj.xdim
 
     def set_task(self, state):
         raise NotImplementedError
 
     def set_init_state(self, state):
         """Set initial state."""
+        if len(state.shape) == 1:
+            state = state[None, :]
         cars = self._cars + [self.main_car]
         last_idx = 0
         for car in cars:
-            car.init_state = state[last_idx : last_idx + len(car.state)]
-            last_idx += len(car.state)
+            car.init_state = state[:, last_idx : last_idx + car.xdim]
+            last_idx += car.xdim
         for obj in self._objects:
-            obj.state = state[last_idx : last_idx + len(obj.state)]
-            last_idx += len(obj.state)
+            obj.state = state[:, last_idx : last_idx + obj.xdim]
+            last_idx += obj.xdim
         self.state = state
 
     @property
@@ -425,6 +434,9 @@ class DriveWorld(gym.Env):
         weights=None,
     ):
         assert mode in ["human", "state_pixels", "rgb_array"]
+        if len(self.state) > 1:
+            print("WARNING: rendering with batch mode")
+
         if self._window is None:
             caption = f"{self.__class__}"
             try:
@@ -505,8 +517,8 @@ class DriveWorld(gym.Env):
         )
 
     def center_camera(self, main_car):
-        center_x = main_car.state[0]
-        center_y = main_car.state[1]
+        center_x = main_car.state[0, 0]
+        center_y = main_car.state[0, 1]
         gl.glOrtho(
             center_x - 1.0 / self._magnify,
             center_x + 1.0 / self._magnify,
@@ -545,7 +557,7 @@ class DriveWorld(gym.Env):
                 anchor_y="top",
                 multiline=True,
             )
-        speed = self._main_car.state[3] * self._speed_factor
+        speed = self._main_car.state[0, 3] * self._speed_factor
         self._label.text = f"Speed: {speed:.2f} mph"
         if text is not None:
             self._label.text += "\n" + text
@@ -592,7 +604,7 @@ class DriveWorld(gym.Env):
         self._heat_fn = val
 
     def draw_heatmap(self):
-        center = self.main_car.state[:2]
+        center = self.main_car.state[0, :2]
         c0 = center - onp.array([1.0, 1.0]) / self._magnify
         c1 = center + onp.array([1.0, 1.0]) / self._magnify
 

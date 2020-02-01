@@ -96,7 +96,7 @@ class EntranceDriveWorld(DriveWorld):
                 # return feature.diff_to_fence(fence.center, normal, main_pos)
 
             fence_fns[f_i] = fence_dist_fn
-        feats_dict["dist_fences"] = concat_funcs(fence_fns, axis=0)
+        feats_dict["dist_fences"] = concat_funcs(fence_fns, axis=1)
         feats_dict["dist_fences"] = jax.jit(feats_dict["dist_fences"])
 
         # Entrance driveway distance feature

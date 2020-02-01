@@ -13,7 +13,7 @@ Optional TODO:
 from time import time
 from functools import partial
 from rdb.optim.utils import *
-from rdb.optim.optimizers import *
+from rdb.optim.optimizer import *
 from rdb.optim.runner import Runner
 from rdb.exps.utils import Profiler
 from jax.lax import fori_loop, scan
@@ -33,51 +33,76 @@ config.update("jax_enable_x64", True)
 # =====================================================
 
 
-def build_forward(f_dyn, xdim, udim, dt):
+def build_forward(f_dyn, xdim, udim, horizon, dt):
     """Rollout environment, given initial x and array of u.
 
     Args:
-        xu (ndarray): concatenate([x, us])
         f_dyn (fn): one step forward function, `x_next = f_dyn(x, u)`
         udim (int): action dimension
+
+    Note:
+        * udim, horizon, dt cannot be changed later
 
     """
 
     @jax.jit
     def roll_forward(x, us):
+        """Forward trajectory.
+
+        Args:
+            x (ndarray): (nbatch, xdim,)
+            us (ndarray): (horizon, nbatch, xdim)
+
+        Output:
+            xs (ndarray): (horizon, nbatch, xdim)
+
+        """
         # Omitting last x
         # (TODO): scipy.optimize implicitly flattens array
-        us = np.reshape(us, (-1, udim))
+        us = np.reshape(us, (horizon, -1, udim))
 
         def step(curr_x, u):
             next_x = curr_x + f_dyn(curr_x, u) * dt
             return next_x, curr_x
 
         last_x, xs = scan(step, x, us)
+        # curr_x = x
+        # for step in range(horizon):
+        #     next_x = curr_x + f_dyn(curr_x, u[step]) * dt
+
         return xs
 
     return roll_forward
 
 
-def build_costs(udim, roll_forward, f_cost):
+def build_costs(udim, horizon, roll_forward, f_cost):
     """Compute cost given start state & actions.
 
     Args:
-        x (ndarray)
-        us (ndarray)
         roll_forward (fn): full trajectory forward function, `roll_forward(x, us, length)`
         f_cost (fn): one step cost function, `f_cost(x, us, weights)`
 
     Note:
-        * IMPORTANT: roll_forward is jitted with `length, udim, dt` arguments
+        * udim, horizon, dt cannot be changed later
 
     """
 
     @jax.jit
     def roll_costs(x, us, weights):
+        """Calculate trajectory costs
+
+        Args:
+            x (ndarray): (nbatch, xdim,)
+            us (ndarray): (horizon, nbatch, xdim)
+            weights (ndarray): (weight_dim, nbatch)
+
+        Output:
+            cost (ndarray): (nbatch, 1)
+
+        """
         vf_cost = jax.vmap(partial(f_cost, weights=weights))
         # (TODO): scipy.optimize implicitly flattens array
-        us = np.reshape(us, (-1, udim))
+        us = np.reshape(us, (horizon, -1, udim))
         xs = roll_forward(x, us)
         costs = vf_cost(xs, us)
         return np.array(costs)
@@ -85,7 +110,7 @@ def build_costs(udim, roll_forward, f_cost):
     return roll_costs
 
 
-def build_features(udim, roll_forward, f_feat):
+def build_features(udim, horizon, roll_forward, f_feat):
     """Collect trajectory features
 
     Args:
@@ -95,7 +120,7 @@ def build_features(udim, roll_forward, f_feat):
         f_feat (fn): one step feature function `feats = f_feat(x, u)`
 
     Note:
-        * IMPORTANT: roll_forward is jitted with `length, udim, dt` arguments
+        * udim, horizon cannot be changed later
 
     Output:
         feats (dict): `feat_key[dist_car] = array(T, feat_dim)`
@@ -105,7 +130,7 @@ def build_features(udim, roll_forward, f_feat):
     @jax.jit
     def roll_features(x, us):
         # (TODO): scipy.optimize implicitly flattens array
-        us = np.reshape(us, (-1, udim))
+        us = np.reshape(us, (horizon, -1, udim))
         xs = roll_forward(x, us)
         feats = []
         vf_feat = jax.vmap(f_feat)
@@ -121,8 +146,8 @@ def build_mpc(env, f_cost, horizon, dt, replan=True, T=None):
     Args:
         env (object): has `env.dynamics_fn`
         f_cost (fn): 1 step cost function
-                    `f_cost(state, act)`, use pre-specified weight
-                    `f_cost(state, act, weight)`, use weight at runtime
+            `f_cost(state, act)`, use pre-specified weight
+            `f_cost(state, act, weight)`, use weight at runtime
         horizon (int): planning horizon
         dt (float): timestep size
         replan (bool): bool, plan once or replan at every step
@@ -141,8 +166,8 @@ def build_mpc(env, f_cost, horizon, dt, replan=True, T=None):
     if T is None:
         T = horizon
 
-    h_forward = build_forward(f_dyn=f_dyn, xdim=xdim, udim=udim, dt=dt)
-    h_costs = build_costs(roll_forward=h_forward, f_cost=f_cost, udim=udim)
+    h_forward = build_forward(f_dyn, xdim, udim, horizon, dt)
+    h_costs = build_costs(udim, horizon, h_forward, f_cost)
 
     """Forward/cost/grad functions for Horizon, used in optimizer"""
     h_csum = jax.jit(lambda x0, us, weights: np.sum(h_costs(x0, us, weights)))
@@ -161,13 +186,13 @@ def build_mpc(env, f_cost, horizon, dt, replan=True, T=None):
         t_costs = h_costs
         t_costs_u = h_costs_u
     else:
-        t_forward = build_forward(f_dyn=f_dyn, xdim=xdim, udim=udim, dt=dt)
-        t_costs = build_costs(roll_forward=t_forward, f_cost=f_cost, udim=udim)
+        t_forward = build_forward(f_dyn, xdim, udim, horizon, dt)
+        t_costs = build_costs(udim, horizon, t_forward, f_cost)
         t_costs_u = lambda x0, us, weights: t_costs(x0, us, weights)
     t_csum = lambda x0, us, weights: np.sum(t_costs(x0, us, weights))
     t_traj_u = numpy_fn(t_forward)
     t_csum_u = lambda x0, us, weights: float(t_csum(x0, us, weights))
-    t_feats_u = build_features(roll_forward=t_forward, f_feat=f_feat, udim=udim)
+    t_feats_u = build_features(udim, horizon, t_forward, f_feat)
 
     optimizer = Optimizer(
         h_traj_u=h_traj_u,

@@ -22,11 +22,11 @@ def build_offtrack(env):
     """Detects when main_car nudges the edge of the track.
 
     Args:
-        states (ndarray): (T, xdim)
-        actions (ndarray): (T, udim)
+        states (ndarray): (T, nbatch, xdim)
+        actions (ndarray): (T, nbatch, udim)
 
     Return:
-        * offtrack (ndarray): (T, ) boolean
+        * offtrack (ndarray): (nbatch, T) boolean
 
     Note:
         * Needs to know car shape a-priori
@@ -38,9 +38,10 @@ def build_offtrack(env):
 
     @jax.jit
     def func(states, actions):
-        states, actions = make_batch(states), make_batch(actions)
+        assert len(states.shape) == 3
+        assert len(actions.shape) == 3
         feats = vfn(states, actions)
-        return np.any(np.abs(feats) < threshold, axis=1)
+        return np.any(np.abs(feats) < threshold, axis=2).swapaxes(0, 1)
 
     return func
 
@@ -49,26 +50,26 @@ def build_collision(env):
     """Detects when main_car nudges another car.
 
     Args:
-        states (ndarray): (T, xdim)
-        actions (ndarray): (T, udim)
+        states (ndarray): (T, nbatch, xdim)
+        actions (ndarray): (T, nbatch, udim)
 
     Return:
-        * collision (ndarray): (T, ) boolean
+        * collision (ndarray): (nbatch, T) boolean
 
     Note:
         * Needs to know car shape a-priori
 
     """
-    num_cars = len(env.cars)
-    threshold = np.array([env.car_width, env.car_length])
+    ncars = len(env.cars)
+    threshold = np.array([env.car_width, env.car_length]).repeat(ncars)
     vfn = jax.vmap(env.raw_features_dict["dist_cars"])
 
     @jax.jit
     def func(states, actions):
-        states, actions = make_batch(states), make_batch(actions)
+        assert len(states.shape) == 3
+        assert len(actions.shape) == 3
         feats = vfn(states, actions)
-        per_car = np.all(np.abs(feats) < threshold, axis=-1)
-        return np.any(per_car, axis=1)
+        return np.any(np.abs(feats) < threshold, axis=2).swapaxes(0, 1)
 
     return func
 
@@ -77,69 +78,69 @@ def build_uncomfortable(env, max_actions):
     """Detects if actions exceed max actions.
 
     Args:
-        states (ndarray): (T, xdim)
-        actions (ndarray): (T, udim)
+        states (ndarray): (T, nbatch, xdim)
+        actions (ndarray): (T, nbatch, udim)
 
     Return:
-        * uncomfortable (ndarray): (T, ) boolean
+        * uncomfortable (ndarray): (nbatch, T) boolean
 
     """
 
     @jax.jit
     def func(states, actions):
-        actions = make_batch(actions)
-        return np.any(np.abs(actions) > max_actions, axis=1)
+        assert len(states.shape) == 3
+        assert len(actions.shape) == 3
+        return np.any(np.abs(actions) > max_actions, axis=2).swapaxes(0, 1)
 
     return func
 
 
-# @jax.jit
 def build_overspeed(env, max_speed):
     """Detects when main_car runs overspeed.
 
     Args:
-        states (ndarray): (T, xdim)
-        actions (ndarray): (T, udim)
+        states (ndarray): (T, nbatch, xdim)
+        actions (ndarray): (T, nbatch, udim)
 
     Return:
-        * overspeed (ndarray): (T, ) boolean
+        * overspeed (ndarray): (nbatch, T) boolean
 
     """
     vfn = jax.vmap(env.raw_features_dict["speed"])
 
     @jax.jit
     def func(states, actions):
-        states, actions = make_batch(states), make_batch(actions)
+        assert len(states.shape) == 3
+        assert len(actions.shape) == 3
         feats = vfn(states, actions)
-        return np.any(feats > max_speed, axis=1)
+        return np.any(feats > max_speed, axis=2).swapaxes(0, 1)
 
     return func
 
 
-# @jax.jit
 def build_underspeed(env, min_speed):
     """Detects when main_car runs underspeed.
 
     Args:
-        states (ndarray): (T, xdim)
-        actions (ndarray): (T, udim)
+        states (ndarray): (T, nbatch, xdim)
+        actions (ndarray): (T, nbatch, udim)
 
     Return:
-        * underspeed (ndarray): (T, ) boolean
+        * underspeed (ndarray): (nbatch, T) boolean
 
     """
     vfn = jax.vmap(env.raw_features_dict["speed"])
 
     @jax.jit
     def func(states, actions):
-        states, actions = make_batch(states), make_batch(actions)
+        assert len(states.shape) == 3
+        assert len(actions.shape) == 3
         feats = vfn(states, actions)
-        return np.any(feats < min_speed, axis=1)
+        return np.any(feats < min_speed, axis=2).swapaxes(0, 1)
 
     return func
 
 
-# @jax.jit
 def build_wronglane(env, lane_idx):
     """Detects when main_car (center) runs onto different lane.
 
@@ -147,40 +148,53 @@ def build_wronglane(env, lane_idx):
         * Needs to know lane shapes a-priori
 
     Args:
-        states (ndarray): (T, xdim)
-        actions (ndarray): (T, udim)
+        states (ndarray): (T, nbatch, xdim)
+        actions (ndarray): (T, nbatch, udim)
         lane_idx (tuple): wrong lane's index for `env.lanes[idx]`
 
     Return:
-        * wronglane (ndarray): (T, ) boolean
+        * wronglane (ndarray): (nbatch, T) boolean
 
     """
     vfn = jax.vmap(env.raw_features_dict["dist_lanes"])
 
     @jax.jit
     def func(states, actions):
-        states, actions = make_batch(states), make_batch(actions)
+        assert len(states.shape) == 3
+        assert len(actions.shape) == 3
         feats = vfn(states, actions)
-        return feats[:, lane_idx] < env.lane_width / 2
+        return np.any(feats[:, lane_idx, None] < env.lane_width / 2, axis=2).swapaxes(
+            0, 1
+        )
 
     return func
 
 
 def build_overtake(env, car_idx):
     """Detects when main_car overtakes the car_idx-th car.
+
+    Args:
+        states (ndarray): (T, nbatch, xdim)
+        actions (ndarray): (T, nbatch, udim)
+        lane_idx (tuple): wrong lane's index for `env.lanes[idx]`
+
+    Return:
+        * overtake (ndarray): (nbatch, T) boolean
+
     """
     main_y_idx = 9
     car_y_idx = 4 * car_idx + 1
 
     def overtake_fn(state, actions):
-        return state[main_y_idx] > state[car_y_idx]
+        return state[:, main_y_idx, None] > state[:, car_y_idx, None]
 
     vfn = jax.vmap(overtake_fn)
 
     @jax.jit
     def func(states, actions):
-        states, actions = make_batch(states), make_batch(actions)
+        assert len(states.shape) == 3
+        assert len(actions.shape) == 3
         feats = vfn(states, actions)
-        return feats
+        return np.any(feats, axis=2).swapaxes(0, 1)
 
     return func

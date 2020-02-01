@@ -249,12 +249,13 @@ def more_than(x, y):
     """Compute x - y if more, or 0 if less.
 
     Args:
-        x (ndarray): batched 2D state, (nbatch, 4) or (nbatch, 2)
-        y (ndarray): target, (nbatch, 4), (nbatch, 2), (2,) or (4,)
+        x (ndarray): batched 2D state, (nbatch, dim)
+        y : target, float, (nbatch, dim) or (dim,)
 
     """
     assert len(x.shape) == 2
-    assert y.shape[-1] == x.shape[1]
+    y = np.array(y)
+    assert len(y.shape) == 0 or y.shape[-1] == x.shape[1]
     return np.maximum(x - y, 0)
 
 
@@ -263,12 +264,13 @@ def less_than(x, y):
     """Compute y - x if less, or 0 if more.
 
     Args:
-        x (ndarray): batched 2D state, (nbatch, 4) or (nbatch, 2)
-        y (ndarray): target, (nbatch, 4), (nbatch, 2), (2,) or (4,)
+        x (ndarray): batched 2D state, (nbatch, dim)
+        y (ndarray): target, float, (nbatch, dim) or (dim,)
 
     """
     assert len(x.shape) == 2
-    assert y.shape[-1] == x.shape[1]
+    y = np.array(y)
+    assert len(y.shape) == 0 or y.shape[-1] == x.shape[1]
     return np.maximum(y - x, 0)
 
 
@@ -425,15 +427,15 @@ def gaussian_feat(data, sigma=None, mu=0.0):
     # Make sigma diagonalized vector
     dim = data.shape[1]
     if sigma is None:
-        sigma = np.eye(dim)
+        sigma_arr = np.eye(dim)
     else:
-        sigma = np.array(sigma)
+        sigma_arr = np.array(sigma)
         assert (
-            len(sigma.shape) == 0
-            or len(sigma.shape) == 1
-            and sigma.shape[0] == data.shape[1]
+            len(sigma_arr.shape) == 0
+            or len(sigma_arr.shape) == 1
+            and sigma_arr.shape[0] == data.shape[1]
         )
-        sigma = np.atleast_1d(sigma) ** 2
+        sigma_arr = np.atleast_1d(sigma_arr) ** 2
 
     # Number of data points
     num = data.shape[0]
@@ -441,8 +443,8 @@ def gaussian_feat(data, sigma=None, mu=0.0):
     diff = data - mu
 
     def dim_i_gaussian(diff_i):
-        exp = np.exp(-0.5 * diff_i @ np.diag(1 / sigma) @ diff_i.T)
-        gaus = exp / (np.sqrt((2 * np.pi) ** dim * np.prod(sigma)))
+        exp = np.exp(-0.5 * diff_i @ np.diag(1 / sigma_arr) @ diff_i.T)
+        gaus = exp / (np.sqrt((2 * np.pi) ** dim * np.prod(sigma_arr)))
         gaus = np.sum(gaus)
         return gaus
 

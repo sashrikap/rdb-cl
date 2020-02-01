@@ -1,32 +1,28 @@
 from jax import random
 from rdb.infer import *
+import numpy as onp
+import pytest
 
 
-def test_1_chain():
+@pytest.mark.parametrize("num", [1, 2, 3, 4])
+def test_chain(num):
     key = random.PRNGKey(1)
     prior = LogUniformPrior(
         rng_key=None, normalized_key="a", feature_keys=["a", "b"], log_max=5
     )
     prior.update_key(key)
-    data = {"a": 1, "b": 3}
-    print(prior.log_prob(data))
+    data = {"a": onp.ones(num), "b": 3 * onp.ones(num)}
+    prob = prior.log_prob(data)
+    assert len(prob) == num
 
 
-def test_2_chainz():
+@pytest.mark.parametrize("num", [1, 2, 3, 4])
+def test_sample(num):
     key = random.PRNGKey(1)
     prior = LogUniformPrior(
         rng_key=None, normalized_key="a", feature_keys=["a", "b"], log_max=5
     )
     prior.update_key(key)
-    data = [{"a": 1, "b": 3}, {"a": 1, "b": 5}]
-    print(prior.log_prob(data))
-
-
-def test_3_chainz():
-    key = random.PRNGKey(1)
-    prior = LogUniformPrior(
-        rng_key=None, normalized_key="a", feature_keys=["a", "b"], log_max=5
-    )
-    prior.update_key(key)
-    data = [{"a": 1, "b": 3}] * 3
-    print(prior.log_prob(data))
+    data = prior(num)
+    for key, val in data.items():
+        assert len(val) == num

@@ -29,15 +29,33 @@ class Car(object):
         Args:
             init_state: initial state
             horizon: planning horizon
+
+        Properties:
+            state: (nbatch, udim), by default nbatch = 1
+
         """
         self.env = env
         self.horizon = horizon
         self.dynamics_fn = build_car_dynamics(friction)
-        self._init_state = init_state
-        self._state = init_state
+        if len(init_state.shape) == 1:
+            self._init_state = init_state[None, :]
+            self._state = init_state[None, :]
+        else:
+            self._init_state = init_state
+            self._state = init_state
         self._sprite = None
         self._color = color
+        self._xdim = 4
+        self._udim = 2
         # Initilialize trajectory data
+
+    @property
+    def xdim(self):
+        return self._xdim
+
+    @property
+    def udim(self):
+        return self._udim
 
     def reset(self):
         self._state = self._init_state
@@ -48,6 +66,7 @@ class Car(object):
 
     @state.setter
     def state(self, state):
+        assert len(state.shape) == 2
         self._state = state
 
     @property
@@ -56,6 +75,7 @@ class Car(object):
 
     @init_state.setter
     def init_state(self, init_state):
+        assert len(init_state.shape) == 2
         self._init_state = init_state
 
     @property
@@ -76,9 +96,9 @@ class Car(object):
         """
         if self._sprite is None:
             self._sprite = car_sprite(self.color)
-        self._sprite.x, self._sprite.y = self.state[0], self.state[1]
+        self._sprite.x, self._sprite.y = self.state[0, 0], self.state[0, 1]
         # sprite.x, sprite.y = 0, 0
-        self._sprite.rotation = -self.state[2] * 180 / onp.pi
+        self._sprite.rotation = -self.state[0, 2] * 180 / onp.pi
         self._sprite.opacity = opacity
         self._sprite.draw()
 
@@ -91,7 +111,9 @@ class FixSpeedCar(Car):
         self.dynamics_fn = build_fixspeed_dynamics(fix_speed)
 
     def control(self, dt):
-        self._state += self.dynamics_fn(self._state, None) * dt
+        self._state += (
+            self.dynamics_fn(self._state, np.zeros((len(self._state), self.udim))) * dt
+        )
 
     def copy(self):
         return FixSpeedCar(

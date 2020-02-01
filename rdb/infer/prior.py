@@ -132,10 +132,10 @@ class LogUniformPrior(Prior):
     def _build_function(self):
         """Build prior function."""
 
-        def prior_fn():
+        def prior_fn(num_samples):
             output = {}
             for key, dist_ in self._log_prior_dict.items():
-                val = numpyro.sample(key, dist_)
+                val = numpyro.sample(key, dist_, sample_shape=(num_samples,))
                 output[key] = onp.exp(val)
             return output
 
@@ -148,9 +148,9 @@ class LogUniformPrior(Prior):
             samples.append(self())
         return samples
 
-    def __call__(self):
+    def __call__(self, num_samples):
         assert (
             self._prior_fn is not None
         ), "Need to initialize with random seed by `update_key`"
 
-        return self._prior_fn()
+        return self._prior_fn(num_samples)

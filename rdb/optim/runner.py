@@ -4,6 +4,7 @@ import time
 import numpy as np
 from imageio import imsave
 from functools import partial
+from rdb.infer import *
 from rdb.optim.utils import *
 from scipy.misc import imresize
 from os.path import join, dirname
@@ -24,8 +25,8 @@ class Runner(object):
 
     Args:
         env (object): environment
-        roll_forward (fn): can pass in jit-accelerated function
-        roll_costs (fn): can pass in jit-accelerated function
+        roll_forward (fn): return (T, nbatch, xdim)
+        roll_costs (fn): return (T, nbatch, 1)
 
     Examples:
         >>> xs = roll_forward(x0, us)
@@ -46,6 +47,8 @@ class Runner(object):
         self._roll_features = roll_features
         if roll_features is None:
             self._roll_features = env.roll_features
+        # JIT compile
+        self._compiled = False
 
     @property
     def env(self):
@@ -82,10 +85,10 @@ class Runner(object):
         """Collect constraint violations from trajectory.
 
         Args:
-            x0 (ndarray): (T, xdim), list of states
-            actions (ndarray): (T, udim), list of actions
+            x0 (ndarray): (T, nbatch, xdim), list of states
+            actions (ndarray): (T, nbatch, udim), list of actions
         Return:
-            violations (dict): feats['offtrack']
+            violations (dict): feats['offtrack'] -> (T, nbatch, 1)
         Keys:
             `offtrack`, `collision`, `uncomfortable`,
             `overspeed`, `underspeed`, `wronglane`
@@ -116,6 +119,17 @@ class Runner(object):
         return frames
 
     def collect_mp4(self, state, actions, width=450, path=None, text=None):
+        """Save mp4 data.
+
+        Args:
+            state(ndarray): (nbatch, xdim)
+            actions(ndarray): (T, nbatch, udim)
+
+        """
+        assert len(state.shape) == 2
+        assert len(actions.shape) == 3
+        state = state[0, :]
+        actions = actions[:, 0, :]
         if path is None:
             path = join(dirname(rdb.__file__), "..", "data", "recording.mp4")
         self._env.reset()
@@ -125,9 +139,20 @@ class Runner(object):
         return path
 
     def nb_show_mp4(self, state, actions, path, clear=True):
-        """ Visualize mp4 on Jupyter notebook """
+        """ Visualize mp4 on Jupyter notebook
+
+        Args:
+            state(ndarray): (nbatch, xdim)
+            actions(ndarray): (T, nbatch, udim)
+
+        """
         from ipywidgets import Output
         from IPython.display import display, Image, Video, clear_output
+
+        assert len(state.shape) == 2
+        assert len(actions.shape) == 3
+        state = state[0, :]
+        actions = actions[:, 0, :]
 
         if os.path.isfile(path):
             os.remove(path)
@@ -139,6 +164,18 @@ class Runner(object):
         display(Video(mp4_path, width=FRAME_WIDTH))
 
     def collect_thumbnail(self, state, actions=None, width=450, path=None, text=None):
+        """Save thumbnail data.
+
+        Args:
+            state(ndarray): (nbatch, xdim)
+            actions(ndarray): (T, nbatch, udim)
+
+        """
+        assert len(state.shape) == 2
+        assert len(actions.shape) == 3
+        state = state[0, :]
+        actions = actions[:, 0, :]
+
         if path is None:
             path = join(dirname(rdb.__file__), "..", "data", "thumbnail.png")
         self._env.reset()
@@ -150,9 +187,21 @@ class Runner(object):
         imsave(path, frame)
 
     def nb_show_thumbnail(self, state, path, clear=True):
-        """ Visualize mp4 on Jupyter notebook """
+        """ Visualize mp4 on Jupyter notebook
+
+        Args:
+            state(ndarray): (nbatch, xdim)
+            actions(ndarray): (T, nbatch, udim)
+
+        """
+
         from ipywidgets import Output
         from IPython.display import display, Image, clear_output
+
+        assert len(state.shape) == 2
+        assert len(actions.shape) == 3
+        state = state[0, :]
+        actions = actions[:, 0, :]
 
         if os.path.isfile(path):
             os.remove(path)
@@ -163,28 +212,54 @@ class Runner(object):
         # display(Video(mp4_path, width=FRAME_WIDTH))
         display(Image(path))
 
-    def __call__(self, x0, actions, weights=None):
+    def __call__(self, x0, actions, weights, batch=True):
         """Run optimization.
 
         Args:
-            x0 (ndarray(xdim)):
-            actions array(T, u_dim): actions
+            x0 (ndarray): (nbatch, xdim)
+            actions (ndarray), (T, nbatch, udim)
+            batch (bool), batch mode. If `true`, weights are batched
+                If `false`, weights are not batched
+
+        Return:
+            cost_sum: (nbatch, 1)
+
+        Info:
+            costs: key -> (nbatch, T)
+            feats: key -> (nbatch, T)
+            feats_sum: key -> Weights(nbatch, )
+            violations: key -> Weights(nbatch, T)
+            vios_sum: key -> Weights(nbatch, T)
+            meta_data: key -> Weights(nbatch, T)
 
         """
-        # TODO: action space shape checking
         assert self._roll_costs is not None, "Cost function improperly defined"
-        weights = prepare_weights(weights, self._env.features_keys)
-        weights_dict = sort_dict_by_keys(weights, self._env.features_keys)
-        weights = np.array(list(weights_dict.values()))
+        weights_arr = (
+            Weights(weights, batch=batch).prepare(self._env.features_keys).numpy_array()
+        )
+
+        if not self._compiled:
+            print(f"First time using rnner, input x0 shape {x0.shape}")
+            t_start = time()
 
         x = x0
-        info = dict(costs=[], feats={}, feats_sum={}, violations={})
+        info = {}
         xs = self._roll_forward(x0, actions)
 
-        info["costs"] = self._roll_costs(x0, actions, weights)
-        info["feats"], info["feats_sum"] = self._collect_features(x0, actions)
-        info["violations"] = self._collect_violations(xs, actions)
-        info["metadata"] = self._collect_metadata(xs, actions)
+        # Use Weights class here to conveniently deal with dict of lists
+        costs = self._roll_costs(x0, actions, weights_arr).T
+        cost_sum = onp.sum(costs, axis=1)
+        feats, feats_sum = self._collect_features(x0, actions)
 
-        cost_sum = np.sum(info["costs"])
+        info["costs"] = costs
+        info["feats"] = Weights(feats)
+        info["feats_sum"] = Weights(feats_sum)
+        info["violations"] = Weights(self._collect_violations(xs, actions))
+        info["metadata"] = Weights(self._collect_metadata(xs, actions))
+
+        if not self._compiled:
+            self._compiled = True
+            print(
+                f"Runner compile time {time() - t_start:.3f}, input x0 shape {x0.shape}"
+            )
         return np.array(xs), cost_sum, info
