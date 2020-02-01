@@ -142,7 +142,7 @@ def test_nonlinear_featrues_cost(batch, n_cars):
     weights = {}
     for key in out_dict.keys():
         weights[key] = onp.random.random(batch)
-    weights_arr = Weights(weights).prepare(features_keys).numpy_array()
+    weights_arr = DictList(weights).prepare(features_keys).numpy_array()
     cost_fn = build_cost(nlr_dict)
     out = cost_fn(xn, ucar, weights=weights_arr)
     assert out.shape[0] == batch

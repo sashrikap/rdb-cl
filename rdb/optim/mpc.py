@@ -33,6 +33,43 @@ config.update("jax_enable_x64", True)
 # =====================================================
 
 
+def scipy_wrapper(jit_fn, horizon, udim, flatten_out=False):
+    """Function to interface with scipy.optimizer, which implicitly flattens input.
+
+    This method does two things:
+        * Undo scipy.minimize's flattening
+        * Return ordinary numpy oupout
+
+    Note:
+        * Inefficient way
+          (horizon, nbatch, udim) -> scipy -> (horizon * nbatch * udim)
+          -> jit function recompile
+        * Efficient way
+          (horizon, nbatch, udim) -> scipy -> (horizon * nbatch * udim)
+          -> scipy_warpper ->(horizon, nbatch, udim)
+          -> jit function no recompile
+
+    This undos the effect.
+
+    """
+
+    def _fn(x, us, *args):
+        """
+
+        Args:
+            x (ndarray): initial state
+            us (ndarray): actions (horizon, nbatch, udim)
+
+        """
+        us = np.reshape(us, (horizon, -1, udim))
+        out = onp.array(jit_fn(x, us, *args))
+        if flatten_out:
+            out = out.flatten()
+        return out
+
+    return _fn
+
+
 def build_forward(f_dyn, xdim, udim, horizon, dt):
     """Rollout environment, given initial x and array of u.
 
@@ -56,20 +93,16 @@ def build_forward(f_dyn, xdim, udim, horizon, dt):
         Output:
             xs (ndarray): (horizon, nbatch, xdim)
 
+        Note:
+            Output includes the first x and omits the last x
+
         """
-        # Omitting last x
-        # (TODO): scipy.optimize implicitly flattens array
-        us = np.reshape(us, (horizon, -1, udim))
 
         def step(curr_x, u):
             next_x = curr_x + f_dyn(curr_x, u) * dt
             return next_x, curr_x
 
         last_x, xs = scan(step, x, us)
-        # curr_x = x
-        # for step in range(horizon):
-        #     next_x = curr_x + f_dyn(curr_x, u[step]) * dt
-
         return xs
 
     return roll_forward
@@ -101,8 +134,6 @@ def build_costs(udim, horizon, roll_forward, f_cost):
 
         """
         vf_cost = jax.vmap(partial(f_cost, weights=weights))
-        # (TODO): scipy.optimize implicitly flattens array
-        us = np.reshape(us, (horizon, -1, udim))
         xs = roll_forward(x, us)
         costs = vf_cost(xs, us)
         return np.array(costs)
@@ -129,8 +160,6 @@ def build_features(udim, horizon, roll_forward, f_feat):
 
     @jax.jit
     def roll_features(x, us):
-        # (TODO): scipy.optimize implicitly flattens array
-        us = np.reshape(us, (horizon, -1, udim))
         xs = roll_forward(x, us)
         feats = []
         vf_feat = jax.vmap(f_feat)
@@ -163,41 +192,34 @@ def build_mpc(env, f_cost, horizon, dt, replan=True, T=None):
     f_feat = env.features_fn
     xdim, udim = env.xdim, env.udim
 
-    if T is None:
-        T = horizon
-
-    h_forward = build_forward(f_dyn, xdim, udim, horizon, dt)
-    h_costs = build_costs(udim, horizon, h_forward, f_cost)
-
     """Forward/cost/grad functions for Horizon, used in optimizer"""
+    h_traj = build_forward(f_dyn, xdim, udim, horizon, dt)
+    h_costs = build_costs(udim, horizon, h_traj, f_cost)
     h_csum = jax.jit(lambda x0, us, weights: np.sum(h_costs(x0, us, weights)))
+
+    # Gradient w.r.t. x and u
     h_grad = jax.jit(jax.grad(h_csum, argnums=(0, 1)))
     h_grad_u = lambda x0, us, weights: h_grad(x0, us, weights)[1]
 
-    h_traj_u = numpy_fn(h_forward)
-    h_grad_u = numpy_fn(h_grad_u)
-    h_csum_u = lambda x0, us, weights: float(h_csum(x0, us, weights))
-    h_costs_u = lambda x0, us, weights: h_costs(x0, us, weights)
-
     """Forward/cost functions for T, used in runner"""
-    if T == horizon:
-        # Avoid repeated jit
-        t_forward = h_forward
+    if T is None:
+        # T rollout same as horizon rollout
+        T = horizon
+        t_traj = h_traj
         t_costs = h_costs
-        t_costs_u = h_costs_u
     else:
-        t_forward = build_forward(f_dyn, xdim, udim, horizon, dt)
-        t_costs = build_costs(udim, horizon, t_forward, f_cost)
-        t_costs_u = lambda x0, us, weights: t_costs(x0, us, weights)
-    t_csum = lambda x0, us, weights: np.sum(t_costs(x0, us, weights))
-    t_traj_u = numpy_fn(t_forward)
-    t_csum_u = lambda x0, us, weights: float(t_csum(x0, us, weights))
-    t_feats_u = build_features(udim, horizon, t_forward, f_feat)
+        t_traj = build_forward(f_dyn, xdim, udim, horizon, dt)
+        t_costs = build_costs(udim, horizon, t_traj, f_cost)
 
-    optimizer = Optimizer(
-        h_traj_u=h_traj_u,
-        h_grad_u=h_grad_u,
-        h_csum_u=h_csum_u,
+    # Rollout for t steps, optimzed every h (h <= t)
+    t_csum = lambda x0, us, weights: np.sum(t_costs(x0, us, weights))
+    t_feats = build_features(udim, horizon, t_traj, f_feat)
+
+    # Create optimizer & runner
+    optimizer = OptimizerScipy(
+        h_traj=scipy_wrapper(h_traj, horizon, udim),
+        h_grad_u=scipy_wrapper(h_grad_u, horizon, udim, flatten_out=True),
+        h_csum=scipy_wrapper(h_csum, horizon, udim),
         xdim=xdim,
         udim=udim,
         horizon=horizon,
@@ -205,8 +227,6 @@ def build_mpc(env, f_cost, horizon, dt, replan=True, T=None):
         T=T,
         features_keys=env.features_keys,
     )
-    runner = Runner(
-        env, roll_forward=t_traj_u, roll_costs=t_costs_u, roll_features=t_feats_u
-    )
+    runner = Runner(env, roll_forward=t_traj, roll_costs=t_costs, roll_features=t_feats)
 
     return optimizer, runner

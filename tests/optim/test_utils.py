@@ -3,6 +3,7 @@ from time import time
 import jax.numpy as np
 import jax
 import numpy as onp
+import pytest
 
 
 def test_sum():
@@ -23,59 +24,6 @@ def test_append_dict():
     dout = append_dict_by_keys(d1, d2)
     for k, v in dout.items():
         assert onp.allclose(dout[k], out[k])
-
-
-def test_weights_dict():
-    def f1(a, b):
-        return np.array(a) + np.array(b)
-
-    def f2(a, b):
-        return np.array(a) - np.array(b)
-
-    def f3(a, b):
-        return np.array(a) * np.array(b)
-
-    fns = {"f1": f1, "f2": f2, "f3": f3}
-    weights = {"f1": 1, "f2": 2}
-    fn_keys = list(fns.keys())
-    weights = zero_fill_dict(weights, fn_keys)
-    fn = weigh_funcs_dict(fns, weights_dict=weights)
-    assert np.allclose(fn(1, 2), 1)
-
-
-def test_weights_dict_jax():
-    def f1(a, b):
-        return np.array(a) + np.array(b)
-
-    def f2(a, b):
-        return np.array(a) - np.array(b)
-
-    def f3(a, b):
-        return np.array(a) * np.array(b)
-
-    fns = {"f1": f1, "f2": f2, "f3": f3}
-    weights = {"f1": 1, "f2": 2}
-    fn_keys = list(fns.keys())
-    weights = sort_dict_by_keys(zero_fill_dict(weights, fn_keys), fn_keys)
-    t1 = time()
-    fn = jax.jit(weigh_funcs_dict_runtime(fns))
-    assert np.allclose(fn(1, 2, weights=weights), 1)
-    dt1 = time() - t1
-    # print(f"Took time {dt1}")
-
-    t2 = time()
-    assert np.allclose(fn(1, 2, weights=weights), 1)
-    dt2 = time() - t2
-    # print(f"Took time {dt2}")
-
-    weights = {"f1": 2, "f2": 2}
-    fn_keys = list(fns.keys())
-    weights = sort_dict_by_keys(zero_fill_dict(weights, fn_keys), fn_keys)
-    t3 = time()
-    assert np.allclose(fn(1, 2, weights=weights), 4)
-    dt3 = time() - t3
-    # print(f"Took time {dt3}")
-    print(f"Dict version slow down {dt3/dt2:.2f}")
 
 
 def test_weights_list_jax():
@@ -101,6 +49,24 @@ def test_weights_list_jax():
     assert np.allclose(fn(1, 2, weights=weights), 4)
     dt3 = time() - t3
     print(f"List version slow down {dt3/dt2:.2f}")
+
+
+@pytest.mark.parametrize("nbatch", [1, 2, 3, 4])
+def test_vectorized_weights_list_jax(nbatch):
+    def f1(a, b):
+        return np.array(a) + np.array(b)
+
+    def f2(a, b):
+        return np.array(a) - np.array(b)
+
+    fns = {"f1": f1, "f2": f2}
+    weights = np.array([[1], [2]]).repeat(nbatch, axis=1)
+    fn = jax.jit(weigh_funcs_runtime(fns))
+    output = np.array([[1]]).repeat(nbatch)
+    in_a = np.array([1]).repeat(nbatch)
+    in_b = np.array([2]).repeat(nbatch)
+    output = np.array([1]).repeat(nbatch)
+    assert np.allclose(fn(in_a, in_b, weights=weights), output)
 
 
 def test_partial():

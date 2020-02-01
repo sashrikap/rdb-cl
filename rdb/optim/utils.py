@@ -194,13 +194,6 @@ def sum_funcs(funcs):
     return compose(add_op, juxt(funcs))
 
 
-def numpy_fn(fn):
-    def _fn(*args):
-        return onp.array(fn(*args))
-
-    return _fn
-
-
 def weigh_funcs_runtime(funcs_dict):
     """Weigh multiple functions by runtime weights.
 
@@ -225,6 +218,9 @@ def weigh_funcs_runtime(funcs_dict):
         Args:
             weights (ndarray): Weights.numpy_array, (weights_dim, nbatch)
 
+        Note:
+            fn(*args): output (nbatch, )
+
         """
         assert isinstance(weights, list) or isinstance(weights, np.ndarray)
         assert len(funcs_list) == len(weights)
@@ -233,45 +229,6 @@ def weigh_funcs_runtime(funcs_dict):
             val = fn(*args)
             assert w.shape == val.shape, "Weight shape mismatches value shape"
             output += w * val
-        return output
-
-    return func
-
-
-def weigh_funcs_dict(funcs_dict, weights_dict):
-    """Weigh multiple functions by predefined weights.
-
-    Notes:
-        * Functions & weights are organized by dictionary.
-        * funcs_dict is inclusive of weights_dict
-
-    """
-    fns = []
-    for key, fn in funcs_dict.items():
-        assert key in weights_dict
-        w = weights_dict[key]
-        fns.append(compose(partial(mul, w), fn))
-    add_op = partial(reduce, add)
-    return compose(add_op, juxt(fns))
-
-
-def weigh_funcs_dict_runtime(funcs_dict):
-    """Weigh multiple functions by runtime weights.
-
-    Functions and weights are organized by dictionary.
-
-    Example:
-        >>> cost_fn = weigh_funcs_runtime(funcs_dict)
-        >>> cost = cost_fn(xs, weights_dict)
-
-    """
-
-    def func(*args, weights):
-        assert isinstance(weights, dict)
-        output = 0.0
-        for key, fn in funcs_dict.items():
-            assert key in weights
-            output += weights[key] * fn(*args)
         return output
 
     return func

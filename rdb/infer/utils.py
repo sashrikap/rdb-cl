@@ -102,9 +102,11 @@ def random_choice(items, num, probs=None, replacement=True):
         # no replacement
         assert probs is None, "Cannot use probs without replacement"
         assert num < len(items), f"Only has {len(items)} items"
+        probs = onp.array(probs)
         arr = numpyro.sample(
             "random_choice", dist.Uniform(0, 1), sample_shape=(len(items),)
         )
+        arr = onp.array(arr)
         idxs = onp.argsort(arr)[:num]
         return [items[idx] for idx in idxs]
     else:
@@ -116,9 +118,12 @@ def random_choice(items, num, probs=None, replacement=True):
             probs = probs / onp.sum(probs)
         probs = onp.cumsum(probs)
         arr = numpyro.sample("random_choice", dist.Uniform(0, 1), sample_shape=(num,))
+        arr = onp.array(arr)
         output = []
         for i in range(num):
-            output.append(items[onp.abs(arr[i] - probs).argmin()])
+            diff = onp.minimum(arr[i] - probs, 0)
+            first_neg = onp.argmax(diff < 0)
+            output.append(items[first_neg])
         return onp.array(output)
 
 

@@ -25,12 +25,13 @@ def build_constraints():
     )
     constraints_dict["wronglane"] = constraints.build_wronglane(env=env, lane_idx=2)
     constraints_dict["collision"] = constraints.build_collision(env=env)
+    constraints_dict["overtake"] = constraints.build_overtake(env=env, car_idx=1)
     constraints_fn = merge_dict_funcs(constraints_dict)
     return constraints_fn
 
 
-def test_combined_full():
-    batch = 2
+@pytest.mark.parametrize("batch", [2, 3, 4, 10])
+def test_combined_full(batch):
     cons_fn = build_constraints()
     dyn_fn = env.dynamics_fn
     state = env.state.repeat(batch, axis=0)
@@ -44,6 +45,5 @@ def test_combined_full():
     all_states = onp.array(all_states)
     all_acs = onp.array(all_acs)
     cons_out = cons_fn(all_states, all_acs)
-    import pdb
-
-    pdb.set_trace()
+    for key, val in cons_out.items():
+        assert val.shape == (batch, horizon)

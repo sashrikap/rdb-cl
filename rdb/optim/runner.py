@@ -48,7 +48,7 @@ class Runner(object):
         if roll_features is None:
             self._roll_features = env.roll_features
         # JIT compile
-        self._compiled = False
+        self._a_shape = None
 
     @property
     def env(self):
@@ -60,42 +60,6 @@ class Runner(object):
             return True
         except NameError:
             return False
-
-    def _collect_features(self, x0, actions):
-        """
-        Return:
-            feats (dict): dict(key, [f_t0, f_t1, ..., f_tn]), time series
-            feats_sum (dict): dict(key, sum([f_t0, f_t1, ..., f_tn])), sum
-
-        """
-        feats = self._roll_features(x0, actions)
-        feats_sum = OrderedDict(
-            {key: np.sum(val, axis=0) for (key, val) in feats.items()}
-        )
-        return feats, feats_sum
-
-    def _collect_metadata(self, xs, actions):
-        """Collect extra data, such as overtaking.
-
-        """
-        metadata_fn = self._env.metadata_fn
-        return metadata_fn(xs, actions)
-
-    def _collect_violations(self, xs, actions):
-        """Collect constraint violations from trajectory.
-
-        Args:
-            x0 (ndarray): (T, nbatch, xdim), list of states
-            actions (ndarray): (T, nbatch, udim), list of actions
-        Return:
-            violations (dict): feats['offtrack'] -> (T, nbatch, 1)
-        Keys:
-            `offtrack`, `collision`, `uncomfortable`,
-            `overspeed`, `underspeed`, `wronglane`
-
-        """
-        constraints_fn = self._env.constraints_fn
-        return constraints_fn(xs, actions)
 
     def collect_frames(self, actions, width=450, mode="rgb_array", text=""):
         self._env.reset()
@@ -132,6 +96,7 @@ class Runner(object):
         actions = actions[:, 0, :]
         if path is None:
             path = join(dirname(rdb.__file__), "..", "data", "recording.mp4")
+        os.makedirs(dirname(path), exist_ok=True)
         self._env.reset()
         self._env.state = state
         render_env(self._env, state, actions, fps=3, path=path, text=text)
@@ -158,29 +123,41 @@ class Runner(object):
             os.remove(path)
         FRAME_WIDTH = 450
         mp4_path = self.collect_mp4(state, actions, path=path, width=FRAME_WIDTH)
+        os.makedirs(dirname(mp4_path), exist_ok=True)
         if clear:
             clear_output()
         print(f"video path {mp4_path}")
         display(Video(mp4_path, width=FRAME_WIDTH))
 
-    def collect_thumbnail(self, state, actions=None, width=450, path=None, text=None):
+    def collect_thumbnail(self, state, width=450, path=None, text=None):
         """Save thumbnail data.
 
         Args:
             state(ndarray): (nbatch, xdim)
-            actions(ndarray): (T, nbatch, udim)
 
         """
         assert len(state.shape) == 2
-        assert len(actions.shape) == 3
-        state = state[0, :]
-        actions = actions[:, 0, :]
-
         if path is None:
             path = join(dirname(rdb.__file__), "..", "data", "thumbnail.png")
+        os.makedirs(dirname(path), exist_ok=True)
         self._env.reset()
         self._env.state = state
         frame = self._env.render("rgb_array", text=text)
+        frame = imresize(frame, (width, width))
+        if self.run_from_ipython():
+            self._env.close_window()
+        imsave(path, frame)
+
+    def collect_heatmap(self, state, weights, width=450, path=None, text=None):
+        assert len(state.shape) == 2
+        if path is None:
+            path = join(dirname(rdb.__file__), "..", "data", "thumbnail.png")
+        os.makedirs(dirname(path), exist_ok=True)
+        self._env.reset()
+        self._env.state = state
+        frame = self._env.render(
+            "rgb_array", draw_heat=True, weights=weights, text=text
+        )
         frame = imresize(frame, (width, width))
         if self.run_from_ipython():
             self._env.close_window()
@@ -222,44 +199,63 @@ class Runner(object):
                 If `false`, weights are not batched
 
         Return:
-            cost_sum: (nbatch, 1)
-
-        Info:
-            costs: key -> (nbatch, T)
-            feats: key -> (nbatch, T)
-            feats_sum: key -> Weights(nbatch, )
-            violations: key -> Weights(nbatch, T)
-            vios_sum: key -> Weights(nbatch, T)
-            meta_data: key -> Weights(nbatch, T)
+            xs (ndarray): (T, nbatch, xdim)
+            cost_sum: (nbatch, )
+            info (dict): rollout info
+                info['costs']: key -> (nbatch, T)
+                info['feats']: key -> DictList(nbatch, T)
+                info['feats_sum']: key -> DictList(nbatch, )
+                info['violations']: key -> DictList(nbatch, T)
+                info['vios_sum']: key -> DictList(nbatch,)
+                info['metadata']: key -> DictList(nbatch, T)
 
         """
         assert self._roll_costs is not None, "Cost function improperly defined"
         weights_arr = (
-            Weights(weights, batch=batch).prepare(self._env.features_keys).numpy_array()
+            DictList(weights, expand_dims=not batch)
+            .prepare(self._env.features_keys)
+            .numpy_array()
         )
 
-        if not self._compiled:
-            print(f"First time using rnner, input x0 shape {x0.shape}")
-            t_start = time()
+        # Track JIT recompile
+        t_compile = None
+        a_shape = actions.shape
+        if self._a_shape is None:
+            print(f"Runner first compile: ac {a_shape}")
+            self._a_shape = a_shape
+            t_compile = time()
+        elif actions.shape != self._a_shape:
+            print(f"Runner recompile: ac {actions.shape}, previously {self._a_shape}")
+            self._a_shape = a_shape
+            t_compile = time()
 
-        x = x0
-        info = {}
+        # Rollout
         xs = self._roll_forward(x0, actions)
-
-        # Use Weights class here to conveniently deal with dict of lists
         costs = self._roll_costs(x0, actions, weights_arr).T
-        cost_sum = onp.sum(costs, axis=1)
-        feats, feats_sum = self._collect_features(x0, actions)
+        feats = self._roll_features(x0, actions)
+        feats = DictList(feats).transpose()
 
-        info["costs"] = costs
-        info["feats"] = Weights(feats)
-        info["feats_sum"] = Weights(feats_sum)
-        info["violations"] = Weights(self._collect_violations(xs, actions))
-        info["metadata"] = Weights(self._collect_metadata(xs, actions))
-
-        if not self._compiled:
-            self._compiled = True
+        # Track JIT recompile
+        if t_compile is not None:
             print(
-                f"Runner compile time {time() - t_start:.3f}, input x0 shape {x0.shape}"
+                f"Runner finish compile in {time() - t_compile:.3f}s: ac {self._a_shape}"
             )
-        return np.array(xs), cost_sum, info
+
+        # Compute features
+        cost_sum = onp.sum(costs, axis=1)
+        feats_sum = feats.sum(axis=1)
+        violations = DictList(self._env.constraints_fn(xs, actions))
+        vios_sum = violations.sum(axis=1)
+        metadata = DictList(self._env.metadata_fn(xs, actions))
+
+        # DictList conveniently deals with list of dicts
+        info = {}
+        info["costs"] = costs
+        info["cost_sum"] = cost_sum
+        info["feats"] = feats
+        info["feats_sum"] = feats_sum
+        info["violations"] = violations
+        info["vios_sum"] = vios_sum
+        info["metadata"] = metadata
+
+        return onp.array(xs), cost_sum, info

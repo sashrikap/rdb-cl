@@ -71,7 +71,7 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
             * env.reset
 
         """
-        return self._get_init_states([task])[0]
+        return self._get_init_states([task])
 
     def _get_init_states(self, tasks):
         """Vectorized version of `get_init_state`

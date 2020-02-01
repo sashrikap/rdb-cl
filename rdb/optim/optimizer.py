@@ -11,7 +11,7 @@ import jax.numpy as np
 import jax
 
 
-class Optimizer(object):
+class OptimizerScipy(object):
     """Generic Optimizer for optimal control.
 
     Example:
@@ -22,9 +22,9 @@ class Optimizer(object):
 
     def __init__(
         self,
-        h_traj_u,
+        h_traj,
         h_grad_u,
-        h_csum_u,
+        h_csum,
         xdim,
         udim,
         horizon,
@@ -35,9 +35,15 @@ class Optimizer(object):
         """Construct Optimizer.
 
         Args:
-            h_traj_u (fn): func(us, x0), return horizon
-            h_grad_u (fn): func(us, x0, weights), horizon gradient
-            h_csum_u (fn): func(us, x0, weights), horizon cost
+            h_traj (fn): horizion rollout
+                func(x0, us) -> (T, nbatch, xdim)
+            h_grad_u (fn): horizon gradient w.r.t. u
+                func(x0, us, weights) -> (T * nbatch * udim, )
+                input us flatten by scipy
+                output needs to be flattened
+            h_csum (fn): horizon cost
+                func(x0, us, weights) -> (T, nbatch, 1)
+                input us flatten by scipy
             replan (bool): True if replan at every step
             T (int): only in replan mode, plan for longer length than horizon
 
@@ -57,10 +63,11 @@ class Optimizer(object):
         self._replan = replan
         self._horizon = horizon
         self._T = T
-        self.h_traj_u = h_traj_u
+        ## Rollout functions
+        self.h_traj = h_traj
+        self.h_csum = h_csum
         self.h_grad_u = h_grad_u
-        self.h_csum_u = h_csum_u
-        self._compiled = False
+        self._u_shape = None
 
         if self._T is None:
             self._T = horizon
@@ -69,27 +76,53 @@ class Optimizer(object):
         return
 
     def cost_u(self, x0, us, weights):
-        """
+        """Compute costs.
+
         Args:
-            u (ndarray): array of actions
-            x0 (ndarray): initial state
-            weights (dict): cost function weights
+            u (ndarray): actions (T, nbatch, udim)
+            x0 (ndarray): initial state (nbatch, xdim)
+            weights (ndarray): cost function weights (wdim, nbatch)
+
+        Output:
+            cost sum (ndarray): (nbatch, 1)
 
         """
-        return self.h_csum_u(x0, us, weights)
+        return self.h_csum(x0, us, weights)
 
     def grad_u(self, x0, us, weights):
+        """Compute gradient w.r.t. u.
+
+        Args:
+            x0 (ndarray): initial state (nbatch, xdim)
+            u (ndarray): actions (T, nbatch, udim)
+            weights (ndarray): cost function weights (wdim, nbatch)
+
+        Output:
+            gradient (ndarray): (T, nbatch, udim)
+
+        """
         return self.h_grad_u(x0, us, weights)
 
     def get_trajectory(self, x0, us):
-        return self.h_traj_u(x0, us)
+        """Compute trajectory
+
+        Args:
+            x0 (ndarray): initial state (nbatch, xdim)
+            u (ndarray): actions (T, nbatch, udim)
+            weights (ndarray): cost function weights (wdim, nbatch)
+
+        Ouput:
+            xs (ndarray): (T, nbatch, xdim)
+
+        """
+        return self.h_traj(x0, us)
 
     def __call__(self, x0, weights, batch=True, us0=None, init="zeros"):
         """Run Optimizer.
 
         Args:
             x0 (ndarray), initial state (nbatch, xdim)
-            weights (dict/Weights), weights
+            weights (dict/DictList), weights
             batch (bool), batch mode. If `true`, weights and output are batched
                 If `false`, weights and output are not batched
 
@@ -99,15 +132,26 @@ class Optimizer(object):
         """
 
         weights_arr = (
-            Weights(weights, batch=batch).prepare(self._features_keys).numpy_array()
+            DictList(weights, expand_dims=not batch)
+            .prepare(self._features_keys)
+            .numpy_array()
         )
         assert len(weights_arr.shape) == 2
         n_batch = weights_arr.shape[1]
 
-        if not self._compiled:
-            print(f"First time using optimizer, input x0 shape {x0.shape}")
-            t_start = time()
+        # Track JIT recompile
+        t_compile = None
         u_shape = (self._horizon, n_batch, self._udim)
+        if self._u_shape is None:
+            print(f"Optimizer first compile: u0 {u_shape}")
+            self._u_shape = u_shape
+            t_compile = time()
+        elif u_shape != self._u_shape:
+            print(f"Optimizer recompile: u0 {u_shape}, previously {self._u_shape}")
+            self._u_shape = u_shape
+            t_compile = time()
+
+        # Initial guess
         if us0 is None:
             if init == "zeros":
                 us0 = np.zeros(u_shape)
@@ -115,47 +159,49 @@ class Optimizer(object):
                 us0 = np.random(key, u_shape)
             else:
                 raise NotImplementedError(f"Initialization undefined for '{init}'")
+
+        # Optimal Control
         if self._replan:
-            """Replan. Reoptimize control sequence at every timestep."""
+            ## Replan.
+            ## Reoptimize control sequence at every timestep.
             opt_u, xs, du = [], [], []
             cmin = 0.0
             x_t = x0
             for t in range(self._T):
-                csum_u_x0 = lambda u: self.h_csum_u(x_t, u, weights_arr)
+                csum_u_x0 = lambda u: self.h_csum(x_t, u, weights_arr)
                 grad_u_x0 = lambda u: self.h_grad_u(x_t, u, weights_arr)
                 res = minimize(csum_u_x0, us0, method="L-BFGS-B", jac=grad_u_x0)
-                if not self._compiled:
-                    self._compiled = True
+                if t_compile is not None:
                     print(
-                        f"Optimizer compile time {time() - t_start:.3f}, input x0 shape {x0.shape}"
+                        f"Optimizer finish compile in {time() - t_compile:.3f}s: u0 {self._u_shape}"
                     )
                 opt_u_t = np.reshape(res["x"], u_shape)
                 cmin_t = res["fun"]
                 grad_u_t = res["jac"]
                 opt_u.append(opt_u_t[0])
-                xs_t = self.h_traj_u(x_t, opt_u_t)
+                xs_t = self.h_traj(x_t, opt_u_t)
                 du.append(grad_u_t[0])
                 ## Forward 1 timestep, record 1st action
                 xs.append(x_t)
                 x_t = xs_t[1]
                 us0 = opt_u_t
+
         else:
-            """No Replan. Only optimize control sequence at the beginning."""
-            # Runime cost function weights
-            csum_u_x0 = lambda u: self.h_csum_u(x0, u, weights_arr)
+            ## No Replan.
+            ## Only optimize control sequence at the beginning
+            csum_u_x0 = lambda u: self.h_csum(x0, u, weights_arr)
             grad_u_x0 = lambda u: self.h_grad_u(x0, u, weights_arr)
             res = minimize(csum_u_x0, us0, method="L-BFGS-B", jac=grad_u_x0)
             opt_u = res["x"]
             cmin = res["fun"]
             grad = res["jac"]
             opt_u = np.reshape(opt_u, u_shape)
-            xs = self.h_traj_u(x0, opt_u)
-            costs = self.h_csum_u(x0, opt_u, weights_arr)
+            xs = self.h_traj(x0, opt_u)
+            costs = self.h_csum(x0, opt_u, weights_arr)
             u_info = {"du": grad, "xs": xs, "cost_fn": csum_u_x0, "costs": costs}
-            if not self._compiled:
-                self._compiled = True
+            if t_compile is not None:
                 print(
-                    f"Optimizer compile time {time() - t_start:.3f}, input x0 shape {x0.shape}"
+                    f"Optimizer finish compile in {time() - t_compile:.3f}s: u0 {self._u_shape}"
                 )
 
         return np.array(opt_u)

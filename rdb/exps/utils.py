@@ -59,9 +59,12 @@ def create_params(template, params):
     """Return products of all params specified as list.
 
     Example:
-        >> template = {'a': 1, 'b': 2}
-        >> create_params(template, {'a': [1, 2], 'b':[2, 3]})
-        >> # [{'a': 1, 'b': 2}, {'a': 1, 'b': 3}, {'a': 2, 'b': 2}, {'a': 2, 'b': 3}]
+        >> template = {'a': [1], 'b': [2]}
+        >> create_params(template, {
+            'a': [1, 2],
+            'b': [2, 3]
+           })
+        >> [{'a': [1], 'b': [2]}, {'a': [1], 'b': [3]}, {'a': [2], 'b': [2]}, {'a': [2], 'b': [3]}]
 
     """
     all_params = []

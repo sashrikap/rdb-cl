@@ -8,8 +8,7 @@ Use Cases:
     * For evaluating different acquisition function in active IRD.
 
 TODO:
-    * Currently not using JIT to speed up
-    * Collision assumes cars are the same
+    * Jerk detection
 
 """
 
@@ -162,10 +161,11 @@ def build_wronglane(env, lane_idx):
     def func(states, actions):
         assert len(states.shape) == 3
         assert len(actions.shape) == 3
+        # (T, nbatch, nlanes)
         feats = vfn(states, actions)
-        return np.any(feats[:, lane_idx, None] < env.lane_width / 2, axis=2).swapaxes(
-            0, 1
-        )
+        return np.any(
+            feats[:, :, lane_idx, None] < env.lane_width / 2, axis=2
+        ).swapaxes(0, 1)
 
     return func
 

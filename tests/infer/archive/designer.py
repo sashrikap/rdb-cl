@@ -1,7 +1,7 @@
 """Test designer module.
 """
 from rdb.infer.ird_oc import IRDOptimalControl, Designer
-from rdb.optim.mpc import shooting_method
+from rdb.optim.mpc import build_mpc
 from rdb.infer.utils import *
 from functools import partial
 from jax import random
@@ -30,7 +30,7 @@ PROPOSAL_VAR = 0.2
 
 env = gym.make(ENV_NAME)
 env.reset()
-controller, runner = shooting_method(
+controller, runner = build_mpc(
     env, env.main_car.cost_runtime, HORIZON, env.dt, replan=False
 )
 true_w = {
