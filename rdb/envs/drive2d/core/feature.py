@@ -42,12 +42,15 @@ def dist_to(x, y):
         x (ndarray): batched 2D state
         y (ndarray): target, 1D or 2D
 
+    Output:
+        out (ndarray): (nbatch, 1)
+
     """
     assert len(x.shape) == 2 and x.shape[1] == XDIM
     assert y.shape[-1] == POSDIM or y.shape[-1] == XDIM
 
     diff = np.array(x[:, :2]) - np.array(y[..., :2])
-    return np.linalg.norm(diff, axis=-1)
+    return np.linalg.norm(diff, axis=1, keepdims=True)
 
 
 @jax.jit
@@ -58,20 +61,23 @@ def dist_to_segment(x, pt1, pt2):
         x (ndarray): batched 2D state, (nbatch, 4)
         pt1, pt2 (ndarray): target, 1D or 2D, (nbatch, 4) or (nbatch, 2)
 
+    Output:
+        out (ndarray): (nbatch, 1)
+
     """
     assert len(x.shape) == 2 and x.shape[1] == XDIM
-    assert pt1.shape[-1] == POSDIM
-    assert pt2.shape[-1] == POSDIM
+    assert len(pt1.shape) == 1 and pt1.shape[-1] == POSDIM
+    assert len(pt2.shape) == 1 and pt2.shape[-1] == POSDIM
 
     x = x[:, :2]
     pt1 = pt1[..., :2]
     pt2 = pt2[..., :2]
     delta = pt2 - pt1
-    sum_sqr = np.sum(np.square(delta), axis=-1)
+    sum_sqr = np.sum(np.square(delta))
     ui = np.sum(delta * (x - pt1) / (sum_sqr + 1e-8), axis=-1, keepdims=True)
     ui = np.clip(ui, 0, 1.0)
     dx = pt1 + ui * delta - x
-    return np.linalg.norm(dx, axis=-1)
+    return np.linalg.norm(dx, axis=-1, keepdims=True)
 
 
 @jax.jit
@@ -97,13 +103,16 @@ def dist_to_lane(x, center, normal):
         x (ndarray): batched 2D state, (nbatch, 4)
         center, normal (ndarray): target, 1D or 2D
 
+    Output:
+        out (ndarray): (nbatch, 1)
+
     """
     assert len(x.shape) == 2 and x.shape[1] == XDIM
     assert center.shape[-1] == POSDIM
     assert normal.shape[-1] == POSDIM
 
     diff = np.array(center) - np.array(x[:, :2])
-    return np.abs(np.sum(normal * diff, axis=-1))
+    return np.abs(np.sum(normal * diff, axis=-1, keepdims=True))
 
 
 @jax.jit
@@ -117,11 +126,11 @@ def dist_inside_fence(x, center, normal):
 
     """
     assert len(x.shape) == 2 and x.shape[1] == XDIM
-    assert center.shape[-1] == POSDIM
-    assert normal.shape[-1] == POSDIM
+    assert len(center.shape) == 1 and center.shape[-1] == POSDIM
+    assert len(normal.shape) == 1 and normal.shape[-1] == POSDIM
 
     diff = np.array(x[:, :2]) - np.array(center)
-    return np.sum(normal * diff, axis=-1)
+    return np.sum(normal * diff, axis=-1, keepdims=True)
 
 
 @jax.jit
@@ -135,8 +144,8 @@ def dist_outside_fence(x, center, normal):
 
     """
     assert len(x.shape) == 2 and x.shape[1] == XDIM
-    assert center.shape[-1] == POSDIM
-    assert normal.shape[-1] == POSDIM
+    assert len(center.shape) == 1 and center.shape[-1] == POSDIM
+    assert len(normal.shape) == 1 and normal.shape[-1] == POSDIM
     return -1 * dist_inside_fence(x, center, normal)
 
 
@@ -149,7 +158,7 @@ def speed_forward(x):
 
     """
     assert len(x.shape) == 2 and x.shape[1] == UDIM
-    return x[:, 3] * np.sin(x[:, 2])
+    return x[:, 3, None] * np.sin(x[:, 2, None])
 
 
 @jax.jit
@@ -160,8 +169,8 @@ def speed_size(x):
         x (ndarray): batched 2D state, (nbatch, 4)
 
     """
-    assert len(x.shape) == 2 and x.shape[1] == UDIM
-    return x[:, 3]
+    assert len(x.shape) == 2 and x.shape[1] == XDIM
+    return x[:, 3, None]
 
 
 @jax.jit
@@ -171,12 +180,15 @@ def control_magnitude(u):
     Args:
         u (ndarray): batched 2D action, (nbatch, 2)
 
+    Output:
+        out (ndarray): (nbatch, 1)
+
     Convention:
         * Action: [turn, accel/brake]
 
     """
     assert len(u.shape) == 2 and u.shape[1] == UDIM
-    return np.linalg.norm(u, axis=-1)
+    return np.linalg.norm(u, axis=1, keepdims=True)
 
 
 @jax.jit
@@ -186,10 +198,13 @@ def control_thrust(u):
     Args:
         u (ndarray): batched 2D action, (nbatch, 2)
 
+    Output:
+        out (ndarray): (nbatch, 1)
+
     """
     assert len(u.shape) == 2 and u.shape[1] == UDIM
     thrust = np.maximum(u * np.array([0, 1]), 0)
-    return np.sum(thrust, axis=-1)
+    return np.sum(thrust, axis=1, keepdims=True)
 
 
 @jax.jit
@@ -199,18 +214,29 @@ def control_brake(u):
     Args:
         u (ndarray): batched 2D action, (nbatch, 2)
 
+    Output:
+        out (ndarray): (nbatch, 1)
+
     """
     assert len(u.shape) == 2 and u.shape[1] == UDIM
     brake = np.minimum(u * np.array([0, 1]), 0)
-    return np.sum(brake, axis=-1)
+    return np.sum(brake, axis=1, keepdims=True)
 
 
 @jax.jit
 def control_turn(u):
-    """Turning force."""
+    """Turning force.
+
+    Args:
+        u (ndarray): batched 2D action, (nbatch, 2)
+
+    Output:
+        out (ndarray): (nbatch, 1)
+
+    """
     assert len(u.shape) == 2 and u.shape[1] == UDIM
     turn = np.abs(u * np.array([1, 0]))
-    return np.sum(u, axis=-1)
+    return np.sum(u, axis=1, keepdims=True)
 
 
 # ====================================================
@@ -386,22 +412,27 @@ def gaussian_feat(data, sigma=None, mu=0.0):
         sigma: int or (dim, )
         mu: int or (dim, )
 
+    Output:
+        out: (nbatch, 1)
+
     Note:
         Assumes independent components.
 
     """
     assert len(data.shape) == 2
-    assert (
-        len(sigma.shape) == 1
-        or len(sigma.shape) == 1
-        and sigma.shape[0] == data.shape[1]
-    )
-    assert len(mu.shape) == 1 or len(mu.shape) == 1 and mu.shape[0] == data.shape[1]
+    mu = np.array(mu)
+    assert len(mu.shape) == 0 or len(mu.shape) == 1 and mu.shape[0] == data.shape[1]
     # Make sigma diagonalized vector
     dim = data.shape[1]
     if sigma is None:
         sigma = np.eye(dim)
     else:
+        sigma = np.array(sigma)
+        assert (
+            len(sigma.shape) == 0
+            or len(sigma.shape) == 1
+            and sigma.shape[0] == data.shape[1]
+        )
         sigma = np.atleast_1d(sigma) ** 2
 
     # Number of data points
@@ -415,7 +446,8 @@ def gaussian_feat(data, sigma=None, mu=0.0):
         gaus = np.sum(gaus)
         return gaus
 
-    feats = jmap(dim_i_gaussian, diff)
+    # pad one dimension to output (nbatch, 1)
+    feats = np.array(jmap(dim_i_gaussian, diff))[:, None]
     return feats
 
 

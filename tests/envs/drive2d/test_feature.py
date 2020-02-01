@@ -15,41 +15,56 @@ xdim = 4
 def run_one_act_feature(feat, u0):
     """Iterate on only u0"""
     ft_batch = feat(u0)
+    assert len(ft_batch.shape) == 2
     ft_single = []
     for i, u in enumerate(u0):
-        assert np.allclose(ft_batch[i], feat(np.array([u])))
+        out = feat(np.array([u]))
+        assert len(out.shape) == 2
+        assert np.allclose(ft_batch[i], out)
 
 
 def run_one_state_feature(feat, x0, u0):
     """Iterate on only x0 and not u0"""
     ft_batch = feat(x0, u0)
+    assert len(ft_batch.shape) == 2
     ft_single = []
     for i, x in enumerate(x0):
-        assert np.allclose(ft_batch[i], feat(np.array([x]), u0))
+        out = feat(np.array([x]), u0)
+        assert len(out.shape) == 2
+        assert np.allclose(ft_batch[i], out)
 
 
 def run_two_state_feature(feat, x0, u0):
     """Iterate on both x0 and u0"""
     ft_batch = feat(x0, u0)
+    assert len(ft_batch.shape) == 2
     ft_single = []
     for i, (x, u) in enumerate(zip(x0, u0)):
-        assert np.allclose(ft_batch[i], feat(np.array([x]), np.array([u])))
+        out = feat(np.array([x]), np.array([u]))
+        assert len(out.shape) == 2
+        assert np.allclose(ft_batch[i], out)
 
 
 def run_three_state_feature(feat, a0, b0, c0):
     """Only iterate on a0, not on b0, c0"""
     ft_batch = feat(x0, b0, c0)
+    assert len(ft_batch.shape) == 2
     ft_single = []
     for i, a in enumerate(a0):
-        assert np.allclose(ft_batch[i], feat(np.array([a]), b0, c0))
+        out = feat(np.array([a]), b0, c0)
+        assert len(out.shape) == 2
+        assert np.allclose(ft_batch[i], out)
 
 
 def run_four_state_feature(feat, a0, b0, c0, d0):
     """Only iterate on a0, not on b0, c0, d0"""
     ft_batch = feat(x0, b0, c0, d0)
+    assert len(ft_batch.shape) == 2
     ft_single = []
     for i, a in enumerate(a0):
-        assert np.allclose(ft_batch[i], feat(np.array([a]), b0, c0, d0))
+        out = feat(np.array([a]), b0, c0, d0)
+        assert len(out.shape) == 2
+        assert np.allclose(ft_batch[i], out)
 
 
 # ====================================================
@@ -106,7 +121,7 @@ def test_speed_forward():
 
 
 def test_speed_size():
-    run_one_act_feature(speed_size, u0)
+    run_one_act_feature(speed_size, x0)
 
 
 def test_control_magnitude():
@@ -209,19 +224,22 @@ def test_gaussian_feat():
     mu = np.array([0.5, 0.5])
     sigma = np.array([1, 2])
     var = multivariate_normal(mean=mu, cov=np.diag(sigma ** 2))
-    assert np.allclose(gaussian_feat(data, sigma, mu), [var.pdf(data)])
+    result = np.array([var.pdf(data)])[:, None]
+    assert np.allclose(gaussian_feat(data, sigma, mu), result)
 
     data = np.array([[-5, -3]])
     mu = np.array([0.5, 0.1])
     sigma = np.array([0.1, 0.2])
     var = multivariate_normal(mean=mu, cov=np.diag(sigma ** 2))
-    assert np.allclose(gaussian_feat(data, sigma, mu), [var.pdf(data)])
+    result = np.array([var.pdf(data)])[:, None]
+    assert np.allclose(gaussian_feat(data, sigma, mu), result)
 
     data = np.array([[-1, -1], [-4, 2]])
     mu = np.array([0.5, 0.5])
     sigma = np.array([1, 2])
     var = multivariate_normal(mean=mu, cov=np.diag(sigma ** 2))
-    assert np.allclose(gaussian_feat(data, sigma, mu), [var.pdf(data)])
+    result = var.pdf(data)[:, None]
+    assert np.allclose(gaussian_feat(data, sigma, mu), result)
 
     run_three_state_feature(gaussian_feat, x0, obj, obj)
 

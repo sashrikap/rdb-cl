@@ -258,7 +258,7 @@ class DriveWorld(gym.Env):
             fn = index_func(obj.dynamics_fn, idx)
             fns[key] = fn
             indices[key] = idx
-        dynamics_fn = concat_funcs(fns.values())
+        dynamics_fn = concat_funcs(fns.values(), axis=1)
         return dynamics_fn, indices
 
     def _get_raw_features_dict(self):
@@ -291,7 +291,6 @@ class DriveWorld(gym.Env):
             key = f"cars{c_i}"
             car_idx = self._indices[key]
             main_idx = self._indices["main_car"]
-            # car_shape = np.array([self._car_width, self._car_length])
 
             def car_dist_fn(state, actions, car_idx=car_idx):
                 # Very important to keep third argument for variable closure
@@ -342,9 +341,9 @@ class DriveWorld(gym.Env):
         def control_turn_fn(state, actions):
             return feature.control_turn(actions)
 
-        feats_dict["dist_cars"] = concat_funcs(car_fns, axis=0)
-        feats_dict["dist_lanes"] = concat_funcs(lane_fns, axis=0)
-        feats_dict["dist_objects"] = concat_funcs(obj_fns, axis=0)
+        feats_dict["dist_cars"] = concat_funcs(car_fns, axis=1)
+        feats_dict["dist_lanes"] = concat_funcs(lane_fns, axis=1)
+        feats_dict["dist_objects"] = concat_funcs(obj_fns, axis=1)
         feats_dict["speed"] = speed_fn
         feats_dict["speed_over"] = speed_fn
         feats_dict["speed_under"] = speed_fn
@@ -580,9 +579,7 @@ class DriveWorld(gym.Env):
 
     def set_heat(self, weights):
         # Clean up weights input
-        weights = zero_fill_dict(weights, self.features_keys)
-        weights_dict = sort_dict_by_keys(weights, self.features_keys)
-        weights = np.array(list(weights_dict.values()))
+        weights = prepare_weights(weights, self.features_keys)
 
         def val(x, y, weights=weights):
             cost_fn = partial(self._main_car.cost_runtime, weights=weights)

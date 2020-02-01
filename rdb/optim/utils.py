@@ -16,6 +16,24 @@ from functools import partial, reduce
 from toolz.functoolz import juxt
 from operator import mul, add
 
+# ==================================================
+# =================== MPC Tools ====================
+# ==================================================
+
+
+def prepare_weights(weights, features_keys):
+    """Given weights (with or w/o missing keys) and feature keys, zero-fill and sort weights.
+
+    Args:
+        weights (dict): dictionary weights with missing values
+        features_keys (list): full list of feature keys
+
+    """
+    weights = zero_fill_dict(weights, features_keys)
+    weights_dict = sort_dict_by_keys(weights, features_keys)
+    weights = np.array(list(weights_dict.values()))
+    return weights
+
 
 # ==================================================
 # ================ Dictionary Tools ================
@@ -367,30 +385,3 @@ def not_func(func):
 def debug_print(data):
     print(data)
     return data
-
-
-# def merge_list_funcs(funcs_list):
-#     """Execute a list of functions individually.
-
-#     """
-
-#     def func(*args):
-#         output = []
-#         for fn in funcs_list:
-#             output.append(fn(*args))
-#         return output
-
-#     return func
-
-
-# def chain_list_funcs(outer_list, inner_list):
-#     """Chain lists of functions.
-
-#     Example:
-#         >>> output[i] = outer[i](inner[i](data))
-
-#     """
-#     output = []
-#     for outer, inner in zip(outer_list, inner_list):
-#         output.append(compose(outer, inner))
-#     return output

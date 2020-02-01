@@ -86,9 +86,7 @@ class Optimizer(object):
     def __call__(self, x0, us0=None, weights=None, init="zeros"):
         ## Turn dict into list, in the same order as environment features_keys
         ## which later gets chained into one cost function
-        weights = zero_fill_dict(weights, self._features_keys)
-        weights_dict = sort_dict_by_keys(weights, self._features_keys)
-        weights = np.array(list(weights_dict.values()))
+        weights = prepare_weights(weights, self._features_keys)
 
         if not self._compiled:
             print("First time running optimizer, compiling with jit...")

@@ -173,7 +173,7 @@ class Runner(object):
         """
         # TODO: action space shape checking
         assert self._roll_costs is not None, "Cost function improperly defined"
-        weights = zero_fill_dict(weights, self._env.features_keys)
+        weights = prepare_weights(weights, self._env.features_keys)
         weights_dict = sort_dict_by_keys(weights, self._env.features_keys)
         weights = np.array(list(weights_dict.values()))
 
