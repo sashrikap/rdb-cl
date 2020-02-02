@@ -32,7 +32,7 @@ def test_random_probs():
     for _ in range(1000):
         results.append(random_choice_fn(arr, 100, probs, replacement=True))
     mean = onp.array(results).mean()
-    assert onp.isclose(mean, 1.99924)
+    assert mean > 1.99 and mean < 2.01
 
     probs = onp.array([0.6, 0.2, 0.2])
     arr = [1, 2, 3]
@@ -40,7 +40,7 @@ def test_random_probs():
     for _ in range(1000):
         results.append(random_choice_fn(arr, 4, probs, replacement=True))
     mean = onp.array(results).mean()
-    assert onp.isclose(mean, 1.606)
+    assert mean > 1.59 and mean < 1.61
 
 
 def test_random_speed():

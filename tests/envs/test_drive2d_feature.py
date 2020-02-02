@@ -1,5 +1,6 @@
 from rdb.envs.drive2d.core.feature import *
 import jax.numpy as np
+import numpy as onp
 import pytest
 
 batch = 10
@@ -146,14 +147,10 @@ def test_control_turn():
 
 
 def test_index_feat():
-    data = np.array([[1, 2], [3, 4]])
+    data = np.array([[[1], [2]], [[3], [4]]])
     index = 1
-    result = np.array([[2], [4]])
-    assert np.allclose(index_feat(data, index), result)
-    index = 0
-    result = np.array([[1], [3]])
-    assert np.allclose(index_feat(data, index), result)
-    run_one_state_feature(index_feat, x0, 0)
+    result = np.array([[[2]], [[4]]])
+    assert np.allclose(item_index_feat(data, index), result)
 
 
 def test_quadratic():
@@ -220,28 +217,31 @@ def test_neg_exp_feat():
 def test_gaussian_feat():
     from scipy.stats import multivariate_normal
 
-    data = np.array([[-1, -1]])
+    data = np.array([[[-1, -1]]])
     mu = np.array([0.5, 0.5])
     sigma = np.array([1, 2])
     var = multivariate_normal(mean=mu, cov=np.diag(sigma ** 2))
-    result = np.array([var.pdf(data)])[:, None]
+    result = np.array([var.pdf(data)])[..., None]
     assert np.allclose(gaussian_feat(data, sigma, mu), result)
 
-    data = np.array([[-5, -3]])
+    data = np.array([[[-5, -3]]])
     mu = np.array([0.5, 0.1])
     sigma = np.array([0.1, 0.2])
     var = multivariate_normal(mean=mu, cov=np.diag(sigma ** 2))
-    result = np.array([var.pdf(data)])[:, None]
+    result = np.array([var.pdf(data)])[..., None]
     assert np.allclose(gaussian_feat(data, sigma, mu), result)
 
-    data = np.array([[-1, -1], [-4, 2]])
+    data = np.array([[[-1, -1], [-4, 2]]])
     mu = np.array([0.5, 0.5])
     sigma = np.array([1, 2])
     var = multivariate_normal(mean=mu, cov=np.diag(sigma ** 2))
-    result = var.pdf(data)[:, None]
+    result = var.pdf(data)[..., None]
     assert np.allclose(gaussian_feat(data, sigma, mu), result)
 
-    run_three_state_feature(gaussian_feat, x0, obj, obj)
+    data = onp.random.random((3, 4, 2))
+    var = multivariate_normal(mean=mu, cov=np.diag(sigma ** 2))
+    result = var.pdf(data)[..., None]
+    assert np.allclose(gaussian_feat(data, sigma, mu), result)
 
 
 def test_exp_bounded_feat():

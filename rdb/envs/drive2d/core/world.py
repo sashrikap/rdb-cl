@@ -276,20 +276,21 @@ class DriveWorld(gym.Env):
         Note:
             Decides environment feature key order for raw_feats, nonlinear_feats.
 
-        Example:
-            >>> feat_1 = feature_fn_1(state)
-
         Output:
-            indices["dist_cars"]: `dist = func(state)`
-            indices["dist_lanes"]:
-            indices["speed"]:
-            indices["control"]:
+            fn["dist_cars"]: difference to other cars
+                (nbatch, xdim) -> (nbatch, ncars, car_xdim)
+            fn["dist_lanes"]: distance to lanes
+                (nbatch, xdim) -> (nbatch, nlanes)
+            fn["dist_objects"]: difference to objects
+                (nbatch, xdim) -> (nbatch, nobjs, obj_xdim)
+            fn["speed"]: speed magnitude
+                (nbatch, xdim) -> (nbatch, 1)
+            fn["control"]: control magnitude
+                (nbatch, xdim) -> (nbatch, 1)
 
-        Require:
-            self._indices: e.g. {'car0': (0, 3)}
+        Note:
+            * requires self._indices: e.g. {'car0': (0, 3)}
 
-        Output:
-            feat_fns: e.g. {'dist_cars': lambda state: return dist}
 
         """
         assert self._indices is not None, "Need to define state indices"
@@ -350,9 +351,9 @@ class DriveWorld(gym.Env):
         def control_turn_fn(state, actions):
             return feature.control_turn(actions)
 
-        feats_dict["dist_cars"] = concat_funcs(car_fns, axis=1)
-        feats_dict["dist_lanes"] = concat_funcs(lane_fns, axis=1)
-        feats_dict["dist_objects"] = concat_funcs(obj_fns, axis=1)
+        feats_dict["dist_cars"] = stack_funcs(car_fns, axis=1)
+        feats_dict["dist_lanes"] = stack_funcs(lane_fns, axis=1)
+        feats_dict["dist_objects"] = stack_funcs(obj_fns, axis=1)
         feats_dict["speed"] = speed_fn
         feats_dict["speed_over"] = speed_fn
         feats_dict["speed_under"] = speed_fn
@@ -434,7 +435,7 @@ class DriveWorld(gym.Env):
         weights=None,
     ):
         assert mode in ["human", "state_pixels", "rgb_array"]
-        if len(self.state) > 1:
+        if self.state.shape[0] > 1:
             print("WARNING: rendering with batch mode")
 
         if self._window is None:
@@ -597,8 +598,8 @@ class DriveWorld(gym.Env):
             cost_fn = partial(self._main_car.cost_runtime, weights=weights)
             state = deepcopy(self.state)
             main_idx = self._indices["main_car"]
-            state[main_idx[0] : main_idx[0] + 3] = [x, y, onp.pi / 3]
-            act = onp.array([0, 0])
+            state[:, main_idx[0] : main_idx[0] + 3] = [x, y, onp.pi / 3]
+            act = onp.zeros((1, self.udim))
             return cost_fn(state, act)
 
         self._heat_fn = val

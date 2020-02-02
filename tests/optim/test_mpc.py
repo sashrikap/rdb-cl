@@ -4,8 +4,12 @@ import pytest
 import jax.numpy as np
 import numpy as onp
 import rdb.envs.drive2d
-from rdb.optim.mpc import build_mpc
+from jax.config import config
+from rdb.optim.mpc import *
 from rdb.optim.runner import Runner
+
+config.update("jax_enable_x64", True)
+
 
 ENV_NAME = "Week6_02-v1"  # Two Blockway
 env = gym.make(ENV_NAME)
@@ -30,7 +34,7 @@ optimizer, runner = build_mpc(
 def get_init_states(nbatch):
     num_tasks = len(env.all_tasks)
     tasks = env.all_tasks[onp.random.randint(0, num_tasks, size=nbatch)]
-    states = onp.stack([env.get_init_state(t) for t in tasks], axis=0)
+    states = onp.concatenate([env.get_init_state(t) for t in tasks], axis=0)
     return states
 
 

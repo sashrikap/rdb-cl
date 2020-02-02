@@ -39,8 +39,10 @@ def build_offtrack(env):
     def func(states, actions):
         assert len(states.shape) == 3
         assert len(actions.shape) == 3
+        # feats (T, nbatch, nfence, 1)
         feats = vfn(states, actions)
-        return np.any(np.abs(feats) < threshold, axis=2).swapaxes(0, 1)
+        assert len(feats.shape) == 4
+        return np.any(np.abs(feats) < threshold, axis=(2, 3)).swapaxes(0, 1)
 
     return func
 
@@ -49,8 +51,8 @@ def build_collision(env):
     """Detects when main_car nudges another car.
 
     Args:
-        states (ndarray): (T, nbatch, xdim)
         actions (ndarray): (T, nbatch, udim)
+        states (ndarray): (T, nbatch, xdim)
 
     Return:
         * collision (ndarray): (nbatch, T) boolean
@@ -60,15 +62,17 @@ def build_collision(env):
 
     """
     ncars = len(env.cars)
-    threshold = np.array([env.car_width, env.car_length]).repeat(ncars)
+    threshold = np.array([env.car_width, env.car_length])
     vfn = jax.vmap(env.raw_features_dict["dist_cars"])
 
     @jax.jit
     def func(states, actions):
         assert len(states.shape) == 3
         assert len(actions.shape) == 3
+        # feats: (T, nbatch, ncars, 2)
         feats = vfn(states, actions)
-        return np.any(np.abs(feats) < threshold, axis=2).swapaxes(0, 1)
+        assert len(feats.shape) == 4
+        return np.any(np.abs(feats) < threshold, axis=(2, 3)).swapaxes(0, 1)
 
     return func
 
@@ -111,7 +115,9 @@ def build_overspeed(env, max_speed):
     def func(states, actions):
         assert len(states.shape) == 3
         assert len(actions.shape) == 3
+        # feats (T, nbatch, 1)
         feats = vfn(states, actions)
+        assert len(feats.shape) == 3
         return np.any(feats > max_speed, axis=2).swapaxes(0, 1)
 
     return func
@@ -134,7 +140,9 @@ def build_underspeed(env, min_speed):
     def func(states, actions):
         assert len(states.shape) == 3
         assert len(actions.shape) == 3
+        # feats (T, nbatch, 1)
         feats = vfn(states, actions)
+        assert len(feats.shape) == 3
         return np.any(feats < min_speed, axis=2).swapaxes(0, 1)
 
     return func
@@ -161,10 +169,11 @@ def build_wronglane(env, lane_idx):
     def func(states, actions):
         assert len(states.shape) == 3
         assert len(actions.shape) == 3
-        # (T, nbatch, nlanes)
+        # feats (T, nbatch, nlanes, 1)
         feats = vfn(states, actions)
+        assert len(feats.shape) == 4
         return np.any(
-            feats[:, :, lane_idx, None] < env.lane_width / 2, axis=2
+            feats[:, :, lane_idx, None, :] < env.lane_width / 2, axis=(2, 3)
         ).swapaxes(0, 1)
 
     return func
@@ -194,7 +203,9 @@ def build_overtake(env, car_idx):
     def func(states, actions):
         assert len(states.shape) == 3
         assert len(actions.shape) == 3
+        # feats (T, nbatch, 1)
         feats = vfn(states, actions)
+        assert len(feats.shape) == 3
         return np.any(feats, axis=2).swapaxes(0, 1)
 
     return func

@@ -35,8 +35,8 @@ def test_index():
         return loss
 
     grad_sum = jax.grad(loss_sum)
-    gs = grad_sum(np.array([0, 1, 2], dtype=float))
-    assert np.allclose(gs, np.array([1, 2, 1], dtype=float))
+    gs = grad_sum(np.array([0.0, 1.0, 2.0]))
+    assert np.allclose(gs, np.array([1.0, 2.0, 1.0]))
 
 
 def test_multivariable():
@@ -45,7 +45,7 @@ def test_multivariable():
         return loss
 
     grad = jax.grad(loss_sum)
-    gs = grad(np.array([2, 3, 4, 5], dtype=float))
+    gs = grad(np.array([2.0, 3.0, 4.0, 5.0]))
 
 
 def test_retain():
@@ -58,14 +58,14 @@ def test_retain():
         return loss
 
     grad = jax.grad(loss_sum)
-    gs = grad(np.array([2, 3, 4, 5], dtype=float))
+    gs = grad(np.array([2.0, 3.0, 4.0, 5.0]))
     assert np.allclose(gs, np.array([40.0, 60.0, 480.0, 750.0]))
     a = 20
     t1 = time.time()
-    gs = grad(np.array([2, 3, 4, 5], dtype=float))
+    gs = grad(np.array([2.0, 3.0, 4.0, 5.0]))
     t2 = time.time()
     _grad = jax.jit(grad)
-    _gs = _grad(np.array([2, 3, 4, 5], dtype=float))
+    _gs = _grad(np.array([2.0, 3.0, 4.0, 5.0]))
     t3 = time.time()
 
     dt1 = t2 - t1
@@ -96,7 +96,7 @@ def test_args():
         return loss
 
     grad = jax.grad(loss_sum)
-    gs = grad(np.array([2, 3, 4, 5], dtype=float), 3)
+    gs = grad(np.array([2.0, 3.0, 4.0, 5.0]), 3)
     assert np.allclose(gs, np.array([12.0, 18.0, 144.0, 225.0]))
 
 

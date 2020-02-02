@@ -1,9 +1,12 @@
 from jax.lax import fori_loop, scan
 from jax.ops import index_update
+from jax.config import config
 from jax import jit
 from time import time
 import jax.numpy as np
 import jax
+
+config.update("jax_enable_x64", True)
 
 
 def test_fori():
@@ -66,4 +69,4 @@ def test_vmap():
 
     vfun = jax.vmap(fun)
     vals = np.ones((3, 3))
-    assert np.allclose(vfun(vals), [2, 2, 2])
+    assert np.allclose(vfun(vals), [2.0, 2.0, 2.0])

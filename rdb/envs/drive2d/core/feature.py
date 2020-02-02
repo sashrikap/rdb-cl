@@ -279,22 +279,36 @@ def less_than(x, y):
 ##==================================================
 
 
+def is_state(data):
+    """Wheter data look like (nbatch, dim)"""
+    return len(data.shape) == 2
+
+
+def is_item_state(data):
+    """Whether data look like (nbatch, nitem, dim)"""
+    return len(data.shape) == 3
+
+
+def is_numeric(data):
+    """Whether data is numerical value, e.g. float"""
+    return len(np.array(data).shape) == 0
+
+
 @jax.jit
-def index_feat(data, index):
+def item_index_feat(data, index):
     """Compute data[:, index].
 
     Args:
-        data (ndarray): batched 2D state, (nbatch, dim)
-        index: int or (batch,)
+        data (ndarray): batched 2D state, (nbatch, ndata, dim)
+        index: int
 
     Output:
         out (ndarray): (nbatch, 1)
 
     """
-    assert len(data.shape) == 2
-    index = np.array(index)
-    assert len(index.shape) == 0
-    return data[:, index, None]
+    assert is_item_state(data)
+    assert is_numeric(index)
+    return data[:, index, None, :]
 
 
 @jax.jit
@@ -302,11 +316,11 @@ def quadratic_feat(data, goal=None):
     """Compute square(data - goal).
 
     Args:
-        data (ndarray): batched 2D state, (nbatch, dim)
+        data (ndarray): batched 2D state, (nbatch, dim) or (nbatch, nitem, dim)
         goal (ndarray): target, (nbatch, dim) or (dim,)
 
     """
-    assert len(data.shape) == 2
+    assert is_state(data) or is_item_state(data)
     if goal is None:
         goal = np.zeros_like(data)
     return np.square(data - goal)
@@ -317,11 +331,11 @@ def abs_feat(data, goal=None):
     """Compute abs(data - goal).
 
     Args:
-        data (ndarray): batched 2D state, (nbatch, dim)
+        data (ndarray): batched 2D state, (nbatch, dim) or (nbatch, nitems, dim)
         goal (ndarray): target, (nbatch, dim) or (dim,)
 
     """
-    assert len(data.shape) == 2
+    assert is_state(data) or is_item_state(data)
     if goal is None:
         goal = np.zeros_like(data)
     return np.abs(data - goal)
@@ -332,10 +346,10 @@ def neg_feat(data):
     """Compute -data.
 
     Args:
-        data (ndarray): batched 2D state, (nbatch, dim)
+        data (ndarray): batched 2D state, (nbatch, dim) or (nbatch, nitems, dim)
 
     """
-    assert len(data.shape) == 2
+    assert is_state(data) or is_item_state(data)
     return -1 * data
 
 
@@ -344,10 +358,10 @@ def positive_const_feat(data):
     """Constant if greater than 0. Used to test boundaries.
 
     Args:
-        data (ndarray): batched 2D state, (nbatch, dim)
+        data (ndarray): batched 2D state, (nbatch, dim) or (nbatch, nitems, dim)
 
     """
-    assert len(data.shape) == 2
+    assert is_state(data) or is_item_state(data)
     return np.where(data > 0, np.ones_like(data), np.zeros_like(data))
 
 
@@ -356,10 +370,10 @@ def relu_feat(data):
     """Compute f(x) = x if x >= 0; 0 otherwise.
 
     Args:
-        data (ndarray): batched 2D state, (nbatch, dim)
+        data (ndarray): batched 2D state, (nbatch, dim) or (nbatch, nitems, dim)
 
     """
-    assert len(data.shape) == 2
+    assert is_state(data) or is_item_state(data)
     return np.maximum(data, 0)
 
 
@@ -368,10 +382,10 @@ def neg_relu_feat(data):
     """Compute f(x) = x if x < 0; 0 otherwise.
 
     Args:
-        data (ndarray): batched 2D state, (nbatch, dim)
+        data (ndarray): batched 2D state, (nbatch, dim) or (nbatch, nitem, dim)
 
     """
-    assert len(data.shape) == 2
+    assert is_state(data) or is_item_state(data)
     return np.minimum(data, 0)
 
 
@@ -380,11 +394,11 @@ def sigmoid_feat(data, mu=1.0):
     """Compute sigmoid function.
 
     Args:
-        data (ndarray): batched 2D state, (nbatch, dim)
+        data (ndarray): batched 2D state, (nbatch, dim) or (nbatch, nitem, dim)
         mu (mdarray): float or (dim,)
 
     """
-    assert len(data.shape) == 2
+    assert is_state(data) or is_item_state(data)
     mu = np.array(mu)
     assert len(mu.shape) == 0 or len(mu.shape) == 1 and mu.shape[0] == data.shape[1]
     return 0.5 * (np.tanh(data / (2.0 * mu)) + 1)
@@ -395,11 +409,11 @@ def neg_exp_feat(data, mu):
     """Compute -exp(x / mu).
 
     Args:
-        data (ndarray): batched 2D state, (nbatch, 4) or (nbatch, 2)
+        data (ndarray): batched 2D state, (nbatch, dim) or (nbatch, dim)
         mu (mdarray): float or (nbatch,)
 
     """
-    assert len(data.shape) == 2
+    assert is_state(data) or is_item_state(data)
     mu = np.array(mu)
     assert len(mu.shape) == 0 or len(mu.shape) == 1 and mu.shape[0] == data.shape[1]
     return np.exp(-data / mu)
@@ -410,22 +424,22 @@ def gaussian_feat(data, sigma=None, mu=0.0):
     """Compute Normal(data, sigma, mu).
 
     Args:
-        data (ndarray): batched 2D state, (nbatch, dim)
+        data (ndarray): batched 2D state, (nbatch, n_data, dim)
         sigma: int or (dim, )
         mu: int or (dim, )
 
     Output:
-        out: (nbatch, 1)
+        out: (nbatch, n_data, 1)
 
     Note:
         Assumes independent components.
 
     """
-    assert len(data.shape) == 2
+    assert is_item_state(data)
     mu = np.array(mu)
-    assert len(mu.shape) == 0 or len(mu.shape) == 1 and mu.shape[0] == data.shape[1]
+    assert len(mu.shape) == 0 or len(mu.shape) == 1 and mu.shape[0] == data.shape[2]
     # Make sigma diagonalized vector
-    dim = data.shape[1]
+    dim = data.shape[2]
     if sigma is None:
         sigma_arr = np.eye(dim)
     else:
@@ -433,16 +447,18 @@ def gaussian_feat(data, sigma=None, mu=0.0):
         assert (
             len(sigma_arr.shape) == 0
             or len(sigma_arr.shape) == 1
-            and sigma_arr.shape[0] == data.shape[1]
+            and sigma_arr.shape[0] == data.shape[2]
         )
         sigma_arr = np.atleast_1d(sigma_arr) ** 2
 
-    # Number of data points
-    num = data.shape[0]
+    # Collapse n_data (dimension 1)
+    data_shape = data.shape
+    data = data.reshape(-1, data.shape[2])
     feats = []
     diff = data - mu
 
     def dim_i_gaussian(diff_i):
+        assert len(diff_i.shape) == 1
         exp = np.exp(-0.5 * diff_i @ np.diag(1 / sigma_arr) @ diff_i.T)
         gaus = exp / (np.sqrt((2 * np.pi) ** dim * np.prod(sigma_arr)))
         gaus = np.sum(gaus)
@@ -450,6 +466,8 @@ def gaussian_feat(data, sigma=None, mu=0.0):
 
     # pad one dimension to output (nbatch, 1)
     feats = np.array(jmap(dim_i_gaussian, diff))[:, None]
+    # Recover n_data (dimension 1)
+    feats = feats.reshape((data_shape[0], data_shape[1], 1))
     return feats
 
 
@@ -459,8 +477,11 @@ def exp_bounded_feat(data, lower, upper, width):
 
     Used for `cost = exp(over bound)`
 
+    Args:
+        data (ndarray): batched 2D state, (nbatch, dim)
+
     """
-    assert len(data.shape) == 2
+    assert is_state(data)
     lower = np.array(lower)
     upper = np.array(upper)
     assert (

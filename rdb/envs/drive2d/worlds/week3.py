@@ -77,19 +77,22 @@ class HighwayDriveWorld_Week3(HighwayDriveWorld):
         sum_keep = partial(np.sum, keepdims=True)
         # Gaussian
         ncars = len(self._cars)
-        car_sigma = np.array([self._car_width / 2, self._car_length]).repeat(ncars)
         nlr_feats_dict["dist_cars"] = compose(
-            np.sum, partial(feature.gaussian_feat, sigma=car_sigma)
+            np.sum,
+            partial(
+                feature.gaussian_feat,
+                sigma=np.array([self._car_width / 2, self._car_length]),
+            ),
         )
         # Gaussian
         nlr_feats_dict["dist_lanes"] = compose(
             np.sum,
             feature.neg_feat,
             partial(feature.gaussian_feat, sigma=self._car_length),
-            partial(feature.index_feat, index=self._goal_lane),
+            partial(feature.item_index_feat, index=self._goal_lane),
         )
         """nlr_feats_dict["dist_lanes"] = compose(
-            np.sum, quadratic_feat, partial(index_feat, index=self._goal_lane)
+            np.sum, quadratic_feat, partial(item_index_feat, index=self._goal_lane)
         )"""
         # Quadratic barrier function
         """nlr_feats_dict["dist_fences"] = compose(

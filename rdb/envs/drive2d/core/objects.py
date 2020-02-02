@@ -75,7 +75,7 @@ class Object(object):
         self._sprite.x = self.state[0, 0]
         self._sprite.y = self.state[0, 1]
         rotation = 0.0
-        if len(self.state) >= 3:
+        if self.xdim >= 3:
             rotation = self.state[0, 2]
         self._sprite.rotation = rotation
         self._sprite.opacity = self._opacity

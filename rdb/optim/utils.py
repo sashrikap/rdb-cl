@@ -286,7 +286,7 @@ def stack_funcs(funcs, axis=0):
         * Useful for Dynamics function
 
     """
-    stack = partial(np.stack, axis=0)
+    stack = partial(np.stack, axis=axis)
     return compose(stack, juxt(funcs))
 
 

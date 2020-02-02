@@ -32,7 +32,7 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
         horizon=10,
         num_lanes=3,
         lane_width=0.13,
-        car_ranges=[[-0.4, 1.2], [-0.4, 1.2]],
+        car_ranges=[[-0.4, 1.0], [-0.4, 1.0]],
         car_delta=0.1,
         obstacle_states=[],
         obs_ranges=[[-0.16, 0.16, -0.8, 0.8]],
@@ -89,8 +89,8 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
         # Object state
         state_idx, task_idx = obj_idx, 2
         for obj in self._objects:
-            next_task_idx = task_idx + len(obj.state)
-            next_state_idx = state_idx + len(obj.state)
+            next_task_idx = task_idx + obj.xdim
+            next_state_idx = state_idx + obj.xdim
             all_states[:, state_idx:next_state_idx] = onp.array(
                 tasks[:, task_idx:next_task_idx]
             )
@@ -109,32 +109,40 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
 
         """
         nlr_feats_dict = OrderedDict()
+        # Sum across ncars & state (nbatch, ncars, state)
+        sum_items = partial(np.sum, axis=(1, 2))
         # Sum across state (nbatch, state)
         sum_state = partial(np.sum, axis=1)
         # Gaussian
         ncars = len(self._cars)
-        car_sigma = np.array([self._car_width / 2, self._car_length]).repeat(ncars)
         nlr_feats_dict["dist_cars"] = compose(
-            sum_state, partial(feature.gaussian_feat, sigma=car_sigma)
+            sum_items,
+            partial(
+                feature.gaussian_feat,
+                sigma=np.array([self._car_width / 2, self._car_length]),
+            ),
         )
         # Gaussian
         nlr_feats_dict["dist_lanes"] = compose(
-            sum_state,
+            sum_items,
             feature.neg_feat,
             partial(feature.gaussian_feat, sigma=self._car_length),
-            partial(feature.index_feat, index=self._goal_lane),
+            partial(feature.item_index_feat, index=self._goal_lane),
         )
         nlr_feats_dict["dist_fences"] = compose(
-            sum_state,
+            sum_items,
             # feature.quadratic_feat,
             # feature.neg_relu_feat,
             feature.relu_feat,
             lambda dist: dist + (self._lane_width + self._car_length) / 2,
         )
         nobjs = len(self._objects)
-        obj_sigma = np.array([self._car_width / 2, self._car_length * 2]).repeat(nobjs)
         nlr_feats_dict["dist_objects"] = compose(
-            partial(np.sum, axis=1), partial(feature.gaussian_feat, sigma=obj_sigma)
+            sum_items,
+            partial(
+                feature.gaussian_feat,
+                sigma=np.array([self._car_width / 2, self._car_length * 2]),
+            ),
         )
         bound = self._control_bound
         nlr_feats_dict["control"] = compose(sum_state, feature.quadratic_feat)
@@ -368,7 +376,7 @@ class Week6_02(HighwayDriveWorld_Week6):
         car2 = np.array([-lane_width, 0.9, np.pi / 2, 0])
         car_states = np.array([car1, car2])
         car_speeds = np.array([car_speed, car_speed])
-        car_ranges = [[-0.4, 1.2], [-0.4, 1.2]]
+        car_ranges = [[-0.4, 1.0], [-0.4, 1.0]]
         # Obstacle states
         obstacle_states = np.array([[0.0, 0.3], [-lane_width, 0.3]])
         # [x_min, x_max, y_min, y_max]
@@ -416,7 +424,7 @@ class Week6_02_v1(HighwayDriveWorld_Week6):
         car2 = np.array([-lane_width, 0.9, np.pi / 2, 0])
         car_states = np.array([car1, car2])
         car_speeds = np.array([car_speed, car_speed])
-        car_ranges = [[-0.4, 1.2], [-0.4, 1.2]]
+        car_ranges = [[-0.4, 1.0], [-0.4, 1.0]]
         # Obstacle states
         obstacle_states = np.array([[0.0, 0.3], [-lane_width, 0.3]])
         # [x_min, x_max, y_min, y_max]

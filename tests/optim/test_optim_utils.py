@@ -116,8 +116,8 @@ def test_concat_funcs():
     def f2(x1, x2):
         return x1 + 2 * x2
 
-    concat_fn = concat_funcs([f1, f2], axis=-1)
-    stack_fn = stack_funcs([f1, f2], axis=-1)
+    concat_fn = concat_funcs([f1, f2], axis=0)
+    stack_fn = stack_funcs([f1, f2], axis=0)
     x1 = np.array([1, 2])
     x2 = np.array([2, 3])
     stack_output = np.array([[-1, -1], [5, 8]])
@@ -133,8 +133,8 @@ def test_concat_funcs_2d():
     def f2(x1, x2):
         return x1 + 2 * x2
 
-    concat_fn = concat_funcs([f1, f2], axis=-1)
-    stack_fn = stack_funcs([f1, f2], axis=-1)
+    concat_fn = concat_funcs([f1, f2], axis=1)
+    stack_fn = stack_funcs([f1, f2], axis=0)
     x1 = np.array([[1, 2], [1, 2]])
     x2 = np.array([[2, 3], [2, 3]])
     stack_output = np.array([[[-1, -1], [-1, -1]], [[5, 8], [5, 8]]])
