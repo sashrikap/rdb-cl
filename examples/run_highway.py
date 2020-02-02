@@ -20,6 +20,10 @@ BENCHMARK = 100
 BENCHMARK_SINGLE = False
 BENCHMARK_BATCH = True
 MAKE_MP4 = False
+# ENGINE = "scipy"
+# METHOD = "lbfgs"
+ENGINE = "jax"
+METHOD = "adam"
 # ENV_NAME = "Week3_02-v0"  # Highway
 # TASK = (0.2, -0.7)
 # ENV_NAME = "Week6_01-v0"  # Blockway
@@ -63,7 +67,14 @@ if not DUMMY_ACTION:
     if not REPLAN:
         T = horizon
     optimizer, runner = build_mpc(
-        env, main_car.cost_runtime, horizon, env.dt, replan=REPLAN, T=T
+        env,
+        main_car.cost_runtime,
+        horizon,
+        env.dt,
+        replan=REPLAN,
+        T=T,
+        engine=ENGINE,
+        method=METHOD,
     )
     state = copy.deepcopy(env.state)
     t1 = time()
@@ -116,7 +127,14 @@ if not DUMMY_ACTION:
         if BENCHMARK_BATCH:
             N_batch = 20
             optimizer2, runner2 = build_mpc(
-                env, main_car.cost_runtime, horizon, env.dt, replan=REPLAN, T=T
+                env,
+                main_car.cost_runtime,
+                horizon,
+                env.dt,
+                replan=REPLAN,
+                T=T,
+                engine=ENGINE,
+                method=METHOD,
             )
             all_weights = []
             for _ in range(N):

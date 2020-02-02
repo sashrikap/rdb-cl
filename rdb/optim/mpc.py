@@ -29,7 +29,7 @@ config.update("jax_enable_x64", True)
 
 
 # =====================================================
-# =========== Utility functions for rollout ===========
+# ================= Optimizer wrappers ================
 # =====================================================
 
 
@@ -68,6 +68,11 @@ def scipy_wrapper(jit_fn, horizon, udim, flatten_out=False):
         return out
 
     return _fn
+
+
+# =====================================================
+# =========== Utility functions for rollout ===========
+# =====================================================
 
 
 def build_forward(f_dyn, xdim, udim, horizon, dt):
@@ -169,7 +174,9 @@ def build_features(udim, horizon, roll_forward, f_feat):
     return roll_features
 
 
-def build_mpc(env, f_cost, horizon, dt, replan=True, T=None):
+def build_mpc(
+    env, f_cost, horizon, dt, replan=True, T=None, engine="scipy", method="lbfgs"
+):
     """Create MPC controller.
 
     Args:
@@ -216,17 +223,34 @@ def build_mpc(env, f_cost, horizon, dt, replan=True, T=None):
     t_feats = build_features(udim, horizon, t_traj, f_feat)
 
     # Create optimizer & runner
-    optimizer = OptimizerScipy(
-        h_traj=scipy_wrapper(h_traj, horizon, udim),
-        h_grad_u=scipy_wrapper(h_grad_u, horizon, udim, flatten_out=True),
-        h_csum=scipy_wrapper(h_csum, horizon, udim),
-        xdim=xdim,
-        udim=udim,
-        horizon=horizon,
-        replan=replan,
-        T=T,
-        features_keys=env.features_keys,
-    )
+    if engine == "scipy":
+        optimizer = OptimizerScipy(
+            h_traj=scipy_wrapper(h_traj, horizon, udim),
+            h_grad_u=scipy_wrapper(h_grad_u, horizon, udim, flatten_out=True),
+            h_csum=scipy_wrapper(h_csum, horizon, udim),
+            xdim=xdim,
+            udim=udim,
+            horizon=horizon,
+            replan=replan,
+            T=T,
+            features_keys=env.features_keys,
+            method=method,
+        )
+    elif engine == "jax":
+        optimizer = OptimizerJax(
+            h_traj=h_traj,
+            h_grad_u=h_grad_u,
+            h_csum=h_csum,
+            xdim=xdim,
+            udim=udim,
+            horizon=horizon,
+            replan=replan,
+            T=T,
+            features_keys=env.features_keys,
+            method=method,
+        )
+    else:
+        raise NotImplementedError
     runner = Runner(env, roll_forward=t_traj, roll_costs=t_costs, roll_features=t_feats)
 
     return optimizer, runner

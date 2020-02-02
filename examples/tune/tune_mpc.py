@@ -85,8 +85,7 @@ def run_batch(states, optimizer, weights):
     return costs_all
 
 
-@pytest.mark.parametrize("nbatch", [1, 2, 5])
-def test_lbfgs_lbfgs(nbatch):
+def tune_lbfgs_lbfgs(nbatch):
     states = get_init_states(nbatch)
     ## Single
     costs_single = run_single(states, optimizer, weights)
@@ -99,12 +98,11 @@ def test_lbfgs_lbfgs(nbatch):
     max_idx = abs_ratio.argmax()
     max_ratio = abs_ratio[max_idx]
     print(
-        f"Batch Lbfgs vs single Lbfgs diff max ratio: {max_ratio:.3f} mean: {abs_ratio.mean():.3f}"
+        f"Batch Lbfgs vs single Lbfgs diff max ratio: {max_ratio:.3f} median: {np.median(abs_ratio):.3f}"
     )
 
 
-@pytest.mark.parametrize("nbatch", [1, 2, 5])
-def test_adam_lbfgs(nbatch):
+def tune_adam_lbfgs(nbatch):
     states = get_init_states(nbatch)
     ## Single
     costs_single = run_single(states, optimizer, weights)
@@ -117,30 +115,11 @@ def test_adam_lbfgs(nbatch):
     max_idx = abs_ratio.argmax()
     max_ratio = abs_ratio[max_idx]
     print(
-        f"Batch Adam vs single Lbfgs diff max ratio: {max_ratio:.3f} mean: {abs_ratio.mean():.3f}"
+        f"Batch Adam vs single Lbfgs diff max ratio: {max_ratio:.3f} median: {np.median(abs_ratio):.3f}"
     )
 
 
-@pytest.mark.parametrize("nbatch", [1, 2, 5])
-def ttest_adam_adam(nbatch):
-    states = get_init_states(nbatch)
-    ## Single
-    costs_single = run_single(states, adam_optimizer, weights)
-    ## Batch
-    costs_batch = run_batch(states, adam_optimizer, weights)
-    print(f"Nbatch {nbatch}")
-    ## Only check if batch is worse than single
-    abs_diff = onp.maximum(costs_batch - costs_single, 0)
-    abs_ratio = abs_diff / costs_single
-    max_idx = abs_ratio.argmax()
-    max_ratio = abs_ratio[max_idx]
-    print(
-        f"Batch Adam vs single Lbfgs diff max ratio: {max_ratio:.3f} mean: {abs_ratio.mean():.3f}"
-    )
-
-
-@pytest.mark.parametrize("nbatch", [1, 2, 5])
-def test_momentum_lbfgs(nbatch):
+def tune_momentum_lbfgs(nbatch):
     states = get_init_states(nbatch)
     ## Single
     costs_single = run_single(states, optimizer, weights)
@@ -153,28 +132,11 @@ def test_momentum_lbfgs(nbatch):
     max_idx = abs_ratio.argmax()
     max_ratio = abs_ratio[max_idx]
     print(
-        f"Batch Momt vs single Lbfgs diff max ratio: {max_ratio:.3f} mean: {abs_ratio.mean():.3f}"
+        f"Batch Momt vs single Lbfgs diff max ratio: {max_ratio:.3f} median: {np.median(abs_ratio):.3f}"
     )
 
 
-@pytest.mark.parametrize("nbatch", [1, 2, 5])
-def test_scipy_mpc(nbatch):
-    states = get_init_states(nbatch)
-    weights_all = [weights] * nbatch
-    acs_all = optimizer(states, weights=weights_all)
-    traj_all, costs_all, info_all = runner(
-        states, acs_all, weights=weights_all, batch=True
-    )
-    assert acs_all.shape == (horizon, nbatch, udim)
-    assert traj_all.shape == (horizon, nbatch, xdim)
-    assert info_all["costs"].shape == (nbatch, horizon)
-    for key, val in info_all["feats"].items():
-        assert val.shape == (nbatch, horizon)
-    for key, val in info_all["feats_sum"].items():
-        assert val.shape == (nbatch,)
-    for key, val in info_all["violations"].items():
-        assert val.shape == (nbatch, horizon)
-    for key, val in info_all["vios_sum"].items():
-        assert val.shape == (nbatch,)
-    for key, val in info_all["metadata"].items():
-        assert val.shape == (nbatch, horizon)
+if __name__ == "__main__":
+    # tune_lbfgs_lbfgs(100)
+    tune_adam_lbfgs(100)
+    # tune_momentum_lbfgs(100)

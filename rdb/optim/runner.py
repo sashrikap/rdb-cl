@@ -221,11 +221,13 @@ class Runner(object):
         t_compile = None
         a_shape = actions.shape
         if self._a_shape is None:
-            print(f"Runner first compile: ac {a_shape}")
+            print(f"JIT - Runner first compile: ac {a_shape}")
             self._a_shape = a_shape
             t_compile = time()
         elif actions.shape != self._a_shape:
-            print(f"Runner recompile: ac {actions.shape}, previously {self._a_shape}")
+            print(
+                f"JIT - Runner recompile: ac {actions.shape}, previously {self._a_shape}"
+            )
             self._a_shape = a_shape
             t_compile = time()
 
@@ -238,7 +240,7 @@ class Runner(object):
         # Track JIT recompile
         if t_compile is not None:
             print(
-                f"Runner finish compile in {time() - t_compile:.3f}s: ac {self._a_shape}"
+                f"JIT - Runner finish compile in {time() - t_compile:.3f}s: ac {self._a_shape}"
             )
 
         # Compute features
