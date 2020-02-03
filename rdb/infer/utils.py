@@ -173,6 +173,7 @@ def visualize_chains(samples, accepts, num_plots, fig_dir, title, **kwargs):
     Args:
         samples (ndim=2): array of samples
         accepts (ndim=2, bool): array of acceptance
+        num_plots (int): visualize chain progressively. E.g. num_plots=10, visualize ~10%, 20%...99% samples
         fig_dir (str): directory to save the figure
         title (str): figure name, gets padded with plot index
 

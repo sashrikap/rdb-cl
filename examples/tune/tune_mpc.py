@@ -26,36 +26,20 @@ weights = {
     "speed": 0.05,
     "control": 0.1,
 }
-optimizer, runner = build_mpc(
-    env,
-    main_car.cost_runtime,
-    horizon,
-    env.dt,
-    replan=False,
-    T=T,
-    engine="scipy",
-    method="lbfgs",
-)
-adam_optimizer, _ = build_mpc(
-    env,
-    main_car.cost_runtime,
-    horizon,
-    env.dt,
-    replan=False,
-    T=T,
-    engine="jax",
-    method="adam",
-)
-momt_optimizer, _ = build_mpc(
-    env,
-    main_car.cost_runtime,
-    horizon,
-    env.dt,
-    replan=False,
-    T=T,
-    engine="jax",
-    method="momentum",
-)
+
+
+def get_mpc(engine, method):
+    optimizer, runner = build_mpc(
+        env,
+        main_car.cost_runtime,
+        horizon,
+        env.dt,
+        replan=False,
+        T=T,
+        engine=engine,
+        method=method,
+    )
+    return optimizer, runner
 
 
 def get_init_states(nbatch):
@@ -65,9 +49,9 @@ def get_init_states(nbatch):
     return states
 
 
-def run_single(states, optimizer, weights):
+def run_single(states, optimizer, runner, weights):
     costs_single = []
-    for state_i in states:
+    for state_i in tqdm(states, desc=f"Running single optimzer"):
         state_i = state_i[None, :]
         acs_i = optimizer(state_i, weights=weights, batch=False)
         traj_i, cost_i, info_i = runner(state_i, acs_i, weights=weights, batch=False)
@@ -76,7 +60,7 @@ def run_single(states, optimizer, weights):
     return costs_single
 
 
-def run_batch(states, optimizer, weights):
+def run_batch(states, optimizer, runner, weights):
     weights_all = [weights] * len(states)
     acs_all = optimizer(states, weights=weights_all)
     traj_all, costs_all, info_all = runner(
@@ -85,12 +69,15 @@ def run_batch(states, optimizer, weights):
     return costs_all
 
 
-def tune_lbfgs_lbfgs(nbatch):
+def tune_method(nbatch, engine, method, engine_gt="scipy", method_gt="lbfgs"):
+    """Compare method {engine, method} vs single l-bfgs"""
+    opt_a, runner_a = get_mpc(engine, method)
+    opt_gt, runner_gt = get_mpc(engine_gt, method_gt)
     states = get_init_states(nbatch)
     ## Single
-    costs_single = run_single(states, optimizer, weights)
+    costs_single = run_single(states, opt_gt, runner_gt, weights)
     ## Batch
-    costs_batch = run_batch(states, optimizer, weights)
+    costs_batch = run_batch(states, opt_a, runner_a, weights)
     print(f"Nbatch {nbatch}")
     ## Only check if batch is worse than single
     abs_diff = onp.maximum(costs_batch - costs_single, 0)
@@ -98,45 +85,16 @@ def tune_lbfgs_lbfgs(nbatch):
     max_idx = abs_ratio.argmax()
     max_ratio = abs_ratio[max_idx]
     print(
-        f"Batch Lbfgs vs single Lbfgs diff max ratio: {max_ratio:.3f} median: {np.median(abs_ratio):.3f}"
-    )
-
-
-def tune_adam_lbfgs(nbatch):
-    states = get_init_states(nbatch)
-    ## Single
-    costs_single = run_single(states, optimizer, weights)
-    ## Batch
-    costs_batch = run_batch(states, adam_optimizer, weights)
-    print(f"Nbatch {nbatch}")
-    ## Only check if batch is worse than single
-    abs_diff = onp.maximum(costs_batch - costs_single, 0)
-    abs_ratio = abs_diff / costs_single
-    max_idx = abs_ratio.argmax()
-    max_ratio = abs_ratio[max_idx]
-    print(
-        f"Batch Adam vs single Lbfgs diff max ratio: {max_ratio:.3f} median: {np.median(abs_ratio):.3f}"
-    )
-
-
-def tune_momentum_lbfgs(nbatch):
-    states = get_init_states(nbatch)
-    ## Single
-    costs_single = run_single(states, optimizer, weights)
-    ## Batch
-    costs_batch = run_batch(states, momt_optimizer, weights)
-    print(f"Nbatch {nbatch}")
-    ## Only check if batch is worse than single
-    abs_diff = onp.maximum(costs_batch - costs_single, 0)
-    abs_ratio = abs_diff / costs_single
-    max_idx = abs_ratio.argmax()
-    max_ratio = abs_ratio[max_idx]
-    print(
-        f"Batch Momt vs single Lbfgs diff max ratio: {max_ratio:.3f} median: {np.median(abs_ratio):.3f}"
+        f"Batch {method} vs single {method_gt} diff max ratio: {max_ratio:.3f} median: {np.median(abs_ratio):.3f}"
     )
 
 
 if __name__ == "__main__":
-    # tune_lbfgs_lbfgs(100)
-    tune_adam_lbfgs(100)
-    # tune_momentum_lbfgs(100)
+    # tune_method(100, "scipy", "lbfgs")
+    # tune_method(1000, "scipy", "lbfgs")
+    # tune_method(100, "scipy", "bfgs")
+    # tune_method(100, "scipy", "bfgs", engine_gt="scipy", method_gt="bfgs")
+    # tune_method(100, "scipy", "basinhopping")
+    # tune_method(100, "jax", "adam")
+    tune_method(1000, "jax", "adam")
+    # tune_method(100, "jax", "momentum")

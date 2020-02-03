@@ -5,18 +5,20 @@ Wrappers around different scipy.minimize packages for MPC.
 """
 
 from jax.experimental import optimizers
-from scipy.optimize import minimize
+from scipy.optimize import minimize, basinhopping
 from rdb.optim.utils import *
 from rdb.infer import *
 import jax.numpy as np
 import jax
 
 
-class OptimizerScipy(object):
-    """Scipy Optimizer for optimal control.
+# =====================================================
+# ================= Optimizer classes =================
+# =====================================================
 
-    General API:
-        >>> actions = optimizer(x0, u0=u0, weights=weights)
+
+class OptimizerMPC(object):
+    """General MPC optimizer class.
 
     """
 
@@ -64,19 +66,16 @@ class OptimizerScipy(object):
         self._replan = replan
         self._horizon = horizon
         self._T = T
-        ## Rollout functions
-        self.h_traj = h_traj
-        self.h_csum = h_csum
-        self.h_grad_u = h_grad_u
-        self._u_shape = None
-
         self._method = method
-
+        self._u_shape = None
         if self._T is None:
             self._T = horizon
         if not self._replan:
             assert self._T == self._horizon, "No replanning, only plan for horizon"
-        return
+        ## Rollout functions
+        self.h_traj = h_traj
+        self.h_csum = h_csum
+        self.h_grad_u = h_grad_u
 
     def cost_u(self, x0, us, weights):
         """Compute costs.
@@ -130,16 +129,64 @@ class OptimizerScipy(object):
 
         """
         if self._method == "lbfgs":
+            """L-BFGS tend to work fairly well on MPC, the down side is vectorizing it
+            tends to drag down overall performance
+
+            Parameters:
+                `maxcor`: found by tuning with examples/tune/tune_mpc.
+
+            """
             res = minimize(
                 fn, us0, method="L-BFGS-B", jac=grad_fn, options={"maxcor": 20}
             )
-            info = {}
-            info["grad"] = res["jac"]
-            info["cost"] = res["fun"]
-            info["us"] = res["x"].reshape(us0.shape)
+        elif self._method == "bfgs":
+            """BFGS >= L-BFGS
+
+            Note:
+                * WARNING: unbearably slow to use for vectorized high-dim
+
+            """
+            res = minimize(fn, us0, method="BFGS", jac=grad_fn)
+        elif self._method == "basinhopping":
+            """Global Optimization
+
+            Basin hopping uses l-bfgs-b backbone and works at least better.
+
+            Note:
+                * WARNING: unbearably slow to compile for vectorized high-dim
+                4min on horizon 10, batch 100
+                * `niter` requires tuning
+
+
+            """
+
+            def fn_grad_fn(us0):
+                return fn(us0), grad_fn(us0)
+
+            kwargs = {"method": "L-BFGS-B", "jac": True}
+            res = basinhopping(fn_grad_fn, us0, minimizer_kwargs=kwargs, niter=200)
         else:
             raise NotImplementedError
+
+        info = {}
+        info["cost"] = res["fun"]
+        info["us"] = res["x"].reshape(us0.shape)
+        if "jac" in res.keys():
+            info["grad"] = res["jac"]
+        else:
+            info["grad"] = grad_fn(info["us"])
         return info
+
+    def _minimize(self, fn, grad_fn, us0):
+        """Optimize fn using scipy.minimize.
+
+        Args:
+            fn (fn): cost function
+            grad_fn (fn): gradient function
+            us0 (ndarray): initial action guess (T, nbatch, udim)
+
+        """
+        raise NotImplementedError
 
     def __call__(self, x0, weights, batch=True, us0=None, init="zeros"):
         """Run Optimizer.
@@ -196,10 +243,6 @@ class OptimizerScipy(object):
             for t in range(self._T):
                 csum_u_x0 = lambda u: self.h_csum(x_t, u, weights_arr)
                 grad_u_x0 = lambda u: self.h_grad_u(x_t, u, weights_arr)
-                # res = minimize(csum_u_x0, us0, method="L-BFGS-B", jac=grad_u_x0, options={"maxcor": 20})
-                # opt_u_t = np.reshape(res["x"], u_shape)
-                # cmin_t = res["fun"]
-                # grad_u_t = res["jac"]
                 res = self._minimize(csum_u_x0, grad_u_x0, us0)
                 opt_u_t = res["us"]
                 cmin_t = res["cost"]
@@ -222,12 +265,6 @@ class OptimizerScipy(object):
             ## Only optimize control sequence at the beginning
             csum_u_x0 = lambda u: self.h_csum(x0, u, weights_arr)
             grad_u_x0 = lambda u: self.h_grad_u(x0, u, weights_arr)
-            # res = minimize(csum_u_x0, us0, method="L-BFGS-B", jac=grad_u_x0, options={"maxcor": 20})
-            # opt_u = res["x"]
-            # cmin = res["fun"]
-            # grad = res["jac"]
-            # opt_u = np.reshape(opt_u, u_shape)
-
             res = self._minimize(csum_u_x0, grad_u_x0, us0)
             opt_u = res["us"]
             cmin = res["cost"]
@@ -244,7 +281,174 @@ class OptimizerScipy(object):
         return np.array(opt_u)
 
 
-class OptimizerJax(OptimizerScipy):
+class OptimizerScipy(OptimizerMPC):
+    """Scipy Optimizer for optimal control.
+
+    Includes scipy-powered optimizers. Though vectorizable, the batch size affects
+    individual optimization outcome quality.
+
+    General API:
+        >>> actions = optimizer(x0, u0=u0, weights=weights)
+
+    """
+
+    def __init__(
+        self,
+        h_traj,
+        h_grad_u,
+        h_csum,
+        xdim,
+        udim,
+        horizon,
+        replan=True,
+        T=None,
+        features_keys=[],
+        method="lbfgs",
+    ):
+        """Construct Optimizer.
+
+        Args:
+            h_traj (fn): horizion rollout
+                func(x0, us) -> (T, nbatch, xdim)
+            h_grad_u (fn): horizon gradient w.r.t. u
+                func(x0, us, weights) -> (T * nbatch * udim, )
+                input us flatten by scipy
+                output needs to be flattened
+            h_csum (fn): horizon cost
+                func(x0, us, weights) -> (T, nbatch, 1)
+                input us flatten by scipy
+            replan (bool): True if replan at every step
+            T (int): only in replan mode, plan for longer length than horizon
+
+        Example:
+            >>> # No initialization
+            >>> actions = optimizer(x0, weights=weights)
+            >>> # With initialization
+            >>> actions = optimizer(x0, u0=u0, weights=weights)
+
+        Note:
+            * If `weights` is provided, it is user's reponsibility to ensure that cost_u & grad_u can accept `weights` as argument
+
+        """
+        super().__init__(
+            h_traj,
+            h_grad_u,
+            h_csum,
+            xdim,
+            udim,
+            horizon,
+            replan=replan,
+            T=T,
+            features_keys=features_keys,
+            method=method,
+        )
+        ## Rollout functions
+        self.h_traj = self._scipy_wrapper(h_traj)
+        self.h_csum = self._scipy_wrapper(h_csum)
+        self.h_grad_u = self._scipy_wrapper(h_grad_u, flatten_out=True)
+
+    def _scipy_wrapper(self, jit_fn, flatten_out=False):
+        """Function to interface with scipy.optimizer, which implicitly flattens input.
+
+        This method does two things:
+            * Undo scipy.minimize's flattening
+            * Return ordinary numpy oupout
+
+        Note:
+            * Inefficient way
+              (horizon, nbatch, udim) -> scipy -> (horizon * nbatch * udim)
+              -> jit function recompile
+            * Efficient way
+              (horizon, nbatch, udim) -> scipy -> (horizon * nbatch * udim)
+              -> scipy_warpper ->(horizon, nbatch, udim)
+              -> jit function no recompile
+
+        This undos the effect.
+
+        """
+
+        def _fn(x, us, *args):
+            """
+
+            Args:
+                x (ndarray): initial state
+                us (ndarray): actions (horizon, nbatch, udim)
+
+            """
+            us = np.reshape(us, (self._horizon, -1, self._udim))
+            out = onp.array(jit_fn(x, us, *args))
+            if flatten_out:
+                out = out.flatten()
+            return out
+
+        return _fn
+
+    def _minimize(self, fn, grad_fn, us0):
+        """Optimize fn using scipy.minimize.
+
+        Args:
+            fn (fn): cost function
+            grad_fn (fn): gradient function
+            us0 (ndarray): initial action guess (T, nbatch, udim)
+
+        """
+        if self._method == "lbfgs":
+            """L-BFGS tend to work fairly well on MPC, the down side is vectorizing it
+            tends to drag down overall performance
+
+            Parameters:
+                `maxcor`: found by tuning with examples/tune/tune_mpc.
+
+            """
+            res = minimize(
+                fn, us0, method="L-BFGS-B", jac=grad_fn, options={"maxcor": 20}
+            )
+        elif self._method == "bfgs":
+            """BFGS >= L-BFGS
+
+            Note:
+                * WARNING: unbearably slow to use for vectorized high-dim
+
+            """
+            res = minimize(fn, us0, method="BFGS", jac=grad_fn)
+        elif self._method == "basinhopping":
+            """Global Optimization
+
+            Basin hopping uses l-bfgs-b backbone and works at least better.
+
+            Note:
+                * WARNING: unbearably slow to compile for vectorized high-dim
+                4min on horizon 10, batch 100
+                * `niter` requires tuning
+
+
+            """
+
+            def fn_grad_fn(us0):
+                return fn(us0), grad_fn(us0)
+
+            kwargs = {"method": "L-BFGS-B", "jac": True}
+            res = basinhopping(fn_grad_fn, us0, minimizer_kwargs=kwargs, niter=200)
+        else:
+            raise NotImplementedError
+
+        info = {}
+        info["cost"] = res["fun"]
+        info["us"] = res["x"].reshape(us0.shape)
+        if "jac" in res.keys():
+            info["grad"] = res["jac"]
+        else:
+            info["grad"] = grad_fn(info["us"])
+        return info
+
+
+class OptimizerJax(OptimizerMPC):
+    """JAX Optimizer for optimal control.
+
+    Includes JAX-powered vectorized optimizers.
+
+    """
+
     def __init__(
         self,
         h_traj,

@@ -131,7 +131,6 @@ def run_interactive(active_fn_name, random_keys=None, load_design=-1, evaluate=F
         eval_server=eval_server,
         iterations=p.EXP_ITERATIONS,
         num_eval_tasks=p.NUM_EVAL_TASKS,
-        num_eval_sample=p.NUM_EVAL_SAMPLES,
         num_eval_map=p.NUM_EVAL_MAP,
         num_active_tasks=p.NUM_ACTIVE_TASKS,
         num_active_sample=p.NUM_ACTIVE_SAMPLES,

@@ -134,7 +134,6 @@ def main(random_key, evaluate=False):
         eval_server=eval_server,
         iterations=EXP_ITERATIONS,
         num_eval_tasks=NUM_EVAL_TASKS,
-        num_eval_sample=NUM_EVAL_SAMPLES,
         num_eval_map=NUM_EVAL_MAP,
         num_active_tasks=NUM_ACTIVE_TASKS,
         num_active_sample=NUM_ACTIVE_SAMPLES,

@@ -1,4 +1,4 @@
-"""Active-IRD Experiment.
+"""Active-IRD Main Experiment.
 
 Prerequisite:
     * Acquisition criteria
@@ -54,7 +54,6 @@ class ExperimentActiveIRD(object):
         model (object): IRD model
         iteration (int): algorithm iterations
         num_eval_map (int): if > 0, use MAP estimate
-        num_eval_sample (int): if num_eval_map=-1, uniformly subsample current belief
         num_active_tasks (int): # task candidates for active selection
         num_active_sample (int): running acquisition function on belief
             samples is costly, so subsample belief particles
@@ -69,7 +68,6 @@ class ExperimentActiveIRD(object):
         iterations=10,
         num_eval_tasks=4,
         num_eval_map=-1,
-        num_eval_sample=5,
         num_active_tasks=4,
         num_active_sample=-1,
         fixed_task_seed=None,
@@ -96,7 +94,6 @@ class ExperimentActiveIRD(object):
         # Evaluation
         self._num_eval_map = num_eval_map
         self._num_eval_tasks = num_eval_tasks
-        self._num_eval_sample = num_eval_sample
         # Active Task proposal
         self._num_active_tasks = num_active_tasks
         self._fixed_candidates = fixed_candidates
@@ -299,10 +296,7 @@ class ExperimentActiveIRD(object):
         else:
             # Compute belief features
             eval_names = [f"eval_{task}" for task in eval_tasks]
-            if self._num_eval_map > 0:
-                belief = belief.map_estimate(self._num_eval_map)
-            else:
-                belief = belief.subsample(self._num_eval_sample)
+            belief = belief.map_estimate(self._num_eval_map)
             target = self._model.designer.truth
             self._eval_server.compute_tasks(
                 belief, eval_tasks, eval_names, verbose=True

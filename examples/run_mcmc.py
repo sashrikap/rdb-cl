@@ -4,7 +4,7 @@ Note:
     * See (rdb.exps.active_ird.py) for more details.
 
 """
-from rdb.exps.active_ird import ExperimentActiveIRD
+from rdb.exps.mcmc_convergence import ExperimentMCMC
 from rdb.exps.active import ActiveInfoGain, ActiveRatioTest, ActiveRandom
 from rdb.distrib.particles import ParticleServer
 from rdb.infer.ird_oc import IRDOptimalControl
@@ -123,16 +123,11 @@ def main(random_key):
         fixed_task_seed = None
 
     NUM_DESIGNS = len(design_data["DESIGNS"])
-    experiment = ExperimentActiveIRD(
+    experiment = ExperimentMCMC(
         ird_model,
-        active_fns,
         eval_server=eval_server,
-        iterations=EXP_ITERATIONS,
         num_eval_tasks=NUM_EVAL_TASKS,
-        num_eval_sample=NUM_EVAL_SAMPLES,
         num_eval_map=NUM_EVAL_MAP,
-        num_active_tasks=NUM_ACTIVE_TASKS,
-        num_active_sample=NUM_ACTIVE_SAMPLES,
         fixed_task_seed=fixed_task_seed,
         design_data=design_data,
         num_load_design=0,
@@ -142,10 +137,9 @@ def main(random_key):
         normalized_key=NORMALIZED_KEY,
     )
     """ Experiment """
-    for num_load_design in range(0, NUM_DESIGNS + 1):
-        experiment._num_load_design = num_load_design
+    for num_designer_prior in range(0, NUM_DESIGNS + 1):
         experiment.update_key(rng_key)
-        experiment.run_designer_mcmc()
+        experiment.run_designer_mcmc(num_designer_prior, "design")
     ray.shutdown()  # Prepare for next run, which reinitialize ray with different seed
 
 
@@ -158,12 +152,12 @@ if __name__ == "__main__":
 
     # Load parameters
     if not GCP_MODE:
-        PARAMS = load_params("examples/params/active_template.yaml")
+        PARAMS = load_params("examples/params/mcmc_template.yaml")
     else:
-        PARAMS = load_params("/dar_payload/rdb/examples/params/active_params.yaml")
+        PARAMS = load_params("/dar_payload/rdb/examples/params/mcmc_params.yaml")
     locals().update(PARAMS)
     if not GCP_MODE:
-        # RANDOM_KEYS = [24]
+        RANDOM_KEYS = [24]
         NUM_EVAL_WORKERS = 4
     for ki in copy.deepcopy(RANDOM_KEYS):
         main(random_key=ki)

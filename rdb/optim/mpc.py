@@ -29,48 +29,6 @@ config.update("jax_enable_x64", True)
 
 
 # =====================================================
-# ================= Optimizer wrappers ================
-# =====================================================
-
-
-def scipy_wrapper(jit_fn, horizon, udim, flatten_out=False):
-    """Function to interface with scipy.optimizer, which implicitly flattens input.
-
-    This method does two things:
-        * Undo scipy.minimize's flattening
-        * Return ordinary numpy oupout
-
-    Note:
-        * Inefficient way
-          (horizon, nbatch, udim) -> scipy -> (horizon * nbatch * udim)
-          -> jit function recompile
-        * Efficient way
-          (horizon, nbatch, udim) -> scipy -> (horizon * nbatch * udim)
-          -> scipy_warpper ->(horizon, nbatch, udim)
-          -> jit function no recompile
-
-    This undos the effect.
-
-    """
-
-    def _fn(x, us, *args):
-        """
-
-        Args:
-            x (ndarray): initial state
-            us (ndarray): actions (horizon, nbatch, udim)
-
-        """
-        us = np.reshape(us, (horizon, -1, udim))
-        out = onp.array(jit_fn(x, us, *args))
-        if flatten_out:
-            out = out.flatten()
-        return out
-
-    return _fn
-
-
-# =====================================================
 # =========== Utility functions for rollout ===========
 # =====================================================
 
@@ -224,33 +182,24 @@ def build_mpc(
 
     # Create optimizer & runner
     if engine == "scipy":
-        optimizer = OptimizerScipy(
-            h_traj=scipy_wrapper(h_traj, horizon, udim),
-            h_grad_u=scipy_wrapper(h_grad_u, horizon, udim, flatten_out=True),
-            h_csum=scipy_wrapper(h_csum, horizon, udim),
-            xdim=xdim,
-            udim=udim,
-            horizon=horizon,
-            replan=replan,
-            T=T,
-            features_keys=env.features_keys,
-            method=method,
-        )
+        optimizer_cls = OptimizerScipy
     elif engine == "jax":
-        optimizer = OptimizerJax(
-            h_traj=h_traj,
-            h_grad_u=h_grad_u,
-            h_csum=h_csum,
-            xdim=xdim,
-            udim=udim,
-            horizon=horizon,
-            replan=replan,
-            T=T,
-            features_keys=env.features_keys,
-            method=method,
-        )
+        optimizer_cls = OptimizerJax
     else:
         raise NotImplementedError
+
+    optimizer = optimizer_cls(
+        h_traj=h_traj,
+        h_grad_u=h_grad_u,
+        h_csum=h_csum,
+        xdim=xdim,
+        udim=udim,
+        horizon=horizon,
+        replan=replan,
+        T=T,
+        features_keys=env.features_keys,
+        method=method,
+    )
     runner = Runner(env, roll_forward=t_traj, roll_costs=t_costs, roll_features=t_feats)
 
     return optimizer, runner
