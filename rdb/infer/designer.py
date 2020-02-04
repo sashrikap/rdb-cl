@@ -125,7 +125,7 @@ class Designer(PGM):
         samples.visualize(true_w=self.true_w, obs_w=None)
         # Visualize multiple MCMC chains to check convergence.
         visualize_chains(
-            info["all_samples"],
+            info["all_chains"],
             fig_dir=f"{self._save_dir}/mcmc",
             title=save_name,
             **self._weight_params,

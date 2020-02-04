@@ -167,17 +167,16 @@ def visualize_chains(chains, fig_dir, title, **kwargs):
         title (str): figure name, gets padded with plot index
 
     """
-    colors = ["b", "g", "r", "c", "m", "y", "k", "w"]
-    assert chains[0].shape[1] < len(colors), "Too many chains not enough colors"
+    import itertools
+    import matplotlib.cm as cm
+
+    colors = cm.Spectral(np.linspace(0, 1, len(chains)))
     os.makedirs(fig_dir, exist_ok=True)
     all_weights = []
     all_colors = []
     all_labels = []
-    path = f"{fig_dir}/{title_i}.png"
-    title_i = f"{title}%"
     for ci, chain_i in enumerate(chains):
-        all_colors.append(colors[ci])
-        all_labels.append(f"Label_{i}_accept_{len(chain_i)}")
+        all_labels.append(f"Label_{ci}_accept_{len(chain_i)}")
     plot_weights_comparison(
-        chains, all_colors, all_labels, path=path, title=title_i, **kwargs
+        chains, colors, all_labels, path=f"{fig_dir}/{title}.png", title=title, **kwargs
     )

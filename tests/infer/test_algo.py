@@ -13,6 +13,7 @@ import numpyro
 import itertools
 import numpyro.distributions as dist
 from rdb.infer import *
+from functools import partial
 from rdb.infer.dictlist import *
 from rdb.infer.algos import MetropolisHasting
 from numpyro.handlers import scale, condition, seed
@@ -70,7 +71,7 @@ def kernel(obs, state, tasks):
 
 
 @pytest.mark.parametrize("num_chains", [1, 5, 10, 30])
-def test_mh_algo(num_chains):
+def ttest_mh_algo(num_chains):
     state = onp.zeros(2)
     tasks = onp.array([[2, 3], [3, 4], [4, 5]])
     key = random.PRNGKey(1)
@@ -92,7 +93,7 @@ def test_mh_algo(num_chains):
 @pytest.mark.parametrize(
     "num_chains, num_tasks", list(itertools.product([5, 10, 30], [2, 4]))
 )
-def test_mh_algo_state_2d(num_chains, num_tasks):
+def ttest_mh_algo_state_2d(num_chains, num_tasks):
     state = onp.zeros((5, 2))
     key = random.PRNGKey(1)
     tasks = onp.array([onp.ones((5, 2))] * num_tasks)
@@ -115,9 +116,8 @@ dict_proposal = IndGaussianProposal(
 )
 
 
-def dict_kernel(obs, state, tasks):
+def dict_kernel(obs, state, tasks, xdim):
     assert obs.shape == state[0].shape
-    xdim = 5
     weight_dim = 2
     nbatch = len(state)
     ntasks = len(tasks)
@@ -160,20 +160,20 @@ class dict_proposal(object):
 
 
 @pytest.mark.parametrize(
-    "num_chains, num_tasks", list(itertools.product([5, 10, 30], [2, 4]))
+    "xdim, num_chains, num_tasks",
+    list(itertools.product([1, 5], [1, 2, 10, 30], [2, 4])),
 )
-def test_mh_algo_dict(num_chains, num_tasks):
+def test_mh_algo_dict(xdim, num_chains, num_tasks):
     num_tasks = 3
-    xdim = 5
     weight_dim = 2
-    num_samples = 10
+    num_samples = 100
     key = random.PRNGKey(1)
     obs = DictList({"a": onp.ones(xdim), "b": 3 * onp.ones(xdim)})
     tasks = [1, 2, 3]
     state = DictList({"a": onp.zeros(xdim), "b": 3 * onp.zeros(xdim)})
     infer = MetropolisHasting(
         None,
-        dict_kernel,
+        partial(dict_kernel, xdim=xdim),
         proposal=dict_proposal(),
         num_samples=num_samples,
         num_warmups=100,
@@ -186,3 +186,8 @@ def test_mh_algo_dict(num_chains, num_tasks):
     for samples_i in info["all_chains"]:
         assert samples_i.shape[0] == weight_dim
         assert samples_i.shape[2] == xdim
+    visualize_chains(
+        info["all_chains"],
+        fig_dir=f"data/test/mcmc",
+        title=f"test_mcmc_xdim_{xdim}_chains_{num_chains}_tasks_{num_tasks}",
+    )

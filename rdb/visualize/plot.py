@@ -99,6 +99,7 @@ def plot_weights_comparison(
     max_weights=8.0,
     bins=100,
     log_scale=True,
+    loc="upper right",
     figsize=(20, 10),
 ):
     """Plot different lists weights for visualizing (e.g. MCMC convergence).
@@ -114,27 +115,39 @@ def plot_weights_comparison(
 
     assert len(all_weights_dicts) == len(all_weights_colors) == len(all_labels)
     axs = None
-    for weights_dicts, color in zip(all_weights_dicts, all_weights_colors):
+    # For each chain
+    for weights_dicts, color, label in zip(
+        all_weights_dicts, all_weights_colors, all_labels
+    ):
         if len(weights_dicts) == 0:
             continue
 
         n_values = len(weights_dicts[0].values())
         if axs is None:
             fig, axs = plt.subplots(n_values, 1, figsize=figsize, dpi=80)
+        # For each key in all dicts of that chain
         for i, key in enumerate(sorted(list(weights_dicts[0].keys()))):
-            values = [onp.log(s[key]) if log_scale else s[key] for s in weights_dicts]
+            n_weights = len(weights_dicts)
+            values = []
+            for wi in range(n_weights):
+                weight_i = weights_dicts[wi]
+                values.append(onp.log(weight_i[key]) if log_scale else weight_i[key])
+            # Hacky: only take 1st dimension of weight_i[key], which works for visualizing
+            # weights (only 1dim), but not other things
+            values = onp.array(values)[:, 0]
             n, bins, patches = axs[i].hist(
                 values,
                 bins,
                 histtype="stepfilled",  # no vertical border
                 range=(-max_weights, max_weights),
                 density=True,
+                label=label,
                 facecolor=color,
                 ec="k",  # border
                 alpha=0.25,
             )
         axs[i].set_xlabel(key)
-        axs[i].legend(loc=loc)
+    axs[0].legend(loc=loc)
     plt.tight_layout()
     if title is not None:
         fig.suptitle(title)
