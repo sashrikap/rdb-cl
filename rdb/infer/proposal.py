@@ -4,6 +4,7 @@ Includes:
     [1] Gaussian Proposal Prior.
 
 """
+from rdb.infer import *
 from numpyro.handlers import seed
 from rdb.optim.utils import concate_dict_by_keys, unconcate_dict_by_keys
 import numpyro.distributions as dist
@@ -46,6 +47,9 @@ class IndGaussianProposal(Proposal):
     Args:
         proposal_var (int): gaussian std
         feature_keys (list): initial list of features
+
+    Note:
+        * uses DictList data structure
 
     """
 
@@ -99,7 +103,7 @@ class IndGaussianProposal(Proposal):
                 log_val = np.log(val)
                 next_log_val = numpyro.sample("next_log_val", dist.Normal(log_val, std))
                 next_vals.append(np.exp(next_log_val))
-            next_state = dict(zip(keys, next_vals))
+            next_state = DictList(zip(keys, next_vals))
             return next_state
 
         return seed(proposal_fn, self._rng_key)

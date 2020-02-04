@@ -85,7 +85,7 @@ class DictList(dict):
                     assert len(val.shape) > 0
                 new_data[key] = val
             super().__init__(new_data)
-        elif isinstance(data, list):
+        elif isinstance(data, list) or isinstance(data, tuple):
             data = concate_dict_by_keys(data)
             super().__init__(data)
         else:
@@ -135,14 +135,30 @@ class DictList(dict):
             data[key] = onp.concatenate([val, dictlist[key]], axis=0)
         return DictList(data)
 
+    def repeat_expand_axis0(self, num):
+        """Repeat num times along new 0-th dimension."""
+        data = OrderedDict()
+        for key, val in self.items():
+            data[key] = onp.repeat(val[None, :], num, axis=0)
+        return DictList(data)
+
+    def tile_axis0(self, num):
+        """Tile num times along existing 0-th dimension."""
+        data = OrderedDict()
+        for key, val in self.items():
+            new_shape = [1] * len(val.shape)
+            new_shape[0] = num
+            data[key] = onp.tile(val, new_shape)
+        return DictList(data)
+
     def transpose(self):
-        """Transpose every value"""
+        """Transpose every value."""
         data = OrderedDict()
         for key, val in self.items():
             data[key] = val.T
         return DictList(data)
 
-    def sum(self, axis=1, keepdims=False):
+    def sum(self, axis, keepdims=False):
         """Sum each value by axis.
 
         Note:
@@ -150,10 +166,7 @@ class DictList(dict):
 
         """
         shape = self.shape
-        assert axis >= 1, f"Cannot sum across batch"
-        assert axis + 1 < len(
-            shape
-        ), f"Cannot sum axis {axis}, current DictList: nkeys={shape[0]} value {shape[1:]}"
+        assert axis != 0, f"Cannot sum across batch"
         data = OrderedDict()
         for key, val in self.items():
             data[key] = onp.sum(val, axis=axis, keepdims=keepdims)
@@ -162,6 +175,44 @@ class DictList(dict):
             return DictList(data)
         else:
             return data
+
+    def __mul__(self, dict_):
+        """Multiply with another dictlist.
+        """
+        assert isinstance(dict_, DictList)
+        data = OrderedDict()
+        for key, val in self.items():
+            assert key in dict_
+            data[key] = dict_[key] * self[key]
+        return DictList(data)
+
+    def __add__(self, dict_):
+        """Add another dictlist.
+        """
+        assert isinstance(dict_, DictList)
+        data = OrderedDict()
+        for key, val in self.items():
+            assert key in dict_
+            data[key] = dict_[key] + self[key]
+        return DictList(data)
+
+    def __sub__(self, dict_):
+        """Subtract another dictlist.
+        """
+        assert isinstance(dict_, DictList)
+        data = OrderedDict()
+        for key, val in self.items():
+            assert key in dict_
+            data[key] = dict_[key] - self[key]
+        return DictList(data)
+
+    def sum_values(self):
+        """Sum all values.
+        """
+        vals = [v for v in self.values()]
+        assert len(vals) > 0
+        assert onp.all([v.shape == vals[0].shape for v in vals])
+        return sum(vals)
 
     def mean(self, axis=1, keepdims=False):
         """Average each value by axis."""
@@ -184,6 +235,13 @@ class DictList(dict):
             keys = sorted(self.keys())
         return DictList(sort_dict_by_keys(self, keys))
 
+    def reshape(self, shape):
+        """Reshape values"""
+        out = OrderedDict()
+        for key, val in self.items():
+            out[key] = val.reshape(shape)
+        return DictList(out)
+
     def prepare(self, features_keys):
         """Return copy of self, weiht keys sorted.
         """
@@ -203,10 +261,22 @@ class DictList(dict):
         return np.array(list(self.values()))
 
     def __getitem__(self, key):
+        """Indexing by key or by index.
+        """
         if isinstance(key, str):
+            # key
             val = dict.__getitem__(self, key)
-        elif isinstance(key, int):
-            val = select_from_dict(self, key)
+        elif isinstance(key, int) or isinstance(key, onp.ndarray):
+            # index
+            output = {}
+            idx = key
+            for k, val in self.items():
+                output[k] = val[idx]
+            if len(self.shape) == 2:
+                # normal dict
+                return output
+            else:
+                return DictList(output)
         else:
             raise NotImplementedError
         return val

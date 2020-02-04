@@ -59,16 +59,6 @@ def stack_dict_log_values(dicts):
     return output
 
 
-def select_from_dict(dict_, idx):
-    """
-    """
-    output = {}
-    for key, val in dict_.items():
-        assert len(val) > idx
-        output[key] = val[idx]
-    return output
-
-
 def random_choice_from_dict(dict_, random_choice_fn, num_samples, replacement=True):
     """
     """
@@ -167,34 +157,27 @@ def collect_trajs(list_ws, state, controller, runner, desc=None):
 # ========================================================
 
 
-def visualize_chains(samples, accepts, num_plots, fig_dir, title, **kwargs):
+def visualize_chains(chains, fig_dir, title, **kwargs):
     """Visualize multiple MCMC chains to check convergence.
 
     Args:
-        samples (ndim=2): array of samples
-        accepts (ndim=2, bool): array of acceptance
-        num_plots (int): visualize chain progressively. E.g. num_plots=10, visualize ~10%, 20%...99% samples
+        chains (list): list of accepted chains, [(n_samples, n_weights), ...]
+        num_plots=10, visualize ~10%, 20%...99% samples
         fig_dir (str): directory to save the figure
         title (str): figure name, gets padded with plot index
 
     """
     colors = ["b", "g", "r", "c", "m", "y", "k", "w"]
-    samples = onp.array(samples)
-    accepts = onp.array(accepts)
-    assert samples.shape[1] < len(colors), "Too many chains not enough colors"
-    num_samples = len(samples) // num_plots
+    assert chains[0].shape[1] < len(colors), "Too many chains not enough colors"
     os.makedirs(fig_dir, exist_ok=True)
-    for i in range(num_plots):
-        samples_i = samples[0 : num_samples * (i + 1), :]
-        accepts_i = accepts[0 : num_samples * (i + 1), :]
-        all_weights = []
-        all_colors = []
-        ratio = accepts_i[:, 0].sum() / accepts[:, 0].sum()
-        title_i = f"{title}_accept_{100 * ratio:06.2f}%"
-        path = f"{fig_dir}/{title_i}.png"
-        for wi in range(samples.shape[1]):
-            all_weights.append(samples_i[accepts_i[:, wi], wi])
-            all_colors.append(colors[wi])
-        plot_weights_comparison(
-            all_weights, all_colors, path=path, title=title_i, **kwargs
-        )
+    all_weights = []
+    all_colors = []
+    all_labels = []
+    path = f"{fig_dir}/{title_i}.png"
+    title_i = f"{title}%"
+    for ci, chain_i in enumerate(chains):
+        all_colors.append(colors[ci])
+        all_labels.append(f"Label_{i}_accept_{len(chain_i)}")
+    plot_weights_comparison(
+        chains, all_colors, all_labels, path=path, title=title_i, **kwargs
+    )

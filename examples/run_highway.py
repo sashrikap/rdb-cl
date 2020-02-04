@@ -16,7 +16,8 @@ DUMMY_ACTION = False
 DRAW_HEAT = False
 # DRAW_HEAT = False
 REPLAN = False
-BENCHMARK = 100
+# BENCHMARK = 100
+BENCHMARK = -1
 BENCHMARK_SINGLE = False
 BENCHMARK_BATCH = True
 MAKE_MP4 = False
@@ -45,11 +46,11 @@ main_car = env.main_car
 horizon = 10
 T = 10
 weights = {
-    "dist_cars": 1.1,
-    "dist_lanes": 0.1,
+    "dist_cars": 5,
+    "dist_lanes": 5,
     "dist_fences": 0.35,
-    "dist_objects": 100.25,
-    "speed": 0.05,
+    "dist_objects": 10.25,
+    "speed": 5,
     "control": 0.1,
 }
 # weights = {"dist_lanes": 5.35}

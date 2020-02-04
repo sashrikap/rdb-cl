@@ -189,3 +189,44 @@ def test_transpose():
     result = {"a": [[1, 1], [2, 1]], "b": [[1, 3], [2, 3]]}
     assert w.shape == (2, 2, 2)
     assert_equal(result, w.transpose())
+
+
+def test_sum():
+    dict1 = DictList({"a": [[1, 1], [2, 1]], "b": [[1, 3], [2, 3]]})
+    dict2 = DictList({"a": [[1, 1], [2, 1]], "b": [[1, 3], [2, 3]]})
+    result = {"a": [[2, 2], [4, 2]], "b": [[2, 6], [4, 6]]}
+    assert_equal(result, dict1 + dict2)
+
+
+def test_mul():
+    dict1 = DictList({"a": [1, 3, 5], "b": [1, 3, 2]})
+    dict2 = DictList({"a": [2, 2, 2], "b": [3, 3, 3]})
+    result = {"a": [2, 6, 10], "b": [3, 9, 6]}
+    assert_equal(result, dict1 * dict2)
+
+
+def test_sum_values():
+    dict_ = DictList({"a": [[1, 1], [2, 1]], "b": [[1, 3], [2, 3]]})
+    result = [[2, 4], [4, 4]]
+    assert onp.allclose(result, dict_.sum_values())
+
+
+def test_repeat_expand_axis0():
+    dict_ = DictList({"a": [2, 1], "b": [1, 3]})
+    out = dict_.repeat_expand_axis0(3)
+    result = DictList({"a": [[2, 1], [2, 1], [2, 1]], "b": [[1, 3], [1, 3], [1, 3]]})
+    assert_equal(out, result)
+
+
+def test_tile_axis0():
+    dict_ = DictList({"a": [[2, 1]], "b": [[1, 3]]})
+    out = dict_.tile_axis0(3)
+    result = DictList({"a": [[2, 1], [2, 1], [2, 1]], "b": [[1, 3], [1, 3], [1, 3]]})
+    assert_equal(out, result)
+
+
+def test_reshape():
+    dict_ = DictList({"a": [[2, 1]], "b": [[1, 3]]})
+    out = dict_.reshape((2, 1))
+    result = DictList({"a": [[2], [1]], "b": [[1], [3]]})
+    assert_equal(out, result)

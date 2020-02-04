@@ -93,6 +93,7 @@ def plot_weights(
 def plot_weights_comparison(
     all_weights_dicts,
     all_weights_colors,
+    all_labels,
     path=None,
     title=None,
     max_weights=8.0,
@@ -105,12 +106,13 @@ def plot_weights_comparison(
     Args:
         highlight_dicts (list): list of weight dictionaries
         highlight_colors (list): list of colors for highlighting these weights
+        all_labels (list):
         highlight_labels (list): list of labels for denoting these weights
         max_weights (float): log range of weights ~ (-max_weights, max_weights)
 
     """
 
-    assert len(all_weights_dicts) == len(all_weights_colors)
+    assert len(all_weights_dicts) == len(all_weights_colors) == len(all_labels)
     axs = None
     for weights_dicts, color in zip(all_weights_dicts, all_weights_colors):
         if len(weights_dicts) == 0:
@@ -132,6 +134,7 @@ def plot_weights_comparison(
                 alpha=0.25,
             )
         axs[i].set_xlabel(key)
+        axs[i].legend(loc=loc)
     plt.tight_layout()
     if title is not None:
         fig.suptitle(title)

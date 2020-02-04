@@ -4,6 +4,7 @@ Includes:
     [1] Gaussian Prior.
 
 """
+from rdb.infer import *
 from numpyro.handlers import seed
 from rdb.optim.utils import concate_dict_by_keys, unconcate_dict_by_keys
 import numpyro.distributions as dist
@@ -137,7 +138,7 @@ class LogUniformPrior(Prior):
             for key, dist_ in self._log_prior_dict.items():
                 val = numpyro.sample(key, dist_, sample_shape=(num_samples,))
                 output[key] = onp.exp(val)
-            return output
+            return DictList(output)
 
         return seed(prior_fn, self._rng_key)
 

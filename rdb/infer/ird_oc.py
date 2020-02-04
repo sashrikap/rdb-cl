@@ -22,45 +22,19 @@ import jax
 import jax.numpy as np
 import numpy as onp
 from rdb.optim.utils import multiply_dict_by_keys, append_dict_by_keys
+from rdb.infer.designer import Designer, DesignerInteractive
 from numpyro.handlers import scale, condition, seed
 from rdb.infer.utils import random_choice, logsumexp
 from rdb.infer.particles import Particles
-from rdb.infer.designer import Designer, DesignerInteractive
+from rdb.infer.pgm import PGM
 from tqdm.auto import tqdm, trange
-from rdb.exps.utils import *
-from os.path import join
 from rdb.infer.algos import *
 from rdb.infer.utils import *
+from rdb.exps.utils import *
+from os.path import join
 from time import time
 
 pp = pprint.PrettyPrinter(indent=4)
-
-
-class PGM(object):
-    """Generic Probabilisitc Graphical Model Class.
-
-    Methods:
-        likelihood (fn): p(obs | theta) p(theta)
-
-    """
-
-    def __init__(self, rng_key, kernel, proposal, sample_method="mh", sample_args={}):
-        self._rng_key = rng_key
-        self._sampler = self._build_sampler(
-            kernel, proposal, sample_method, sample_args
-        )
-
-    def update_key(self, rng_key):
-        self._rng_key = rng_key
-        # self._sampler.update_key(rng_key)
-
-    def _build_sampler(self, kernel, proposal, sample_method, sample_args):
-        if sample_method == "mh":
-            return MetropolisHasting(
-                self._rng_key, kernel, proposal=proposal, **sample_args
-            )
-        else:
-            raise NotImplementedError
 
 
 class IRDOptimalControl(PGM):

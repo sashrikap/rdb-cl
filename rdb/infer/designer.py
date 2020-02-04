@@ -10,6 +10,7 @@ from rdb.optim.utils import multiply_dict_by_keys, append_dict_by_keys
 from numpyro.handlers import scale, condition, seed
 from rdb.infer.utils import random_choice, logsumexp
 from rdb.infer.particles import Particles
+from rdb.infer.pgm import PGM
 from tqdm.auto import tqdm, trange
 from rdb.exps.utils import *
 from os.path import join
@@ -77,23 +78,6 @@ class Designer(PGM):
         self._prior_tasks = []
         self._num_prior_tasks = num_prior_tasks
 
-    def _get_chain_viz(self, save_name, num_plots=5):
-        """Visualize multiple MCMC chains to check convergence.
-        """
-
-        def fn(samples, accepts):
-            fig_dir = f"{self._save_dir}/mcmc"
-            visualize_chains(
-                samples,
-                accepts,
-                num_plots=num_plots,
-                fig_dir=fig_dir,
-                title=save_name,
-                **self._weight_params,
-            )
-
-        return fn
-
     def create_particles(self, weights, save_name):
         return Particles(
             rng_key=self._rng_key,
@@ -123,11 +107,8 @@ class Designer(PGM):
         else:
             # Sample based on prior tasks + new_task
             sample_tasks = onp.concatenate([self._prior_tasks, [new_task]])
-            sample_ws = self._sampler.sample(
-                obs=self._true_w,
-                tasks=sample_tasks,
-                chain_viz=self._get_chain_viz(save_name=save_name),
-                name=save_name,
+            sample_ws, info = self._sampler.sample(
+                obs=self._true_w, tasks=sample_tasks, name=save_name
             )
         samples = Particles(
             rng_key=self._rng_key,
@@ -142,6 +123,15 @@ class Designer(PGM):
             env=self._env,
         )
         samples.visualize(true_w=self.true_w, obs_w=None)
+        # Visualize multiple MCMC chains to check convergence.
+        visualize_chains(
+            info["all_samples"],
+            fig_dir=f"{self._save_dir}/mcmc",
+            title=save_name,
+            **self._weight_params,
+        )
+
+        self._visualize_chains(save_name=save_name),
         return samples.subsample(1)
 
     def reset_prior_tasks(self):
