@@ -71,9 +71,9 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
             * env.reset
 
         """
-        return self._get_init_states([task])
+        return self.get_init_states([task])
 
-    def _get_init_states(self, tasks):
+    def get_init_states(self, tasks):
         """Vectorized version of `get_init_state`
         """
         tasks = onp.array(tasks)
@@ -226,7 +226,7 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
             all_tasks = tasks
         elif self._task_naturalness == "distance":
             ## Difference to cars and objects
-            all_states = self._get_init_states(tasks)
+            all_states = self.get_init_states(tasks)
             all_acs = np.zeros((len(tasks), 2))
 
             diff_cars = self._raw_features_dict["dist_cars"](all_states, all_acs)

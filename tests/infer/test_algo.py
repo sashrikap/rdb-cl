@@ -129,7 +129,12 @@ def dict_kernel(obs, state, tasks, xdim):
     tasks_ = onp.array(tasks_)
     state_ = DictList(state_)
     # sum across tasks
-    out = (obs - state_).reshape((nbatch, ntasks, xdim))
+    try:
+        out = (obs - state_).reshape((nbatch, ntasks, xdim))
+    except:
+        import pdb
+
+        pdb.set_trace()
     # sum across task
     out = out.sum(axis=1)
     assert out.shape == (weight_dim, nbatch, xdim)

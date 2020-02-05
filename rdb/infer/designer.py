@@ -1,10 +1,10 @@
-import numpyro
 import pprint
 import copy
 import json
 import os
 import jax
 import jax.numpy as np
+import numpyro, itertools
 import numpy as onp
 from rdb.optim.utils import multiply_dict_by_keys, append_dict_by_keys
 from numpyro.handlers import scale, condition, seed
@@ -106,10 +106,13 @@ class Designer(PGM):
             sample_ws = onp.array([self._true_w])
         else:
             # Sample based on prior tasks + new_task
-            sample_tasks = onp.concatenate([self._prior_tasks, [new_task]])
+            sample_tasks = onp.concatenate([self._prior_tasks, new_task])
             sample_ws, info = self._sampler.sample(
                 obs=self._true_w, tasks=sample_tasks, name=save_name
             )
+        import pdb
+
+        pdb.set_trace()
         samples = Particles(
             rng_key=self._rng_key,
             env_fn=self._env_fn,
@@ -144,6 +147,7 @@ class Designer(PGM):
 
     @property
     def prior_tasks(self):
+        assert self._num_prior_tasks == len(self._prior_tasks)
         return self._prior_tasks
 
     @prior_tasks.setter
@@ -155,6 +159,10 @@ class Designer(PGM):
     @property
     def true_w(self):
         return self._true_w
+
+    @true_w.setter
+    def true_w(self, w):
+        self._true_w = w
 
     @property
     def truth(self):
@@ -173,25 +181,43 @@ class Designer(PGM):
         self.reset_prior_tasks()
 
     def _build_kernel(self, beta):
-        def likelihood_fn(true_w, sample_w, task):
+        def likelihood_fn(true_w, sample_w, tasks):
+            """Designer forward likelihood p(design_w | true_w).
+
+            Args:
+                true_w (DictList): designer's true w in mind
+                    shape: (nweight, 1)
+                sample_w (DictList): current sampled w
+                    shape: (nweight, nbatch, 1)
+                tasks (ndarray): prior tasks
+                    shape: (ntasks, task_dim)
+
+            """
             assert self._prior_tasks is not None, "Need >=0 prior tasks."
-            if self._num_prior_tasks == 0:
-                all_tasks = onp.array([task])
-            else:
-                all_tasks = onp.concatenate([self._prior_tasks, [task]])
-            assert len(all_tasks) == self._num_prior_tasks + 1
-            log_prob = 0.0
-            for task_i in all_tasks:
-                state = self.env.get_init_state(task)
-                actions = self._controller(state, sample_w)
-                _, cost, info = self._runner(state, actions, weights=true_w)
-                rew = -1 * cost
-                log_prob += beta * rew
-            log_prob += self._prior.log_prob(sample_w)
+            assert len(tasks) == self._num_prior_tasks + 1
+            nbatch = len(sample_w)
+            ntasks = len(tasks)
+            ## Do something on each sample each task
+            ## Cross product:
+            ##  (nbatch,) x (ntasks,) -> (nbatch * ntasks,)
+            pairs = list(itertools.product(sample_w, tasks))
+            batch_ws, batch_tasks = zip(*pairs)
+            batch_tasks = np.array(batch_tasks)
+            batch_ws = DictList(batch_ws)
+            true_ws = DictList(true_w, expand_dims=True).repeat(nbatch * ntasks, axis=0)
+
+            ## Calculate probability
+            log_probs = onp.zeros(nbatch * ntasks)
+            states = self.env.get_init_states(batch_tasks)
+            actions = self._controller(states, batch_ws)
+            _, costs, info = self._runner(states, actions, weights=true_ws)
+            rews = -1 * costs
+            log_probs += beta * rews
+            log_probs += self._prior.log_prob(batch_ws)
             # if True:
             if False:
                 print(f"Designer prob {log_prob:.3f}", actions.mean())
-            return log_prob
+            return log_probs
 
         def _kernel(true_w, sample_w, **kwargs):
             """Vectorized"""
@@ -262,6 +288,7 @@ class DesignerInteractive(Designer):
         Todo:
             * Display all other not-selected candidates.
         """
+
         self.env.set_task(task)
         init_state = self.env.get_init_state(task)
         # Visualize task

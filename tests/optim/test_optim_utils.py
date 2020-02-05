@@ -6,6 +6,11 @@ import numpy as onp
 import pytest
 
 
+def assert_equal(ina, inb):
+    for key in ina.keys():
+        assert onp.allclose(ina[key], inb[key])
+
+
 def test_sum():
     def f1(a, b):
         return np.array(a) + np.array(b)
@@ -97,7 +102,7 @@ def test_index():
     assert np.allclose(fn([1, 2, 2, 3]), 4)
 
 
-def test_concate_dict_speed():
+def test_stack_dict():
     from rdb.exps.utils import Profiler
 
     keys = ["a", "b", "c", "d", "e"]
@@ -105,8 +110,46 @@ def test_concate_dict_speed():
     for _ in range(500):
         dicts.append(dict(zip(keys, onp.random.random(5))))
     for _ in range(10):
-        with Profiler("Concate dict"):
-            concate_dict_by_keys(dicts)
+        with Profiler("Stack dict"):
+            out = stack_dict_by_keys(dicts)
+            for key, val in out.items():
+                assert val.shape == (500,)
+
+    in_a = {"a": [1], "b": [2]}
+    in_b = {"a": [2], "b": [3]}
+    result = {"a": [[1], [2]], "b": [[2], [3]]}
+    assert_equal(stack_dict_by_keys([in_a, in_b]), result)
+
+    in_a = {"a": [1], "b": [2]}
+    in_b = {"a": [2], "b": [3]}
+    in_c = {"a": [0], "b": [4]}
+    result = {"a": [[1], [2], [0]], "b": [[2], [3], [4]]}
+    assert_equal(stack_dict_by_keys([in_a, in_b, in_c]), result)
+
+
+def test_concat_dict():
+    from rdb.exps.utils import Profiler
+
+    keys = ["a", "b", "c", "d", "e"]
+    dicts = []
+    for _ in range(500):
+        dicts.append(dict(zip(keys, onp.random.random(5))))
+    for _ in range(10):
+        with Profiler("Stack dict"):
+            out = concate_dict_by_keys(dicts)
+            for key, val in out.items():
+                assert val.shape == (500,)
+
+    in_a = {"a": [1], "b": [2]}
+    in_b = {"a": [2], "b": [3]}
+    result = {"a": [1, 2], "b": [2, 3]}
+    assert_equal(concate_dict_by_keys([in_a, in_b]), result)
+
+    in_a = {"a": [1], "b": [2]}
+    in_b = {"a": [2], "b": [3]}
+    in_c = {"a": [0], "b": [4]}
+    result = {"a": [1, 2, 0], "b": [2, 3, 4]}
+    assert_equal(concate_dict_by_keys([in_a, in_b, in_c]), result)
 
 
 def test_concat_funcs():

@@ -7,61 +7,12 @@ import copy, os
 import numpyro
 import numpyro.distributions as dist
 from rdb.visualize.plot import plot_weights_comparison
-from rdb.optim.utils import concate_dict_by_keys
+from rdb.optim.utils import *
 from scipy.stats import gaussian_kde
 from rdb.exps.utils import Profiler
 from tqdm.auto import tqdm, trange
 from numpyro.handlers import seed
 from functools import partial
-
-# ========================================================
-# ============== Dictionary Tools ========================
-# ========================================================
-
-
-def stack_dict_values(dicts, normalize=False):
-    """Stack a list of dictionaries into a list.
-
-    Note:
-        * Equivalent to stack([d.values for d in dicks])
-
-    """
-    lists = []
-    for dict_ in dicts:
-        lists.append(onp.array(list(dict_.values())))
-    output = onp.stack(lists)
-    if normalize:
-        max_ = output.max(axis=0)
-        min_ = output.min(axis=0)
-        output = (output - min_) / (max_ - min_ + 1e-6)
-    return output
-
-
-def stack_dict_values_ratio(dicts, original):
-    """Stack a list of dictionaries' ratio over original into a list.
-    """
-    lists = []
-    for dict_ in dicts:
-        lists.append(
-            onp.array(list(dict_.values())) / onp.array(list(original.values()))
-        )
-    return onp.stack(lists)
-
-
-def stack_dict_log_values(dicts):
-    """Stack a list of log dictionaries into a list.
-
-    """
-    lists = []
-    for dict_ in dicts:
-        lists.append(onp.array(list(dict_.values())))
-    output = onp.log(onp.stack(lists))
-    return output
-
-
-def random_choice_from_dict(dict_, random_choice_fn, num_samples, replacement=True):
-    """
-    """
 
 
 # ========================================================
@@ -146,9 +97,9 @@ def collect_trajs(list_ws, state, controller, runner, desc=None):
         feats.append(info["feats"])
         feats_sum.append(info["feats_sum"])
         violations.append(info["violations"])
-    feats = concate_dict_by_keys(feats)
-    feats_sum = concate_dict_by_keys(feats_sum)
-    violations = concate_dict_by_keys(violations)
+    feats = stack_dict_by_keys(feats)
+    feats_sum = stack_dict_by_keys(feats_sum)
+    violations = stack_dict_by_keys(violations)
     return actions, feats, feats_sum, violations
 
 

@@ -2,23 +2,16 @@ import numpy as onp
 from time import time
 from jax import random
 from numpyro.handlers import seed
-from rdb.infer.utils import stack_dict_values, random_choice
-from rdb.optim.utils import concate_dict_by_keys
+from rdb.infer.utils import *
+from rdb.optim.utils import *
 from rdb.exps.utils import Profiler
 
 
-def test_stack_values():
-    in1 = {"a": 1, "b": 2}
-    in2 = {"a": 2, "b": 4}
-    out = onp.array([[1, 2], [2, 4]])
-    assert onp.allclose(stack_dict_values([in1, in2]), out)
-
-
-def test_concate_by_keys():
+def test_stack_by_keys():
     in1 = {"a": [1], "b": [2]}
     in2 = {"a": [2], "b": [4]}
     out = {"a": onp.array([[1], [2]]), "b": [[2], [4]]}
-    out_test = concate_dict_by_keys([in1, in2])
+    out_test = stack_dict_by_keys([in1, in2])
     for key in out_test.keys():
         assert onp.allclose(out[key], out_test[key])
 

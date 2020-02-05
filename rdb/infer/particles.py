@@ -2,12 +2,7 @@
 
 """
 from rdb.infer.utils import collect_trajs, random_choice
-from rdb.optim.utils import (
-    multiply_dict_by_keys,
-    subtract_dict_by_keys,
-    concate_dict_by_keys,
-    unconcate_dict_by_keys,
-)
+from rdb.optim.utils import *
 from rdb.visualize.plot import plot_weights, plot_rankings
 from numpyro.handlers import scale, condition, seed
 from fast_histogram import histogram1d
@@ -39,7 +34,7 @@ class Particles(object):
         runner,
         save_name,
         sample_ws=None,
-        sample_concate_ws=None,
+        sample_stack_ws=None,
         weight_params={},
         fig_dir=None,
         save_dir=None,
@@ -50,7 +45,7 @@ class Particles(object):
         self._controller = controller
         self._runner = runner
         self._sample_ws = sample_ws
-        self._sample_concate_ws = sample_concate_ws
+        self._sample_stack_ws = sample_stack_ws
         self._rng_key = rng_key
         self._weight_params = weight_params
         self._expanded_name = f"weights_seed_{str(self._rng_key)}_{save_name}"
@@ -80,9 +75,9 @@ class Particles(object):
         self._sample_violations = {}
         self._sample_actions = {}
 
-    def update_weights(self, sample_ws=None, sample_concate_ws=None):
+    def update_weights(self, sample_ws=None, sample_stack_ws=None):
         self._sample_ws = sample_ws
-        self._sample_concate_ws = sample_concate_ws
+        self._sample_stack_ws = sample_stack_ws
         self.build_cache()
 
     @property
@@ -93,9 +88,9 @@ class Particles(object):
     def weights(self):
         if self._sample_ws is None:
             assert (
-                self._sample_concate_ws is not None
+                self._sample_stack_ws is not None
             ), "Must properly initialize particle weights"
-            self._sample_ws = unconcate_dict_by_keys(self._sample_concate_ws)
+            self._sample_ws = unstack_dict_by_keys(self._sample_stack_ws)
         return self._sample_ws
 
     @weights.setter
@@ -103,13 +98,13 @@ class Particles(object):
         self.update_weights(sample_ws=ws)
 
     @property
-    def concate_weights(self):
-        if self._sample_concate_ws is None:
+    def stack_weights(self):
+        if self._sample_stack_ws is None:
             assert (
                 self._sample_ws is not None
             ), "Must properly initialize particle weights"
-            self._sample_concate_ws = concate_dict_by_keys(self._sample_ws)
-        return self._sample_concate_ws
+            self._sample_stack_ws = stack_dict_by_keys(self._sample_ws)
+        return self._sample_stack_ws
 
     @property
     def cached_names(self):
@@ -284,16 +279,16 @@ class Particles(object):
         ), "Must properly initialize particle weights"
         N = len(self.weights)
         idxs = self._random_choice(onp.arange(N), num=N, probs=probs, replacement=True)
-        new_concate_ws = dict()
-        for key, value in self.concate_weights.items():
-            new_concate_ws[key] = value[idxs]
+        new_stack_ws = dict()
+        for key, value in self.stack_weights.items():
+            new_stack_ws[key] = value[idxs]
         new_ps = Particles(
             rng_key=self._rng_key,
             env_fn=self._env_fn,
             controller=self._controller,
             runner=self._runner,
             save_name=self._save_name,
-            sample_concate_ws=new_concate_ws,
+            sample_stack_ws=new_stack_ws,
             weight_params=self._weight_params,
             env=self._env,
         )
@@ -317,7 +312,7 @@ class Particles(object):
         FAST_HISTOGRAM = True
 
         ranges = (-max_weights, max_weights)
-        data = onp.array(list(self.concate_weights.values()))
+        data = onp.array(list(self.stack_weights.values()))
         # Omit first weight
         data = onp.log(data[1:, :])
         if method == "gaussian":
@@ -354,7 +349,7 @@ class Particles(object):
             density by summing bucket counts.
 
         """
-        data = onp.array(list(self.concate_weights.values()))
+        data = onp.array(list(self.stack_weights.values()))
         # Omit first weight
         data = onp.log(data[1:, :])
 
@@ -512,7 +507,7 @@ class Particles(object):
 
         """
         assert len(self.weights) == 1, "Can only visualize one weight sample"
-        vios = concate_dict_by_keys(list(self._sample_violations.values()))
+        vios = stack_dict_by_keys(list(self._sample_violations.values()))
         # Dims: (n_keys, n_tasks, 1)
         num_violates = onp.array(list(vios.values())).sum(axis=(0, 2))
         # Ranking violations and performance (based on violation)

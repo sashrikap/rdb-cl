@@ -90,6 +90,14 @@ def test_list_index():
     result = {"a": 4, "b": 3}
     assert_equal(out, result)
 
+    data = [{"a": 1, "b": 1}, {"a": 1, "b": 2}, {"a": 4, "b": 3}]
+    w = DictList(data)
+    assert len(w) == 3
+    assert w.shape == (2, 3)
+    out = w[[True, False, True]]
+    result = {"a": [1, 4], "b": [1, 3]}
+    assert_equal(out, result)
+
 
 def test_list_index():
     data = [{"a": 1, "b": 1}, {"a": 1, "b": 2}, {"a": 4, "b": 3}]
@@ -211,9 +219,9 @@ def test_sum_values():
     assert onp.allclose(result, dict_.sum_values())
 
 
-def test_repeat_expand_axis0():
-    dict_ = DictList({"a": [2, 1], "b": [1, 3]})
-    out = dict_.repeat_expand_axis0(3)
+def test_repeat():
+    dict_ = DictList({"a": [2, 1], "b": [1, 3]}, expand_dims=True)
+    out = dict_.repeat(3, axis=0)
     result = DictList({"a": [[2, 1], [2, 1], [2, 1]], "b": [[1, 3], [1, 3], [1, 3]]})
     assert_equal(out, result)
 
@@ -230,3 +238,21 @@ def test_reshape():
     out = dict_.reshape((2, 1))
     result = DictList({"a": [[2], [1]], "b": [[1], [3]]})
     assert_equal(out, result)
+
+
+def test_iter():
+    dict_ = DictList({"a": [1, 2], "b": [1, 3]})
+    results = [{"a": 1, "b": 1}, {"a": 2, "b": 3}]
+    n = 0
+    for d in dict_:
+        assert_equal(d, results[n])
+        n += 1
+    assert n == 2
+
+    dict_ = DictList({"a": [[1, 2], [2, 3]], "b": [[1, 3], [1, 1]]})
+    results = [{"a": [1, 2], "b": [1, 3]}, {"a": [2, 3], "b": [1, 1]}]
+    n = 0
+    for d in dict_:
+        assert_equal(d, results[n])
+        n += 1
+    assert n == 2

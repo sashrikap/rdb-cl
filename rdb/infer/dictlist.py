@@ -68,29 +68,35 @@ class DictList(dict):
 
     Args:
         data (dict): payload
-        batch (bool): if True, `data` is (nbatch, data_dims, ...)
-            if false, `data` is (data_dims, ...), pad leading dimension
-
+        expand_dims (bool): if True, `data` is padded with extra leading dimension (1, data_dims, ...)
+            useful when later batching data
     """
 
     def __init__(self, data, expand_dims=False):
         if isinstance(data, dict):
             # Ensure every value is stored as array
             new_data = OrderedDict()
+            if expand_dims:
+                data = self._expand_dict(data)
             for key, val in data.items():
-                if expand_dims:
-                    val = onp.array([val])
-                else:
-                    val = onp.array(val)
-                    assert len(val.shape) > 0
+                val = onp.array(val)
+                assert len(val.shape) > 0
                 new_data[key] = val
             super().__init__(new_data)
         elif isinstance(data, list) or isinstance(data, tuple):
-            data = concate_dict_by_keys(data)
+            if expand_dims:
+                data = [self._expand_dict(d) for d in data]
+            data = stack_dict_by_keys(data)
             super().__init__(data)
         else:
             raise NotImplementedError
         self._assert_shape()
+
+    def _expand_dict(self, dict_):
+        out = OrderedDict()
+        for key, val in dict_.items():
+            out[key] = onp.array([val])
+        return out
 
     def __len__(self):
         lens = onp.array([len(val) for val in self.values()])
@@ -135,11 +141,11 @@ class DictList(dict):
             data[key] = onp.concatenate([val, dictlist[key]], axis=0)
         return DictList(data)
 
-    def repeat_expand_axis0(self, num):
-        """Repeat num times along new 0-th dimension."""
+    def repeat(self, num, axis=0):
+        """Repeat num times along given axis."""
         data = OrderedDict()
         for key, val in self.items():
-            data[key] = onp.repeat(val[None, :], num, axis=0)
+            data[key] = onp.repeat(val, num, axis=axis)
         return DictList(data)
 
     def tile_axis0(self, num):
@@ -245,10 +251,9 @@ class DictList(dict):
     def prepare(self, features_keys):
         """Return copy of self, weiht keys sorted.
         """
-        length = len(self)
         for key in features_keys:
             if key not in self.keys():
-                self[key] = onp.zeros(length)
+                self[key] = onp.zeros(self.shape[1:])
         return self.sort_by_keys(features_keys)
 
     def numpy_array(self):
@@ -259,6 +264,19 @@ class DictList(dict):
 
         """
         return np.array(list(self.values()))
+
+    def __iter__(self):
+        """Iterator to do `for d in dictlist`"""
+        self.n = 0
+        return self
+
+    def __next__(self):
+        if self.n < len(self):
+            result = self[self.n]
+            self.n += 1
+            return result
+        else:
+            raise StopIteration
 
     def __getitem__(self, key):
         """Indexing by key or by index.
@@ -273,8 +291,11 @@ class DictList(dict):
             for k, val in self.items():
                 output[k] = val[idx]
             if len(self.shape) == 2:
-                # normal dict
-                return output
+                if isinstance(key, int):
+                    # normal dict
+                    return output
+                else:
+                    return DictList(output)
             else:
                 return DictList(output)
         else:

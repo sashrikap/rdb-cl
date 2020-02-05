@@ -92,7 +92,11 @@ def run_interactive(active_fn_name, random_keys=None, load_design=-1, evaluate=F
         num_normalizers=p.NUM_NORMALIZERS,
         normalized_key=p.NORMALIZED_KEY,
         proposal=ird_proposal,
-        sample_args={"num_warmups": p.NUM_WARMUPS, "num_samples": p.NUM_SAMPLES},
+        sample_args={
+            "num_warmups": p.NUM_WARMUPS,
+            "num_samples": p.NUM_SAMPLES,
+            "use_dictlist": True,
+        },
         interactive_mode=True,
         interactive_name=p.INTERACTIVE_NAME,
         save_root=f"{SAVE_ROOT}/{SAVE_NAME}",

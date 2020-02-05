@@ -1,6 +1,6 @@
 from rdb.infer.particles import Particles
 from jax import random
-from rdb.optim.utils import concate_dict_by_keys
+from rdb.optim.utils import *
 import numpy as onp
 
 
@@ -15,7 +15,7 @@ def test_concate_dict_speed():
     ps = particles.resample(onp.ones(500))
     assert len(ps.weights) == 500
 
-    concate_dict_ws = concate_dict_by_keys(dict_ws)
+    concate_dict_ws = stack_dict_by_keys(dict_ws)
     particles = Particles(rkey, env_fn, None, None, sample_concate_ws=concate_dict_ws)
     assert len(particles.weights) == 500
     ps = particles.resample(onp.ones(500))

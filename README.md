@@ -2,7 +2,7 @@
 
 Can we formally study reward hacking behaviors, such that our self-driving cars, presumably optimizing some reward, will work nicely and safely?
 
-README updated (19/10/17)
+README updated (19/02/04)
 
 ## Installation
 
@@ -17,9 +17,6 @@ pre-commit install
 ```bash
 # Simple merge lane example
 python examples/run_highway.py
-
-# Plot reward surface over possible tasks (takes 5~6mins to run)
-python examples/plot_highway.py
 ```
 
 ### Credit

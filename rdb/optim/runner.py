@@ -92,8 +92,6 @@ class Runner(object):
         """
         assert len(state.shape) == 2
         assert len(actions.shape) == 3
-        state = state[0, :]
-        actions = actions[:, 0, :]
         if path is None:
             path = join(dirname(rdb.__file__), "..", "data", "recording.mp4")
         os.makedirs(dirname(path), exist_ok=True)
@@ -116,9 +114,6 @@ class Runner(object):
 
         assert len(state.shape) == 2
         assert len(actions.shape) == 3
-        state = state[0, :]
-        actions = actions[:, 0, :]
-
         if os.path.isfile(path):
             os.remove(path)
         FRAME_WIDTH = 450
@@ -168,7 +163,6 @@ class Runner(object):
 
         Args:
             state(ndarray): (nbatch, xdim)
-            actions(ndarray): (T, nbatch, udim)
 
         """
 
@@ -176,10 +170,6 @@ class Runner(object):
         from IPython.display import display, Image, clear_output
 
         assert len(state.shape) == 2
-        assert len(actions.shape) == 3
-        state = state[0, :]
-        actions = actions[:, 0, :]
-
         if os.path.isfile(path):
             os.remove(path)
         FRAME_WIDTH = 450

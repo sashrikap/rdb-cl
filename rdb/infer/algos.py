@@ -135,10 +135,18 @@ class MetropolisHasting(Inference):
             return onp.concatenate([array_a, array_b])
 
     def _vectorize_state(self, state):
-        """DictList does not support [None, :]."""
+        """Vectorize for batch sampling.
+
+        Args:
+            state: (state_dim,)
+
+        Output:
+            state: (nchains, state_dim)
+
+        """
         if self._use_dictlist:
-            assert isinstance(state, DictList)
-            return state.repeat_expand_axis0(self._num_chains)
+            state = DictList(state, expand_dims=True)
+            return state.repeat(self._num_chains, axis=0)
         else:
             return onp.repeat(state[None, :], self._num_chains, axis=0)
 

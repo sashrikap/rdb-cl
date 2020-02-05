@@ -6,7 +6,7 @@ Includes:
 """
 from rdb.infer import *
 from numpyro.handlers import seed
-from rdb.optim.utils import concate_dict_by_keys, unconcate_dict_by_keys
+from rdb.optim.utils import *
 import numpyro.distributions as dist
 import jax.numpy as np
 import numpy as onp
@@ -126,7 +126,7 @@ class LogUniformPrior(Prior):
 
     def _log_prob_vec(self, state):
         n_chains = len(state)
-        state = concate_dict_by_keys(state)
+        state = stack_dict_by_keys(state)
         log_prob = self._log_prob(state)
         return log_prob
 

@@ -69,12 +69,33 @@ def sort_dict_by_keys(dict_, keys):
     d = OrderedDict()
     for k in keys:
         assert k in dict_
-        # if k in dict_:
         d[k] = dict_[k]
     return d
 
 
 def concate_dict_by_keys(dicts):
+    """Concatenate key-value pairs for list of dictionaries
+
+    Example:
+        >>> function([{'a': [1], 'b': [2]}, {'a': [2], 'b': [3]}])
+        >>> # get {'a': [1, 2], 'b': [2, 3]}
+
+    Note:
+        * Can be slow: 0.25s for 500 items, do not use in heavy iterations
+
+    """
+    if len(dicts) == 0:
+        return {}
+    else:
+        # Crude check of keys
+        keys = dicts[0].keys()
+        out_dict = {}
+        for key in keys:
+            out_dict[key] = onp.concatenate([d[key] for d in dicts])
+        return out_dict
+
+
+def stack_dict_by_keys(dicts):
     """Stack key-value pairs for list of dictionaries
 
     Example:
@@ -92,12 +113,12 @@ def concate_dict_by_keys(dicts):
         keys = dicts[0].keys()
         out_dict = {}
         for key in keys:
-            out_dict[key] = onp.array([d[key] for d in dicts])
+            out_dict[key] = onp.stack([d[key] for d in dicts])
         return out_dict
 
 
-def unconcate_dict_by_keys(dict_):
-    """Opposite of concate_dict_by_keys.
+def unstack_dict_by_keys(dict_):
+    """Opposite of stack_dict_by_keys.
 
     Example:
         >>> input: {'a': np.array(10, 15)}

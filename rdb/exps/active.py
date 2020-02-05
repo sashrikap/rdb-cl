@@ -13,11 +13,7 @@ Credits:
 
 import jax.numpy as np
 import numpy as onp
-from rdb.optim.utils import (
-    multiply_dict_by_keys,
-    subtract_dict_by_keys,
-    concate_dict_by_keys,
-)
+from rdb.optim.utils import *
 from rdb.infer.utils import logsumexp, random_uniform
 from rdb.exps.utils import Profiler
 from numpyro.handlers import seed
@@ -142,7 +138,7 @@ class ActiveRatioTest(ActiveInfoGain):
             desc = None
         next_feats_sum = belief.get_features_sum(next_task, next_task_name, desc=desc)
         user_feats_sum = obs.get_features_sum(next_task, next_task_name)
-        weights = belief.concate_weights
+        weights = belief.stack_weights
         log_ratios = self._compute_log_ratios(weights, next_feats_sum, user_feats_sum)
 
         if self._debug:

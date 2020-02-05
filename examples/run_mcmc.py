@@ -20,7 +20,7 @@ import ray
 
 
 def main(random_key):
-    SAVE_ROOT = data_dir() if not GCP_MODE else "/gcp_output"  # Don'tchange this line
+    SAVE_ROOT = data_dir() if not GCP_MODE else "/gcp_output"  # Don't change this line
     DEBUG_ROOT = data_dir() if not GCP_MODE else "/gcp_input"
 
     # Define random key
@@ -63,9 +63,10 @@ def main(random_key):
     )
 
     ## Evaluation Server
-    eval_server = ParticleServer(
-        env_fn, controller_fn, num_workers=NUM_EVAL_WORKERS, parallel=PARALLEL
-    )
+    # eval_server = ParticleServer(
+    #     env_fn, controller_fn, num_workers=NUM_EVAL_WORKERS, parallel=PARALLEL
+    # )
+    eval_server = None
     weight_params = {"bins": HIST_BINS, "max_weights": MAX_WEIGHT}
 
     ird_model = IRDOptimalControl(
@@ -75,7 +76,7 @@ def main(random_key):
         controller_fn=controller_fn,
         eval_server=eval_server,
         beta=BETA,
-        true_w=TRUE_W,
+        true_w=None,
         prior=prior,
         proposal=ird_proposal,
         num_normalizers=NUM_NORMALIZERS,
@@ -83,38 +84,20 @@ def main(random_key):
             "num_warmups": NUM_WARMUPS,
             "num_samples": NUM_SAMPLES,
             "num_chains": NUM_IRD_CHAINS,
+            "use_dictlist": True,
         },
         designer_proposal=designer_proposal,
         designer_args={
             "num_warmups": NUM_DESIGNER_WARMUPS,
             "num_samples": NUM_DESIGNERS,
             "num_chains": NUM_DESIGNER_CHAINS,
+            "use_dictlist": True,
         },
         weight_params=weight_params,
-        use_true_w=USER_TRUE_W,
-        num_prior_tasks=NUM_PRIOR_TASKS,
         normalized_key=NORMALIZED_KEY,
         save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
         exp_name=f"{EXP_NAME}",
     )
-
-    ## Active acquisition function for experiment
-    active_fns = {
-        "infogain": ActiveInfoGain(
-            rng_key=None, model=ird_model, beta=BETA, params=weight_params, debug=False
-        ),
-        "ratiomean": ActiveRatioTest(
-            rng_key=None, model=ird_model, method="mean", debug=False
-        ),
-        "ratiomin": ActiveRatioTest(
-            rng_key=None, model=ird_model, method="min", debug=False
-        ),
-        "random": ActiveRandom(rng_key=None, model=ird_model),
-    }
-    keys = list(active_fns.keys())
-    for key in keys:
-        if key not in ACTIVE_FNS:
-            del active_fns[key]
 
     ## Task sampling seed
     if FIXED_TASK_SEED is not None:
@@ -130,17 +113,16 @@ def main(random_key):
         num_eval_map=NUM_EVAL_MAP,
         fixed_task_seed=fixed_task_seed,
         design_data=design_data,
-        num_load_design=0,
         save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
         exp_name=f"{EXP_NAME}",
         exp_params=PARAMS,
+        exp_mode=EXP_MODE,
         normalized_key=NORMALIZED_KEY,
     )
     """ Experiment """
-    for num_designer_prior in range(0, NUM_DESIGNS + 1):
-        experiment.update_key(rng_key)
-        experiment.run_designer_mcmc(num_designer_prior, "design")
-    ray.shutdown()  # Prepare for next run, which reinitialize ray with different seed
+    experiment.update_key(rng_key)
+    experiment.run_designer()
+    # ray.shutdown()  # Prepare for next run, which reinitialize ray with different seed
 
 
 if __name__ == "__main__":

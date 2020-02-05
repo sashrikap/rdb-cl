@@ -6,7 +6,7 @@ Includes:
 """
 from rdb.infer import *
 from numpyro.handlers import seed
-from rdb.optim.utils import concate_dict_by_keys, unconcate_dict_by_keys
+from rdb.optim.utils import *
 import numpyro.distributions as dist
 import jax.numpy as np
 import numpyro
@@ -103,7 +103,7 @@ class IndGaussianProposal(Proposal):
                 log_val = np.log(val)
                 next_log_val = numpyro.sample("next_log_val", dist.Normal(log_val, std))
                 next_vals.append(np.exp(next_log_val))
-            next_state = DictList(zip(keys, next_vals))
+            next_state = DictList(dict(zip(keys, next_vals)))
             return next_state
 
         return seed(proposal_fn, self._rng_key)
@@ -119,9 +119,9 @@ class IndGaussianProposal(Proposal):
                 self.add_feature(key)
             return self._proposal_fn(state)
         else:
-            state = concate_dict_by_keys(state)
+            state = stack_dict_by_keys(state)
             for key in state.keys():
                 self.add_feature(key)
             state = self._proposal_fn(state)
-            state = unconcate_dict_by_keys(state)
+            state = unstack_dict_by_keys(state)
             return state
