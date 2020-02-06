@@ -11,6 +11,7 @@ from rdb.optim.utils import *
 from rdb.infer.utils import *
 import jax.numpy as np
 import numpy as onp
+import copy
 
 
 class DictList(dict):
@@ -83,16 +84,32 @@ class DictList(dict):
                 assert len(val.shape) > 0
                 new_data[key] = val
             super().__init__(new_data)
-        elif isinstance(data, list) or isinstance(data, tuple):
+        elif (
+            isinstance(data, list)
+            or isinstance(data, tuple)
+            or isinstance(data, onp.ndarray)
+        ):
             if expand_dims:
                 data = [self._expand_dict(d) for d in data]
-            data = stack_dict_by_keys(data)
+            data = self._stack_dict_by_keys(data)
             super().__init__(data)
         else:
             raise NotImplementedError
         self._assert_shape()
 
+    def _stack_dict_by_keys(self, dicts):
+        """Utility function."""
+        if len(dicts) == 0:
+            return OrderedDict()
+        else:
+            keys = dicts[0].keys()
+            out = OrderedDict()
+            for key in keys:
+                out[key] = onp.stack([d[key] for d in dicts])
+            return out
+
     def _expand_dict(self, dict_):
+        """Utility function."""
         out = OrderedDict()
         for key, val in dict_.items():
             out[key] = onp.array([val])
@@ -148,12 +165,13 @@ class DictList(dict):
             data[key] = onp.repeat(val, num, axis=axis)
         return DictList(data)
 
-    def tile_axis0(self, num):
+    def tile(self, num, axis=0):
         """Tile num times along existing 0-th dimension."""
         data = OrderedDict()
+        assert axis + 1 < len(self.shape)
         for key, val in self.items():
             new_shape = [1] * len(val.shape)
-            new_shape[0] = num
+            new_shape[axis] = num
             data[key] = onp.tile(val, new_shape)
         return DictList(data)
 
@@ -181,6 +199,21 @@ class DictList(dict):
             return DictList(data)
         else:
             return data
+
+    def normalize(self, key):
+        """Normalize all values based on key.
+        """
+        data = OrderedDict()
+        norm_val = self[key]
+        for key, val in self.items():
+            data[key] = val / norm_val
+        return DictList(data)
+
+    def copy(self):
+        data = OrderedDict()
+        for key, val in self.items():
+            data[key] = copy.deepcopy(val)
+        return DictList(data)
 
     def __mul__(self, dict_):
         """Multiply with another dictlist.
@@ -237,9 +270,12 @@ class DictList(dict):
 
     def sort_by_keys(self, keys=None):
         """Return OrderedDict by sorting"""
+        out = OrderedDict()
         if keys is None:
             keys = sorted(self.keys())
-        return DictList(sort_dict_by_keys(self, keys))
+        for key in keys:
+            out[key] = self[key]
+        return DictList(out)
 
     def reshape(self, shape):
         """Reshape values"""
@@ -257,13 +293,22 @@ class DictList(dict):
         return self.sort_by_keys(features_keys)
 
     def numpy_array(self):
-        """Return stacked values
+        """Return stacked values in jax.numpy
 
         Output:
             out (ndarray): (num_feats, n_batch)
 
         """
         return np.array(list(self.values()))
+
+    def onp_array(self):
+        """Return stacked values
+
+        Output:
+            out (ndarray): (num_feats, n_batch)
+
+        """
+        return onp.array(list(self.values()))
 
     def __iter__(self):
         """Iterator to do `for d in dictlist`"""
@@ -284,9 +329,13 @@ class DictList(dict):
         if isinstance(key, str):
             # key
             val = dict.__getitem__(self, key)
-        elif isinstance(key, int) or isinstance(key, onp.ndarray):
+        elif (
+            isinstance(key, int)
+            or isinstance(key, onp.ndarray)
+            or isinstance(key, np.ndarray)
+        ):
             # index
-            output = {}
+            output = OrderedDict()
             idx = key
             for k, val in self.items():
                 output[k] = val[idx]

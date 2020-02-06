@@ -11,7 +11,7 @@ def test_chain(num):
         rng_key=None, normalized_key="a", feature_keys=["a", "b"], proposal_var=5
     )
     proposal.update_key(key)
-    data = {"a": onp.ones(num), "b": 3 * onp.ones(num)}
+    data = DictList({"a": onp.ones(num), "b": 3 * onp.ones(num)})
     out = proposal(data)
     for key, val in out.items():
         assert len(val) == num

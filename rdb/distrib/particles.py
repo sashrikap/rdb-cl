@@ -27,7 +27,7 @@ class ParticleWorkerSingle(object):
             controller=self._controller,
             runner=self._runner,
             save_name=None,
-            sample_ws=[],
+            weights=[],
             env=self._env,
         )
 

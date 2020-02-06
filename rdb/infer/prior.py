@@ -48,6 +48,9 @@ class LogUniformPrior(Prior):
         log_max (float): log range (-log_max, log_max)
         feature_keys (list): initial list of features
 
+    Out:
+        out (DictList): (nkeys, num_samples)
+
     """
 
     def __init__(self, rng_key, normalized_key, feature_keys, log_max):
@@ -107,15 +110,11 @@ class LogUniformPrior(Prior):
     def log_prob(self, state):
         """Log probability of the reiceived state."""
         assert self._log_prior_dict is not None, "Must initialize with random seed"
-        if isinstance(state, dict):
-            return self._log_prob(state)
-        else:
-            return self._log_prob_vec(state)
-
-    def _log_prob(self, state):
+        assert isinstance(state, DictList)
         for key in state.keys():
             self.add_feature(key)
-        log_prob = 0.0
+        nbatch = len(state)
+        log_prob = onp.zeros(nbatch)
         for key, dist_ in self._log_prior_dict.items():
             val = state[key]
             pkey = self._check_range(key, val, dist_)
@@ -124,14 +123,13 @@ class LogUniformPrior(Prior):
             log_prob += pkey
         return log_prob
 
-    def _log_prob_vec(self, state):
-        n_chains = len(state)
-        state = stack_dict_by_keys(state)
-        log_prob = self._log_prob(state)
-        return log_prob
-
     def _build_function(self):
-        """Build prior function."""
+        """Build prior function.
+
+        Output:
+            out (DictList): (nkeys, num_samples)
+
+        """
 
         def prior_fn(num_samples):
             output = {}

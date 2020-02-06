@@ -21,7 +21,6 @@ import os
 import jax
 import jax.numpy as np
 import numpy as onp
-from rdb.optim.utils import multiply_dict_by_keys, append_dict_by_keys
 from rdb.infer.designer import Designer, DesignerInteractive
 from numpyro.handlers import scale, condition, seed
 from rdb.infer.utils import random_choice, logsumexp
@@ -147,7 +146,7 @@ class IRDOptimalControl(PGM):
                 controller=self._controller,
                 runner=self._runner,
                 beta=beta,
-                truth=self.create_particles([true_w], save_name="true_w"),
+                true_w=true_w,
                 prior=prior,
                 proposal=designer_proposal,
                 sample_method=sample_method,
@@ -288,12 +287,13 @@ class IRDOptimalControl(PGM):
         return samples
 
     def create_particles(self, weights, save_name):
+        weights = DictList(weights)
         return Particles(
             rng_key=self._rng_key,
             env_fn=self._env_fn,
             controller=self._controller,
             runner=self._runner,
-            sample_ws=weights,
+            weights=weights,
             save_name=save_name,
             weight_params=self._weight_params,
             fig_dir=f"{self._save_dir}/plots",

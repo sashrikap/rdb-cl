@@ -71,7 +71,7 @@ def kernel(obs, state, tasks):
 
 
 @pytest.mark.parametrize("num_chains", [1, 5, 10, 30])
-def ttest_mh_algo(num_chains):
+def test_mh_algo(num_chains):
     state = onp.zeros(2)
     tasks = onp.array([[2, 3], [3, 4], [4, 5]])
     key = random.PRNGKey(1)
@@ -93,7 +93,7 @@ def ttest_mh_algo(num_chains):
 @pytest.mark.parametrize(
     "num_chains, num_tasks", list(itertools.product([5, 10, 30], [2, 4]))
 )
-def ttest_mh_algo_state_2d(num_chains, num_tasks):
+def test_mh_algo_state_2d(num_chains, num_tasks):
     state = onp.zeros((5, 2))
     key = random.PRNGKey(1)
     tasks = onp.array([onp.ones((5, 2))] * num_tasks)
@@ -129,12 +129,7 @@ def dict_kernel(obs, state, tasks, xdim):
     tasks_ = onp.array(tasks_)
     state_ = DictList(state_)
     # sum across tasks
-    try:
-        out = (obs - state_).reshape((nbatch, ntasks, xdim))
-    except:
-        import pdb
-
-        pdb.set_trace()
+    out = (obs - state_).reshape((nbatch, ntasks, xdim))
     # sum across task
     out = out.sum(axis=1)
     assert out.shape == (weight_dim, nbatch, xdim)

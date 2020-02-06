@@ -1,22 +1,21 @@
-import pprint
-import copy
-import json
 import os
 import jax
+import copy
+import json
+import pprint
+import numpy as onp
 import jax.numpy as np
 import numpyro, itertools
-import numpy as onp
-from rdb.optim.utils import multiply_dict_by_keys, append_dict_by_keys
-from numpyro.handlers import scale, condition, seed
-from rdb.infer.utils import random_choice, logsumexp
-from rdb.infer.particles import Particles
-from rdb.infer.pgm import PGM
-from tqdm.auto import tqdm, trange
-from rdb.exps.utils import *
-from os.path import join
-from rdb.infer.algos import *
-from rdb.infer.utils import *
 from time import time
+from os.path import join
+from rdb.exps.utils import *
+from rdb.infer.utils import *
+from rdb.infer.pgm import PGM
+from numpyro.handlers import seed
+from tqdm.auto import tqdm, trange
+from rdb.infer.dictlist import DictList
+from rdb.infer.particles import Particles
+from rdb.infer.utils import random_choice
 
 
 class Designer(PGM):
@@ -29,7 +28,7 @@ class Designer(PGM):
           doesn't have to be.
 
     Args:
-        truth (Particles): true weight particles
+        true_w (dict): true weight
 
     """
 
@@ -40,7 +39,7 @@ class Designer(PGM):
         controller,
         runner,
         beta,
-        truth,
+        true_w,
         prior,
         proposal,
         sample_method="mh",
@@ -57,11 +56,11 @@ class Designer(PGM):
         self._env = env_fn()
         self._controller = controller
         self._runner = runner
-        self._truth = truth
-        if self._truth is not None:
-            self._true_w = truth.weights[0]
+        self._true_w = true_w
+        if self._true_w is not None:
+            self._truth = self.create_particles([true_w], "designer_truth")
         else:
-            self._true_w = None
+            self._truth = None
         self._use_true_w = use_true_w
         self._normalized_key = normalized_key
         # Sampling Prior and kernel
@@ -79,13 +78,15 @@ class Designer(PGM):
         self._num_prior_tasks = num_prior_tasks
 
     def create_particles(self, weights, save_name):
+        weights = DictList(weights)
         return Particles(
             rng_key=self._rng_key,
             env_fn=self._env_fn,
             controller=self._controller,
             runner=self._runner,
-            sample_ws=weights,
+            weights=weights,
             save_name=save_name,
+            normalized_key=self._normalized_key,
             weight_params=self._weight_params,
             fig_dir=f"{self._save_dir}/plots",
             save_dir=f"{self._save_dir}/save",
@@ -106,25 +107,22 @@ class Designer(PGM):
             sample_ws = onp.array([self._true_w])
         else:
             # Sample based on prior tasks + new_task
-            sample_tasks = onp.concatenate([self._prior_tasks, new_task])
+            if len(self._prior_tasks) == 0:
+                #  shape (1, task_dim)
+                assert len(new_task.shape) == 2
+                sample_tasks = new_task
+            else:
+                sample_tasks = onp.concatenate([self._prior_tasks, new_task])
+            # init_state = self._prior(1)[0]
+            init_state = None
             sample_ws, info = self._sampler.sample(
-                obs=self._true_w, tasks=sample_tasks, name=save_name
+                obs=self._true_w,
+                tasks=sample_tasks,
+                init_state=init_state,
+                name=save_name,
             )
-        import pdb
-
-        pdb.set_trace()
-        samples = Particles(
-            rng_key=self._rng_key,
-            env_fn=self._env_fn,
-            controller=self._controller,
-            runner=self._runner,
-            weight_params=self._weight_params,
-            sample_ws=sample_ws,
-            save_name=save_name,
-            fig_dir=f"{self._save_dir}/plots",
-            save_dir=f"{self._save_dir}/save",
-            env=self._env,
-        )
+        sample_ws = DictList(sample_ws)
+        samples = self.create_particles(sample_ws, save_name=save_name)
         samples.visualize(true_w=self.true_w, obs_w=None)
         # Visualize multiple MCMC chains to check convergence.
         visualize_chains(
@@ -133,8 +131,6 @@ class Designer(PGM):
             title=save_name,
             **self._weight_params,
         )
-
-        self._visualize_chains(save_name=save_name),
         return samples.subsample(1)
 
     def reset_prior_tasks(self):
@@ -174,49 +170,60 @@ class Designer(PGM):
 
     def update_key(self, rng_key):
         super().update_key(rng_key)
-        self._truth.update_key(rng_key)
+        if self._truth is not None:
+            self._truth.update_key(rng_key)
         self._sampler.update_key(rng_key)
         self._prior.update_key(rng_key)
         self._random_choice = seed(random_choice, rng_key)
         self.reset_prior_tasks()
 
     def _build_kernel(self, beta):
-        def likelihood_fn(true_w, sample_w, tasks):
+        def likelihood_fn(true_w, sample_ws, tasks):
             """Designer forward likelihood p(design_w | true_w).
 
             Args:
                 true_w (DictList): designer's true w in mind
                     shape: (nweight, 1)
-                sample_w (DictList): current sampled w
+                sample_ws (DictList): current sampled w
                     shape: (nweight, nbatch, 1)
                 tasks (ndarray): prior tasks
                     shape: (ntasks, task_dim)
 
+            Return:
+                log_probs (ndarray): (nbatch, )
+
             """
             assert self._prior_tasks is not None, "Need >=0 prior tasks."
             assert len(tasks) == self._num_prior_tasks + 1
-            nbatch = len(sample_w)
+            nfeats = sample_ws.shape[0]
+            nbatch = len(sample_ws)
             ntasks = len(tasks)
             ## Do something on each sample each task
             ## Cross product:
             ##  (nbatch,) x (ntasks,) -> (nbatch * ntasks,)
-            pairs = list(itertools.product(sample_w, tasks))
+            pairs = list(itertools.product(sample_ws, tasks))
             batch_ws, batch_tasks = zip(*pairs)
             batch_tasks = np.array(batch_tasks)
             batch_ws = DictList(batch_ws)
             true_ws = DictList(true_w, expand_dims=True).repeat(nbatch * ntasks, axis=0)
 
-            ## Calculate probability
-            log_probs = onp.zeros(nbatch * ntasks)
+            ## Calculate probability -> (nbatch * ntasks,)
             states = self.env.get_init_states(batch_tasks)
             actions = self._controller(states, batch_ws)
             _, costs, info = self._runner(states, actions, weights=true_ws)
+
+            ## Mean across tasks (nbatch, ntasks) -> (nbatch,)
+            #  To stabilize MH sampling
+            #  (1) average, instead of sum across tasks
+            #  (2) divide by number of features
+            log_probs = onp.zeros(nbatch)
+            costs = costs.reshape((nbatch, ntasks)).mean(axis=1) / nfeats
             rews = -1 * costs
             log_probs += beta * rews
-            log_probs += self._prior.log_prob(batch_ws)
+            log_probs += self._prior.log_prob(sample_ws)
             # if True:
             if False:
-                print(f"Designer prob {log_prob:.3f}", actions.mean())
+                print(f"Designer prob {log_probs:.3f}", actions.mean())
             return log_probs
 
         def _kernel(true_w, sample_w, **kwargs):
@@ -321,12 +328,13 @@ class DesignerInteractive(Designer):
                 print(e)
                 print("Invalid input.")
                 continue
+        user_w = DictList([self._user_inputs[-1]])
         return Particles(
             rng_key=self._rng_key,
             env_fn=self._env_fn,
             controller=self._controller,
             runner=self._runner,
-            sample_ws=[self._user_inputs[-1]],
+            weights=user_w,
             save_name=f"designer_interactive_{self._name}",
             weight_params=self._weight_params,
             env=self._env,

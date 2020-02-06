@@ -38,6 +38,7 @@ class ExperimentMCMC(object):
         eval_server,
         num_eval_tasks=4,
         num_eval_map=-1,
+        num_visualize_tasks=32,
         fixed_task_seed=None,
         normalized_key=None,
         save_root="data/test",
@@ -56,13 +57,15 @@ class ExperimentMCMC(object):
         self._random_task_choice = None
         self._normalized_key = normalized_key
         self._fixed_task_seed = fixed_task_seed
-        # Evaluation
+        # Evaluation & Visualization
         self._num_eval_map = num_eval_map
         self._num_eval_tasks = num_eval_tasks
+        self._num_visualize_tasks = num_visualize_tasks
         # Active Task proposal
         self._exp_params = exp_params
         self._save_root = save_root
         self._exp_name = exp_name
+        self._save_dir = f"{save_root}/{exp_name}"
         self._last_time = time()
         # Load design and cache
         self._design_data = design_data
@@ -71,12 +74,12 @@ class ExperimentMCMC(object):
         self._all_designer_prior_tasks = []
         self._all_designer_prior_ws = []
         self._designer = self._model.designer
-        self._load_design()
 
     def _load_design(self):
         """Different mode of experiments.
         """
         all_tasks = self._model.env.all_tasks
+        num_designs = len(self._design_data["DESIGNS"])
         for design in self._design_data["DESIGNS"]:
             design["WEIGHTS"] = normalize_weights(
                 design["WEIGHTS"], self._normalized_key
@@ -85,6 +88,7 @@ class ExperimentMCMC(object):
         if self._exp_mode.startswith("ird"):
             ## Testing IRD convergence, no need of these designs
             pass
+
         elif self._exp_mode == "designer_true_w_prior_tasks":
             ## Load well-defined Jerry's prior designs
             ## Test # design tasks vs convergence
@@ -94,43 +98,60 @@ class ExperimentMCMC(object):
                 true_w = self._design_data["DESIGNS"][-1]["WEIGHTS"]
                 self._all_designer_prior_tasks.append(design_task)
                 self._all_designer_prior_ws.append(true_w)
+
         elif self._exp_mode == "designer_true_w_random_tasks":
             ## Use one of Jerry's prior designed w as true w
             ## Test # random tasks vs convergence
+            rand_tasks = self._random_task_choice(all_tasks, num_designs)
+            self._all_designer_prior_tasks = rand_tasks
             for d_data in self._design_data["DESIGNS"]:
-                rand_task = self._random_task_choice(all_tasks)
                 # Treat final design as true_w
                 true_w = self._design_data["DESIGNS"][-1]["WEIGHTS"]
-                self._all_designer_prior_tasks.append(rand_task)
                 self._all_designer_prior_ws.append(true_w)
+
         elif self._exp_mode == "designer_random_w_random_tasks":
             ## Use a random w as true w
             ## Test # random tasks vs convergence
+            rand_tasks = onp.array(self._random_task_choice(all_tasks, num_designs))
+            self._all_designer_prior_tasks = rand_tasks
+            rand_w = self._make_random_weights(
+                self._design_data["DESIGNS"][-1]["WEIGHTS"].keys()
+            )
             for d_data in self._design_data["DESIGNS"]:
-                rand_task = self._random_task_choice(all_tasks)
-                rand_w = self._make_random_weights(d_data["WEIGHTS"].keys())
-                self._all_designer_prior_tasks.append(rand_task)
+                # rand_w = self._make_random_weights(d_data["WEIGHTS"].keys())
                 self._all_designer_prior_ws.append(rand_w)
-        elif self._exp_mode == "designer_random_w_more_features":
-            ## Use a random w as true w on random tasks
-            ## The random true w has progressively more features
+
+        elif self._exp_mode == "designer_true_w_more_features":
+            ## Use a true w on random tasks
+            ## The true w has progressively more random features
             ## Test # features (DOF) vs convergence
             all_keys = self._model.env.features_keys
-            n_start = 5
+            # Start from n_start features
+            n_start = 8
+            rand_tasks = self._random_task_choice(
+                self._model.env.all_tasks, num_designs
+            )
+            self._all_designer_prior_tasks = rand_tasks
             for di, d_data in enumerate(self._design_data["DESIGNS"]):
-                # Start from 5 features
                 n_feats = di + n_start
-                rand_task = self._random_task_choice(self._model.env.all_tasks)
-                rand_w = self._make_random_weights(all_keys[:n_feats])
-                self._all_designer_prior_tasks.append(rand_task)
-                self._all_designer_prior_ws.append(rand_w)
+                rand_w = self._make_random_weights(all_keys)
+                true_w = self._design_data["DESIGNS"][-1]["WEIGHTS"]
+                for key, val in rand_w.items():
+                    if key not in true_w:
+                        true_w[key] = val
+                    if len((true_w.keys())) == n_feats:
+                        break
+                self._all_designer_prior_ws.append(true_w)
+
         else:
             raise NotImplementedError
 
     def _make_random_weights(self, keys):
         weights = OrderedDict()
         for key in keys:
-            weights[key] = self._random_weight()
+            weights[key] = np.exp(self._random_weight())
+        for key, val in weights.items():
+            weights[key] = val / weights[self._normalized_key]
         return weights
 
     def run_designer(self):
@@ -147,44 +168,37 @@ class ExperimentMCMC(object):
         # May cause high variance
         assert self._random_task_choice is not None
         all_tasks = self._designer.env.all_tasks
+        viz_tasks = self._random_task_choice(all_tasks, self._num_visualize_tasks)
+        viz_names = [str(t) for t in viz_tasks]
+
         eval_task = self._random_task_choice(all_tasks, 1)
         ## Simulate
-        for n_prior in range(2, len(self._all_designer_prior_tasks)):
+        for n_prior in range(len(self._all_designer_prior_tasks)):
 
+            print(f"Experiment mode {self._exp_mode}")
             print(f"Prior task number: {n_prior}")
+
             prior_tasks = self._all_designer_prior_tasks[:n_prior]
+            if self._exp_mode == "designer_true_w_more_features":
+                ## Keeps only 2 prior tasks
+                prior_tasks = self._all_designer_prior_tasks[:2]
             prior_w = self._all_designer_prior_ws[n_prior]
             self._designer.prior_tasks = prior_tasks
             self._designer.true_w = prior_w
             obs = self._designer.simulate(
-                eval_task,
-                eval_task,
-                save_name=f"designer_seed_{str(self._rng_key)}_prior_{n_prior}",
+                eval_task, eval_task, save_name=f"designer_prior_{n_prior:02d}"
             )
 
-        # ## Evaluate
-        # num_eval = min(self._num_eval_tasks, len(self._model.designer.env.all_tasks))
-        # all_tasks = self._random_task_choice(
-        #     self._designer.env.all_tasks, num_eval, replacement=False
-        # )
-        # all_names = [f"eval_{task}" for task in all_tasks]
-        # self._eval_server.compute_tasks(obs, all_tasks, all_names, verbose=True)
-        # truth = self._designer.truth
-        # self._eval_server.compute_tasks(truth, all_tasks, all_names, verbose=True)
+            ## Visualize performance
+            plot_dir = f"{self._save_dir}/plots"
+            os.makedirs(plot_dir, exist_ok=True)
+            fig_name = f"prior_{n_prior:02d}"
+            obs.visualize_comparisons(
+                viz_tasks, viz_names, self._designer.truth, fig_name
+            )
 
-        # ## Visualize performance
-        # all_diff_rews = []
-        # for task_, name_ in zip(all_tasks, all_names):
-        #     diff_rews, _ = obs.compare_with(task_, name_, truth)
-        #     all_diff_rews.append(diff_rews[0])
-        # plot_dir = f"{self._save_dir}/plots"
-        # os.makedirs(plot_dir, exist_ok=True)
-        # fig_path = f"{plot_dir}/designer_seed_{str(self._rng_key)}"
-        # fig_suffix = f"_prior_{num_prior_tasks:02d}"
-        # obs.visualize_tasks(fig_path, fig_suffix, all_names, all_diff_rews)
-
-        ## Reset designer prior tasks
-        self._designer.prior_tasks = all_tasks
+            ## Reset designer prior tasks
+            self._designer.prior_tasks = all_tasks
 
     def run_ird(self, num_obs, mode):
         """Run IRD on task, varying the number of past observations."""
@@ -232,12 +246,13 @@ class ExperimentMCMC(object):
         self._designer.update_key(rng_key)
         self._random_choice = seed(random_choice, rng_key)
         random_weight = partial(
-            random.uniform,
-            minval=-self._exp_params["MAX_WEIGHT"],
-            maxval=self._exp_params["MAX_WEIGHT"],
+            random_uniform,
+            low=-self._exp_params["MAX_WEIGHT"],
+            high=self._exp_params["MAX_WEIGHT"],
         )
         self._random_weight = seed(random_weight, rng_key)
         if self._fixed_task_seed is not None:
             self._random_task_choice = seed(random_choice, self._fixed_task_seed)
         else:
             self._random_task_choice = self._random_choice
+        self._load_design()

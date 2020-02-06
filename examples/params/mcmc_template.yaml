@@ -5,8 +5,8 @@ NUM_EVAL_WORKERS: 16
 FIXED_TASK_SEED: 0
 
 PARALLEL: True
-NUM_IRD_CHAINS: 2
-NUM_DESIGNER_CHAINS: 2
+NUM_IRD_CHAINS: 4
+NUM_DESIGNER_CHAINS: 4
 
 
 NUM_PRIOR_MODE: "design"
@@ -15,10 +15,10 @@ NUM_PRIOR_MODE: "design"
 
 
 
-EXP_NAME: "mcmc_convergence"
 EXP_ITERATIONS: 24
 ENV_NAME: "Week6_01-v1"
 NUM_EVAL_TASKS: 16384
+NUM_VISUALIZE_TASKS: 1024
 
 
 
@@ -26,26 +26,35 @@ NUM_EVAL_TASKS: 16384
 USER_TRUE_W: False
 
 ## Full sampling
-# NUM_WARMUPS: 1000
-# NUM_NORMALIZERS: 2000
-# NUM_SAMPLES: 1000
-# NUM_EVAL_MAP: 2
-# SAVE_NAME: "200204"
-# NUM_DESIGNER_WARMUPS: 20
-# NUM_DESIGNERS: 200
+NUM_WARMUPS: 1000
+NUM_NORMALIZERS: 2000
+NUM_SAMPLES: 1000
+NUM_EVAL_MAP: 2
+SAVE_NAME: "200205"
+NUM_DESIGNER_WARMUPS: 20
+NUM_DESIGNERS: 200
+# EXP_NAME: "mcmc_convergence_true_w_prior_tasks"
+# EXP_MODE: "designer_true_w_prior_tasks"
+# EXP_NAME: "mcmc_convergence_true_w_random_tasks"
+# EXP_MODE: "designer_true_w_random_tasks"
+# EXP_NAME: "mcmc_convergence_random_w_random_tasks"
+# EXP_MODE: "designer_random_w_random_tasks"
+EXP_NAME: "mcmc_convergence_true_w_more_feats"
+EXP_MODE: "designer_true_w_more_features"
 
 
 ## Testing
-NUM_WARMUPS: 10
-NUM_NORMALIZERS: 50
-NUM_SAMPLES: 10
-NUM_DESIGNER_WARMUPS: 40
-NUM_DESIGNERS: 20
-NUM_EVAL_TASKS: 2
-NUM_EVAL_MAP: 1
-SAVE_NAME: "test"
-EXP_MODE: "designer_true_w_prior_tasks"
-
+# NUM_WARMUPS: 10
+# NUM_NORMALIZERS: 50
+# NUM_SAMPLES: 10
+# NUM_DESIGNER_WARMUPS: 8
+# NUM_DESIGNERS: 8
+# NUM_EVAL_TASKS: 2
+# NUM_EVAL_MAP: 1
+# SAVE_NAME: "test"
+# EXP_NAME: "mcmc_convergence"
+# # EXP_MODE: "designer_true_w_prior_tasks"
+# EXP_MODE: "designer_true_w_random_tasks"
 
 # NUM_EVAL_WORKERS: 1
 # PARALLEL: False
@@ -54,7 +63,7 @@ EXP_MODE: "designer_true_w_prior_tasks"
 MAX_WEIGHT: 20.0
 HIST_BINS: 200
 BETA: 16
-DESIGNER_PROPOSAL_VAR: 0.5
+DESIGNER_PROPOSAL_VAR: 1.
 IRD_PROPOSAL_VAR: 0.5
 
 ## MPC Specific

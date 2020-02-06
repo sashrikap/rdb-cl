@@ -17,12 +17,12 @@ Credits:
 
 """
 
-from jax import random
 from numpyro.handlers import scale, condition, seed
 from rdb.infer.dictlist import DictList
 from numpyro.infer import MCMC, NUTS
 from rdb.exps.utils import Profiler
 from tqdm.auto import tqdm, trange
+from jax import random
 import jax
 import copy
 import numpyro
@@ -167,27 +167,23 @@ class MetropolisHasting(Inference):
         assert self._rng_key is not None, "Need to initialize with random key"
         assert len(state) == self._num_chains
 
-        ## Sample next state
+        ## Sample next state (nbatch, xdim)
         next_state = self._proposal(state)
         next_logpr = self._kernel(obs, next_state, **kwargs)
-        logp_ratio = next_logpr - logpr
+        logp_ratio = onp.array(next_logpr - logpr)
 
-        ## Accept or not
-        accept = onp.log(self._coin_flip()) < logp_ratio
+        # if False:
+        if True:
+            print(f"next {next_logpr} curr {logpr} ratio {logp_ratio}")
+
+        ## Accept or not (nbatch,)
+        accept = onp.log(self._coin_flip()) < onp.array(logp_ratio)
         not_accept = onp.logical_not(accept)
+        # next prob: (nbatch, )
         next_logpr = self._concatenate(next_logpr[accept], logpr[not_accept])
+        # next state: (nbatch, xdim)
         next_state = self._concatenate(next_state[accept], state[not_accept])
 
-        if False:
-            # if True:
-            print(
-                "log next",
-                next_logpr,
-                "log current",
-                logpr,
-                "prob",
-                onp.exp(logp_ratio),
-            )
         assert next_logpr.shape == (self._num_chains,)
         assert next_state.shape == state.shape
         return accept, next_state, next_logpr
@@ -242,6 +238,7 @@ class MetropolisHasting(Inference):
 
         ## Warm-up phase
         warmup_accepts = []
+        print(f"MH Samplint Chains={self._num_chains}")
         range_ = trange(self._num_warmups, desc="MH Warmup")
         for i in range_:
             accept, state, log_prob = self._mh_step(
@@ -270,9 +267,9 @@ class MetropolisHasting(Inference):
             pbar.set_description(f"MH Sampling {name}; Accept {100 * rate:.1f}%")
 
         ## Check multi-chain result shapes
-        # samples (nsteps, self._num_chains, xdim...)
+        #  samples (nsteps, self._num_chains, xdim...)
         samples = onp.array(samples)
-        # accepts (nsteps, self._num_chains)
+        #  accepts (nsteps, self._num_chains)
         accepts = onp.array(accepts)
         assert accepts.shape == (nsteps, self._num_chains)
 

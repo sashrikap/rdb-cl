@@ -11,7 +11,7 @@ def test_chain(num):
         rng_key=None, normalized_key="a", feature_keys=["a", "b"], log_max=5
     )
     prior.update_key(key)
-    data = {"a": onp.ones(num), "b": 3 * onp.ones(num)}
+    data = DictList({"a": onp.ones(num), "b": 3 * onp.ones(num)})
     prob = prior.log_prob(data)
     assert len(prob) == num
 

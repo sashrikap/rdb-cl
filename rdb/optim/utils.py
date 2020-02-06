@@ -73,66 +73,6 @@ def sort_dict_by_keys(dict_, keys):
     return d
 
 
-def concate_dict_by_keys(dicts):
-    """Concatenate key-value pairs for list of dictionaries
-
-    Example:
-        >>> function([{'a': [1], 'b': [2]}, {'a': [2], 'b': [3]}])
-        >>> # get {'a': [1, 2], 'b': [2, 3]}
-
-    Note:
-        * Can be slow: 0.25s for 500 items, do not use in heavy iterations
-
-    """
-    if len(dicts) == 0:
-        return {}
-    else:
-        # Crude check of keys
-        keys = dicts[0].keys()
-        out_dict = {}
-        for key in keys:
-            out_dict[key] = onp.concatenate([d[key] for d in dicts])
-        return out_dict
-
-
-def stack_dict_by_keys(dicts):
-    """Stack key-value pairs for list of dictionaries
-
-    Example:
-        >>> function([{'a': [1], 'b': [2]}, {'a': [2], 'b': [3]}])
-        >>> # get {'a': [[1], [2]], 'b': [[2], [3]]}
-
-    Note:
-        * Can be slow: 0.25s for 500 items, do not use in heavy iterations
-
-    """
-    if len(dicts) == 0:
-        return {}
-    else:
-        # Crude check of keys
-        keys = dicts[0].keys()
-        out_dict = {}
-        for key in keys:
-            out_dict[key] = onp.stack([d[key] for d in dicts])
-        return out_dict
-
-
-def unstack_dict_by_keys(dict_):
-    """Opposite of stack_dict_by_keys.
-
-    Example:
-        >>> input: {'a': np.array(10, 15)}
-        >>> ouptut [{'a': np.array(15,)}, ] * 10
-
-    """
-    keys = list(dict_.keys())
-    values = list(dict_.values())
-    out_dicts = []
-    for i in range(len(dict_[keys[0]])):
-        out_dicts.append(dict(zip(keys, [v[i] for v in values])))
-    return out_dicts
-
-
 def append_dict_by_keys(dict_, item):
     """Append single item to dict (multiple items).
 

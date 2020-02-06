@@ -145,6 +145,8 @@ class Runner(object):
 
     def collect_heatmap(self, state, weights, width=450, path=None, text=None):
         assert len(state.shape) == 2
+
+        weights = DictList(weights)
         if path is None:
             path = join(dirname(rdb.__file__), "..", "data", "thumbnail.png")
         os.makedirs(dirname(path), exist_ok=True)

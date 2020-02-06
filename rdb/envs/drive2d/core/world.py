@@ -24,6 +24,7 @@ from pyglet import gl, graphics
 
 # from gym.envs.classic_control import rendering ## causes problem with headless server
 from rdb.envs.drive2d.core import lane, feature, car
+from rdb.infer.dictlist import *
 from rdb.optim.utils import *
 
 import platform
@@ -591,11 +592,14 @@ class DriveWorld(gym.Env):
         graphics.draw(4, gl.GL_LINES, ("v2f", line_strip))
 
     def set_heat(self, weights):
+        assert isinstance(weights, DictList)
         # Clean up weights input
-        weights = prepare_weights(weights, self.features_keys)
+        weights = weights.prepare(self.features_keys)
 
         def val(x, y, weights=weights):
-            cost_fn = partial(self._main_car.cost_runtime, weights=weights)
+            cost_fn = partial(
+                self._main_car.cost_runtime, weights=weights.numpy_array()
+            )
             state = deepcopy(self.state)
             main_idx = self._indices["main_car"]
             state[:, main_idx[0] : main_idx[0] + 3] = [x, y, onp.pi / 3]

@@ -94,7 +94,7 @@ class IndGaussianProposal(Proposal):
         """Build proposal function."""
 
         def proposal_fn(state):
-            assert isinstance(state, dict), "State must be dictionary type"
+            assert isinstance(state, DictList), "State must be dictionary type"
             assert self._log_std_dict is not None, "Must initialize with random seed"
             keys, vals = list(state.keys()), list(state.values())
             stds = list([self._log_std_dict[k] for k in keys])
@@ -113,15 +113,9 @@ class IndGaussianProposal(Proposal):
             self._proposal_fn is not None
         ), "Need to initialize with random seed by `update_key`"
         updated = False
+        assert isinstance(state, DictList)
 
-        if isinstance(state, dict):
-            for key in state.keys():
-                self.add_feature(key)
-            return self._proposal_fn(state)
-        else:
-            state = stack_dict_by_keys(state)
-            for key in state.keys():
-                self.add_feature(key)
-            state = self._proposal_fn(state)
-            state = unstack_dict_by_keys(state)
-            return state
+        for key in state.keys():
+            self.add_feature(key)
+        state = self._proposal_fn(state)
+        return state

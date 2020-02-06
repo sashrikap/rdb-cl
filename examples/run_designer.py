@@ -54,9 +54,6 @@ def main():
 
     _env = env_fn()
     _controller, _runner = controller_fn(_env)
-    _truth = Particles(
-        None, env_fn, _controller, _runner, save_name="noname", sample_ws=[TRUE_W]
-    )
     weight_params = {"bins": HIST_BINS, "max_weights": MAX_WEIGHT}
     SAVE_ROOT = data_dir() if not GCP_MODE else "/gcp_output"
 
@@ -66,7 +63,7 @@ def main():
         controller=_controller,
         runner=_runner,
         beta=BETA,
-        truth=_truth,
+        true_w=TRUE_W,
         prior=prior,
         proposal=proposal,
         normalized_key=NORMALIZED_KEY,

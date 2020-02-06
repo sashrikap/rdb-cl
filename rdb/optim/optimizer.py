@@ -128,64 +128,6 @@ class OptimizerMPC(object):
             us0 (ndarray): initial action guess (T, nbatch, udim)
 
         """
-        if self._method == "lbfgs":
-            """L-BFGS tend to work fairly well on MPC, the down side is vectorizing it
-            tends to drag down overall performance
-
-            Parameters:
-                `maxcor`: found by tuning with examples/tune/tune_mpc.
-
-            """
-            res = minimize(
-                fn, us0, method="L-BFGS-B", jac=grad_fn, options={"maxcor": 20}
-            )
-        elif self._method == "bfgs":
-            """BFGS >= L-BFGS
-
-            Note:
-                * WARNING: unbearably slow to use for vectorized high-dim
-
-            """
-            res = minimize(fn, us0, method="BFGS", jac=grad_fn)
-        elif self._method == "basinhopping":
-            """Global Optimization
-
-            Basin hopping uses l-bfgs-b backbone and works at least better.
-
-            Note:
-                * WARNING: unbearably slow to compile for vectorized high-dim
-                4min on horizon 10, batch 100
-                * `niter` requires tuning
-
-
-            """
-
-            def fn_grad_fn(us0):
-                return fn(us0), grad_fn(us0)
-
-            kwargs = {"method": "L-BFGS-B", "jac": True}
-            res = basinhopping(fn_grad_fn, us0, minimizer_kwargs=kwargs, niter=200)
-        else:
-            raise NotImplementedError
-
-        info = {}
-        info["cost"] = res["fun"]
-        info["us"] = res["x"].reshape(us0.shape)
-        if "jac" in res.keys():
-            info["grad"] = res["jac"]
-        else:
-            info["grad"] = grad_fn(info["us"])
-        return info
-
-    def _minimize(self, fn, grad_fn, us0):
-        """Optimize fn using scipy.minimize.
-
-        Args:
-            fn (fn): cost function
-            grad_fn (fn): gradient function
-            us0 (ndarray): initial action guess (T, nbatch, udim)
-
-        """
         raise NotImplementedError
 
     def __call__(self, x0, weights, batch=True, us0=None, init="zeros"):
@@ -201,13 +143,17 @@ class OptimizerMPC(object):
             acs (ndarray): (T, nbatch, udim)
 
         """
-
         weights_arr = (
             DictList(weights, expand_dims=not batch)
             .prepare(self._features_keys)
             .numpy_array()
         )
-        assert len(weights_arr.shape) == 2
+        try:
+            assert len(weights_arr.shape) == 2
+        except:
+            import pdb
+
+            pdb.set_trace()
         n_batch = weights_arr.shape[1]
 
         # Track JIT recompile
@@ -398,10 +344,15 @@ class OptimizerScipy(OptimizerMPC):
 
             Parameters:
                 `maxcor`: found by tuning with examples/tune/tune_mpc.
+                `maxiter`: for MPC maxiter affects running speed a lot
 
             """
             res = minimize(
-                fn, us0, method="L-BFGS-B", jac=grad_fn, options={"maxcor": 20}
+                fn,
+                us0,
+                method="L-BFGS-B",
+                jac=grad_fn,
+                options={"maxcor": 20, "maxiter": 120},
             )
         elif self._method == "bfgs":
             """BFGS >= L-BFGS
@@ -494,7 +445,7 @@ class OptimizerJax(OptimizerMPC):
             opt_init, opt_update, get_params = optimizers.adam(
                 step_size=3e-2, b1=0.9, b2=0.99, eps=1e-8
             )
-            num_steps = 200
+            num_steps = 100
         else:
             raise NotImplementedError
 

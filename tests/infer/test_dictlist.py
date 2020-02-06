@@ -226,10 +226,15 @@ def test_repeat():
     assert_equal(out, result)
 
 
-def test_tile_axis0():
+def test_tile():
     dict_ = DictList({"a": [[2, 1]], "b": [[1, 3]]})
-    out = dict_.tile_axis0(3)
+    out = dict_.tile(3, axis=0)
     result = DictList({"a": [[2, 1], [2, 1], [2, 1]], "b": [[1, 3], [1, 3], [1, 3]]})
+    assert_equal(out, result)
+
+    dict_ = DictList({"a": [[2, 1]], "b": [[1, 3]]})
+    out = dict_.tile(3, axis=1)
+    result = DictList({"a": [[2, 1, 2, 1, 2, 1]], "b": [[1, 3, 1, 3, 1, 3]]})
     assert_equal(out, result)
 
 
@@ -256,3 +261,14 @@ def test_iter():
         assert_equal(d, results[n])
         n += 1
     assert n == 2
+
+
+def test_empty():
+    dict_ = DictList([])
+    assert len(dict_) == 0
+
+
+def test_normalize():
+    dict_ = DictList({"a": [1, 2], "b": [1, 3]}).normalize("a")
+    results = {"a": [1, 1], "b": [1, 1.5]}
+    assert_equal(dict_, results)

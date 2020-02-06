@@ -103,6 +103,7 @@ class ExperimentActiveIRD(object):
         self._exp_params = exp_params
         self._save_root = save_root
         self._exp_name = exp_name
+        self._save_dir = f"{save_root}/{exp_name}"
         self._last_time = time()
         # Load design and cache
         self._num_load_design = num_load_design

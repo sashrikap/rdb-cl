@@ -111,6 +111,7 @@ def main(random_key):
         eval_server=eval_server,
         num_eval_tasks=NUM_EVAL_TASKS,
         num_eval_map=NUM_EVAL_MAP,
+        num_visualize_tasks=NUM_VISUALIZE_TASKS,
         fixed_task_seed=fixed_task_seed,
         design_data=design_data,
         save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
@@ -139,7 +140,7 @@ if __name__ == "__main__":
         PARAMS = load_params("/dar_payload/rdb/examples/params/mcmc_params.yaml")
     locals().update(PARAMS)
     if not GCP_MODE:
-        RANDOM_KEYS = [24]
+        RANDOM_KEYS = [23]
         NUM_EVAL_WORKERS = 4
     for ki in copy.deepcopy(RANDOM_KEYS):
         main(random_key=ki)

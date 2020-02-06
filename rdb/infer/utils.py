@@ -8,6 +8,7 @@ import numpyro
 import numpyro.distributions as dist
 from rdb.visualize.plot import plot_weights_comparison
 from rdb.optim.utils import *
+from rdb.infer.dictlist import *
 from scipy.stats import gaussian_kde
 from rdb.exps.utils import Profiler
 from tqdm.auto import tqdm, trange
@@ -64,12 +65,12 @@ def random_choice(items, num, probs=None, replacement=True):
         for i in range(num):
             diff = onp.minimum(arr[i] - probs, 0)
             first_neg = onp.argmax(diff < 0)
-            output.append(items[first_neg])
+            output.append(items[int(first_neg)])
         return onp.array(output)
 
 
-def random_uniform():
-    return numpyro.sample("random", dist.Uniform(0, 1))
+def random_uniform(low=0.0, high=1.0):
+    return numpyro.sample("random", dist.Uniform(low, high))
 
 
 # ========================================================
@@ -81,26 +82,30 @@ def collect_trajs(list_ws, state, controller, runner, desc=None):
     """Utility for collecting features.
 
     Args:
-        list_ws (list)
-        state (ndarray): initial state for the task
+        list_ws (DictList): (nweights, nbatch)
+        state (ndarray): initial state for the task (1, xdim)
+
+    Output:
+        actions (ndarray): (T, nbatch, udim)
+        feats (DictList): (nfeats, nbatch, T)
+        feats_sum (DictList): (nfeats, nbatch)
+        violations (DictList): (nvios, nbatch, T)
+
     """
     feats = []
     feats_sum = []
     violations = []
     actions = []
-    if desc is not None:
-        list_ws = tqdm(list_ws, desc=desc)
-    for w in list_ws:
-        acs = controller(state, weights=w)
-        _, _, info = runner(state, acs, weights=w)
-        actions.append(acs)
-        feats.append(info["feats"])
-        feats_sum.append(info["feats_sum"])
-        violations.append(info["violations"])
-    feats = stack_dict_by_keys(feats)
-    feats_sum = stack_dict_by_keys(feats_sum)
-    violations = stack_dict_by_keys(violations)
-    return actions, feats, feats_sum, violations
+    num_ws = len(list_ws)
+    assert state.shape[0] == 1 and len(state.shape) == 2
+    batch_states = onp.repeat(state, num_ws, axis=0)
+    batch_ws = DictList(list_ws)
+
+    ## acs (T, nbatch, udim)
+    actions = controller(batch_states, weights=batch_ws)
+    ## xs (T, nbatch, xdim), costs (nbatch)
+    xs, costs, info = runner(batch_states, actions, weights=batch_ws)
+    return actions, info["feats"], info["feats_sum"], info["violations"]
 
 
 # ========================================================
@@ -127,7 +132,7 @@ def visualize_chains(chains, fig_dir, title, **kwargs):
     all_colors = []
     all_labels = []
     for ci, chain_i in enumerate(chains):
-        all_labels.append(f"Label_{ci}_accept_{len(chain_i)}")
+        all_labels.append(f"Chain({ci}): accept {len(chain_i)}")
     plot_weights_comparison(
         chains, colors, all_labels, path=f"{fig_dir}/{title}.png", title=title, **kwargs
     )

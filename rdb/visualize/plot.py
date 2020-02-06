@@ -6,9 +6,9 @@ from imageio import imread
 from os.path import join, dirname, isfile, isdir
 from os import listdir
 from matplotlib import cm, gridspec
+from IPython import get_ipython
 
 # from mpl_toolkits import mplot3d
-from IPython import get_ipython
 
 if get_ipython() is not None:
     from IPython.display import display, Video
@@ -38,7 +38,6 @@ def plot_weights(
     max_weights=8.0,
     bins=100,
     log_scale=True,
-    figsize=(20, 10),
 ):
     """Plot weights for visualizing.
 
@@ -52,7 +51,7 @@ def plot_weights(
     assert len(highlight_dicts) == len(highlight_colors) == len(highlight_labels)
 
     n_values = len(weights_dicts[0].values())
-    fig, axs = plt.subplots(n_values, 1, figsize=figsize, dpi=80)
+    fig, axs = plt.subplots(n_values, 1, figsize=(20, 2 * n_values), dpi=80)
     for i, key in enumerate(sorted(list(weights_dicts[0].keys()))):
         values = [onp.log(s[key]) if log_scale else s[key] for s in weights_dicts]
         n, bins, patches = axs[i].hist(
@@ -100,7 +99,6 @@ def plot_weights_comparison(
     bins=100,
     log_scale=True,
     loc="upper right",
-    figsize=(20, 10),
 ):
     """Plot different lists weights for visualizing (e.g. MCMC convergence).
 
@@ -124,7 +122,7 @@ def plot_weights_comparison(
 
         n_values = len(weights_dicts[0].values())
         if axs is None:
-            fig, axs = plt.subplots(n_values, 1, figsize=figsize, dpi=80)
+            fig, axs = plt.subplots(n_values, 1, figsize=(20, 2 * n_values), dpi=80)
         # For each key in all dicts of that chain
         for i, key in enumerate(sorted(list(weights_dicts[0].keys()))):
             n_weights = len(weights_dicts)
@@ -134,7 +132,7 @@ def plot_weights_comparison(
                 values.append(onp.log(weight_i[key]) if log_scale else weight_i[key])
             # Hacky: only take 1st dimension of weight_i[key], which works for visualizing
             # weights (only 1dim), but not other things
-            values = onp.array(values)[:, 0]
+            values = onp.array(values)
             n, bins, patches = axs[i].hist(
                 values,
                 bins,
@@ -146,7 +144,7 @@ def plot_weights_comparison(
                 ec="k",  # border
                 alpha=0.25,
             )
-        axs[i].set_xlabel(key)
+            axs[i].set_xlabel(key)
     axs[0].legend(loc=loc)
     plt.tight_layout()
     if title is not None:

@@ -99,14 +99,15 @@ class ExperimentDesignerPrior(object):
 
             ## Visualize performance
             all_diff_rews = []
-            for task_, name_ in zip(all_tasks, all_names):
+            for task_, name_ in zip():
                 diff_rews, _ = obs.compare_with(task_, name_, truth)
                 all_diff_rews.append(diff_rews[0])
             plot_dir = f"{self._save_dir}/plots"
             os.makedirs(plot_dir, exist_ok=True)
-            fig_path = f"{plot_dir}/designer_seed_{str(self._rng_key)}"
-            fig_suffix = f"_prior_{num_prior_tasks:02d}"
-            obs.visualize_tasks(fig_path, fig_suffix, all_names, all_diff_rews)
+            fig_name = f"prior_{num_prior_tasks:02d}"
+            obs.visualize_comparisons(
+                all_tasks, all_names, truth, fig_name, all_diff_rews
+            )
 
         ## Reset designer prior tasks
         self._designer.prior_tasks = all_tasks

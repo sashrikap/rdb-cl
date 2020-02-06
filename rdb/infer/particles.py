@@ -1,7 +1,9 @@
 """Sampling-based probability over reward weights.
 
 """
-from rdb.infer.utils import collect_trajs, random_choice
+from rdb.infer.dictlist import DictList
+from rdb.exps.utils import *
+from rdb.infer.utils import *
 from rdb.optim.utils import *
 from rdb.visualize.plot import plot_weights, plot_rankings
 from numpyro.handlers import scale, condition, seed
@@ -16,13 +18,20 @@ import os
 
 
 class Particles(object):
-    """Finite sample set. Used to model belief distribution, normalizer, etc.
+    """Finite sample set. Used to model belief distribution, normalizer, etc for reward weights design.
 
     Args:
-        sample_ws (list)
+        weights (DictList)
         rng_key (jax.random): if None, need to call `particles.update_key()`
-        env (object): provide to save time
+        env_fn (fn): environment creation function, use `env_fn` instead of `env` to prevent multi-threaded tampering
+        env (object): environment object, only pass in if you are sure its safe.
         save_name (str): save file name, e.g. "weights_seed_{str(self._rng_key)}_{name}"
+        weight_params (dict): for histogram visualization: MAX_WEIGHT, NUM_BINS, etc
+
+    Note:
+        * Supports caching. E.g.
+        >>> particles.get_feats(task1, task1_name) # first time slow
+        >>> particles.get_feats(task1, task1_name) # second time cached
 
     """
 
@@ -33,8 +42,8 @@ class Particles(object):
         controller,
         runner,
         save_name,
-        sample_ws=None,
-        sample_stack_ws=None,
+        normalized_key,
+        weights=None,
         weight_params={},
         fig_dir=None,
         save_dir=None,
@@ -44,11 +53,14 @@ class Particles(object):
         self._env = env
         self._controller = controller
         self._runner = runner
-        self._sample_ws = sample_ws
-        self._sample_stack_ws = sample_stack_ws
+
+        ## Sample weights
+        assert isinstance(weights, DictList)
         self._rng_key = rng_key
         self._weight_params = weight_params
-        self._expanded_name = f"weights_seed_{str(self._rng_key)}_{save_name}"
+        self._normalized_key = normalized_key
+        self._weights = weights.normalize(self._normalized_key)
+        self._expanded_name = f"{save_name}_seed_{str(self._rng_key)}"
         self._save_name = save_name
         ## File system
         self._fig_dir = fig_dir
@@ -68,6 +80,7 @@ class Particles(object):
     def update_key(self, rng_key):
         self._rng_key = rng_key
         self._random_choice = seed(random_choice, rng_key)
+        self._expanded_name = f"weights_seed_{str(self._rng_key)}_{self._save_name}"
 
     def build_cache(self):
         self._sample_feats = {}
@@ -75,36 +88,37 @@ class Particles(object):
         self._sample_violations = {}
         self._sample_actions = {}
 
-    def update_weights(self, sample_ws=None, sample_stack_ws=None):
-        self._sample_ws = sample_ws
-        self._sample_stack_ws = sample_stack_ws
+    def update_weights(self, weights):
+        self._weights = weights.normalize(self._normalized_key)
         self.build_cache()
 
     @property
     def rng_key(self):
         return self._rng_key
 
+    def _clone(self, weights):
+        return Particles(
+            rng_key=self._rng_key,
+            env_fn=self._env_fn,
+            controller=self._controller,
+            runner=self._runner,
+            save_name=self._save_name,
+            weights=weights,
+            weight_params=self._weight_params,
+            normalized_key=self._normalized_key,
+            env=self._env,
+            fig_dir=self._fig_dir,
+            save_dir=self._save_dir,
+        )
+
     @property
     def weights(self):
-        if self._sample_ws is None:
-            assert (
-                self._sample_stack_ws is not None
-            ), "Must properly initialize particle weights"
-            self._sample_ws = unstack_dict_by_keys(self._sample_stack_ws)
-        return self._sample_ws
+        return self._weights
 
     @weights.setter
     def weights(self, ws):
-        self.update_weights(sample_ws=ws)
-
-    @property
-    def stack_weights(self):
-        if self._sample_stack_ws is None:
-            assert (
-                self._sample_ws is not None
-            ), "Must properly initialize particle weights"
-            self._sample_stack_ws = stack_dict_by_keys(self._sample_ws)
-        return self._sample_stack_ws
+        assert isinstance(ws, DictList)
+        self.update_weights(weights=ws.normalize(self._normalized_key))
 
     @property
     def cached_names(self):
@@ -122,19 +136,11 @@ class Particles(object):
             return self
         else:
             assert (
-                len(self._sample_ws) >= num_samples
+                len(self._weights) >= num_samples
             ), f"Not enough samples for {num_samples}."
-            sub_ws = self._random_choice(self._sample_ws, num_samples, replacement=True)
-            return Particles(
-                rng_key=self._rng_key,
-                env_fn=self._env_fn,
-                controller=self._controller,
-                runner=self._runner,
-                save_name=self._save_name,
-                sample_ws=sub_ws,
-                weight_params=self._weight_params,
-                env=self._env,
-            )
+            weights = self._random_choice(self._weights, num_samples, replacement=True)
+            weights = DictList(weights)
+            return self._clone(weights)
 
     def log_samples(self, num_samples=None):
         """Print samples to terminal for inspection.
@@ -148,6 +154,9 @@ class Particles(object):
     def get_features(self, task, task_name, desc=None):
         """Compute expected features for sample weights on task.
 
+        Return:
+            features (DictList): (nfeats, nparticles, T)
+
         Note:
             * Computing feature is costly. Caches features under task_name.
 
@@ -158,22 +167,35 @@ class Particles(object):
 
     def get_features_sum(self, task, task_name, desc=None):
         """Compute expected feature sums for sample weights on task.
+
+        Return:
+            feats_sum (DictList): (nfeats, nparticles, T)
+
         """
         if task_name not in self.cached_names:
             self._cache_task(task, task_name, desc)
         return self._sample_feats_sum[task_name]
 
     def get_violations(self, task, task_name, desc=None):
-        """Compute violations sum (cached) for sample weights on task."""
+        """Compute violations sum (cached) for sample weights on task.
+
+        Return:
+            violations (DictList): (nvios, nparticles)
+
+        """
         if task_name not in self.cached_names:
             self._cache_task(task, task_name, desc)
         violations = self._sample_violations[task_name]
-        for key, val in violations.items():
-            violations[key] = val.sum(axis=-1)
-        return violations
+        vios_sum = violations.sum(axis=1)
+        return vios_sum
 
     def get_actions(self, task, task_name, desc=None):
-        """Compute actions (cached) for sample weights on task."""
+        """Compute actions (cached) for sample weights on task.
+
+        Return:
+            actions (ndarray): (T, nparticles, udim)
+
+        """
         if task_name not in self.cached_names:
             self._cache_task(task, task_name, desc)
         return self._sample_actions[task_name]
@@ -214,26 +236,6 @@ class Particles(object):
             self._sample_feats_sum[task_name] = data["feats_sum"]
             self._sample_violations[task_name] = data["violations"]
 
-    def count_violations(self, task, task_name):
-        """Roll out features under task.
-
-        Requires:
-            * compute_features
-
-        """
-        if self._env is None:
-            self._env = self._env_fn()
-        state = self._env.get_init_state(task)
-        num_violate = 0.0
-        for w in self.weights:
-            actions = self._controller(state, weights=w)
-            traj, cost, info = self._runner(state, actions, weights=w)
-            violations = info["violations"]
-            num = sum([sum(v) for v in violations.values()])
-            # print(f"violate {num} acs {onp.mean(actions):.3f} xs {onp.mean(traj):.3f}")
-            num_violate += num
-        return float(num_violate) / len(self.weights)
-
     def compare_with(self, task, task_name, target, verbose=False):
         """Compare with a set of target weights (usually true weights). Returns log
         prob ratio of reward, measured by target w.
@@ -241,57 +243,62 @@ class Particles(object):
         Args:
             target (Particles): target to compare against; if None, no target
 
+        Output:
+            diff_rews (ndarray): (nbatch,)
+            diff_vios (ndarray): (nbatch,)
+
         Requires:
             * compute_features
 
         """
+        nbatch = len(self.weights)
         if target is not None:
-            target_w = target.weights[0]
+            # shape (nfeats, nbatch, )
+            target_ws = target.weights.tile(nbatch, axis=0)
+            target_ws = target_ws.normalize(self._normalized_key)
+            assert len(target.weights) == 1, "Can only compare with 1 target weights."
 
             ## Compare reward difference
-            this_feats_sum = self.get_features_sum(task, task_name)
-            this_costs = multiply_dict_by_keys(target_w, this_feats_sum)
-            target_feats_sum = target.get_features_sum(task, task_name)
-            target_cost = multiply_dict_by_keys(target_w, target_feats_sum)
+            #  shape (nfeats, nbatch, )
+            this_fsums = self.get_features_sum(task, task_name)
+            that_fsums = target.get_features_sum(task, task_name)
+            #  shape (nfeats, nbatch, )
+            diff_costs = target_ws * (this_fsums - that_fsums)
+            #  shape (nbatch, )
+            diff_rews = -1 * diff_costs.onp_array().sum(axis=0)
 
-            diff_costs = subtract_dict_by_keys(this_costs, target_cost)
-            diff_rews = -1 * onp.sum(list(diff_costs.values()), axis=0)
             ## Compare violation difference
+            #  shape (nvios, nbatch)
             this_vios = self.get_violations(task, task_name)
-            target_vios = target.get_violations(task, task_name)
-            diff_vios = subtract_dict_by_keys(this_vios, target_vios)
-            diff_vios = onp.sum(list(diff_vios.values()), axis=0)
+            that_vios = target.get_violations(task, task_name)
+            diff_vios = this_vios - that_vios
+            #  shape (nbatch)
+            diff_vios = diff_vios.onp_array().sum(axis=0)
             if verbose:
                 print(
                     f"Diff rew {len(diff_rews)} items: mean {diff_rews.mean():.3f} std {diff_rews.std():.3f} max {diff_rews.max():.3f} min {diff_rews.min():.3f}"
                 )
             return diff_rews, diff_vios
         else:
+            this_ws = self.weights
+            this_fsums = self.get_features_sum(task, task_name)
+            this_costs = this_ws * this_fsums
+            this_rews = -1 * this_costs.onp_array().sum(axis=0)
             this_vios = self.get_violations(task, task_name)
-            this_vios = onp.sum(list(this_vios.values()), axis=0)
-            diff_rews = onp.zeros(1)
-            return diff_rews, this_vios
+            this_vios = this_vios.onp_array().sum(axis=0)
+            return this_rews, this_vios
 
-    def resample(self, probs):
-        """Resample from particles using list of probs. Similar to particle filter update."""
+    def resample(self, new_probs):
+        """Resample from particles using list of new probs. Used for particle filter update."""
         assert (
             self._random_choice is not None
         ), "Must properly initialize particle weights"
-        N = len(self.weights)
-        idxs = self._random_choice(onp.arange(N), num=N, probs=probs, replacement=True)
-        new_stack_ws = dict()
-        for key, value in self.stack_weights.items():
-            new_stack_ws[key] = value[idxs]
-        new_ps = Particles(
-            rng_key=self._rng_key,
-            env_fn=self._env_fn,
-            controller=self._controller,
-            runner=self._runner,
-            save_name=self._save_name,
-            sample_stack_ws=new_stack_ws,
-            weight_params=self._weight_params,
-            env=self._env,
+        assert len(new_probs) == len9self.weights
+        new_weights = self._random_choice(
+            self.weights, num=len(self.weights), probs=new_probs, replacement=True
         )
+        new_weights = DictList(new_weights)
+        new_ps = self._clone(new_weights)
         return new_ps
 
     def entropy(self, bins, max_weights, verbose=True, method="histogram"):
@@ -312,9 +319,11 @@ class Particles(object):
         FAST_HISTOGRAM = True
 
         ranges = (-max_weights, max_weights)
-        data = onp.array(list(self.stack_weights.values()))
-        # Omit first weight
-        data = onp.log(data[1:, :])
+        data = self.weights.copy()
+        # Omit normalized weight
+        del data[self._normalized_key]
+        #  shape (nfeats - 1, nbatch)
+        data = onp.log(data.onp_array())
         if method == "gaussian":
             # scipy gaussian kde requires transpose
             kernel = gaussian_kde(data)
@@ -337,8 +346,6 @@ class Particles(object):
                     hist_prob = hist_density * delta
                 ent = -(hist_density * onp.ma.log(onp.abs(hist_density)) * delta).sum()
                 entropy += ent
-            # if verbose:
-            #    print(f"Entropy {entropy:.3f}")
         return entropy
 
     def map_estimate(self, num_map, method="histogram"):
@@ -349,9 +356,11 @@ class Particles(object):
             density by summing bucket counts.
 
         """
-        data = onp.array(list(self.stack_weights.values()))
+        data = self.weights.copy()
         # Omit first weight
-        data = onp.log(data[1:, :])
+        del data[self._normalized_key]
+        #  shape (nfeats - 1, nbatch)
+        data = onp.log(data.onp_array())
 
         if method == "histogram":
             assert (
@@ -371,18 +380,9 @@ class Particles(object):
                     val_bins_idx = which_bins == val
                     probs[val_bins_idx] += float(ct) / len(row)
             map_idxs = onp.argsort(-1 * probs)[:num_map]
-            map_weights = [self.weights[idx] for idx in map_idxs]
+            map_weights = self.weights[map_idxs]
             # MAP esimate usually used for evaluation; thread-safe to provide self._env
-            map_particles = Particles(
-                rng_key=self._rng_key,
-                env_fn=self._env_fn,
-                controller=self._controller,
-                runner=self._runner,
-                save_name=self._save_name,
-                sample_ws=map_weights,
-                weight_params=self._weight_params,
-                env=self._env,
-            )
+            map_particles = self._clone(map_weights)
             return map_particles
         else:
             raise NotImplementedError
@@ -398,7 +398,7 @@ class Particles(object):
         desc=None,
         video=True,
     ):
-        """ Look at top/mid/bottom * diagnose_N particles and their performance. Record videos.
+        """Look at top/mid/bottom * diagnose_N particles and their performance. Record videos.
 
         Note:
             * A somewhat brittle function for debugging. May be subject to changes
@@ -461,11 +461,14 @@ class Particles(object):
     def record(self, task, task_name, actions, filepath):
         pass
 
-    def visualize(self, true_w, obs_w):
+    def visualize(self, true_w=None, obs_w=None):
         """Visualize weight belief distribution in histogram.
 
-        TODO:
-            * Slow, takes ~5s for 1000 weight particles
+        Shows all weight particles, true weight, observed weight and MAP weights.
+
+        Args:
+            true_w (dict): true weight. Specific to IRD experiments.
+            obs_w (dict): observed weight (e.g. from designer). Specific to IRD experiments.
 
         """
         assert self._fig_dir is not None, "Need to specify figure directory."
@@ -478,7 +481,7 @@ class Particles(object):
         # Visualize multiple map weights in magenta with ranking labels
         plot_weights(
             self.weights,
-            highlight_dicts=[true_w, obs_w] + map_ws,
+            highlight_dicts=[true_w, obs_w] + list(map_ws),
             highlight_colors=["r", "k"] + ["m"] * num_map,
             highlight_labels=["l", "o"] + map_ls,
             path=f"{self._fig_dir}/{self._expanded_name}.png",
@@ -489,44 +492,56 @@ class Particles(object):
     def save(self):
         """Save weight belief particles as npz file."""
         assert self._save_dir is not None, "Need to specify save directory."
-        path = f"{self._save_dir}/{self._expanded_name}.png"
+        path = f"{self._save_dir}/{self._expanded_name}.npz"
         with open(path, "wb+") as f:
             np.savez(f, weights=self.weights)
 
-    def load(self, path):
-        self._sample_ws = np.load(path, allow_pickle=True)["weights"]
+    def load(self):
+        path = f"{self._save_dir}/{self._expanded_name}.npz"
+        assert os.path.isfile(path)
+        load_data = np.load(path, allow_pickle=True)
+        self._weights = DictList(load_data["weights"].item())
 
-    def visualize_tasks(self, path, suffix, task_names, perfs):
-        """Visualize task distribution.
+    def visualize_comparisons(self, tasks, task_names, target, fig_name):
+        """Visualize comparison with target on multiple tasks.
 
         Note:
             * A somewhat brittle function for debugging. May be subject to changes
 
         Args:
+            tasks (ndarray): (ntasks, xdim)
+            task_names (list)
             perfs (list): performance, ususally output from self.compare_with
 
         """
         assert len(self.weights) == 1, "Can only visualize one weight sample"
-        vios = stack_dict_by_keys(list(self._sample_violations.values()))
-        # Dims: (n_keys, n_tasks, 1)
-        num_violates = onp.array(list(vios.values())).sum(axis=(0, 2))
+        diff_rews, diff_vios = [], []
+        for task, task_name in zip(tasks, task_names):
+            # (nbatch,)
+            diff_rew, diff_vio = self.compare_with(task, task_name, target)
+            diff_rews.append(diff_rew)
+            diff_vios.append(diff_vio)
+        # Dims: (n_tasks, nbatch,) -> (n_tasks,)
+        diff_rews = onp.array(diff_rews).mean(axis=1)
+        diff_vios = onp.array(diff_vios).mean(axis=1)
         # Ranking violations and performance (based on violation)
+        prefix = f"{self._fig_dir}/designer_seed_{str(self._rng_key)}"
         plot_rankings(
-            num_violates,
-            "Violations",
-            [perfs],
-            ["Perf diff"],
-            path=f"{path}_violations{suffix}.png",
+            main_val=diff_vios,
+            main_label="Violations",
+            auxiliary_vals=[diff_rews],
+            auxiliary_labels=["Perf diff"],
+            path=f"{prefix}_violations_{fig_name}.png",
             title="Violations",
             yrange=[-20, 20],
         )
         # Ranking performance and violations (based on performance)
         plot_rankings(
-            perfs,
-            "Perf diff",
-            [num_violates],
-            ["Violations"],
-            path=f"{path}_performance{suffix}.png",
+            main_val=diff_rews,
+            main_label="Perf diff",
+            auxiliary_vals=[diff_vios],
+            auxiliary_labels=["Violations"],
+            path=f"{prefix}_performance_{fig_name}.png",
             title="Performance",
             yrange=[-20, 20],
         )
