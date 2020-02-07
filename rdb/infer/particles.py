@@ -88,10 +88,6 @@ class Particles(object):
         self._sample_violations = {}
         self._sample_actions = {}
 
-    def update_weights(self, weights):
-        self._weights = weights.normalize(self._normalized_key)
-        self.build_cache()
-
     @property
     def rng_key(self):
         return self._rng_key
@@ -111,6 +107,17 @@ class Particles(object):
             save_dir=self._save_dir,
         )
 
+    def add_weights(self, weights):
+        """Add more weight samples.
+        """
+        assert isinstance(weights, DictList)
+        new_weights = self.weights.concat(weights)
+        return self._clone(new_weights)
+
+    def tile_weights(self, num):
+        new_weights = self.weights.tile(num, axis=0)
+        return self._clone(new_weights)
+
     @property
     def weights(self):
         return self._weights
@@ -118,7 +125,8 @@ class Particles(object):
     @weights.setter
     def weights(self, ws):
         assert isinstance(ws, DictList)
-        self.update_weights(weights=ws.normalize(self._normalized_key))
+        self._weights = ws.normalize(self._normalized_key)
+        self.build_cache()
 
     @property
     def cached_names(self):
@@ -155,7 +163,7 @@ class Particles(object):
         """Compute expected features for sample weights on task.
 
         Return:
-            features (DictList): (nfeats, nparticles, T)
+            features (DictList): (nfeats, nparticles)
 
         Note:
             * Computing feature is costly. Caches features under task_name.
@@ -169,7 +177,7 @@ class Particles(object):
         """Compute expected feature sums for sample weights on task.
 
         Return:
-            feats_sum (DictList): (nfeats, nparticles, T)
+            feats_sum (DictList): (nfeats, nparticles)
 
         """
         if task_name not in self.cached_names:
@@ -193,7 +201,7 @@ class Particles(object):
         """Compute actions (cached) for sample weights on task.
 
         Return:
-            actions (ndarray): (T, nparticles, udim)
+            actions (ndarray): (nparticles, T, udim)
 
         """
         if task_name not in self.cached_names:
@@ -207,6 +215,8 @@ class Particles(object):
         actions, feats, feats_sum, violations = collect_trajs(
             self.weights, state, self._controller, self._runner, desc=desc
         )
+        # (T, nparticles,udim) -> (nparticles, T, udim)
+        actions = actions.swapaxes(0, 1)
         self._sample_actions[task_name] = actions
         self._sample_feats[task_name] = feats
         self._sample_feats_sum[task_name] = feats_sum
@@ -257,7 +267,6 @@ class Particles(object):
             target_ws = target.weights.tile(nbatch, axis=0)
             target_ws = target_ws.normalize(self._normalized_key)
             assert len(target.weights) == 1, "Can only compare with 1 target weights."
-
             ## Compare reward difference
             #  shape (nfeats, nbatch, )
             this_fsums = self.get_features_sum(task, task_name)
@@ -266,7 +275,6 @@ class Particles(object):
             diff_costs = target_ws * (this_fsums - that_fsums)
             #  shape (nbatch, )
             diff_rews = -1 * diff_costs.onp_array().sum(axis=0)
-
             ## Compare violation difference
             #  shape (nvios, nbatch)
             this_vios = self.get_violations(task, task_name)
@@ -387,79 +395,18 @@ class Particles(object):
         else:
             raise NotImplementedError
 
-    def diagnose(
-        self,
-        task,
-        task_name,
-        target,
-        diagnose_N,
-        prefix,
-        thumbnail=False,
-        desc=None,
-        video=True,
-    ):
-        """Look at top/mid/bottom * diagnose_N particles and their performance. Record videos.
+    def save(self):
+        """Save weight belief particles as npz file."""
+        assert self._save_dir is not None, "Need to specify save directory."
+        path = f"{self._save_dir}/{self._expanded_name}.npz"
+        with open(path, "wb+") as f:
+            np.savez(f, weights=self.weights)
 
-        Note:
-            * A somewhat brittle function for debugging. May be subject to changes
-
-        Args:
-            prefix: include directory info e.g. "data/exp_xxx/save_"
-            params (dict) : experiment parameters
-
-        """
-        if self._env is None:
-            self._env = self._env_fn()
-        init_state = self._env.get_init_state(task)
-
-        if thumbnail:
-            tbn_path = f"{prefix}_task.png"
-            self._runner.collect_thumbnail(init_state, path=tbn_path)
-
-        if video:
-            assert len(self.weights) >= diagnose_N * 3
-            diff_rews, diff_vios = self.compare_with(task, task_name, target)
-            ranks = onp.argsort(diff_rews)
-            top_N_idx = ranks[-diagnose_N:]
-            mid_N_idx = ranks[
-                math.floor((len(ranks) - diagnose_N) / 2) : math.floor(
-                    (len(ranks) + diagnose_N) / 2
-                )
-            ]
-            low_N_idx = list(ranks[:diagnose_N])
-            top_N_idx, mid_N_idx, low_N_idx = (
-                list(top_N_idx),
-                list(mid_N_idx),
-                list(low_N_idx),
-            )
-            actions = np.array(self.get_actions(task, task_name))
-            top_rews, top_acs = diff_rews[top_N_idx], actions[top_N_idx]
-            mid_rews, mid_acs = diff_rews[mid_N_idx], actions[mid_N_idx]
-            low_rews, low_acs = diff_rews[low_N_idx], actions[low_N_idx]
-            mean_diff = diff_rews.mean()
-
-            map_particles = self.map_estimate(diagnose_N)
-            map_acs = np.array(map_particles.get_actions(task, task_name))
-            map_rews, map_vios = map_particles.compare_with(task, task_name, target)
-
-            for label, group_rews, group_acs in zip(
-                ["map", "top", "mid", "low"],
-                [map_rews, top_rews, mid_rews, low_rews],
-                [map_acs, top_acs, mid_acs, low_acs],
-            ):
-                for rew, acs in zip(group_rews, group_acs):
-                    file_path = (
-                        f"{prefix}label_{label}_mean_{mean_diff:.3f}_rew_{rew:.3f}.mp4"
-                    )
-                    # Collect proxy reward paths
-                    self._runner.collect_mp4(init_state, acs, path=file_path)
-                # Collect true reward paths
-                target_acs = self._controller(init_state, weights=target.weights[0])
-                target_path = f"{prefix}label_{label}_mean_{mean_diff:.3f}_true.mp4"
-                self._runner.collect_mp4(init_state, target_acs, path=target_path)
-
-    def record(self, task, task_name, actions, filepath):
-        pass
+    def load(self):
+        path = f"{self._save_dir}/{self._expanded_name}.npz"
+        assert os.path.isfile(path)
+        load_data = np.load(path, allow_pickle=True)
+        self._weights = DictList(load_data["weights"].item())
 
     def visualize(self, true_w=None, obs_w=None):
         """Visualize weight belief distribution in histogram.
@@ -488,19 +435,6 @@ class Particles(object):
             title="Proxy Reward; true (red), obs (black) map (magenta)",
             max_weights=max_weights,
         )
-
-    def save(self):
-        """Save weight belief particles as npz file."""
-        assert self._save_dir is not None, "Need to specify save directory."
-        path = f"{self._save_dir}/{self._expanded_name}.npz"
-        with open(path, "wb+") as f:
-            np.savez(f, weights=self.weights)
-
-    def load(self):
-        path = f"{self._save_dir}/{self._expanded_name}.npz"
-        assert os.path.isfile(path)
-        load_data = np.load(path, allow_pickle=True)
-        self._weights = DictList(load_data["weights"].item())
 
     def visualize_comparisons(self, tasks, task_names, target, fig_name):
         """Visualize comparison with target on multiple tasks.
@@ -545,3 +479,74 @@ class Particles(object):
             title="Performance",
             yrange=[-20, 20],
         )
+
+    # def diagnose(
+    #     self,
+    #     task,
+    #     task_name,
+    #     target,
+    #     diagnose_N,
+    #     prefix,
+    #     thumbnail=False,
+    #     desc=None,
+    #     video=True,
+    # ):
+    #     """Look at top/mid/bottom * diagnose_N particles and their performance. Record videos.
+
+    #     Note:
+    #         * A somewhat brittle function for debugging. May be subject to changes
+
+    #     Args:
+    #         prefix: include directory info e.g. "data/exp_xxx/save_"
+    #         params (dict) : experiment parameters
+
+    #     """
+    #     if self._env is None:
+    #         self._env = self._env_fn()
+    #     init_state = self._env.get_init_state(task)
+
+    #     if thumbnail:
+    #         tbn_path = f"{prefix}_task.png"
+    #         self._runner.collect_thumbnail(init_state, path=tbn_path)
+
+    #     if video:
+    #         assert len(self.weights) >= diagnose_N * 3
+    #         diff_rews, diff_vios = self.compare_with(task, task_name, target)
+    #         ranks = onp.argsort(diff_rews)
+    #         top_N_idx = ranks[-diagnose_N:]
+    #         mid_N_idx = ranks[
+    #             math.floor((len(ranks) - diagnose_N) / 2) : math.floor(
+    #                 (len(ranks) + diagnose_N) / 2
+    #             )
+    #         ]
+    #         low_N_idx = list(ranks[:diagnose_N])
+    #         top_N_idx, mid_N_idx, low_N_idx = (
+    #             list(top_N_idx),
+    #             list(mid_N_idx),
+    #             list(low_N_idx),
+    #         )
+    #         actions = np.array(self.get_actions(task, task_name))
+    #         top_rews, top_acs = diff_rews[top_N_idx], actions[top_N_idx]
+    #         mid_rews, mid_acs = diff_rews[mid_N_idx], actions[mid_N_idx]
+    #         low_rews, low_acs = diff_rews[low_N_idx], actions[low_N_idx]
+    #         mean_diff = diff_rews.mean()
+
+    #         map_particles = self.map_estimate(diagnose_N)
+    #         map_acs = np.array(map_particles.get_actions(task, task_name))
+    #         map_rews, map_vios = map_particles.compare_with(task, task_name, target)
+
+    #         for label, group_rews, group_acs in zip(
+    #             ["map", "top", "mid", "low"],
+    #             [map_rews, top_rews, mid_rews, low_rews],
+    #             [map_acs, top_acs, mid_acs, low_acs],
+    #         ):
+    #             for rew, acs in zip(group_rews, group_acs):
+    #                 file_path = (
+    #                     f"{prefix}label_{label}_mean_{mean_diff:.3f}_rew_{rew:.3f}.mp4"
+    #                 )
+    #                 # Collect proxy reward paths
+    #                 self._runner.collect_mp4(init_state, acs, path=file_path)
+    #             # Collect true reward paths
+    #             target_acs = self._controller(init_state, weights=target.weights[0])
+    #             target_path = f"{prefix}label_{label}_mean_{mean_diff:.3f}_true.mp4"
+    #             self._runner.collect_mp4(init_state, target_acs, path=target_path)

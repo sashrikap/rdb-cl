@@ -192,7 +192,7 @@ class ExperimentActiveIRD(object):
                 obs = self._model.simulate_designer(
                     task=task,
                     task_name=task_name,
-                    save_name=f"designer_seed_{str(self._rng_key)}_method_{key}_itr_{itr:02d}",
+                    save_name=f"designer_method_{key}_itr_{itr:02d}",
                 )
                 self._all_obs[key].append(obs)
                 self._log_time(f"Itr {itr} {key} Designer")
@@ -202,7 +202,7 @@ class ExperimentActiveIRD(object):
                     tasks=self._all_tasks[key],
                     task_names=self._all_task_names[key],
                     obs=self._all_obs[key],
-                    save_name=f"weights_seed_{str(self._rng_key)}_method_{key}_itr_{itr:02d}",
+                    save_name=f"ird_belief_method_{key}_itr_{itr:02d}",
                 )
                 self._all_beliefs[key].append(belief)
                 self._curr_belief[key] = belief
@@ -363,8 +363,7 @@ class ExperimentActiveIRD(object):
             task_name = f"design_{task}"
             weights = normalize_weights(design_i["WEIGHTS"], self._normalized_key)
             obs = self._model.create_particles(
-                [weights],
-                save_name=f"weights_seed_{str(self._rng_key)}_prior_design_{i:02d}",
+                [weights], save_name=f"ird_prior_design_{i:02d}"
             )
 
             # Cache previous designs for active functions
@@ -384,7 +383,7 @@ class ExperimentActiveIRD(object):
                 self._all_tasks[key],
                 self._all_task_names[key],
                 obs=self._all_obs[key],
-                save_name=f"weights_seed_{str(self._rng_key)}_prior_{num_load}",
+                save_name=f"ird_prior_belief_{num_load:02d}",
             )
             for i in range(num_load):
                 # Pack the same beliefs into belief history

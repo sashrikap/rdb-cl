@@ -57,7 +57,7 @@ if HEATMAP:
             else:
                 weight_k[keyi] = 0
         weight_k = DictList([weight_k])
-        weight_k.prepare(feat_keys)
+        weight_k = weight_k.prepare(feat_keys)
         env.set_task(task)
         env.reset()
         path = f"data/thumbnails/env_{ENV_NAME}/heatmap_{key}.png"

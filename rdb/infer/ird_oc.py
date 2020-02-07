@@ -45,6 +45,7 @@ class IRDOptimalControl(PGM):
     Notes:
         * Bayesian Terminology: theta -> true w, obs -> proxy w
         * Provides caching functions to avoid costly feature calcultions
+        * To reduce JIT recompile time, uses separate controller for (1) normalizers, (2) batch kernel, (3) samples and (4) designer
 
     Args:
         controller_fn (fn): returns controller and runner
@@ -80,8 +81,8 @@ class IRDOptimalControl(PGM):
         prior,
         proposal,
         ## Weight parameters
+        normalized_key,
         num_normalizers=-1,
-        normalized_key=None,
         ## Sampling
         sample_method="mh",
         sample_args={},  # "num_warmups": 100, "num_samples": 200
@@ -105,7 +106,10 @@ class IRDOptimalControl(PGM):
         self._env_id = env_id
         self._env_fn = env_fn
         self._env = env_fn()
-        self._controller, self._runner = controller_fn(self._env)
+        self._designer_controller, self._designer_runner = controller_fn(self._env)
+        self._sample_controller, self._sample_runner = controller_fn(self._env)
+        self._norm_controller, self._norm_runner = controller_fn(self._env)
+        self._batch_controller, self._batch_runner = controller_fn(self._env)
         self._eval_server = eval_server
         # Rationality
         self._beta = beta
@@ -132,8 +136,8 @@ class IRDOptimalControl(PGM):
             self._designer = DesignerInteractive(
                 rng_key=rng_key,
                 env_fn=self.env_fn,
-                controller=self._controller,
-                runner=self._runner,
+                controller=self._designer_controller,
+                runner=self._designer_runner,
                 name=interactive_name,
                 normalized_key=self._normalized_key,
             )
@@ -143,8 +147,8 @@ class IRDOptimalControl(PGM):
             self._designer = Designer(
                 rng_key=rng_key,
                 env_fn=self.env_fn,
-                controller=self._controller,
-                runner=self._runner,
+                controller=self._designer_controller,
+                runner=self._designer_runner,
                 beta=beta,
                 true_w=true_w,
                 prior=prior,
@@ -189,6 +193,7 @@ class IRDOptimalControl(PGM):
         self._sampler.update_key(rng_key)
         self._designer.update_key(rng_key)
         self._prior.update_key(rng_key)
+        self._normalizer = self._build_normalizer()
 
     def simulate_designer(self, task, task_name, save_name):
         """Sample one w from b(w) on task
@@ -201,100 +206,83 @@ class IRDOptimalControl(PGM):
         """
         return self._designer.simulate(task, task_name, save_name=save_name)
 
-    def _get_chain_viz(self, save_name, num_plots=10):
-        """Visualize multiple MCMC chains to check convergence.
-        """
-
-        def fn(samples, accepts):
-            fig_dir = f"{self._save_dir}/mcmc"
-            visualize_chains(
-                samples, accepts, num_plots=num_plots, fig_dir=fig_dir, title=save_name
-            )
-
-        return fn
-
-    def sample(self, tasks, task_names, obs, save_name, verbose=True, mode="hybrid"):
+    def sample(self, tasks, task_names, obs, save_name, verbose=True):
         """Sample b(w) for true weights given obs.weights.
 
         Args:
             tasks (list): list of tasks so far
             task_names (list): list of task names so far
             obs (list): list of observation particles, each for 1 task
-            mode (string): how to estimate normalizer (doubly-intractable)
-                `sample`: use random samples for normalizer;
-                `max_norm`: use max trajectory as normalizer;
-                `hybrid`: use random samples mixed with max trajectory
 
         Note:
             * Samples are cached by the last task name to date (`task_names[-1]`)
+            * To approximate IRD doubly-intractible denominator:
+                `sample`: use random samples for normalizer;
+                `max_norm`: use max trajectory as normalizer;
+                `hybrid`: use random samples mixed with max trajectory
 
         TODO:
             * currently `tasks`, `task_names`, `obs` are ugly lists
 
         """
+        assert len(tasks) > 0, "Need >=1 tasks"
         assert (
             len(tasks) == len(task_names) == len(obs)
         ), "Tasks and observations mismatch"
-        assert mode in [
-            "hybrid",
-            "max_norm",
-            "sample",
-        ], "Must specify IRD sampling mode"
+        assert self._normalizer is not None
 
-        all_obs_ws = []
-        all_user_acs = []
-        all_init_states = []
-        all_user_feats_sum = []
-        all_norm_feats_sum = []
+        init_states = self.env.get_init_states(tasks)
+        obs_ws = []
+        user_acs = []
+        norm_feats = []
         for task_i, name_i, obs_i in zip(tasks, task_names, obs):
-            init_state = self.env.get_init_state(task_i)
-            all_init_states.append(init_state)
-            all_obs_ws.append(obs_i.weights[0])
-            all_user_feats_sum.append(obs_i.get_features_sum(task_i, name_i))
-            all_user_acs.append(obs_i.get_actions(task_i, name_i))
+            obs_ws.append(obs_i.weights[0])
+            user_acs.append(obs_i.get_actions(task_i, name_i)[0])
+            norm_feats.append(self._normalizer.get_features_sum(task_i, name_i))
 
-        if mode == "max_norm":
-            all_norm_feats_sum = [None for _ in range(len(tasks))]
-        elif mode == "sample" or mode == "hybrid":
-            if self._normalizer is None:
-                self._normalizer = self._build_normalizer()
-            for task_i, name_i, obs_i in zip(tasks, task_names, obs):
-                all_norm_feats_sum.append(
-                    self._normalizer.get_features_sum(
-                        task_i, name_i, "Computing Normalizer Features"
-                    )
-                )
-        else:
-            raise NotImplementedError
+        print(f"Sampling IRD (obs={len(obs)}): {save_name}")
 
         last_obs_w = obs[-1].weights[0]
-        last_name = task_names[-1]
-
-        print("Sampling IRD")
-        sample_ws = self._sampler.sample(
-            obs=all_obs_ws,  # all obs so far
+        #  shape (ntasks, T, acs_dim)
+        user_acs = onp.array(user_acs)
+        #  shape (nfeats, ntasks, n_normalizer)
+        norm_feats = DictList(norm_feats)
+        norm_feats = norm_feats.prepare(self._env.features_keys)
+        sample_ws, info = self._sampler.sample(
+            obs=obs_ws,  # all obs so far
             init_state=last_obs_w,  # initialize with last obs
-            chain_viz=self._get_chain_viz(save_name=save_name),
-            user_feats_sums=all_user_feats_sum,
-            norm_feats_sums=all_norm_feats_sum,
-            all_init_states=all_init_states,
-            all_user_acs=all_user_acs,
-            verbose=verbose,
-            mode=mode,
+            user_acs=user_acs,
+            norm_feats=norm_feats,
+            tasks=tasks,
             name=save_name,
         )
-        samples = self.create_particles(sample_ws, save_name=save_name)
+        num_samples = len(info["all_chains"][0])
+        visualize_chains(
+            info["all_chains"],
+            fig_dir=f"{self._save_dir}/mcmc",
+            title=f"save_name_{num_samples}",
+            **self._weight_params,
+        )
+        sample_ws = DictList(sample_ws)
+        samples = self.create_particles(
+            sample_ws,
+            save_name=save_name,
+            runner=self._sample_runner,
+            controller=self._sample_controller,
+        )
+        samples.visualize(true_w=self.designer.true_w, obs_w=last_obs_w)
         return samples
 
-    def create_particles(self, weights, save_name):
+    def create_particles(self, weights, save_name, runner, controller):
         weights = DictList(weights)
         return Particles(
             rng_key=self._rng_key,
             env_fn=self._env_fn,
-            controller=self._controller,
-            runner=self._runner,
+            controller=controller,
+            runner=runner,
             weights=weights,
             save_name=save_name,
+            normalized_key=self._normalized_key,
             weight_params=self._weight_params,
             fig_dir=f"{self._save_dir}/plots",
             save_dir=f"{self._save_dir}/save",
@@ -304,113 +292,127 @@ class IRDOptimalControl(PGM):
     def _build_normalizer(self):
         """Build sampling-based normalizer by randomly sampling weights."""
         norm_ws = self._prior.sample(self._num_normalizers)
-        normalizer = self.create_particles(norm_ws, save_name="normalizer")
+        normalizer = self.create_particles(
+            norm_ws,
+            save_name="ird_normalizer",
+            runner=self._norm_runner,
+            controller=self._norm_controller,
+        )
         return normalizer
 
-    def _build_kernel(self, beta):
-        """Likelihood for observed data, used as `PGM._kernel`.
+    def _cross(self, data_a, data_b, type_a, type_b):
+        """To do compuation on each a for each b.
 
-        Builds IRD-specific kernel, which takes specialized
-        arguments: `init_state`, `norm_feats_sums`, `user_feats_sums`.
+        Performs Cross product: (num_a,) x (num_b,) -> (num_a * num_b,).
 
-        Args:
-            prior_w (dict): sampled from prior
-            user_w (dict): user-specified reward weight
-            tasks (array): environment init state
-            norm_feats_sum(array): samples used to normalize . likelihood in
-                inverse reward design problem. Sampled before running `pgm.sample`.
-            user_feats_sums (list)
-            all_init_states (list)
-            all_user_acs (list)
-
-        TODO:
-            * `user_ws` (represented as `obs` in generic sampling class) is not used in
-            kernel, causing some slight confusion
+        Output:
+            batch_a (type_a): shape (num_a * num_b,)
+            batch_b (type_b): shape (num_a * num_b,)
 
         """
 
-        def likelihood_fn(
-            user_ws,
-            sample_w,
-            norm_feats_sums,
-            user_feats_sums,
-            all_init_states,
-            all_user_acs,
-            mode="hybrid",
-        ):
-            """Main likelihood logic.
+        pairs = list(itertools.product(data_a, data_b))
+        batch_a, batch_b = zip(*pairs)
+        return type_a(batch_a), type_b(batch_b)
 
-            Runs `p(w_obs | w)`
+    def _build_kernel(self, beta):
+        """Forward likelihood for observed data, used as MCMC kernel.
 
-            """
-            log_probs = []
-            # Iterate over list of previous tasks
-            assert (
-                len(norm_feats_sums)
-                == len(user_feats_sums)
-                == len(all_init_states)
-                == len(all_user_acs)
+        Finds `p(w_obs | w_true)`.
+
+        Args:
+            user_ws (DictList): designer-specified reward weight
+                shape (nfeats, ntasks)
+            sample_ws (DictList: MCMC sample
+                shape (nfeats, nchains)
+            user_acs (ndarray): user_ws' actions
+                shape (ntasks, T, acs_dim)
+            norm_feats (DictList): normalizer's features
+                shape (nfeats, ntasks, n_normalizers)
+            tasks (ndarray): tasks, (ntasks, task_dim)
+
+        Output:
+            log_probs (ndarray): log probability of sample_ws (nchains, 1)
+
+        Note:
+            * To stabilize MH sampling
+                (1) average across tasks (instead of sum)
+                (2) average across features costs (instead of sum)
+
+        TODO:
+            * `user_ws` (represented as `obs` in generic sampling class) is somewhat confusingly, not used in
+            kernel. Better API design for algo.py
+
+        """
+
+        def likelihood_fn(user_ws, sample_ws, user_acs, norm_feats, tasks):
+
+            assert len(user_ws) == len(norm_feats) == len(user_acs)  #  length (ntasks)
+
+            prior_probs = self._prior.log_prob(sample_ws)
+            sample_ws = sample_ws.prepare(self._env.features_keys)
+            nnorms = norm_feats.shape[1]
+            nfeats = sample_ws.shape[0]
+            nchain = len(sample_ws)
+            ntasks = len(user_ws)
+
+            ## To calculuate likelihood on each sample each task
+            ## Cross product: (nchain,) x (ntasks,) -> (nchain * ntasks,)
+
+            #  shape batch_sample_ws (nfeats, nchain * ntasks)
+            #  shape batch_tasks (nchain * ntasks, task_dim)
+            batch_sample_ws, batch_tasks = self._cross(
+                sample_ws, tasks, DictList, onp.array
             )
-            for n_feats_sum, u_feats_sum, init_state, user_acs in zip(
-                norm_feats_sums, user_feats_sums, all_init_states, all_user_acs
-            ):
-                for val in u_feats_sum.values():
-                    assert len(val) == 1, "Only can take 1 user sample"
-                sample_costs = multiply_dict_by_keys(sample_w, u_feats_sum)
-                ## Numerator
-                sample_rew = -beta * onp.sum(list(sample_costs.values()))
+            #  shape (nchain * ntasks, T, acs_dim)
+            _, batch_user_acs = self._cross(sample_ws, user_acs, DictList, onp.array)
+            #  shape (nfeats, nchain * ntasks, n_normalizers)
+            _, batch_norm_feats = self._cross(sample_ws, norm_feats, DictList, DictList)
 
-                ## Estimating Normalizing constant
-                if mode == "max_norm":
-                    # Use max trajectory to replace normalizer
-                    # Important to initialize from observation actions
-                    assert n_feats_sum is None
-                    sample_acs = self._controller(init_state, sample_w, us0=user_acs)
-                    _, sample_costs, info = self._runner(
-                        init_state, sample_acs, weights=sample_w
-                    )
-                    sum_normal_rew = -beta * sample_costs
+            ## Compute max rews for sample_ws
+            #  shape (nchain * ntasks, state_dim)
+            batch_init_states = self.env.get_init_states(batch_tasks)
+            #  shape (T, nchain * ntasks, acs_dim)
+            batch_user_acs_flat = batch_user_acs.swapaxes(0, 1)
+            #  shape (T, nchain * ntasks, acs_dim)
+            batch_sample_acs = self._batch_controller(
+                batch_init_states, batch_sample_ws, us0=batch_user_acs_flat
+            )
+            _, _, batch_info = self._batch_runner(
+                batch_init_states, batch_sample_acs, weights=batch_sample_ws
+            )
+            #  shape (nfeats, nchain * ntasks, n_normalizers + 1)
+            batch_norm_feats = batch_norm_feats.concat(
+                batch_info["feats_sum"].expand_dims(axis=1), axis=1
+            )
+            #  shape (nchain * ntasks, n_normalizers + 1)
+            batch_norm_costs = (
+                (batch_sample_ws.expand_dims(axis=1) * batch_norm_feats)
+                .onp_array()
+                .mean(axis=0)
+            )
+            batch_norm_rews = -beta * batch_norm_costs
+            #  shape (nchain * ntasks, )
+            batch_norm_rews = -onp.log(nnorms + 1) + logsumexp(batch_norm_rews, axis=1)
 
-                elif mode == "sample":
-                    # Use weight samples of approximate normalizer
-                    normal_costs = multiply_dict_by_keys(sample_w, n_feats_sum)
-                    normal_rews = -beta * onp.sum(list(normal_costs.values()), axis=0)
-                    sum_normal_rew = -onp.log(len(normal_rews)) + logsumexp(normal_rews)
+            ## Denominator: Average across tasks (nchain * ntasks,) -> (nchain,)
+            norm_rews = batch_norm_rews.reshape((nchain, ntasks)).mean(axis=1)
 
-                elif mode == "hybrid":
-                    # Use both max trajectory and weight samples to approximate normalizer
-                    sample_acs = self._controller(init_state, sample_w, us0=user_acs)
-                    _, sample_cost, sample_info = self._runner(
-                        init_state, sample_acs, weights=sample_w
-                    )
-                    # print("Sample cost", sample_cost)
-                    n_feats_sum = append_dict_by_keys(
-                        n_feats_sum, sample_info["feats_sum"]
-                    )
-                    normal_costs = multiply_dict_by_keys(sample_w, n_feats_sum)
-                    normal_rews = -beta * onp.sum(list(normal_costs.values()), axis=0)
-                    sum_normal_rew = -onp.log(len(normal_rews)) + logsumexp(normal_rews)
-                else:
-                    raise NotImplementedError
+            #  shape (nchain * ntasks, )
+            _, batch_user_costs, _ = self._batch_runner(
+                batch_init_states, batch_user_acs_flat, weights=batch_sample_ws
+            )
+            ## Numerator: Average across tasks (nchain * ntasks,) -> (nchain,)
+            user_rews = (
+                -beta * batch_user_costs.reshape((nchain, ntasks)).mean(axis=1) / nfeats
+            )
+            if self._debug_true_w:
+                print(
+                    f"sample rew {user_rews:.3f} normal costs {norm_rews:.3f} diff {user_rews - norm_rews:.3f}"
+                )
 
-                if self._debug_true_w:
-                    # if True:
-                    print(
-                        f"sample rew {sample_rew:.3f} normal costs {sum_normal_rew:.3f} diff {sample_rew - sum_normal_rew:.3f}"
-                    )
+            log_probs = user_rews - norm_rews
+            log_probs += prior_probs
+            return log_probs
 
-                log_probs.append(sample_rew - sum_normal_rew)
-            log_probs.append(self._prior.log_prob(sample_w))
-            return sum(log_probs)
-
-        def _kernel(user_ws, sample_w, **kwargs):
-            """Vectorized"""
-            if isinstance(sample_w, dict):
-                return likelihood_fn(user_ws, sample_w, **kwargs)
-            else:
-                probs = []
-                for uw, sw in zip(user_ws, sample_w):
-                    probs.append(likelihood_fn(uw, sw, **kwargs))
-                return onp.array(probs)
-
-        return _kernel
+        return likelihood_fn

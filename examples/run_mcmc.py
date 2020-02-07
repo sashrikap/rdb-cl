@@ -96,7 +96,7 @@ def main(random_key):
         weight_params=weight_params,
         normalized_key=NORMALIZED_KEY,
         save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
-        exp_name=f"{EXP_NAME}",
+        exp_name=IRD_EXP_MODE,
     )
 
     ## Task sampling seed
@@ -115,15 +115,13 @@ def main(random_key):
         fixed_task_seed=fixed_task_seed,
         design_data=design_data,
         save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
-        exp_name=f"{EXP_NAME}",
         exp_params=PARAMS,
-        exp_mode=EXP_MODE,
         normalized_key=NORMALIZED_KEY,
     )
     """ Experiment """
     experiment.update_key(rng_key)
-    experiment.run_designer()
-    # ray.shutdown()  # Prepare for next run, which reinitialize ray with different seed
+    # experiment.run_designer(DESIGNER_EXP_MODE)
+    experiment.run_ird(IRD_EXP_MODE)
 
 
 if __name__ == "__main__":

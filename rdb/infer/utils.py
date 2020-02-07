@@ -21,10 +21,10 @@ from functools import partial
 # ========================================================
 
 
-def logsumexp(vs):
-    max_v = onp.max(vs)
-    ds = vs - max_v
-    sum_exp = onp.exp(ds).sum()
+def logsumexp(vs, axis=-1):
+    max_v = onp.max(vs, axis=axis)
+    ds = vs - onp.max(vs, axis=axis, keepdims=True)
+    sum_exp = onp.exp(ds).sum(axis=axis)
     return max_v + onp.log(sum_exp)
 
 

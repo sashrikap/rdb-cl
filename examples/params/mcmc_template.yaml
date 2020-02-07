@@ -26,22 +26,22 @@ NUM_VISUALIZE_TASKS: 1024
 USER_TRUE_W: False
 
 ## Full sampling
-NUM_WARMUPS: 1000
+NUM_WARMUPS: 200
 NUM_NORMALIZERS: 2000
-NUM_SAMPLES: 1000
+NUM_SAMPLES: 1500
 NUM_EVAL_MAP: 2
 SAVE_NAME: "200205"
 NUM_DESIGNER_WARMUPS: 20
 NUM_DESIGNERS: 200
-# EXP_NAME: "mcmc_convergence_true_w_prior_tasks"
-# EXP_MODE: "designer_true_w_prior_tasks"
-# EXP_NAME: "mcmc_convergence_true_w_random_tasks"
-# EXP_MODE: "designer_true_w_random_tasks"
-# EXP_NAME: "mcmc_convergence_random_w_random_tasks"
-# EXP_MODE: "designer_random_w_random_tasks"
-EXP_NAME: "mcmc_convergence_true_w_more_feats"
-EXP_MODE: "designer_true_w_more_features"
+# DESIGNER_EXP_MODE: "designer_convergence_true_w_prior_tasks"
+# DESIGNER_EXP_MODE: "designer_convergence_true_w_random_tasks"
+# DESIGNER_EXP_MODE: "designer_convergence_random_w_random_tasks"
+DESIGNER_EXP_MODE: "designer_convergence_true_w_more_features"
 
+IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks"
+# IRD_EXP_MODE: "ird_convergence_true_w_random_tasks"
+# IRD_EXP_MODE: "ird_convergence_random_w_random_tasks"
+# IRD_EXP_MODE: "ird_convergence_true_w_more_features"
 
 ## Testing
 # NUM_WARMUPS: 10
@@ -52,9 +52,9 @@ EXP_MODE: "designer_true_w_more_features"
 # NUM_EVAL_TASKS: 2
 # NUM_EVAL_MAP: 1
 # SAVE_NAME: "test"
-# EXP_NAME: "mcmc_convergence"
-# # EXP_MODE: "designer_true_w_prior_tasks"
-# EXP_MODE: "designer_true_w_random_tasks"
+# # DESIGNER_EXP_MODE: "designer_convergence_true_w_prior_tasks"
+# # DESIGNER_EXP_MODE: "designer_convergence_true_w_random_tasks"
+# IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks"
 
 # NUM_EVAL_WORKERS: 1
 # PARALLEL: False

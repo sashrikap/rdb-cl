@@ -142,10 +142,7 @@ class LogUniformPrior(Prior):
 
     def sample(self, num_samples):
         assert num_samples > 0, "Must sample > 0 samples"
-        samples = []
-        for _ in range(num_samples):
-            samples.append(self())
-        return samples
+        return self(num_samples)
 
     def __call__(self, num_samples):
         assert (

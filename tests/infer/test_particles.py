@@ -53,6 +53,7 @@ def build_particles(num_weights):
         save_name="test_particles",
         weights=weights,
         save_dir=f"{data_dir()}/test",
+        weight_params={"bins": 10, "max_weights": 20},
     )
     key = random.PRNGKey(0)
     ps.update_key(key)
@@ -97,7 +98,7 @@ def test_actions(num_weights):
     task = env.all_tasks[0]
     udim = 2
     actions = ps.get_actions(task, str(task))
-    assert actions.shape == (T, num_weights, udim)
+    assert actions.shape == (num_weights, T, udim)
 
 
 @pytest.mark.parametrize("num_weights", [1, 5])

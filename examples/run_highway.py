@@ -81,6 +81,9 @@ if not DUMMY_ACTION:
     t1 = time()
     actions = optimizer(state, weights=weights, batch=False)
     traj, cost, info = runner(state, actions, weights=weights, batch=False)
+    import pdb
+
+    pdb.set_trace()
     if BENCHMARK > 0:
         t_compile = time() - t1
         print(f"Compile time {t_compile:.3f}")

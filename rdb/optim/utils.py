@@ -17,42 +17,8 @@ from toolz.functoolz import juxt
 from operator import mul, add
 
 # ==================================================
-# =================== MPC Tools ====================
-# ==================================================
-
-
-def prepare_weights(weights, features_keys):
-    """Given weights (with or w/o missing keys) and feature keys, zero-fill and sort weights.
-
-    Args:
-        weights (dict): dictionary weights with missing values
-        features_keys (list): full list of feature keys
-
-    """
-    weights = zero_fill_dict(weights, features_keys)
-    weights_dict = sort_dict_by_keys(weights, features_keys)
-    weights = np.array(list(weights_dict.values()))
-    return weights
-
-
-# ==================================================
 # ================ Dictionary Tools ================
 # ==================================================
-
-
-def zero_fill_dict(dict_, keys):
-    """When `dict_` does not contain all of `keys`, zero-fill the missing elements.
-
-    Userful when designer provides weight_dict that does not use all features.
-
-    """
-    out = {}
-    for key in keys:
-        if key not in dict_:
-            out[key] = 0.0
-        else:
-            out[key] = dict_[key]
-    return out
 
 
 def sort_dict_by_keys(dict_, keys):
@@ -71,21 +37,6 @@ def sort_dict_by_keys(dict_, keys):
         assert k in dict_
         d[k] = dict_[k]
     return d
-
-
-def append_dict_by_keys(dict_, item):
-    """Append single item to dict (multiple items).
-
-    Example:
-        >>> input: {'a': [1, 2, 3]}, {'a': 4}
-        >>> output: {'a': [1, 2, 3, 4]}
-
-    """
-    output = {}
-    for k, v in dict_.items():
-        assert k in item
-        output[k] = onp.concatenate([dict_[k], [item[k]]])
-    return output
 
 
 def multiply_dict_by_keys(da, db):

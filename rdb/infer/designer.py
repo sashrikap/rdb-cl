@@ -121,16 +121,16 @@ class Designer(PGM):
                 init_state=init_state,
                 name=save_name,
             )
+            # Visualize multiple MCMC chains to check convergence.
+            visualize_chains(
+                info["all_chains"],
+                fig_dir=f"{self._save_dir}/mcmc",
+                title=save_name,
+                **self._weight_params,
+            )
         sample_ws = DictList(sample_ws)
         samples = self.create_particles(sample_ws, save_name=save_name)
         samples.visualize(true_w=self.true_w, obs_w=None)
-        # Visualize multiple MCMC chains to check convergence.
-        visualize_chains(
-            info["all_chains"],
-            fig_dir=f"{self._save_dir}/mcmc",
-            title=save_name,
-            **self._weight_params,
-        )
         return samples.subsample(1)
 
     def reset_prior_tasks(self):
@@ -177,6 +177,21 @@ class Designer(PGM):
         self._random_choice = seed(random_choice, rng_key)
         self.reset_prior_tasks()
 
+    def _cross(self, data_a, data_b, type_a, type_b):
+        """To do compuation on each a for each b.
+
+        Performs Cross product: (num_a,) x (num_b,) -> (num_a * num_b,).
+
+        Output:
+            batch_a (type_a): shape (num_a * num_b,)
+            batch_b (type_b): shape (num_a * num_b,)
+
+        """
+
+        pairs = list(itertools.product(data_a, data_b))
+        batch_a, batch_b = zip(*pairs)
+        return type_a(batch_a), type_b(batch_b)
+
     def _build_kernel(self, beta):
         def likelihood_fn(true_w, sample_ws, tasks):
             """Designer forward likelihood p(design_w | true_w).
@@ -185,58 +200,50 @@ class Designer(PGM):
                 true_w (DictList): designer's true w in mind
                     shape: (nweight, 1)
                 sample_ws (DictList): current sampled w
-                    shape: (nweight, nbatch, 1)
+                    shape: (nweight, nchain, 1)
                 tasks (ndarray): prior tasks
                     shape: (ntasks, task_dim)
 
             Return:
-                log_probs (ndarray): (nbatch, )
+                log_probs (ndarray): (nchain, )
 
             """
             assert self._prior_tasks is not None, "Need >=0 prior tasks."
             assert len(tasks) == self._num_prior_tasks + 1
-            nfeats = sample_ws.shape[0]
-            nbatch = len(sample_ws)
-            ntasks = len(tasks)
-            ## Do something on each sample each task
-            ## Cross product:
-            ##  (nbatch,) x (ntasks,) -> (nbatch * ntasks,)
-            pairs = list(itertools.product(sample_ws, tasks))
-            batch_ws, batch_tasks = zip(*pairs)
-            batch_tasks = np.array(batch_tasks)
-            batch_ws = DictList(batch_ws)
-            true_ws = DictList(true_w, expand_dims=True).repeat(nbatch * ntasks, axis=0)
 
-            ## Calculate probability -> (nbatch * ntasks,)
+            prior_probs = self._prior.log_prob(sample_ws)
+            sample_ws = sample_ws.prepare(self._env.features_keys)
+            nfeats = sample_ws.shape[0]
+            nchain = len(sample_ws)
+            ntasks = len(tasks)
+
+            ## Calculuate likelihood on each sample each task
+            ## Cross product: (nchain,) x (ntasks,) -> (nchain * ntasks,)
+            batch_ws, batch_tasks = self._cross(sample_ws, tasks, DictList, onp.array)
+            true_ws = DictList(true_w, expand_dims=True).repeat(nchain * ntasks, axis=0)
+
+            ## Costs -> (nchain * ntasks,)
             states = self.env.get_init_states(batch_tasks)
             actions = self._controller(states, batch_ws)
             _, costs, info = self._runner(states, actions, weights=true_ws)
 
-            ## Mean across tasks (nbatch, ntasks) -> (nbatch,)
+            ## Average across tasks
+            #  shape (nchain * ntasks) -> (nchain, ntasks) -> (nchain,)
             #  To stabilize MH sampling
-            #  (1) average, instead of sum across tasks
-            #  (2) divide by number of features
-            log_probs = onp.zeros(nbatch)
-            costs = costs.reshape((nbatch, ntasks)).mean(axis=1) / nfeats
-            rews = -1 * costs
-            log_probs += beta * rews
-            log_probs += self._prior.log_prob(sample_ws)
+            #  (1) average across tasks (instead of sum)
+            #  (2) average across features costs (instead of sum)
+            log_probs = onp.zeros(nchain)
+            costs = costs.reshape((nchain, ntasks)).mean(axis=1) / nfeats
+            rews = -beta * costs
+
+            log_probs += rews
+            log_probs += prior_probs
             # if True:
             if False:
                 print(f"Designer prob {log_probs:.3f}", actions.mean())
             return log_probs
 
-        def _kernel(true_w, sample_w, **kwargs):
-            """Vectorized"""
-            if isinstance(sample_w, dict):
-                return likelihood_fn(true_w, sample_w, **kwargs)
-            else:
-                probs = []
-                for tw, w in zip(true_w, sample_w):
-                    probs.append(likelihood_fn(tw, w, **kwargs))
-                return onp.array(probs)
-
-        return _kernel
+        return likelihood_fn
 
 
 class DesignerInteractive(Designer):

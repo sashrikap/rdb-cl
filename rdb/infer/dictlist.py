@@ -143,19 +143,19 @@ class DictList(dict):
             first_shape = self[keys[0]].shape
             return tuple([len(keys)] + list(first_shape))
 
-    def append(self, dict_):
+    def append(self, dict_, axis=0):
         """Append dictionary to end."""
         assert isinstance(dict_, dict)
         for key, val in self.items():
-            self[key] = onp.concatenate([val, [dict_[key]]], axis=0)
+            self[key] = onp.concatenate([val, [dict_[key]]], axis=axis)
         self._assert_shape()
 
-    def concat(self, dictlist):
+    def concat(self, dictlist, axis=0):
         """Concatenate with another DictList"""
         assert isinstance(dictlist, DictList)
         data = OrderedDict()
         for key, val in self.items():
-            data[key] = onp.concatenate([val, dictlist[key]], axis=0)
+            data[key] = onp.concatenate([val, dictlist[key]], axis=axis)
         return DictList(data)
 
     def repeat(self, num, axis=0):
@@ -173,6 +173,14 @@ class DictList(dict):
             new_shape = [1] * len(val.shape)
             new_shape[axis] = num
             data[key] = onp.tile(val, new_shape)
+        return DictList(data)
+
+    def expand_dims(self, axis=0):
+        """Expand dimension."""
+        data = OrderedDict()
+        assert axis < len(self.shape)
+        for key, val in self.items():
+            data[key] = onp.expand_dims(val, axis=axis)
         return DictList(data)
 
     def transpose(self):
@@ -287,10 +295,13 @@ class DictList(dict):
     def prepare(self, features_keys):
         """Return copy of self, weiht keys sorted.
         """
+        out = OrderedDict()
         for key in features_keys:
             if key not in self.keys():
-                self[key] = onp.zeros(self.shape[1:])
-        return self.sort_by_keys(features_keys)
+                out[key] = onp.zeros(self.shape[1:])
+            else:
+                out[key] = self[key]
+        return DictList(out)
 
     def numpy_array(self):
         """Return stacked values in jax.numpy

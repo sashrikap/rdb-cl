@@ -239,14 +239,16 @@ class MetropolisHasting(Inference):
         ## Warm-up phase
         warmup_accepts = []
         print(f"MH Samplint Chains={self._num_chains}")
-        range_ = trange(self._num_warmups, desc="MH Warmup")
-        for i in range_:
+        pbar = tqdm(total=self._num_warmups, desc="MH Warmup")
+        for i in range(self._num_warmups):
             accept, state, log_prob = self._mh_step(
                 obs, state, log_prob, *args, **kwargs
             )
             warmup_accepts.append(accept)
             rate, num = self._get_counts(warmup_accepts, chain=0)
-            range_.set_description(f"MH Warmup {name}; Accept {100 * rate:.1f}%")
+            pbar.n, pbar.last_print_n = i + 1, i + 1
+            pbar.refresh()
+            pbar.set_description(f"MH Warmup {name}; Accept {100 * rate:.1f}%")
 
         ## Actual sampling phase (idential to warmup)
         samples = []

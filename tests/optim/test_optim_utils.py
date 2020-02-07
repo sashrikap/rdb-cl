@@ -22,15 +22,6 @@ def test_sum():
     assert np.allclose(fn(1, 2), 2)
 
 
-def test_append_dict():
-    d1 = {"a": [1, 2, 3]}
-    d2 = {"a": 4}
-    out = {"a": [1, 2, 3, 4]}
-    dout = append_dict_by_keys(d1, d2)
-    for k, v in dout.items():
-        assert onp.allclose(dout[k], out[k])
-
-
 def test_weights_list_jax():
     def f1(a, b):
         return np.array(a) + np.array(b)
