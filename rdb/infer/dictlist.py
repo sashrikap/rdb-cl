@@ -208,7 +208,7 @@ class DictList(dict):
         else:
             return data
 
-    def normalize(self, key):
+    def normalize_by_key(self, key):
         """Normalize all values based on key.
         """
         data = OrderedDict()
@@ -216,6 +216,16 @@ class DictList(dict):
         for key, val in self.items():
             data[key] = val / norm_val
         return DictList(data)
+
+    def normalize_across_keys(self):
+        """Normalize all values such that ||w_i||_2 = 1.
+        """
+        this_array = self.onp_array()
+        norm = onp.linalg.norm(this_array, axis=0, keepdims=True)
+        this_array = this_array / norm
+        new_data = self.copy()
+        new_data.from_array(this_array)
+        return new_data
 
     def copy(self):
         data = OrderedDict()
@@ -320,6 +330,13 @@ class DictList(dict):
 
         """
         return onp.array(list(self.values()))
+
+    def from_array(self, array):
+        """Load data from array"""
+        this_keys = list(self.keys())
+        assert len(this_keys) == array.shape[0]
+        for i in range(len(this_keys)):
+            self[this_keys[i]] = array[i]
 
     def __iter__(self):
         """Iterator to do `for d in dictlist`"""

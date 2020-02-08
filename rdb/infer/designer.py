@@ -123,7 +123,8 @@ class Designer(PGM):
             )
             # Visualize multiple MCMC chains to check convergence.
             visualize_chains(
-                info["all_chains"],
+                chains=info["all_chains"],
+                rates=info["rates"],
                 fig_dir=f"{self._save_dir}/mcmc",
                 title=save_name,
                 **self._weight_params,

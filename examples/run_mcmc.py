@@ -137,8 +137,5 @@ if __name__ == "__main__":
     else:
         PARAMS = load_params("/dar_payload/rdb/examples/params/mcmc_params.yaml")
     locals().update(PARAMS)
-    if not GCP_MODE:
-        RANDOM_KEYS = [23]
-        NUM_EVAL_WORKERS = 4
     for ki in copy.deepcopy(RANDOM_KEYS):
         main(random_key=ki)

@@ -172,12 +172,14 @@ class MetropolisHasting(Inference):
         next_logpr = self._kernel(obs, next_state, **kwargs)
         logp_ratio = onp.array(next_logpr - logpr)
 
-        # if False:
-        if True:
-            print(f"next {next_logpr} curr {logpr} ratio {logp_ratio}")
-
         ## Accept or not (nbatch,)
-        accept = onp.log(self._coin_flip()) < onp.array(logp_ratio)
+        coin_flip = onp.log(self._coin_flip())
+
+        if False:
+            # if True:
+            print(f"next {next_logpr} curr {logpr} ratio {logp_ratio} flip {coin_flip}")
+
+        accept = coin_flip < onp.array(logp_ratio)
         not_accept = onp.logical_not(accept)
         # next prob: (nbatch, )
         next_logpr = self._concatenate(next_logpr[accept], logpr[not_accept])
@@ -189,11 +191,9 @@ class MetropolisHasting(Inference):
         return accept, next_state, next_logpr
 
     def _create_coin_flip(self):
-        @jax.jit
         def raw_fn():
             return numpyro.sample("accept", dist.Uniform(0, 1))
 
-        @jax.jit
         def raw_fn_multi():
             return numpyro.sample(
                 "accept", dist.Uniform(0, 1), sample_shape=(self._num_chains,)
@@ -276,9 +276,9 @@ class MetropolisHasting(Inference):
         assert accepts.shape == (nsteps, self._num_chains)
 
         ## Summarize and select accepted
-        self._summarize(samples, accepts, name)
+        rates = self._summarize(samples, accepts, name)
         accepted_chains = self._accepted_samples(samples, accepts)
-        info = {"all_chains": accepted_chains}
+        info = {"all_chains": accepted_chains, "rates": rates}
         main_chain = accepted_chains[0]
         return main_chain, info
 
@@ -304,9 +304,12 @@ class MetropolisHasting(Inference):
 
         """
         accepts = onp.array(accepts)
+        rates = []
         for chain in range(self._num_chains):
             rate, num = self._get_counts(accepts, chain=chain)
             print(f"{name} MH chain {chain} rate {rate:.3f} accept {num}")
+            rates.append(rate)
+        return rates
 
     def _accepted_samples(self, samples, accepts):
         """Select accepted samples from the main chain.

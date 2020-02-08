@@ -113,7 +113,7 @@ def collect_trajs(list_ws, state, controller, runner, desc=None):
 # ========================================================
 
 
-def visualize_chains(chains, fig_dir, title, **kwargs):
+def visualize_chains(chains, rates, fig_dir, title, **kwargs):
     """Visualize multiple MCMC chains to check convergence.
 
     Args:
@@ -126,13 +126,16 @@ def visualize_chains(chains, fig_dir, title, **kwargs):
     import itertools
     import matplotlib.cm as cm
 
+    assert len(chains) == len(rates)
     colors = cm.Spectral(np.linspace(0, 1, len(chains)))
     os.makedirs(fig_dir, exist_ok=True)
     all_weights = []
     all_colors = []
     all_labels = []
-    for ci, chain_i in enumerate(chains):
-        all_labels.append(f"Chain({ci}): accept {len(chain_i)}")
+    for ci, (chain_i, rate_i) in enumerate(zip(chains, rates)):
+        all_labels.append(
+            f"Chain({ci}): accept {len(chain_i)} ({(100 * rate_i):.02f}%)"
+        )
     plot_weights_comparison(
         chains, colors, all_labels, path=f"{fig_dir}/{title}.png", title=title, **kwargs
     )

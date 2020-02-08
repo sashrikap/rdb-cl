@@ -98,8 +98,6 @@ class IRDOptimalControl(PGM):
         ## Saving options
         save_root="data",
         exp_name="active_ird_exp1",
-        ## Debugging options
-        debug_true_w=False,
     ):
         self._rng_key = rng_key
         # Environment settings
@@ -121,9 +119,8 @@ class IRDOptimalControl(PGM):
         self._normalizer = None
         self._user_actions = {}
         self._user_feats = {}
-        self._debug_true_w = debug_true_w
         self._weight_params = weight_params
-        self._kernel = self._build_kernel(beta)
+        self._kernel = self._build_kernel()
         ## Saving
         self._save_root = save_root
         self._exp_name = exp_name
@@ -193,7 +190,14 @@ class IRDOptimalControl(PGM):
         self._sampler.update_key(rng_key)
         self._designer.update_key(rng_key)
         self._prior.update_key(rng_key)
-        self._normalizer = self._build_normalizer()
+        """Build sampling-based normalizer by randomly sampling weights."""
+        norm_ws = self._prior.sample(self._num_normalizers)
+        self._normalizer = self.create_particles(
+            norm_ws,
+            save_name="ird_normalizer",
+            runner=self._norm_runner,
+            controller=self._norm_controller,
+        )
 
     def simulate_designer(self, task, task_name, save_name):
         """Sample one w from b(w) on task
@@ -258,9 +262,10 @@ class IRDOptimalControl(PGM):
         )
         num_samples = len(info["all_chains"][0])
         visualize_chains(
-            info["all_chains"],
+            chains=info["all_chains"],
+            rates=info["rates"],
             fig_dir=f"{self._save_dir}/mcmc",
-            title=f"save_name_{num_samples}",
+            title=f"seed_{str(self._rng_key)}_{save_name}_samples_{num_samples}",
             **self._weight_params,
         )
         sample_ws = DictList(sample_ws)
@@ -289,17 +294,6 @@ class IRDOptimalControl(PGM):
             env=self._env,
         )
 
-    def _build_normalizer(self):
-        """Build sampling-based normalizer by randomly sampling weights."""
-        norm_ws = self._prior.sample(self._num_normalizers)
-        normalizer = self.create_particles(
-            norm_ws,
-            save_name="ird_normalizer",
-            runner=self._norm_runner,
-            controller=self._norm_controller,
-        )
-        return normalizer
-
     def _cross(self, data_a, data_b, type_a, type_b):
         """To do compuation on each a for each b.
 
@@ -315,7 +309,7 @@ class IRDOptimalControl(PGM):
         batch_a, batch_b = zip(*pairs)
         return type_a(batch_a), type_b(batch_b)
 
-    def _build_kernel(self, beta):
+    def _build_kernel(self):
         """Forward likelihood for observed data, used as MCMC kernel.
 
         Finds `p(w_obs | w_true)`.
@@ -345,20 +339,32 @@ class IRDOptimalControl(PGM):
 
         """
 
-        def likelihood_fn(user_ws, sample_ws, user_acs, norm_feats, tasks):
+        def likelihood_fn(
+            user_ws,
+            sample_ws,
+            user_acs,
+            norm_feats,
+            tasks,
+            normalize_across_keys=False,
+            extend_norm=True,
+            one_norm=False,
+        ):
 
             assert len(user_ws) == len(norm_feats) == len(user_acs)  #  length (ntasks)
 
             prior_probs = self._prior.log_prob(sample_ws)
-            sample_ws = sample_ws.prepare(self._env.features_keys)
-            nnorms = norm_feats.shape[1]
+            nnorms = norm_feats.shape[2]
             nfeats = sample_ws.shape[0]
             nchain = len(sample_ws)
             ntasks = len(user_ws)
 
+            sample_ws = sample_ws.prepare(self._env.features_keys)
+            if normalize_across_keys:
+                # import pdb; pdb.set_trace()
+                sample_ws = sample_ws.normalize_across_keys()
+
             ## To calculuate likelihood on each sample each task
             ## Cross product: (nchain,) x (ntasks,) -> (nchain * ntasks,)
-
             #  shape batch_sample_ws (nfeats, nchain * ntasks)
             #  shape batch_tasks (nchain * ntasks, task_dim)
             batch_sample_ws, batch_tasks = self._cross(
@@ -368,33 +374,46 @@ class IRDOptimalControl(PGM):
             _, batch_user_acs = self._cross(sample_ws, user_acs, DictList, onp.array)
             #  shape (nfeats, nchain * ntasks, n_normalizers)
             _, batch_norm_feats = self._cross(sample_ws, norm_feats, DictList, DictList)
-
-            ## Compute max rews for sample_ws
             #  shape (nchain * ntasks, state_dim)
             batch_init_states = self.env.get_init_states(batch_tasks)
             #  shape (T, nchain * ntasks, acs_dim)
             batch_user_acs_flat = batch_user_acs.swapaxes(0, 1)
-            #  shape (T, nchain * ntasks, acs_dim)
-            batch_sample_acs = self._batch_controller(
-                batch_init_states, batch_sample_ws, us0=batch_user_acs_flat
-            )
-            _, _, batch_info = self._batch_runner(
-                batch_init_states, batch_sample_acs, weights=batch_sample_ws
-            )
-            #  shape (nfeats, nchain * ntasks, n_normalizers + 1)
-            batch_norm_feats = batch_norm_feats.concat(
-                batch_info["feats_sum"].expand_dims(axis=1), axis=1
-            )
+
+            if extend_norm:
+                ## Compute max rews for sample_ws
+                #  shape (T, nchain * ntasks, acs_dim)
+                batch_sample_acs = self._batch_controller(
+                    batch_init_states, batch_sample_ws, us0=batch_user_acs_flat
+                )
+                _, _, batch_info = self._batch_runner(
+                    batch_init_states, batch_sample_acs, weights=batch_sample_ws
+                )
+                #  shape (nfeats, nchain * ntasks, n_normalizers + 1)
+                batch_norm_feats = batch_norm_feats.concat(
+                    batch_info["feats_sum"].expand_dims(axis=1), axis=1
+                )
+            elif one_norm:
+                ## Compute max rews for sample_ws
+                #  shape (T, nchain * ntasks, acs_dim)
+                batch_sample_acs = self._batch_controller(
+                    batch_init_states, batch_sample_ws, us0=batch_user_acs_flat
+                )
+                _, _, batch_info = self._batch_runner(
+                    batch_init_states, batch_sample_acs, weights=batch_sample_ws
+                )
+                #  shape (nfeats, nchain * ntasks, n_normalizers + 1)
+                batch_norm_feats = batch_info["feats_sum"].expand_dims(axis=1)
+
             #  shape (nchain * ntasks, n_normalizers + 1)
             batch_norm_costs = (
                 (batch_sample_ws.expand_dims(axis=1) * batch_norm_feats)
                 .onp_array()
-                .mean(axis=0)
-            )
-            batch_norm_rews = -beta * batch_norm_costs
+                .sum(axis=0)
+            ) / nfeats
             #  shape (nchain * ntasks, )
-            batch_norm_rews = -onp.log(nnorms + 1) + logsumexp(batch_norm_rews, axis=1)
-
+            batch_norm_rews = -onp.log(nnorms + 1) + logsumexp(
+                -self._beta * batch_norm_costs, axis=1
+            )
             ## Denominator: Average across tasks (nchain * ntasks,) -> (nchain,)
             norm_rews = batch_norm_rews.reshape((nchain, ntasks)).mean(axis=1)
 
@@ -403,12 +422,21 @@ class IRDOptimalControl(PGM):
                 batch_init_states, batch_user_acs_flat, weights=batch_sample_ws
             )
             ## Numerator: Average across tasks (nchain * ntasks,) -> (nchain,)
-            user_rews = (
-                -beta * batch_user_costs.reshape((nchain, ntasks)).mean(axis=1) / nfeats
+            batch_user_costs /= nfeats
+
+            user_rews = -self._beta * batch_user_costs.reshape((nchain, ntasks)).mean(
+                axis=1
             )
-            if self._debug_true_w:
+
+            ## Debug
+            # if True:
+            if False:
+                diff = onp.array(batch_norm_costs[0, :] - batch_user_costs[0])
                 print(
-                    f"sample rew {user_rews:.3f} normal costs {norm_rews:.3f} diff {user_rews - norm_rews:.3f}"
+                    f"Diff mean {diff.mean():03f} median {onp.median(diff):03f} std {diff.std():.03f}"
+                )
+                print(
+                    f"sample rew {user_rews} normal costs {norm_rews} diff {user_rews - norm_rews}"
                 )
 
             log_probs = user_rews - norm_rews

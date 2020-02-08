@@ -74,7 +74,7 @@ class ExperimentMCMC(object):
         self._all_ird_obs_ws = []
         self._max_ird_obs_num = 10
         # Test incremental # features
-        self._nfeats_start = 8
+        self._nfeats_start = 5
 
     def _load_design(self, exp_mode):
         """Different mode of designer experiments.
@@ -94,7 +94,7 @@ class ExperimentMCMC(object):
             ## Testing IRD convergence, no need of these designs
             pass
 
-        elif exp_mode == "designer_convergence_true_w_prior_tasks":
+        elif "designer_convergence_true_w_prior_tasks" in exp_mode:
             ## Load well-defined Jerry's prior designs
             ## Test # design tasks vs convergence
             for d_data in self._design_data["DESIGNS"]:
@@ -104,7 +104,7 @@ class ExperimentMCMC(object):
                 self._all_designer_prior_tasks.append(design_task)
                 self._all_designer_prior_ws.append(true_w)
 
-        elif exp_mode == "designer_convergence_true_w_random_tasks":
+        elif "designer_convergence_true_w_random_tasks" in exp_mode:
             ## Use one of Jerry's prior designed w as true w
             ## Test # random tasks vs convergence
             rand_tasks = self._random_task_choice(all_tasks, num_designs)
@@ -114,7 +114,7 @@ class ExperimentMCMC(object):
                 true_w = self._design_data["DESIGNS"][-1]["WEIGHTS"]
                 self._all_designer_prior_ws.append(true_w)
 
-        elif exp_mode == "designer_convergence_random_w_random_tasks":
+        elif "designer_convergence_random_w_random_tasks" in exp_mode:
             ## Use a random w as true w
             ## Test # random tasks vs convergence
             rand_tasks = onp.array(self._random_task_choice(all_tasks, num_designs))
@@ -126,7 +126,7 @@ class ExperimentMCMC(object):
                 # rand_w = self._make_random_weights(d_data["WEIGHTS"].keys())
                 self._all_designer_prior_ws.append(rand_w)
 
-        elif exp_mode == "designer_convergence_true_w_more_features":
+        elif "designer_convergence_true_w_more_features" in exp_mode:
             ## Use a true w on random tasks
             ## The true w has progressively more random features
             ## Test # features (DOF) vs convergence
@@ -169,7 +169,7 @@ class ExperimentMCMC(object):
             ## Designer experiment
             pass
 
-        elif exp_mode == "ird_convergence_true_w_prior_tasks":
+        elif "ird_convergence_true_w_prior_tasks" in exp_mode:
             ## Load well-defined Jerry's prior designs
             ## Test # obs vs convergence
             for d_data in self._design_data["DESIGNS"]:
@@ -179,7 +179,7 @@ class ExperimentMCMC(object):
                 self._all_ird_obs_tasks.append(design_task)
                 self._all_ird_obs_ws.append(true_w)
 
-        elif exp_mode == "ird_convergence_true_w_random_tasks":
+        elif "ird_convergence_true_w_random_tasks" in exp_mode:
             ## Use one of Jerry's prior designed w as true w
             ## Test # random tasks vs convergence
             self._all_ird_obs_tasks = rand_tasks
@@ -188,7 +188,7 @@ class ExperimentMCMC(object):
                 true_w = self._design_data["DESIGNS"][-1]["WEIGHTS"]
                 self._all_ird_obs_ws.append(true_w)
 
-        elif exp_mode == "ird_convergence_random_w_random_tasks":
+        elif "ird_convergence_random_w_random_tasks" in exp_mode:
             ## Use a random w as true w
             ## Test # random tasks vs convergence
             self._all_ird_obs_tasks = rand_tasks
@@ -199,7 +199,7 @@ class ExperimentMCMC(object):
                 # rand_w = self._make_random_weights(d_data["WEIGHTS"].keys())
                 self._all_ird_obs_ws.append(rand_w)
 
-        elif exp_mode == "ird_convergence_true_w_more_features":
+        elif "ird_convergence_true_w_more_features" in exp_mode:
             ## Use a true w on random tasks
             ## The true w has progressively more random features
             ## Test # features (DOF) vs convergence
@@ -215,7 +215,7 @@ class ExperimentMCMC(object):
                         true_w[key] = val
                     if len((true_w.keys())) == n_feats:
                         break
-                self._all_ird_obs_tasks.append(true_w)
+                self._all_ird_obs_ws.append(true_w)
 
         else:
             raise NotImplementedError
@@ -249,7 +249,7 @@ class ExperimentMCMC(object):
         ## Simulate
         for n_prior in range(len(self._all_designer_prior_tasks)):
 
-            print(f"Experiment mode {exp_mode}")
+            print(f"Experiment mode ({self._rng_key}) {exp_mode}")
             print(f"Prior task number: {n_prior}")
 
             prior_tasks = self._all_designer_prior_tasks[:n_prior]
@@ -285,7 +285,7 @@ class ExperimentMCMC(object):
 
         for num_obs in range(1, self._max_ird_obs_num):
 
-            print(f"Experiment mode {exp_mode}")
+            print(f"Experiment mode ({self._rng_key}): {exp_mode}")
             print(f"Observation number: {num_obs}")
 
             ## Simulate

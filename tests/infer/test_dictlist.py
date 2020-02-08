@@ -139,6 +139,20 @@ def test_numpy_array():
     assert w.shape == (2, 2)
     np_array = w.numpy_array()
     assert np_array.shape == (2, 2)
+    new_data = DictList([{"b": 1, "a": 1}])
+    new_data.from_array(np_array)
+    assert_equal(w, new_data)
+
+
+def test_onumpy_array():
+    data = [{"b": 1, "a": 1}, {"b": 1, "a": 2}]
+    w = DictList(data)
+    assert w.shape == (2, 2)
+    np_array = w.numpy_array()
+    assert np_array.shape == (2, 2)
+    new_data = DictList([{"b": 1, "a": 1}])
+    new_data.from_array(np_array)
+    assert_equal(w, new_data)
 
 
 def test_sum():
@@ -268,7 +282,31 @@ def test_empty():
     assert len(dict_) == 0
 
 
-def test_normalize():
-    dict_ = DictList({"a": [1, 2], "b": [1, 3]}).normalize("a")
+def test_normalize_by_key():
+    dict_ = DictList({"a": [1, 2], "b": [1, 3]}).normalize_by_key("a")
     results = {"a": [1, 1], "b": [1, 1.5]}
+    assert_equal(dict_, results)
+
+
+def test_normalize_across_keys():
+    dict_ = DictList({"a": [1, 2], "b": [1, 3]}).normalize_across_keys()
+    results = {
+        "a": [onp.sqrt(1 / 2.0), 2.0 / onp.sqrt(13)],
+        "b": [onp.sqrt(1 / 2.0), 3.0 / onp.sqrt(13)],
+    }
+    assert_equal(dict_, results)
+
+    dict_ = DictList(
+        {"a": [[1, 1], [2, 2]], "b": [[1, 2], [3, 3]]}
+    ).normalize_across_keys()
+    results = {
+        "a": [
+            [onp.sqrt(1 / 2.0), onp.sqrt(1 / 5.0)],
+            [2.0 / onp.sqrt(13), 2.0 / onp.sqrt(13)],
+        ],
+        "b": [
+            [onp.sqrt(1 / 2.0), 2.0 / onp.sqrt(5.0)],
+            [3.0 / onp.sqrt(13), 3.0 / onp.sqrt(13)],
+        ],
+    }
     assert_equal(dict_, results)

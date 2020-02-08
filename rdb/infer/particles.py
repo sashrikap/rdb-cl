@@ -59,7 +59,7 @@ class Particles(object):
         self._rng_key = rng_key
         self._weight_params = weight_params
         self._normalized_key = normalized_key
-        self._weights = weights.normalize(self._normalized_key)
+        self._weights = weights.normalize_by_key(self._normalized_key)
         self._expanded_name = f"{save_name}_seed_{str(self._rng_key)}"
         self._save_name = save_name
         ## File system
@@ -125,7 +125,7 @@ class Particles(object):
     @weights.setter
     def weights(self, ws):
         assert isinstance(ws, DictList)
-        self._weights = ws.normalize(self._normalized_key)
+        self._weights = ws.normalize_by_key(self._normalized_key)
         self.build_cache()
 
     @property
@@ -265,7 +265,7 @@ class Particles(object):
         if target is not None:
             # shape (nfeats, nbatch, )
             target_ws = target.weights.tile(nbatch, axis=0)
-            target_ws = target_ws.normalize(self._normalized_key)
+            target_ws = target_ws.normalize_by_key(self._normalized_key)
             assert len(target.weights) == 1, "Can only compare with 1 target weights."
             ## Compare reward difference
             #  shape (nfeats, nbatch, )
