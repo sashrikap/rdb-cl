@@ -215,8 +215,6 @@ class Particles(object):
         actions, feats, feats_sum, violations = collect_trajs(
             self.weights, state, self._controller, self._runner, desc=desc
         )
-        # (T, nparticles,udim) -> (nparticles, T, udim)
-        actions = actions.swapaxes(0, 1)
         self._sample_actions[task_name] = actions
         self._sample_feats[task_name] = feats
         self._sample_feats_sum[task_name] = feats_sum
@@ -296,14 +294,14 @@ class Particles(object):
             this_vios = this_vios.onp_array().sum(axis=0)
             return this_rews, this_vios
 
-    def resample(self, new_probs):
+    def resample(self, probs):
         """Resample from particles using list of new probs. Used for particle filter update."""
         assert (
             self._random_choice is not None
         ), "Must properly initialize particle weights"
-        assert len(new_probs) == len9self.weights
+        assert len(probs) == len(self.weights)
         new_weights = self._random_choice(
-            self.weights, num=len(self.weights), probs=new_probs, replacement=True
+            self.weights, num=len(self.weights), probs=probs, replacement=True
         )
         new_weights = DictList(new_weights)
         new_ps = self._clone(new_weights)

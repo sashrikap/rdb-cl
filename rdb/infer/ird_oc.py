@@ -249,7 +249,7 @@ class IRDOptimalControl(PGM):
         last_obs_w = obs[-1].weights[0]
         #  shape (ntasks, T, acs_dim)
         user_acs = onp.array(user_acs)
-        #  shape (nfeats, ntasks, n_normalizer)
+        #  shape nfeats * (ntasks, n_normalizer)
         norm_feats = DictList(norm_feats)
         norm_feats = norm_feats.prepare(self._env.features_keys)
         sample_ws, info = self._sampler.sample(
@@ -316,13 +316,13 @@ class IRDOptimalControl(PGM):
 
         Args:
             user_ws (DictList): designer-specified reward weight
-                shape (nfeats, ntasks)
+                shape nfeats * (ntasks,)
             sample_ws (DictList: MCMC sample
-                shape (nfeats, nchains)
+                shape nfeats * (nchains,)
             user_acs (ndarray): user_ws' actions
                 shape (ntasks, T, acs_dim)
             norm_feats (DictList): normalizer's features
-                shape (nfeats, ntasks, n_normalizers)
+                shape nfeats * (ntasks, n_normalizers)
             tasks (ndarray): tasks, (ntasks, task_dim)
 
         Output:
@@ -345,50 +345,46 @@ class IRDOptimalControl(PGM):
             user_acs,
             norm_feats,
             tasks,
-            normalize_across_keys=False,
-            extend_norm=True,
-            one_norm=False,
+            normalize_across_keys=True,
+            extend_norm=False,
+            one_norm=True,
         ):
 
             assert len(user_ws) == len(norm_feats) == len(user_acs)  #  length (ntasks)
 
             prior_probs = self._prior.log_prob(sample_ws)
-            nnorms = norm_feats.shape[2]
-            nfeats = sample_ws.shape[0]
+            nnorms = norm_feats.shape[1]
+            nfeats = sample_ws.num_keys
             nchain = len(sample_ws)
             ntasks = len(user_ws)
 
             sample_ws = sample_ws.prepare(self._env.features_keys)
             if normalize_across_keys:
-                # import pdb; pdb.set_trace()
                 sample_ws = sample_ws.normalize_across_keys()
 
             ## To calculuate likelihood on each sample each task
             ## Cross product: (nchain,) x (ntasks,) -> (nchain * ntasks,)
-            #  shape batch_sample_ws (nfeats, nchain * ntasks)
+            #  shape batch_sample_ws nfeats * (nchain * ntasks)
             #  shape batch_tasks (nchain * ntasks, task_dim)
             batch_sample_ws, batch_tasks = self._cross(
                 sample_ws, tasks, DictList, onp.array
             )
             #  shape (nchain * ntasks, T, acs_dim)
             _, batch_user_acs = self._cross(sample_ws, user_acs, DictList, onp.array)
-            #  shape (nfeats, nchain * ntasks, n_normalizers)
+            #  shape nfeats * (nchain * ntasks, n_normalizers)
             _, batch_norm_feats = self._cross(sample_ws, norm_feats, DictList, DictList)
             #  shape (nchain * ntasks, state_dim)
             batch_init_states = self.env.get_init_states(batch_tasks)
-            #  shape (T, nchain * ntasks, acs_dim)
-            batch_user_acs_flat = batch_user_acs.swapaxes(0, 1)
-
             if extend_norm:
                 ## Compute max rews for sample_ws
                 #  shape (T, nchain * ntasks, acs_dim)
                 batch_sample_acs = self._batch_controller(
-                    batch_init_states, batch_sample_ws, us0=batch_user_acs_flat
+                    batch_init_states, batch_sample_ws, us0=batch_user_acs
                 )
                 _, _, batch_info = self._batch_runner(
                     batch_init_states, batch_sample_acs, weights=batch_sample_ws
                 )
-                #  shape (nfeats, nchain * ntasks, n_normalizers + 1)
+                #  shape nfeats * (nchain * ntasks, n_normalizers + 1)
                 batch_norm_feats = batch_norm_feats.concat(
                     batch_info["feats_sum"].expand_dims(axis=1), axis=1
                 )
@@ -396,12 +392,12 @@ class IRDOptimalControl(PGM):
                 ## Compute max rews for sample_ws
                 #  shape (T, nchain * ntasks, acs_dim)
                 batch_sample_acs = self._batch_controller(
-                    batch_init_states, batch_sample_ws, us0=batch_user_acs_flat
+                    batch_init_states, batch_sample_ws, us0=batch_user_acs
                 )
                 _, _, batch_info = self._batch_runner(
                     batch_init_states, batch_sample_acs, weights=batch_sample_ws
                 )
-                #  shape (nfeats, nchain * ntasks, n_normalizers + 1)
+                #  shape nfeats * (nchain * ntasks, n_normalizers + 1)
                 batch_norm_feats = batch_info["feats_sum"].expand_dims(axis=1)
 
             #  shape (nchain * ntasks, n_normalizers + 1)
@@ -419,7 +415,7 @@ class IRDOptimalControl(PGM):
 
             #  shape (nchain * ntasks, )
             _, batch_user_costs, _ = self._batch_runner(
-                batch_init_states, batch_user_acs_flat, weights=batch_sample_ws
+                batch_init_states, batch_user_acs, weights=batch_sample_ws
             )
             ## Numerator: Average across tasks (nchain * ntasks,) -> (nchain,)
             batch_user_costs /= nfeats

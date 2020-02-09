@@ -166,14 +166,13 @@ if not DUMMY_ACTION:
             runner2(state_N, acs, weights=ws)
 
 else:
-    actions = np.zeros((T, 1, env.udim))
-
+    actions = np.zeros((1, T, env.udim))
 
 env.reset()
 env.render("human", draw_heat=DRAW_HEAT, weights=weights)
 
 for t in range(T):
-    env.step(actions[t])
+    env.step(actions[:, t])
     env.render("human", draw_heat=DRAW_HEAT, weights=weights)
     sleep(0.2)
 

@@ -86,10 +86,10 @@ def collect_trajs(list_ws, state, controller, runner, desc=None):
         state (ndarray): initial state for the task (1, xdim)
 
     Output:
-        actions (ndarray): (T, nbatch, udim)
-        feats (DictList): (nfeats, nbatch, T)
-        feats_sum (DictList): (nfeats, nbatch)
-        violations (DictList): (nvios, nbatch, T)
+        actions (ndarray): (nbatch, T, udim)
+        feats (DictList): nfeats * (nbatch, T)
+        feats_sum (DictList): nfeats * (nbatch,)
+        violations (DictList): nvios * (nbatch, T)
 
     """
     feats = []
@@ -101,7 +101,7 @@ def collect_trajs(list_ws, state, controller, runner, desc=None):
     batch_states = onp.repeat(state, num_ws, axis=0)
     batch_ws = DictList(list_ws)
 
-    ## acs (T, nbatch, udim)
+    ## acs (nbatch, T, udim)
     actions = controller(batch_states, weights=batch_ws)
     ## xs (T, nbatch, xdim), costs (nbatch)
     xs, costs, info = runner(batch_states, actions, weights=batch_ws)

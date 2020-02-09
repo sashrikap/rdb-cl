@@ -11,9 +11,10 @@ FEATURE_KEYS:
 - speed
 - control
 FIXED_TASK_SEED: 0
+GCP_LABEL: ird_extendnorm_noacross
 HIST_BINS: 200
 HORIZON: 10
-IRD_EXP_MODE: ird_convergence_true_w_prior_tasks_extendnorm_noacross
+IRD_EXP_MODE: ird_convergence_true_w_prior_tasks_onenorm
 IRD_PROPOSAL_VAR: 0.1
 MAX_WEIGHT: 20.0
 NORMALIZED_KEY: dist_cars
@@ -31,6 +32,6 @@ NUM_VISUALIZE_TASKS: 1024
 NUM_WARMUPS: 200
 PARALLEL: true
 RANDOM_KEYS:
-- 0
+- 3
 SAVE_NAME: '200206'
 USER_TRUE_W: false

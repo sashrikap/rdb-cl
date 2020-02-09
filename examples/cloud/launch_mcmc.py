@@ -19,12 +19,9 @@ def launch(params_dict):
         mounts = [local_mnt]
     else:
         gcp_label = ""
-        if "RANDOM_KEYS" in params_dict and "IRD_EXP_MODE" in params_dict:
+        if "RANDOM_KEYS" in params_dict and "GCP_LABEL" in params_dict:
             key_str = "_".join([str(k) for k in params_dict["RANDOM_KEYS"]])
-            gcp_label = f"{params_dict['IRD_EXP_MODE']}_{key_str}"
-        # if "RANDOM_KEYS" in params_dict and "DESIGNER_EXP_MODE" in params_dict:
-        #     key_str = "_".join([str(k) for k in params_dict["RANDOM_KEYS"]])
-        #     gcp_label = f"{params_dict['DESIGNER_EXP_MODE']}_{key_str}"
+            gcp_label = f"{params_dict['GCP_LABEL']}_{key_str}"
 
         launch_mode = mode.GCPMode(
             zone="us-west1-a",

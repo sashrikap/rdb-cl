@@ -185,24 +185,29 @@ class Runner(object):
         """Run optimization.
 
         Args:
-            x0 (ndarray): (nbatch, xdim)
-            actions (ndarray), (T, nbatch, udim)
+            x0 (ndarray): initial states
+                shape (nbatch, xdim)
+            actions (ndarray): actions
+                shape (nbatch, T, udim)
             batch (bool), batch mode. If `true`, weights are batched
                 If `false`, weights are not batched
 
         Return:
-            xs (ndarray): (T, nbatch, xdim)
+            xs (ndarray): all trajectory states
+                shape (nbatch, T, xdim)
             cost_sum: (nbatch, )
             info (dict): rollout info
-                info['costs']: key -> (nbatch, T)
-                info['feats']: key -> DictList(nbatch, T)
-                info['feats_sum']: key -> DictList(nbatch, )
-                info['violations']: key -> DictList(nbatch, T)
-                info['vios_sum']: key -> DictList(nbatch,)
-                info['metadata']: key -> DictList(nbatch, T)
+
+            info['costs'] (DictList): nfeats * (nbatch, T)
+            info['feats'] (DictList): nfeats * (nbatch, T)
+            info['feats_sum'] (DictList): nfeats * (nbatch, )
+            info['violations'] (DictList): ncons * (nbatch, T)
+            info['vios_sum'] (DictList): ncons * (nbatch,)
+            info['metadata'] (DictList): nmeta * (nbatch, T)
 
         """
         assert self._roll_costs is not None, "Cost function improperly defined"
+
         weights_arr = (
             DictList(weights, expand_dims=not batch)
             .prepare(self._env.features_keys)
@@ -224,10 +229,18 @@ class Runner(object):
             t_compile = time()
 
         # Rollout
+        #  shape (nbatch, T, udim) -> (T, nbatch, udim)
+        actions = actions.swapaxes(0, 1)
+        #  shape (T, nbatch, xdim)
         xs = self._roll_forward(x0, actions)
-        costs = self._roll_costs(x0, actions, weights_arr).T
-        feats = self._roll_features(x0, actions)
-        feats = DictList(feats).transpose()
+        #  shape (T, nbatch,)
+        costs = self._roll_costs(x0, actions, weights_arr)
+        #  shape (nbatch, T,)
+        costs = costs.swapaxes(0, 1)
+        #  shape nfeats * (T, nbatch)
+        feats = DictList(self._roll_features(x0, actions))
+        #  shape nfeats * (nbatch, T)
+        feats = feats.transpose()
 
         # Track JIT recompile
         if t_compile is not None:
@@ -236,11 +249,18 @@ class Runner(object):
             )
 
         # Compute features
-        cost_sum = onp.sum(costs, axis=1)
+        #  shape (nbatch, )
+        cost_sum = costs.sum(axis=1)
+        #  shape nfeats * (nbatch,)
         feats_sum = feats.sum(axis=1)
+        #  shape ncons * (T, nbatch,)
         violations = DictList(self._env.constraints_fn(xs, actions))
+        violations = violations.transpose()
+        #  shape ncons * (nbatch, T,)
         vios_sum = violations.sum(axis=1)
+        #  shape nneta * (T, nbatch,)
         metadata = DictList(self._env.metadata_fn(xs, actions))
+        metadata = metadata.transpose()
 
         # DictList conveniently deals with list of dicts
         info = {}

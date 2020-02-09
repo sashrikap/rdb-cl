@@ -29,13 +29,14 @@ class DictList(dict):
                 'speed': ndarray(nbatch, 1)
             })
         >>> len(weights) = nbatch
-        >>> weights.shape = (3, nbatch, 1)
+        >>> weights.shape = (nbatch, 1)
+        >>> weights.num_keys = 3
         >>> weights.append({
                 'dist_cars': 1,
                 'dist_obj': 2,
                 'speed': 3,
             })
-        >>> weights.shape = (4, nbatch, 1)
+        >>> weights.shape = (nbatch + 1, 1)
         >>> weights[3] = {
                 'dist_cars': 1,
                 'dist_obj': 2,
@@ -51,7 +52,8 @@ class DictList(dict):
                 'speed': ndarray(nbatch, T, 1)
             })
         >>> len(features) = nbatch
-        >>> features.shape = (3, nbatch, T, 1)
+        >>> features.shape = (nbatch, T, 1)
+        >>> features.num_keys = 3
         >>> features[2] = {
                 'dist_cars': ndarray(T, 1),
                 'dist_obj': ndarray(T, 1),
@@ -134,14 +136,21 @@ class DictList(dict):
 
     @property
     def shape(self):
-        """Return (nkeys, nbatch, dim, ...)"""
+        """Return (nbatch, dim, ...)"""
         self._assert_shape()
         keys = list(self.keys())
         if len(keys) == 0:
             return ()
         else:
             first_shape = self[keys[0]].shape
-            return tuple([len(keys)] + list(first_shape))
+            return first_shape
+
+    @property
+    def num_keys(self):
+        """Return nkeys."""
+        self._assert_shape()
+        keys = list(self.keys())
+        return len(keys)
 
     def append(self, dict_, axis=0):
         """Append dictionary to end."""
@@ -168,7 +177,7 @@ class DictList(dict):
     def tile(self, num, axis=0):
         """Tile num times along existing 0-th dimension."""
         data = OrderedDict()
-        assert axis + 1 < len(self.shape)
+        assert axis < len(self.shape)
         for key, val in self.items():
             new_shape = [1] * len(val.shape)
             new_shape[axis] = num
@@ -178,7 +187,6 @@ class DictList(dict):
     def expand_dims(self, axis=0):
         """Expand dimension."""
         data = OrderedDict()
-        assert axis < len(self.shape)
         for key, val in self.items():
             data[key] = onp.expand_dims(val, axis=axis)
         return DictList(data)
@@ -202,7 +210,7 @@ class DictList(dict):
         data = OrderedDict()
         for key, val in self.items():
             data[key] = onp.sum(val, axis=axis, keepdims=keepdims)
-        if len(shape) > 2:
+        if len(shape) > 1:
             # value >= 2D, resulting sum >= 1D
             return DictList(data)
         else:
@@ -274,13 +282,13 @@ class DictList(dict):
     def mean(self, axis=1, keepdims=False):
         """Average each value by axis."""
         shape = self.shape
-        assert axis >= 0 and axis + 1 < len(
+        assert axis >= 0 and axis < len(
             shape
         ), f"Cannot average axis {axis}, current DictList: nkeys={shape[0]} value {shape[1:]}"
         data = OrderedDict()
         for key, val in self.items():
             data[key] = onp.mean(val, axis=axis, keepdims=keepdims)
-        if len(shape) > 2:
+        if len(shape) > 1:
             # value >= 2D, resulting mean >= 1D
             return DictList(data)
         else:
@@ -308,7 +316,7 @@ class DictList(dict):
         out = OrderedDict()
         for key in features_keys:
             if key not in self.keys():
-                out[key] = onp.zeros(self.shape[1:])
+                out[key] = onp.zeros(self.shape)
             else:
                 out[key] = self[key]
         return DictList(out)
@@ -334,7 +342,7 @@ class DictList(dict):
     def from_array(self, array):
         """Load data from array"""
         this_keys = list(self.keys())
-        assert len(this_keys) == array.shape[0]
+        assert len(this_keys) == self.num_keys
         for i in range(len(this_keys)):
             self[this_keys[i]] = array[i]
 
@@ -367,7 +375,7 @@ class DictList(dict):
             idx = key
             for k, val in self.items():
                 output[k] = val[idx]
-            if len(self.shape) == 2:
+            if len(self.shape) == 1:
                 if isinstance(key, int):
                     # normal dict
                     return output

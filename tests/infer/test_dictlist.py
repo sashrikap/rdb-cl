@@ -14,20 +14,23 @@ def test_dict_init():
     w = DictList(data, expand_dims=True)
     result = {"a": [1], "b": [1]}
     assert len(w) == 1
-    assert w.shape == (2, 1)
+    assert w.shape == (1,)
+    assert w.num_keys == 2
     assert_equal(result, w)
 
     data = {"a": [1], "b": [1]}
     w = DictList(data, expand_dims=True)
     result = {"a": [[1]], "b": [[1]]}
-    assert w.shape == (2, 1, 1)
+    assert w.shape == (1, 1)
+    assert w.num_keys == 2
     assert_equal(result, w)
 
     data = {"a": [1], "b": [1]}
     w = DictList(data)
     result = {"a": [1], "b": [1]}
     assert len(w) == 1
-    assert w.shape == (2, 1)
+    assert w.shape == (1,)
+    assert w.num_keys == 2
     assert_equal(result, w)
 
 
@@ -37,37 +40,43 @@ def test_list_init():
     w = DictList(data)
     result = {"a": [1, 1], "b": [1, 2]}
     assert len(w) == 2
-    assert w.shape == (2, 2)
+    assert w.shape == (2,)
+    assert w.num_keys == 2
     assert_equal(result, w)
 
 
 def test_list_append():
     data = {"a": 1, "b": 1}
     w = DictList(data, expand_dims=True)
-    assert w.shape == (2, 1)
+    assert w.shape == (1,)
+    assert w.num_keys == 2
     assert len(w) == 1
 
     w.append({"a": 1, "b": 2})
     result = {"a": onp.array([1, 1]), "b": onp.array([1, 2])}
     assert len(w) == 2
-    assert w.shape == (2, 2)
+    assert w.shape == (2,)
+    assert w.num_keys == 2
     assert_equal(result, w)
 
     w.append({"a": 2, "b": 3})
     result = {"a": onp.array([1, 1, 2]), "b": onp.array([1, 2, 3])}
     assert len(w) == 3
-    assert w.shape == (2, 3)
+    assert w.shape == (3,)
+    assert w.num_keys == 2
     assert_equal(result, w)
 
     w.append({"a": 0, "b": 4})
     result = {"a": onp.array([1, 1, 2, 0]), "b": onp.array([1, 2, 3, 4])}
     assert len(w) == 4
-    assert w.shape == (2, 4)
+    assert w.shape == (4,)
+    assert w.num_keys == 2
     assert_equal(result, w)
 
     w_concat = w.concat(w)
     assert len(w_concat) == 8
-    assert w_concat.shape == (2, 8)
+    assert w_concat.shape == (8,)
+    assert w.num_keys == 2
     result_concat = {"a": onp.tile(result["a"], 2), "b": onp.tile(result["b"], 2)}
     assert_equal(result_concat, w_concat)
     assert_equal(result, w)
@@ -77,7 +86,8 @@ def test_list_index():
     data = [{"a": 1, "b": 1}, {"a": 1, "b": 2}, {"a": 4, "b": 3}]
     w = DictList(data)
     assert len(w) == 3
-    assert w.shape == (2, 3)
+    assert w.shape == (3,)
+    assert w.num_keys == 2
     out = w[0]
     result = {"a": 1, "b": 1}
     assert_equal(out, result)
@@ -93,7 +103,8 @@ def test_list_index():
     data = [{"a": 1, "b": 1}, {"a": 1, "b": 2}, {"a": 4, "b": 3}]
     w = DictList(data)
     assert len(w) == 3
-    assert w.shape == (2, 3)
+    assert w.shape == (3,)
+    assert w.num_keys == 2
     out = w[[True, False, True]]
     result = {"a": [1, 4], "b": [1, 3]}
     assert_equal(out, result)
@@ -103,7 +114,8 @@ def test_list_index():
     data = [{"a": 1, "b": 1}, {"a": 1, "b": 2}, {"a": 4, "b": 3}]
     w = DictList(data)
     assert len(w) == 3
-    assert w.shape == (2, 3)
+    assert w.shape == (3,)
+    assert w.num_keys == 2
     out = w[0]
     result = {"a": 1, "b": 1}
     assert_equal(out, result)
@@ -113,7 +125,8 @@ def test_list_sort():
     data = [{"b": 1, "a": 1}, {"b": 1, "a": 2}]
     w = DictList(data)
     assert len(data) == 2
-    assert w.shape == (2, 2)
+    assert w.shape == (2,)
+    assert w.num_keys == 2
     w1 = w.sort_by_keys()
     for k1, k2 in zip(list(w1.keys()), ["a", "b"]):
         assert k1 == k2
@@ -128,7 +141,8 @@ def test_prepare():
     w = DictList(data)
     keys = ["a", "b", "c"]
     w = w.prepare(keys)
-    assert w.shape == (3, 2)
+    assert w.shape == (2,)
+    assert w.num_keys == 3
     result = {"a": onp.array([1, 2]), "b": onp.array([1, 1]), "c": onp.array([0, 0])}
     assert_equal(w, result)
 
@@ -136,9 +150,11 @@ def test_prepare():
 def test_numpy_array():
     data = [{"b": 1, "a": 1}, {"b": 1, "a": 2}]
     w = DictList(data)
-    assert w.shape == (2, 2)
+    assert w.shape == (2,)
+    assert w.num_keys == 2
     np_array = w.numpy_array()
     assert np_array.shape == (2, 2)
+    assert w.num_keys == 2
     new_data = DictList([{"b": 1, "a": 1}])
     new_data.from_array(np_array)
     assert_equal(w, new_data)
@@ -147,7 +163,8 @@ def test_numpy_array():
 def test_onumpy_array():
     data = [{"b": 1, "a": 1}, {"b": 1, "a": 2}]
     w = DictList(data)
-    assert w.shape == (2, 2)
+    assert w.shape == (2,)
+    assert w.num_keys == 2
     np_array = w.numpy_array()
     assert np_array.shape == (2, 2)
     new_data = DictList([{"b": 1, "a": 1}])
@@ -160,7 +177,8 @@ def test_sum():
     w = DictList(data, expand_dims=True)
     w.append({"a": [2, 1], "b": [3, 3]})
     result = {"a": [[1, 2], [2, 1]], "b": [[1, 3], [3, 3]]}
-    assert w.shape == (2, 2, 2)
+    assert w.shape == (2, 2)
+    assert w.num_keys == 2
     assert_equal(result, w)
 
     w_sum1 = w.sum(axis=1)
@@ -177,7 +195,8 @@ def test_mean():
     w = DictList(data, expand_dims=True)
     w.append({"a": [2, 1], "b": [3, 3]})
     result = {"a": [[1, 2], [2, 1]], "b": [[1, 3], [3, 3]]}
-    assert w.shape == (2, 2, 2)
+    assert w.shape == (2, 2)
+    assert w.num_keys == 2
     assert_equal(result, w)
 
     w_sum1 = w.sum(axis=1)
@@ -209,7 +228,8 @@ def test_transpose():
     w = DictList(data, expand_dims=True)
     w.append({"a": [1, 1], "b": [3, 3]})
     result = {"a": [[1, 1], [2, 1]], "b": [[1, 3], [2, 3]]}
-    assert w.shape == (2, 2, 2)
+    assert w.shape == (2, 2)
+    assert w.num_keys == 2
     assert_equal(result, w.transpose())
 
 

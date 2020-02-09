@@ -110,19 +110,36 @@ def build_features(udim, horizon, roll_forward, f_feat):
     Args:
         x (ndarray): initial state
         us (ndarray): all actions
-        roll_forward (fn): full-trajectory forward function, `x_next = f_dyn(x, u)`
-        f_feat (fn): one step feature function `feats = f_feat(x, u)`
+        roll_forward (fn): full-trajectory forward function
+            usage: `x_next = f_dyn(x, u)`
+        f_feat (fn): one step feature function
+            usage: `feats = f_feat(x, u)`
 
     Note:
         * udim, horizon cannot be changed later
 
     Output:
-        feats (dict): `feat_key[dist_car] = array(T, feat_dim)`
+        feats (dict)
+        feat_key["dist_car"] = array(T, feat_dim)
 
     """
 
     @jax.jit
     def roll_features(x, us):
+        """Calculate trajectory features
+
+        Args:
+            x (ndarray): (nbatch, xdim,)
+            us (ndarray): (horizon, nbatch, xdim)
+
+        Output:
+            feats (OrderedDict): nfeats * (horizon, nbatch)
+
+        Note:
+            * leverages `jax.vmap`'s awesome ability to map & concat dictionaries
+
+        """
+
         xs = roll_forward(x, us)
         feats = []
         vf_feat = jax.vmap(f_feat)

@@ -83,7 +83,10 @@ def test_collect_trajs(num_weights):
 
     actions, feats, feats_sum, vios = collect_trajs(weights, state, optimizer, runner)
     udim = 2
-    assert actions.shape == (T, num_weights, udim)
-    assert feats.shape == (nfeatures, num_weights, T)
-    assert feats_sum.shape == (nfeatures, num_weights)
-    assert vios.shape == (nvios, num_weights, T)
+    assert actions.shape == (num_weights, T, udim)
+    assert feats.shape == (num_weights, T)
+    assert feats.num_keys == nfeatures
+    assert feats_sum.shape == (num_weights,)
+    assert feats_sum.num_keys == nfeatures
+    assert vios.shape == (num_weights, T)
+    assert vios.num_keys == nvios

@@ -46,4 +46,4 @@ def test_combined_full(batch):
     all_acs = onp.array(all_acs)
     cons_out = cons_fn(all_states, all_acs)
     for key, val in cons_out.items():
-        assert val.shape == (batch, horizon)
+        assert val.shape == (horizon, batch)

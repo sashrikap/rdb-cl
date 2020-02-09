@@ -165,8 +165,8 @@ def test_scipy_mpc(nbatch):
     traj_all, costs_all, info_all = runner(
         states, acs_all, weights=weights_all, batch=True
     )
-    assert acs_all.shape == (horizon, nbatch, udim)
-    assert traj_all.shape == (horizon, nbatch, xdim)
+    assert acs_all.shape == (nbatch, horizon, udim)
+    assert traj_all.shape == (nbatch, horizon, xdim)
     assert info_all["costs"].shape == (nbatch, horizon)
     for key, val in info_all["feats"].items():
         assert val.shape == (nbatch, horizon)

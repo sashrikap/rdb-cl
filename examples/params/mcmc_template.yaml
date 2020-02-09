@@ -28,7 +28,7 @@ USER_TRUE_W: False
 
 ## Full sampling
 NUM_WARMUPS: 200
-NUM_NORMALIZERS: 2000
+NUM_NORMALIZERS: 100
 NUM_SAMPLES: 2000
 NUM_EVAL_MAP: 2
 SAVE_NAME: "200206"
@@ -39,8 +39,9 @@ NUM_DESIGNERS: 200
 # DESIGNER_EXP_MODE: "designer_convergence_random_w_random_tasks"
 DESIGNER_EXP_MODE: "designer_convergence_true_w_more_features"
 
-# IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks_onenorm_noacross"
-IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks_extendnorm_noacross"
+GCP_LABEL: "ird_extendnorm_noacross"
+IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks_onenorm_across_beta_100_var_0.25"
+# IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks_onenorm_beta_800"
 # IRD_EXP_MODE: "ird_convergence_true_w_random_tasks"
 # IRD_EXP_MODE: "ird_convergence_random_w_random_tasks"
 # IRD_EXP_MODE: "ird_convergence_true_w_more_features"
@@ -64,9 +65,9 @@ IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks_extendnorm_noacross"
 ## Plotting & weight scaling
 MAX_WEIGHT: 20.0
 HIST_BINS: 200
-BETA: 16
+BETA: 100
 DESIGNER_PROPOSAL_VAR: 1.
-IRD_PROPOSAL_VAR: 0.1
+IRD_PROPOSAL_VAR: 0.2
 
 ## MPC Specific
 HORIZON: 10

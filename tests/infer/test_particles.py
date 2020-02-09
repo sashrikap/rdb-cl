@@ -71,7 +71,8 @@ def test_features(num_weights):
     task = env.all_tasks[0]
     feats = ps.get_features(task, str(task))
     nfeats = len(env.features_keys)
-    assert feats.shape == (nfeats, num_weights, T)
+    assert feats.shape == (num_weights, T)
+    assert feats.num_keys == nfeats
 
 
 @pytest.mark.parametrize("num_weights", [1, 5])
@@ -80,7 +81,8 @@ def test_features_sum(num_weights):
     task = env.all_tasks[0]
     feats_sum = ps.get_features_sum(task, str(task))
     nfeats = len(env.features_keys)
-    assert feats_sum.shape == (nfeats, num_weights)
+    assert feats_sum.shape == (num_weights,)
+    assert feats_sum.num_keys == nfeats
 
 
 @pytest.mark.parametrize("num_weights", [1, 5])
@@ -89,7 +91,8 @@ def test_violations(num_weights):
     task = env.all_tasks[0]
     vios_sum = ps.get_violations(task, str(task))
     nvios = len(env.constraints_keys)
-    assert vios_sum.shape == (nvios, num_weights)
+    assert vios_sum.shape == (num_weights,)
+    assert vios_sum.num_keys == nvios
 
 
 @pytest.mark.parametrize("num_weights", [1, 5])
@@ -98,7 +101,7 @@ def test_actions(num_weights):
     task = env.all_tasks[0]
     udim = 2
     actions = ps.get_actions(task, str(task))
-    assert actions.shape == (num_weights, T, udim)
+    assert actions.shape == (T, num_weights, udim)
 
 
 @pytest.mark.parametrize("num_weights", [1, 5])
@@ -138,7 +141,7 @@ def test_compare_with(num_weights):
     assert diff_vios.shape == (num_weights,)
 
 
-@pytest.mark.parametrize("num_weights", list(itertools.product([10, 20])))
+@pytest.mark.parametrize("num_weights", [10, 20])
 def test_resample(num_weights):
     ps = all_particles[num_weights]
     resample = ps.resample(probs=onp.ones(num_weights))

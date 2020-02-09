@@ -25,7 +25,7 @@ def build_offtrack(env):
         actions (ndarray): (T, nbatch, udim)
 
     Return:
-        * offtrack (ndarray): (nbatch, T) boolean
+        * offtrack (ndarray): (T, nbatch) boolean
 
     Note:
         * Needs to know car shape a-priori
@@ -42,7 +42,7 @@ def build_offtrack(env):
         # feats (T, nbatch, nfence, 1)
         feats = vfn(states, actions)
         assert len(feats.shape) == 4
-        return np.any(np.abs(feats) < threshold, axis=(2, 3)).swapaxes(0, 1)
+        return np.any(np.abs(feats) < threshold, axis=(2, 3))
 
     return func
 
@@ -55,7 +55,7 @@ def build_collision(env):
         states (ndarray): (T, nbatch, xdim)
 
     Return:
-        * collision (ndarray): (nbatch, T) boolean
+        * collision (ndarray): (T, nbatch) boolean
 
     Note:
         * Needs to know car shape a-priori
@@ -72,7 +72,7 @@ def build_collision(env):
         # feats: (T, nbatch, ncars, 2)
         feats = vfn(states, actions)
         assert len(feats.shape) == 4
-        return np.any(np.abs(feats) < threshold, axis=(2, 3)).swapaxes(0, 1)
+        return np.any(np.abs(feats) < threshold, axis=(2, 3))
 
     return func
 
@@ -85,7 +85,7 @@ def build_uncomfortable(env, max_actions):
         actions (ndarray): (T, nbatch, udim)
 
     Return:
-        * uncomfortable (ndarray): (nbatch, T) boolean
+        * uncomfortable (ndarray): (T, nbatch) boolean
 
     """
 
@@ -93,7 +93,7 @@ def build_uncomfortable(env, max_actions):
     def func(states, actions):
         assert len(states.shape) == 3
         assert len(actions.shape) == 3
-        return np.any(np.abs(actions) > max_actions, axis=2).swapaxes(0, 1)
+        return np.any(np.abs(actions) > max_actions, axis=2)
 
     return func
 
@@ -106,7 +106,7 @@ def build_overspeed(env, max_speed):
         actions (ndarray): (T, nbatch, udim)
 
     Return:
-        * overspeed (ndarray): (nbatch, T) boolean
+        * overspeed (ndarray): (T, nbatch) boolean
 
     """
     vfn = jax.vmap(env.raw_features_dict["speed"])
@@ -118,7 +118,7 @@ def build_overspeed(env, max_speed):
         # feats (T, nbatch, 1)
         feats = vfn(states, actions)
         assert len(feats.shape) == 3
-        return np.any(feats > max_speed, axis=2).swapaxes(0, 1)
+        return np.any(feats > max_speed, axis=2)
 
     return func
 
@@ -131,7 +131,7 @@ def build_underspeed(env, min_speed):
         actions (ndarray): (T, nbatch, udim)
 
     Return:
-        * underspeed (ndarray): (nbatch, T) boolean
+        * underspeed (ndarray): (T, nbatch) boolean
 
     """
     vfn = jax.vmap(env.raw_features_dict["speed"])
@@ -143,7 +143,7 @@ def build_underspeed(env, min_speed):
         # feats (T, nbatch, 1)
         feats = vfn(states, actions)
         assert len(feats.shape) == 3
-        return np.any(feats < min_speed, axis=2).swapaxes(0, 1)
+        return np.any(feats < min_speed, axis=2)
 
     return func
 
@@ -160,7 +160,7 @@ def build_wronglane(env, lane_idx):
         lane_idx (tuple): wrong lane's index for `env.lanes[idx]`
 
     Return:
-        * wronglane (ndarray): (nbatch, T) boolean
+        * wronglane (ndarray): (T, nbatch) boolean
 
     """
     vfn = jax.vmap(env.raw_features_dict["dist_lanes"])
@@ -172,9 +172,7 @@ def build_wronglane(env, lane_idx):
         # feats (T, nbatch, nlanes, 1)
         feats = vfn(states, actions)
         assert len(feats.shape) == 4
-        return np.any(
-            feats[:, :, lane_idx, None, :] < env.lane_width / 2, axis=(2, 3)
-        ).swapaxes(0, 1)
+        return np.any(feats[:, :, lane_idx, None, :] < env.lane_width / 2, axis=(2, 3))
 
     return func
 
@@ -188,7 +186,7 @@ def build_overtake(env, car_idx):
         lane_idx (tuple): wrong lane's index for `env.lanes[idx]`
 
     Return:
-        * overtake (ndarray): (nbatch, T) boolean
+        * overtake (ndarray): (T, nbatch) boolean
 
     """
     main_y_idx = 9
@@ -206,6 +204,6 @@ def build_overtake(env, car_idx):
         # feats (T, nbatch, 1)
         feats = vfn(states, actions)
         assert len(feats.shape) == 3
-        return np.any(feats, axis=2).swapaxes(0, 1)
+        return np.any(feats, axis=2)
 
     return func

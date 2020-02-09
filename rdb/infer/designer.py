@@ -214,7 +214,7 @@ class Designer(PGM):
 
             prior_probs = self._prior.log_prob(sample_ws)
             sample_ws = sample_ws.prepare(self._env.features_keys)
-            nfeats = sample_ws.shape[0]
+            nfeats = sample_ws.num_keys
             nchain = len(sample_ws)
             ntasks = len(tasks)
 

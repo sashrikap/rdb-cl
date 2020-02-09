@@ -136,7 +136,7 @@ def test_nonlinear_features_full(batch, n_cars):
 
 
 @pytest.mark.parametrize("batch,n_cars", list(itertools.product([1, 2, 10], [2, 4, 5])))
-def test_nonlinear_featrues_cost(batch, n_cars):
+def test_nonlinear_features_cost(batch, n_cars):
     dyn_fn = build_dynamics(n_cars)
     feats_dict, feats_fn = build_features(dyn_fn, n_cars)
     nlr_dict, nlr_fn = build_nonlinear(feats_dict, n_cars)

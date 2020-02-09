@@ -134,13 +134,17 @@ class OptimizerMPC(object):
         """Run Optimizer.
 
         Args:
-            x0 (ndarray), initial state (nbatch, xdim)
+            x0 (ndarray), initial state
+                shape (nbatch, xdim)
             weights (dict/DictList), weights
+                shape nfeats * (nbatch)
+            us0 (ndarray), initial actions
+                shape (nbatch, T, xdim)
             batch (bool), batch mode. If `true`, weights and output are batched
-                If `false`, weights and output are not batched
 
         Output:
-            acs (ndarray): (T, nbatch, udim)
+            acs (ndarray): actions
+                shape (nbatch, T, udim)
 
         """
         weights_arr = (
@@ -148,17 +152,12 @@ class OptimizerMPC(object):
             .prepare(self._features_keys)
             .numpy_array()
         )
-        try:
-            assert len(weights_arr.shape) == 2
-        except:
-            import pdb
-
-            pdb.set_trace()
+        assert len(weights_arr.shape) == 2
         n_batch = weights_arr.shape[1]
 
         # Track JIT recompile
         t_compile = None
-        u_shape = (self._horizon, n_batch, self._udim)
+        u_shape = (n_batch, self._horizon, self._udim)
         if self._u_shape is None:
             print(f"JIT - Optimizer first compile: u0 {u_shape}")
             self._u_shape = u_shape
@@ -174,10 +173,12 @@ class OptimizerMPC(object):
         if us0 is None:
             if init == "zeros":
                 us0 = np.zeros(u_shape)
-            elif init == "random":
-                us0 = np.random(key, u_shape)
             else:
                 raise NotImplementedError(f"Initialization undefined for '{init}'")
+
+        # Reshape to T-first
+        #  shape (nbatch, T, u_dim) -> (T, nbatch, u_dim)
+        us0 = us0.swapaxes(0, 1)
 
         # Optimal Control
         if self._replan:
@@ -224,7 +225,11 @@ class OptimizerMPC(object):
                     f"JIT - Optimizer finish compile in {time() - t_compile:.3f}s: u0 {self._u_shape}"
                 )
 
-        return np.array(opt_u)
+        #  shape (T, nbatch, udim)
+        opt_us = np.array(opt_u)
+        #  shape (nbatch, T, udim)
+        opt_us = opt_us.swapaxes(0, 1)
+        return opt_us
 
 
 class OptimizerScipy(OptimizerMPC):

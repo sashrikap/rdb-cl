@@ -132,7 +132,8 @@ def dict_kernel(obs, state, tasks, xdim):
     out = (obs - state_).reshape((nbatch, ntasks, xdim))
     # sum across task
     out = out.sum(axis=1)
-    assert out.shape == (weight_dim, nbatch, xdim)
+    assert out.shape == (nbatch, xdim)
+    assert out.num_keys == weight_dim
     # sum across xdim
     out = out.sum(axis=1).sum_values()
     return out
@@ -182,12 +183,14 @@ def test_mh_algo_dict(xdim, num_chains, num_tasks):
     )
     infer.update_key(key)
     samples, info = infer.sample(obs, init_state=state, tasks=tasks)
-    assert samples.shape == (weight_dim, num_samples, xdim)
+    assert samples.shape == (num_samples, xdim)
+    assert samples.num_keys == weight_dim
     for samples_i in info["all_chains"]:
-        assert samples_i.shape[0] == weight_dim
-        assert samples_i.shape[2] == xdim
+        assert samples_i.num_keys == weight_dim
+        assert samples_i.shape[1] == xdim
     visualize_chains(
         info["all_chains"],
+        info["rates"],
         fig_dir=f"data/test/mcmc",
         title=f"test_mcmc_xdim_{xdim}_chains_{num_chains}_tasks_{num_tasks}",
     )
