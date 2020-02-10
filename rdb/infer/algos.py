@@ -180,7 +180,7 @@ class MetropolisHasting(Inference):
 
         ## Sample next state (nbatch, xdim)
         next_state = self._proposal(state)
-        next_logpr = self._kernel(obs, next_state, **kwargs)
+        next_logpr = onp.array(self._kernel(obs, next_state, **kwargs))
         logp_ratio = onp.array(next_logpr - logpr)
 
         ## Accept or not (nbatch,)
@@ -191,12 +191,19 @@ class MetropolisHasting(Inference):
             print(f"next {next_logpr} curr {logpr} ratio {logp_ratio} flip {coin_flip}")
 
         accept = coin_flip < onp.array(logp_ratio)
+
+        ## Check and mask out -inf
+        pos_inf = onp.logical_and(onp.isinf(next_logpr), next_logpr > 0)
+        neg_inf = onp.isneginf(next_logpr)
+        assert not any(pos_inf)
+        next_logpr[neg_inf] = 0.0
+
+        ## Accept for next state
         not_accept = onp.logical_not(accept)
         #  shape (nbatch, )
-        next_logpr = next_logpr * accept + logpr *not_accept
+        next_logpr = next_logpr * accept + logpr * not_accept
         #  shape (nbatch, xdim)
         next_state = next_state * accept + state * not_accept
-
         assert next_logpr.shape == (self._num_chains,)
         assert next_state.shape == state.shape
         return accept, next_state, next_logpr

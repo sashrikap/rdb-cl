@@ -175,12 +175,12 @@ class OptimizerMPC(object):
         t_compile = None
         u_shape = (n_batch, self._horizon, self._udim)
         if self._u_shape is None:
-            print(f"JIT - Controller: {self._name}")
+            print(f"JIT - Controller <{self._name}>")
             print(f"JIT - Controller first compile: u0 {u_shape}")
             self._u_shape = u_shape
             t_compile = time()
         elif u_shape != self._u_shape:
-            print(f"JIT - Controller: {self._name}")
+            print(f"JIT - Controller <{self._name}>")
             print(
                 f"JIT - Controller recompile: u0 {u_shape}, previously {self._u_shape}"
             )

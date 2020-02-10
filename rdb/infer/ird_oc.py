@@ -339,6 +339,10 @@ class IRDOptimalControl(PGM):
             #  shape (ntasks, nchain, T, acs_dim)
             ird_us0 = ird_acs.repeat(nchain, axis=1)
             ird_truth.compute_tasks(tasks, us0=ird_us0)
+            # import pdb; pdb.set_trace()
+            # ird_truth_acs1 = ird_truth.get_actions(tasks)
+            # ird_truth2 = ird_truth._clone(ird_truth.weights)
+            # ird_truth_acs2 = ird_truth2.get_actions(tasks)
             #  shape (ntasks, nnorms, T, acs_dim)
             normal_us0 = ird_acs.repeat(nnorms, axis=1)
             #  weights shape nfeats * (nnorms,)
@@ -364,6 +368,7 @@ class IRDOptimalControl(PGM):
                 sample=sample_obs,
                 truth=sample_truth,
             )
+            # import pdb; pdb.set_trace()
             #  shape (ntasks * nchain,) -> (ntasks, nchain)
             sample_probs = sample_probs.reshape((ntasks, nchain))
 
@@ -383,7 +388,13 @@ class IRDOptimalControl(PGM):
             #  weights shape nfeats * (ntasks * nnorms_1,)
             normal_truth = normal.tile(ntasks).combine(ird_obs)
             #  shape (ntasks * nnorms_1,), Runs (ntasks * nnorms_1) times
-            normal_probs = self._designer._kernel(normal_true_ws, normal_obs_ws, normal_tasks, sample=normal_obs, truth=normal_truth)
+            normal_probs = self._designer._kernel(
+                normal_true_ws,
+                normal_obs_ws,
+                normal_tasks,
+                sample=normal_obs,
+                truth=normal_truth,
+            )
             #  shape (ntasks, nnorms_1,)
             normal_probs = normal_probs.reshape((ntasks, nnorms_1))
             #  shape (ntasks, nnorms_1,) -> (ntasks, )

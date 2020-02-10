@@ -97,8 +97,8 @@ def main(random_key):
         weight_params=weight_params,
         normalized_key=NORMALIZED_KEY,
         save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
-        exp_name=DESIGNER_EXP_MODE,
-        # exp_name=IRD_EXP_MODE,
+        # exp_name=DESIGNER_EXP_MODE,
+        exp_name=IRD_EXP_MODE,
     )
 
     ## Task sampling seed
@@ -122,8 +122,8 @@ def main(random_key):
     )
     """ Experiment """
     experiment.update_key(rng_key)
-    experiment.run_designer(DESIGNER_EXP_MODE)
-    # experiment.run_ird(IRD_EXP_MODE)
+    # experiment.run_designer(DESIGNER_EXP_MODE)
+    experiment.run_ird(IRD_EXP_MODE)
 
 
 if __name__ == "__main__":

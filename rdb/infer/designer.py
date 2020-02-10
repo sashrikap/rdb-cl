@@ -246,6 +246,7 @@ class Designer(PGM):
 
             assert len(batch_arr.shape) == len(normal_arr.shape) == 4
             # return batch_arr * normal_arr
+            # return batch_arr * normal_arr
             nfeats = len(batch_arr)
             sum_ = np.zeros(out_shape)
             sum_ = jax.lax.fori_loop(0, nfeats, _mult_add, sum_)
@@ -254,32 +255,44 @@ class Designer(PGM):
 
         @partial(jax.jit, static_argnums=(3,))
         def _batch_extend_fn(batch_arr, normal_arr, feats_arr, out_shape):
-            """Multiply, average append and logsumexp two very costly array in likelihood_fn.
+            """Multiply, average, append and logsumexp two very costly array in likelihood_fn.
 
             Args:
-                batch_arr (ndarray): (nfeats, 1, nbatch, 1)
-                normal_arr (ndarray): (nfeats, ntasks, 1, nnorms)
-                feats_arr (ndarray): (nfeats, ntasks, nbatch)
-                out_shape (tuple): (ntasks, nbatch, nnorms + 1)
+                batch_arr (ndarray): shape (nfeats, 1, nbatch, 1)
+                normal_arr (ndarray): shape (nfeats, ntasks, 1, nnorms)
+                feats_arr (ndarray): shape (nfeats, ntasks, nbatch)
+                out_shape (tuple): shape (ntasks, nbatch, nnorms + 1)
+
+            Output:
+                sum (ndarry): shape (ntasks, nbatch, nnorms + 1)
 
             """
 
             def _mult_add(i, sum_):
-                #  shape (tasks, nbatch, nnorms)
-                mul_ = np.multiply(batch_arr[i], normal_arr[i])
-                feat_ = np.expand_dims(feats_arr[i], axis=2)
-                return sum_ + np.concatenate([mul_, feat_], axis=2)
+                nbatch = feats_arr.shape[2]
+                #  shape (ntasks, nbatch, 1)
+                feats_arr_ = np.expand_dims(feats_arr[i], axis=2)
+                #  shape (ntasks, nbatch, nnorms)
+                normal_arr_ = normal_arr[i].repeat(nbatch, axis=1)
+                #  shape (ntasks, nbatch, nnorms + 1)
+                normal_ext_ = np.concatenate([normal_arr_, feats_arr_], axis=2)
+                #  shape (ntasks, nbatch, nnorms + 1)
+                mul_ = np.multiply(batch_arr[i], normal_ext_)
+                return sum_ + mul_
 
+            assert len(batch_arr) == len(normal_arr)
             assert len(batch_arr.shape) == len(normal_arr.shape) == 4
-            # return batch_arr * normal_arr
             nfeats = len(batch_arr)
             sum_ = np.zeros(out_shape)
+            #  shape (ntasks, nbatch, nnorms + 1)
             sum_ = jax.lax.fori_loop(0, nfeats, _mult_add, sum_)
             mean_arr = sum_ / nfeats
             return np_logsumexp(-beta * mean_arr, axis=2)
 
         def likelihood_fn(true_ws, sample_ws, tasks, sample=None, truth=None):
-            """Designer forward likelihood p(design_w | true_w).
+            """Main likelihood function. Used in Designer and Designer Inversion (IRD Kernel).
+
+            Designer forward likelihood p(design_w | true_w).
 
             Args:
                 true_ws (DictList): designer's true w in mind
@@ -343,6 +356,7 @@ class Designer(PGM):
 
             ## =================================================
             ## ======= Computing Denominator: normal_xxx =======
+            nnorms_1 = nnorms + 1
             #  shape nfeats * (ntasks, nbatch)
             truth_feats_sum = truth.get_features_sum(tasks)
             truth_feats_sum = truth_feats_sum.numpy_array()
@@ -356,13 +370,14 @@ class Designer(PGM):
             # normal_rews = _batch_fn(
             #     normal_truth, normal_feats_sum, (ntasks, nbatch, nnorms)
             # )
+            #  shape (ntasks, nbatch, nnorms_1)
             normal_rews = _batch_extend_fn(
                 normal_truth,
                 normal_feats_sum,
                 truth_feats_sum,
-                (ntasks, nbatch, nnorms + 1),
+                (ntasks, nbatch, nnorms_1),
             )
-            normal_rews -= onp.log(nnorms)
+            normal_rews -= onp.log(nnorms_1)
 
             assert sample_costs.shape == (nfeats, ntasks, nbatch)
             assert normal_rews.shape == (ntasks, nbatch)

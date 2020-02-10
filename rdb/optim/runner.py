@@ -221,12 +221,12 @@ class Runner(object):
         t_compile = None
         a_shape = actions.shape
         if self._a_shape is None:
-            print(f"JIT - Runner: {self._name}")
+            print(f"JIT - Runner <{self._name}>")
             print(f"JIT - Runner first compile: ac {a_shape}")
             self._a_shape = a_shape
             t_compile = time()
         elif actions.shape != self._a_shape:
-            print(f"JIT - Runner: {self._name}")
+            print(f"JIT - Runner <{self._name}>")
             print(
                 f"JIT - Runner recompile: ac {actions.shape}, previously {self._a_shape}"
             )
