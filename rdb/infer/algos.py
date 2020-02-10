@@ -179,34 +179,26 @@ class MetropolisHasting(Inference):
         assert len(state) == self._num_chains
 
         ## Sample next state (nbatch, xdim)
-        with Profiler("MH Proposal"):
-            next_state = self._proposal(state)
-        with Profiler("MH Kernel"):
-            next_logpr = self._kernel(obs, next_state, **kwargs)
-        with Profiler("MH log prob"):
-            next_logpr += self._prior.log_prob(next_state)
+        next_state = self._proposal(state)
+        next_logpr = self._kernel(obs, next_state, **kwargs)
+        logp_ratio = onp.array(next_logpr - logpr)
 
-        with Profiler("MH others", verbose=False):
-            logp_ratio = onp.array(next_logpr - logpr)
+        ## Accept or not (nbatch,)
+        coin_flip = onp.log(self._coin_flip())
 
-            ## Accept or not (nbatch,)
-            coin_flip = onp.log(self._coin_flip())
+        # if False:
+        if True:
+            print(f"next {next_logpr} curr {logpr} ratio {logp_ratio} flip {coin_flip}")
 
-            if False:
-                # if True:
-                print(
-                    f"next {next_logpr} curr {logpr} ratio {logp_ratio} flip {coin_flip}"
-                )
+        accept = coin_flip < onp.array(logp_ratio)
+        not_accept = onp.logical_not(accept)
+        #  shape (nbatch, )
+        next_logpr = next_logpr * accept + logpr *not_accept
+        #  shape (nbatch, xdim)
+        next_state = next_state * accept + state * not_accept
 
-            accept = coin_flip < onp.array(logp_ratio)
-            not_accept = onp.logical_not(accept)
-            # next prob: (nbatch, )
-            next_logpr = self._concatenate(next_logpr[accept], logpr[not_accept])
-            # next state: (nbatch, xdim)
-            next_state = self._concatenate(next_state[accept], state[not_accept])
-
-            assert next_logpr.shape == (self._num_chains,)
-            assert next_state.shape == state.shape
+        assert next_logpr.shape == (self._num_chains,)
+        assert next_state.shape == state.shape
         return accept, next_state, next_logpr
 
     def _create_coin_flip(self):
@@ -255,7 +247,7 @@ class MetropolisHasting(Inference):
         ## Expand dimension into batch-first
         obs = self._vectorize_state(obs)
         state = self._vectorize_state(state)
-        log_prob = self._kernel(obs, state, **kwargs) + self._prior.log_prob(state)
+        log_prob = self._kernel(obs, state, **kwargs)
         assert log_prob.shape == (self._num_chains,)
 
         ## Warm-up phase

@@ -260,15 +260,18 @@ class DictList(dict):
             data[key] = copy.deepcopy(val)
         return DictList(data)
 
-    def __mul__(self, dict_):
+    def __mul__(self, data):
         """Multiply with another dictlist.
         """
-        assert isinstance(dict_, DictList)
-        data = OrderedDict()
-        for key, val in self.items():
-            assert key in dict_
-            data[key] = dict_[key] * self[key]
-        return DictList(data)
+        out = OrderedDict()
+        if isinstance(data, DictList):
+            for key, val in self.items():
+                assert key in data
+                out[key] = data[key] * self[key]
+        else:
+            for key, val in self.items():
+                out[key] = data * self[key]
+        return DictList(out)
 
     def __add__(self, dict_):
         """Add another dictlist.

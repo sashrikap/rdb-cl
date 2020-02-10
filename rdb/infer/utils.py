@@ -101,13 +101,15 @@ def cross_product(data_a, data_b, type_a, type_b):
     return type_a(batch_a), type_b(batch_b)
 
 
-def collect_trajs(ws, states, controller, runner, desc=None):
+def collect_trajs(ws, states, controller, runner, us0=None, desc=None):
     """Utility for collecting features.
 
     Args:
         ws (DictList): nfeats * (nbatch)
         states (ndarray): initial state for the task
             shape (nbatch, xdim)
+        us0 (ndarray) initial action
+            shape (nbatch, T, udim)
 
     Output:
         actions (ndarray): (nbatch, T, udim)
@@ -125,8 +127,11 @@ def collect_trajs(ws, states, controller, runner, desc=None):
     assert isinstance(ws, DictList)
     assert len(states.shape) == 2 and len(states) == len(ws)
     assert len(ws.shape) == 1
+    if us0 is not None:
+        us0 = onp.array(us0)
+        assert len(us0.shape) == 3 and len(us0) == len(ws)
     ## acs (nbatch, T, udim)
-    actions = controller(states, weights=ws)
+    actions = controller(states, us0=us0, weights=ws)
     ## xs (T, nbatch, xdim), costs (nbatch)
     xs, costs, info = runner(states, actions, weights=ws)
     return actions, costs, info["feats"], info["feats_sum"], info["violations"]
