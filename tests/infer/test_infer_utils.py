@@ -68,8 +68,8 @@ optimizer, runner = build_mpc(
 def test_collect_trajs(num_weights):
     key = random.PRNGKey(0)
     random_choice_fn = seed(random_choice, key)
-    task = random_choice_fn(env.all_tasks, 1)
-    state = env.get_init_states(task)
+    tasks = random_choice_fn(env.all_tasks, num_weights)
+    states = env.get_init_states(tasks)
 
     weights = []
     for _ in range(num_weights):
@@ -77,13 +77,17 @@ def test_collect_trajs(num_weights):
         for key in env.features_keys:
             w[key] = onp.random.random()
         weights.append(w)
+    weights = DictList(weights)
 
     nfeatures = len(env.features_keys)
     nvios = len(env.constraints_keys)
 
-    actions, feats, feats_sum, vios = collect_trajs(weights, state, optimizer, runner)
+    actions, costs, feats, feats_sum, vios = collect_trajs(
+        weights, states, optimizer, runner
+    )
     udim = 2
     assert actions.shape == (num_weights, T, udim)
+    assert costs.shape == (num_weights,)
     assert feats.shape == (num_weights, T)
     assert feats.num_keys == nfeatures
     assert feats_sum.shape == (num_weights,)

@@ -172,6 +172,29 @@ def test_onumpy_array():
     assert_equal(w, new_data)
 
 
+def test_expand_dims():
+    data = {"a": [1, 2], "b": [1, 3]}
+    w = DictList(data)
+    result = {"a": [1, 2], "b": [1, 3]}
+    assert_equal(w, result)
+    w1 = w.expand_dims(1)
+    result1 = {"a": [[1], [2]], "b": [[1], [3]]}
+    assert_equal(w1, result1)
+    w2 = w.expand_dims((1, 0))
+    result2 = {"a": [[[1], [2]]], "b": [[[1], [3]]]}
+    assert_equal(w2, result2)
+
+
+def test_expand_dims():
+    data = {"a": [[1], [2]], "b": [[1], [3]]}
+    w = DictList(data).squeeze(axis=1)
+    result = {"a": [1, 2], "b": [1, 3]}
+    assert_equal(w, result)
+    data = {"a": [[[1], [2]]], "b": [[[1], [3]]]}
+    w = DictList(data).squeeze(axis=(0, 1))
+    assert_equal(w, result)
+
+
 def test_sum():
     data = {"a": [1, 2], "b": [1, 3]}
     w = DictList(data, expand_dims=True)

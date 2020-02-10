@@ -78,15 +78,33 @@ def random_uniform(low=0.0, high=1.0):
 # ========================================================
 
 
-def collect_trajs(list_ws, state, controller, runner, desc=None):
+def cross_product(data_a, data_b, type_a, type_b):
+    """To do compuation on each a for each b.
+
+    Performs Cross product: (num_a,) x (num_b,) -> (num_a * num_b,).
+
+    Output:
+        batch_a (type_a): shape (num_a * num_b,)
+        batch_b (type_b): shape (num_a * num_b,)
+
+    """
+
+    pairs = list(itertools.product(data_a, data_b))
+    batch_a, batch_b = zip(*pairs)
+    return type_a(batch_a), type_b(batch_b)
+
+
+def collect_trajs(ws, states, controller, runner, desc=None):
     """Utility for collecting features.
 
     Args:
-        list_ws (DictList): (nweights, nbatch)
-        state (ndarray): initial state for the task (1, xdim)
+        ws (DictList): nfeats * (nbatch)
+        states (ndarray): initial state for the task
+            shape (nbatch, xdim)
 
     Output:
         actions (ndarray): (nbatch, T, udim)
+        costs (ndarray): (nbatch,)
         feats (DictList): nfeats * (nbatch, T)
         feats_sum (DictList): nfeats * (nbatch,)
         violations (DictList): nvios * (nbatch, T)
@@ -96,16 +114,15 @@ def collect_trajs(list_ws, state, controller, runner, desc=None):
     feats_sum = []
     violations = []
     actions = []
-    num_ws = len(list_ws)
-    assert state.shape[0] == 1 and len(state.shape) == 2
-    batch_states = onp.repeat(state, num_ws, axis=0)
-    batch_ws = DictList(list_ws)
-
+    num_ws = len(ws)
+    assert isinstance(ws, DictList)
+    assert len(states.shape) == 2 and len(states) == len(ws)
+    assert len(ws.shape) == 1
     ## acs (nbatch, T, udim)
-    actions = controller(batch_states, weights=batch_ws)
+    actions = controller(states, weights=ws)
     ## xs (T, nbatch, xdim), costs (nbatch)
-    xs, costs, info = runner(batch_states, actions, weights=batch_ws)
-    return actions, info["feats"], info["feats_sum"], info["violations"]
+    xs, costs, info = runner(states, actions, weights=ws)
+    return actions, costs, info["feats"], info["feats_sum"], info["violations"]
 
 
 # ========================================================

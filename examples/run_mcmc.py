@@ -33,9 +33,9 @@ def main(random_key):
         env.reset()
         return env
 
-    def controller_fn(env):
+    def controller_fn(env, name=""):
         controller, runner = build_mpc(
-            env, env.main_car.cost_runtime, HORIZON, env.dt, replan=False
+            env, env.main_car.cost_runtime, HORIZON, env.dt, replan=False, name=name
         )
         return controller, runner
 
@@ -87,6 +87,7 @@ def main(random_key):
             "use_dictlist": True,
         },
         designer_proposal=designer_proposal,
+        designer_num_normalizers=DESIGNER_NUM_NORMALIZERS,
         designer_args={
             "num_warmups": NUM_DESIGNER_WARMUPS,
             "num_samples": NUM_DESIGNERS,
@@ -96,6 +97,7 @@ def main(random_key):
         weight_params=weight_params,
         normalized_key=NORMALIZED_KEY,
         save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
+        # exp_name=DESIGNER_EXP_MODE,
         exp_name=IRD_EXP_MODE,
     )
 

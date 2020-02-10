@@ -150,7 +150,16 @@ def build_features(udim, horizon, roll_forward, f_feat):
 
 
 def build_mpc(
-    env, f_cost, horizon, dt, replan=True, T=None, engine="scipy", method="lbfgs"
+    env,
+    f_cost,
+    horizon,
+    dt,
+    replan=True,
+    T=None,
+    engine="scipy",
+    method="lbfgs",
+    name="",
+    test_mode=False,
 ):
     """Create MPC controller.
 
@@ -216,7 +225,11 @@ def build_mpc(
         T=T,
         features_keys=env.features_keys,
         method=method,
+        name=name,
+        test_mode=test_mode,
     )
-    runner = Runner(env, roll_forward=t_traj, roll_costs=t_costs, roll_features=t_feats)
+    runner = Runner(
+        env, roll_forward=t_traj, roll_costs=t_costs, roll_features=t_feats, name=name
+    )
 
     return optimizer, runner

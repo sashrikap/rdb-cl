@@ -2,6 +2,20 @@ import jax.numpy as np
 import jax
 
 
+def test_vmap():
+    def fun(val1, val2):
+        return {"a": val1 + val2, "b": val1 + val2 * 2}
+
+    val1, val2 = np.array([1.0, 2.0, 3.0]), np.array([1.0, 2.0, 6.0])
+    vfun = jax.vmap(fun)
+    out = vfun(val1, val2)
+    result = {"a": np.array([2, 4, 9]), "b": [3, 6, 15]}
+    for key in out:
+        assert key in result and np.allclose(out[key], result[key])
+    for key in result:
+        assert key in out and np.allclose(out[key], result[key])
+
+
 def test_multi_arguments():
     def func(arg1, arg2):
         return np.sum(arg1 * arg2)

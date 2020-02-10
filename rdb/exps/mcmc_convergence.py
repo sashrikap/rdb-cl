@@ -243,9 +243,8 @@ class ExperimentMCMC(object):
         assert self._random_task_choice is not None
         all_tasks = self._designer.env.all_tasks
         viz_tasks = self._random_task_choice(all_tasks, self._num_visualize_tasks)
-        viz_names = [str(t) for t in viz_tasks]
 
-        new_task = self._random_task_choice(all_tasks, 1)
+        new_tasks = self._random_task_choice(all_tasks, 1)
         ## Simulate
         for n_prior in range(len(self._all_designer_prior_tasks)):
 
@@ -253,22 +252,21 @@ class ExperimentMCMC(object):
             print(f"Prior task number: {n_prior}")
 
             prior_tasks = self._all_designer_prior_tasks[:n_prior]
-            if exp_mode == "designer_convergence_true_w_more_features":
+            if "designer_convergence_true_w_more_features" in exp_mode:
                 ## Keeps only 2 prior tasks
                 prior_tasks = self._all_designer_prior_tasks[:2]
             prior_w = self._all_designer_prior_ws[n_prior]
             self._designer.prior_tasks = prior_tasks
             self._designer.true_w = prior_w
             obs = self._designer.simulate(
-                new_task, str(new_task), save_name=f"designer_prior_{n_prior:02d}"
+                new_tasks, save_name=f"designer_prior_{n_prior:02d}"
             )
 
             ## Visualize performance
-            plot_dir = f"{save_dir}/plots"
-            os.makedirs(plot_dir, exist_ok=True)
-            fig_name = f"prior_{n_prior:02d}"
             obs.visualize_comparisons(
-                viz_tasks, viz_names, self._designer.truth, fig_name
+                tasks=viz_tasks,
+                target=self._designer.truth,
+                fig_name=f"prior_{n_prior:02d}",
             )
 
             ## Reset designer prior tasks
@@ -290,20 +288,13 @@ class ExperimentMCMC(object):
 
             ## Simulate
             obs_tasks = self._all_ird_obs_tasks[:num_obs]
-            obs_names = [str(task) for task in obs_tasks]
             obs_ws = self._all_ird_obs_ws[:num_obs]
+            obs_name = f"designer_ird_obs_{num_obs:02d}"
             obs = [
-                self._designer.create_particles(
-                    [w], save_name=f"designer_ird_obs_{num_obs:02d}"
-                )
-                for w in obs_ws
+                self._designer.create_particles([w], save_name=obs_name) for w in obs_ws
             ]
-            belief = self._model.sample(
-                tasks=obs_tasks,
-                task_names=obs_names,
-                obs=obs,
-                save_name=f"ird_obs_{num_obs:02d}",
-            )
+            belief_name = f"ird_obs_{num_obs:02d}"
+            belief = self._model.sample(tasks=obs_tasks, obs=obs, save_name=belief_name)
 
             ## Reset designer prior tasks
             self._designer.prior_tasks = all_tasks

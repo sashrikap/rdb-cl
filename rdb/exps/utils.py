@@ -111,13 +111,13 @@ def normalize_weights(weights, key=None):
 
 
 class Profiler(object):
-    def __init__(self, name, level=logging.INFO):
+    def __init__(self, name, verbose=True):
         self.name = name
-        self.level = level
+        self.verbose = verbose
 
     def step(self, name):
         """ Returns the duration and stepname since last step/start """
-        self.summarize_step(start=self.step_start, step_name=name, level=self.level)
+        self.summarize_step(start=self.step_start, step_name=name)
         now = time.time()
         self.step_start = now
 
@@ -129,11 +129,11 @@ class Profiler(object):
     def __exit__(self, exception_type, exception_value, traceback):
         self.summarize_step(self.start)
 
-    def summarize_step(self, start, step_name="", level=None):
+    def summarize_step(self, start, step_name=""):
         duration = time.time() - start
         step_semicolon = ":" if step_name else ""
-        # level = level or self.level
-        print(
-            f"{self.name}{step_semicolon + step_name}: {duration:.3f} seconds {1/duration:.3f} fps"
-        )
+        if self.verbose:
+            print(
+                f"{self.name}{step_semicolon + step_name}: {duration:.3f} seconds {1/duration:.3f} fps"
+            )
         return duration

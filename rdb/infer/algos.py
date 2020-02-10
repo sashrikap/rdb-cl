@@ -45,9 +45,13 @@ class Inference(object):
 
     """
 
-    def __init__(self, rng_key, kernel, num_samples, num_warmups, num_chains=1):
+    def __init__(
+        self, rng_key, kernel, prior, proposal, num_samples, num_warmups, num_chains=1
+    ):
         self._rng_key = rng_key
         self._kernel = kernel
+        self._prior = prior
+        self._proposal = proposal
         self._num_samples = num_samples
         self._num_warmups = num_warmups
         assert (
@@ -94,6 +98,7 @@ class MetropolisHasting(Inference):
     Note:
         * Basic Implementation.
         * When sampling, initialize from observation.
+        * By default, state uses onp.array. Also supports rdb.infer.dictlist
 
     Args:
         num_samples (int): number of samples to return
@@ -101,7 +106,7 @@ class MetropolisHasting(Inference):
         proposal (Proposal): given one sample, return next
         num_chains (int): if >=1, use 1st chain for sampling, others for convergence checking
         kernel (fn): inference kernel
-        use_dictlist (bool): state represented by DictList data structure
+        use_dictlist (bool): state represented by DictList
 
     Kernel args:
         obs (ndarray): (obs_dim, )
@@ -114,16 +119,22 @@ class MetropolisHasting(Inference):
         self,
         rng_key,
         kernel,
+        prior,
+        proposal,
         num_samples,
         num_warmups,
-        proposal,
         num_chains=1,
         use_dictlist=False,
     ):
         super().__init__(
-            rng_key, kernel, num_samples, num_warmups, num_chains=num_chains
+            rng_key,
+            kernel=kernel,
+            prior=prior,
+            proposal=proposal,
+            num_samples=num_samples,
+            num_warmups=num_warmups,
+            num_chains=num_chains,
         )
-        self._proposal = proposal
         self._coin_flip = None
         self._use_dictlist = use_dictlist
 
@@ -138,15 +149,15 @@ class MetropolisHasting(Inference):
         """Vectorize for batch sampling.
 
         Args:
-            state: (state_dim,)
+            state: (state_dim, ...)
 
         Output:
-            state: (nchains, state_dim)
+            state: (nchains, state_dim, ...)
 
         """
         if self._use_dictlist:
-            state = DictList(state, expand_dims=True)
-            return state.repeat(self._num_chains, axis=0)
+            #  shape nfeats * (nstate, ...)
+            return DictList([state for _ in range(self._num_chains)])
         else:
             return onp.repeat(state[None, :], self._num_chains, axis=0)
 
@@ -168,26 +179,34 @@ class MetropolisHasting(Inference):
         assert len(state) == self._num_chains
 
         ## Sample next state (nbatch, xdim)
-        next_state = self._proposal(state)
-        next_logpr = self._kernel(obs, next_state, **kwargs)
-        logp_ratio = onp.array(next_logpr - logpr)
+        with Profiler("MH Proposal"):
+            next_state = self._proposal(state)
+        with Profiler("MH Kernel"):
+            next_logpr = self._kernel(obs, next_state, **kwargs)
+        with Profiler("MH log prob"):
+            next_logpr += self._prior.log_prob(next_state)
 
-        ## Accept or not (nbatch,)
-        coin_flip = onp.log(self._coin_flip())
+        with Profiler("MH others", verbose=False):
+            logp_ratio = onp.array(next_logpr - logpr)
 
-        if False:
-            # if True:
-            print(f"next {next_logpr} curr {logpr} ratio {logp_ratio} flip {coin_flip}")
+            ## Accept or not (nbatch,)
+            coin_flip = onp.log(self._coin_flip())
 
-        accept = coin_flip < onp.array(logp_ratio)
-        not_accept = onp.logical_not(accept)
-        # next prob: (nbatch, )
-        next_logpr = self._concatenate(next_logpr[accept], logpr[not_accept])
-        # next state: (nbatch, xdim)
-        next_state = self._concatenate(next_state[accept], state[not_accept])
+            if False:
+                # if True:
+                print(
+                    f"next {next_logpr} curr {logpr} ratio {logp_ratio} flip {coin_flip}"
+                )
 
-        assert next_logpr.shape == (self._num_chains,)
-        assert next_state.shape == state.shape
+            accept = coin_flip < onp.array(logp_ratio)
+            not_accept = onp.logical_not(accept)
+            # next prob: (nbatch, )
+            next_logpr = self._concatenate(next_logpr[accept], logpr[not_accept])
+            # next state: (nbatch, xdim)
+            next_state = self._concatenate(next_state[accept], state[not_accept])
+
+            assert next_logpr.shape == (self._num_chains,)
+            assert next_state.shape == state.shape
         return accept, next_state, next_logpr
 
     def _create_coin_flip(self):
@@ -219,7 +238,9 @@ class MetropolisHasting(Inference):
         """Vectorized MH Sample.
 
         Args:
-            obs (ndarray): observation
+            obs (ndarray/DictList): observation
+                shape (ndarray): (state_dim,)
+                shape (DictList): nkeys * (state_dim,)
             init_state (xdim,), use expand_dims=True
 
         """
@@ -232,9 +253,10 @@ class MetropolisHasting(Inference):
         state = init_state if init_state is not None else obs
 
         ## Expand dimension into batch-first
+        obs = self._vectorize_state(obs)
         state = self._vectorize_state(state)
-        log_prob = self._kernel(obs, state, **kwargs)
-        assert len(log_prob) == self._num_chains
+        log_prob = self._kernel(obs, state, **kwargs) + self._prior.log_prob(state)
+        assert log_prob.shape == (self._num_chains,)
 
         ## Warm-up phase
         warmup_accepts = []
@@ -343,9 +365,25 @@ class NUTSMonteCarlo(Inference):
     """
 
     def __init__(
-        self, rng_key, kernel, num_samples, num_warmups, step_size=1.0, num_chains=1
+        self,
+        rng_key,
+        kernel,
+        prior,
+        proposal,
+        num_samples,
+        num_warmups,
+        step_size=1.0,
+        num_chains=1,
     ):
-        super().__init__(rng_key, kernel, num_samples, num_warmups, num_chains=1)
+        super().__init__(
+            rng_key,
+            kernel=kernel,
+            prior=prior,
+            proposal=proposal,
+            num_samples=num_samples,
+            num_warmups=num_warmups,
+            num_chains=num_chains,
+        )
         self._step_size = step_size
 
     def sample(self, obs, *args, **kwargs):
@@ -369,8 +407,18 @@ class HamiltonionMonteCarlo(Inference):
 
     """
 
-    def __init__(self, rng_key, kernel, num_samples, num_warmups, step_size=1.0):
-        super().__init__(rng_key, kernel, num_samples, num_warmups)
+    def __init__(
+        self, rng_key, kernel, prior, proposal, num_samples, num_warmups, step_size=1.0
+    ):
+        super().__init__(
+            rng_key,
+            kernel=kernel,
+            prior=prior,
+            proposal=proposal,
+            num_samples=num_samples,
+            num_warmups=num_warmups,
+            num_chains=num_chains,
+        )
         self._step_size = step_size
 
     def sample(self, obs, *args, **kwargs):
@@ -386,8 +434,16 @@ class HamiltonionMonteCarlo(Inference):
 
 
 class RejectionSampling(Inference):
-    def __init__(self, rng_key, kernel, num_samples, num_warmups):
-        super().__init__(rng_key, kernel, num_samples, num_warmups)
+    def __init__(self, rng_key, kernel, prior, proposal, num_samples, num_warmups):
+        super().__init__(
+            rng_key,
+            kernel=kernel,
+            prior=prior,
+            proposal=proposal,
+            num_samples=num_samples,
+            num_warmups=num_warmups,
+            num_chains=num_chains,
+        )
 
     def sample(self, obs, *args, **kargs):
         raise NotImplementedError("Not completed")

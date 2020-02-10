@@ -90,10 +90,16 @@ class DictList(dict):
             isinstance(data, list)
             or isinstance(data, tuple)
             or isinstance(data, onp.ndarray)
+            or isinstance(data, np.ndarray)
         ):
             if expand_dims:
                 data = [self._expand_dict(d) for d in data]
-            data = self._stack_dict_by_keys(data)
+            try:
+                data = self._stack_dict_by_keys(data)
+            except:
+                import pdb
+
+                pdb.set_trace()
             super().__init__(data)
         else:
             raise NotImplementedError
@@ -104,6 +110,7 @@ class DictList(dict):
         if len(dicts) == 0:
             return OrderedDict()
         else:
+            assert all([isinstance(d, dict) for d in dicts])
             keys = dicts[0].keys()
             out = OrderedDict()
             for key in keys:
@@ -187,8 +194,25 @@ class DictList(dict):
     def expand_dims(self, axis=0):
         """Expand dimension."""
         data = OrderedDict()
+        assert isinstance(axis, tuple) or isinstance(axis, int)
+        if isinstance(axis, int):
+            axis = [axis]
         for key, val in self.items():
-            data[key] = onp.expand_dims(val, axis=axis)
+            for ax in axis:
+                val = onp.expand_dims(val, axis=ax)
+            data[key] = val
+        return DictList(data)
+
+    def squeeze(self, axis=0):
+        """Suqueeze dimension."""
+        data = OrderedDict()
+        assert isinstance(axis, tuple) or isinstance(axis, int)
+        if isinstance(axis, int):
+            axis = [axis]
+        for key, val in self.items():
+            for ax in axis:
+                val = onp.squeeze(val, axis=ax)
+            data[key] = val
         return DictList(data)
 
     def transpose(self):
@@ -268,7 +292,7 @@ class DictList(dict):
         data = OrderedDict()
         for key, val in self.items():
             assert key in dict_
-            data[key] = dict_[key] - self[key]
+            data[key] = self[key] - dict_[key]
         return DictList(data)
 
     def sum_values(self):
@@ -369,6 +393,7 @@ class DictList(dict):
             isinstance(key, int)
             or isinstance(key, onp.ndarray)
             or isinstance(key, np.ndarray)
+            or isinstance(key, list)
         ):
             # index
             output = OrderedDict()

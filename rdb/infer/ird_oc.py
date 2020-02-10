@@ -23,7 +23,6 @@ import jax.numpy as np
 import numpy as onp
 from rdb.infer.designer import Designer, DesignerInteractive
 from numpyro.handlers import scale, condition, seed
-from rdb.infer.utils import random_choice, logsumexp
 from rdb.infer.particles import Particles
 from rdb.infer.pgm import PGM
 from tqdm.auto import tqdm, trange
@@ -88,6 +87,7 @@ class IRDOptimalControl(PGM):
         sample_args={},  # "num_warmups": 100, "num_samples": 200
         ## Designer
         designer_proposal=None,
+        designer_num_normalizers=-1,
         designer_args={},
         num_prior_tasks=0,
         use_true_w=False,
@@ -104,19 +104,16 @@ class IRDOptimalControl(PGM):
         self._env_id = env_id
         self._env_fn = env_fn
         self._env = env_fn()
-        self._designer_controller, self._designer_runner = controller_fn(self._env)
-        self._sample_controller, self._sample_runner = controller_fn(self._env)
-        self._norm_controller, self._norm_runner = controller_fn(self._env)
-        self._batch_controller, self._batch_runner = controller_fn(self._env)
+        self._build_controllers(controller_fn)
         self._eval_server = eval_server
         # Rationality
         self._beta = beta
         # Sampling functions
         self._prior = prior
         self._num_normalizers = num_normalizers
+        self._normalizer = None
         self._normalized_key = normalized_key
         ## Caching normalizers, samples and features
-        self._normalizer = None
         self._user_actions = {}
         self._user_feats = {}
         self._weight_params = weight_params
@@ -125,7 +122,9 @@ class IRDOptimalControl(PGM):
         self._save_root = save_root
         self._exp_name = exp_name
         self._save_dir = f"{save_root}/{exp_name}"
-        super().__init__(rng_key, self._kernel, proposal, sample_method, sample_args)
+        super().__init__(
+            rng_key, self._kernel, prior, proposal, sample_method, sample_args
+        )
         # assume designer uses the same beta, prior and prior proposal
         self._interactive_mode = interactive_mode
         if interactive_mode:
@@ -133,8 +132,7 @@ class IRDOptimalControl(PGM):
             self._designer = DesignerInteractive(
                 rng_key=rng_key,
                 env_fn=self.env_fn,
-                controller=self._designer_controller,
-                runner=self._designer_runner,
+                controller_fn=controller_fn,
                 name=interactive_name,
                 normalized_key=self._normalized_key,
             )
@@ -144,8 +142,7 @@ class IRDOptimalControl(PGM):
             self._designer = Designer(
                 rng_key=rng_key,
                 env_fn=self.env_fn,
-                controller=self._designer_controller,
-                runner=self._designer_runner,
+                controller_fn=controller_fn,
                 beta=beta,
                 true_w=true_w,
                 prior=prior,
@@ -156,9 +153,21 @@ class IRDOptimalControl(PGM):
                 weight_params=weight_params,
                 num_prior_tasks=num_prior_tasks,
                 normalized_key=self._normalized_key,
+                num_normalizers=designer_num_normalizers,
                 save_root=save_root,
                 exp_name=exp_name,
             )
+
+    def _build_controllers(self, controller_fn):
+        self._sample_controller, self._sample_runner = controller_fn(
+            self._env, "IRD Sample"
+        )
+        self._normal_controller, self._normal_runner = controller_fn(
+            self._env, "IRD Normal"
+        )
+        self._batch_controller, self._batch_runner = controller_fn(
+            self._env, "IRD Batch"
+        )
 
     @property
     def env_id(self):
@@ -191,15 +200,15 @@ class IRDOptimalControl(PGM):
         self._designer.update_key(rng_key)
         self._prior.update_key(rng_key)
         """Build sampling-based normalizer by randomly sampling weights."""
-        norm_ws = self._prior.sample(self._num_normalizers)
+        normal_ws = self._prior(self._num_normalizers)
         self._normalizer = self.create_particles(
-            norm_ws,
+            normal_ws,
             save_name="ird_normalizer",
-            runner=self._norm_runner,
-            controller=self._norm_controller,
+            runner=self._normal_runner,
+            controller=self._normal_controller,
         )
 
-    def simulate_designer(self, task, task_name, save_name):
+    def simulate_designer(self, task, save_name):
         """Sample one w from b(w) on task
 
         Args:
@@ -208,55 +217,41 @@ class IRDOptimalControl(PGM):
             save_name (str)
 
         """
-        return self._designer.simulate(task, task_name, save_name=save_name)
+        return self._designer.simulate(task, save_name=save_name)
 
-    def sample(self, tasks, task_names, obs, save_name, verbose=True):
+    def sample(self, tasks, obs, save_name, verbose=True):
         """Sample b(w) for true weights given obs.weights.
 
         Args:
             tasks (list): list of tasks so far
-            task_names (list): list of task names so far
             obs (list): list of observation particles, each for 1 task
 
         Note:
-            * Samples are cached by the last task name to date (`task_names[-1]`)
             * To approximate IRD doubly-intractible denominator:
                 `sample`: use random samples for normalizer;
                 `max_norm`: use max trajectory as normalizer;
                 `hybrid`: use random samples mixed with max trajectory
 
         TODO:
-            * currently `tasks`, `task_names`, `obs` are ugly lists
+            * currently `tasks`, `obs` are ugly lists
 
         """
+        ntasks = len(tasks)
         assert len(tasks) > 0, "Need >=1 tasks"
-        assert (
-            len(tasks) == len(task_names) == len(obs)
-        ), "Tasks and observations mismatch"
+        assert len(tasks) == len(obs), "Tasks and observations mismatch"
         assert self._normalizer is not None
-
-        init_states = self.env.get_init_states(tasks)
-        obs_ws = []
-        user_acs = []
-        norm_feats = []
-        for task_i, name_i, obs_i in zip(tasks, task_names, obs):
-            obs_ws.append(obs_i.weights[0])
-            user_acs.append(obs_i.get_actions(task_i, name_i)[0])
-            norm_feats.append(self._normalizer.get_features_sum(task_i, name_i))
 
         print(f"Sampling IRD (obs={len(obs)}): {save_name}")
 
-        last_obs_w = obs[-1].weights[0]
-        #  shape (ntasks, T, acs_dim)
-        user_acs = onp.array(user_acs)
-        #  shape nfeats * (ntasks, n_normalizer)
-        norm_feats = DictList(norm_feats)
-        norm_feats = norm_feats.prepare(self._env.features_keys)
+        ## Preempt computations
+        self._normalizer.compute_tasks(tasks, vectorize=False)
+        #  shape nfeats * (ntasks,)
+        obs_ws = DictList([ob.weights for ob in obs]).squeeze(axis=1)
+        assert obs_ws.shape == (ntasks,)
+
         sample_ws, info = self._sampler.sample(
             obs=obs_ws,  # all obs so far
-            init_state=last_obs_w,  # initialize with last obs
-            user_acs=user_acs,
-            norm_feats=norm_feats,
+            init_state=obs_ws[-1],  # initialize with last obs
             tasks=tasks,
             name=save_name,
         )
@@ -294,149 +289,93 @@ class IRDOptimalControl(PGM):
             env=self._env,
         )
 
-    def _cross(self, data_a, data_b, type_a, type_b):
-        """To do compuation on each a for each b.
-
-        Performs Cross product: (num_a,) x (num_b,) -> (num_a * num_b,).
-
-        Output:
-            batch_a (type_a): shape (num_a * num_b,)
-            batch_b (type_b): shape (num_a * num_b,)
-
-        """
-
-        pairs = list(itertools.product(data_a, data_b))
-        batch_a, batch_b = zip(*pairs)
-        return type_a(batch_a), type_b(batch_b)
-
     def _build_kernel(self):
-        """Forward likelihood for observed data, used as MCMC kernel.
-
-        Finds `p(w_obs | w_true)`.
+        """Forward likelihood `p(w_obs | w_true)` for observed data, used as MCMC kernel.
 
         Args:
-            user_ws (DictList): designer-specified reward weight
-                shape nfeats * (ntasks,)
+            obs_ws (list): list of observed weights
+                ntasks * DictList(nchain, ntasks)
             sample_ws (DictList: MCMC sample
-                shape nfeats * (nchains,)
-            user_acs (ndarray): user_ws' actions
-                shape (ntasks, T, acs_dim)
-            norm_feats (DictList): normalizer's features
-                shape nfeats * (ntasks, n_normalizers)
+                shape nfeats * (nchain,)
             tasks (ndarray): tasks, (ntasks, task_dim)
 
         Output:
-            log_probs (ndarray): log probability of sample_ws (nchains, 1)
+            log_probs (ndarray): log probability of sample_ws (nchain, 1)
 
         Note:
             * To stabilize MH sampling
-                (1) average across tasks (instead of sum)
-                (2) average across features costs (instead of sum)
-
-        TODO:
-            * `user_ws` (represented as `obs` in generic sampling class) is somewhat confusingly, not used in
-            kernel. Better API design for algo.py
+              (1) average across tasks (instead of sum)
+              (2) average across features costs (instead of sum)
 
         """
 
-        def likelihood_fn(
-            user_ws,
-            sample_ws,
-            user_acs,
-            norm_feats,
-            tasks,
-            normalize_across_keys=True,
-            extend_norm=False,
-            one_norm=True,
-        ):
-
-            assert len(user_ws) == len(norm_feats) == len(user_acs)  #  length (ntasks)
-
-            prior_probs = self._prior.log_prob(sample_ws)
-            nnorms = norm_feats.shape[1]
+        def likelihood_fn(obs_ws, sample_ws, tasks):
+            normal = self._normalizer
+            nnorms = len(normal.weights)
             nfeats = sample_ws.num_keys
             nchain = len(sample_ws)
-            ntasks = len(user_ws)
+            ntasks = len(tasks)
+            try:
+                assert obs_ws.shape == (nchain, ntasks)
+            except:
+                import pdb
 
-            sample_ws = sample_ws.prepare(self._env.features_keys)
-            if normalize_across_keys:
-                sample_ws = sample_ws.normalize_across_keys()
+                pdb.set_trace()
 
-            ## To calculuate likelihood on each sample each task
-            ## Cross product: (nchain,) x (ntasks,) -> (nchain * ntasks,)
-            #  shape batch_sample_ws nfeats * (nchain * ntasks)
-            #  shape batch_tasks (nchain * ntasks, task_dim)
-            batch_sample_ws, batch_tasks = self._cross(
-                sample_ws, tasks, DictList, onp.array
+            ## Pre-empt task computations
+            #  shape nfeats * (ntasks,)
+            ird_obs_ws = DictList(obs_ws[0])
+            #  weights shape nfeats * (ntasks,)
+            ird_obs = self.create_particles(
+                weights=ird_obs_ws,
+                controller=self._sample_controller,
+                runner=self._sample_runner,
+                save_name="designer_sample",
             )
-            #  shape (nchain * ntasks, T, acs_dim)
-            _, batch_user_acs = self._cross(sample_ws, user_acs, DictList, onp.array)
-            #  shape nfeats * (nchain * ntasks, n_normalizers)
-            _, batch_norm_feats = self._cross(sample_ws, norm_feats, DictList, DictList)
-            #  shape (nchain * ntasks, state_dim)
-            batch_init_states = self.env.get_init_states(batch_tasks)
-            if extend_norm:
-                ## Compute max rews for sample_ws
-                #  shape (T, nchain * ntasks, acs_dim)
-                batch_sample_acs = self._batch_controller(
-                    batch_init_states, batch_sample_ws, us0=batch_user_acs
-                )
-                _, _, batch_info = self._batch_runner(
-                    batch_init_states, batch_sample_acs, weights=batch_sample_ws
-                )
-                #  shape nfeats * (nchain * ntasks, n_normalizers + 1)
-                batch_norm_feats = batch_norm_feats.concat(
-                    batch_info["feats_sum"].expand_dims(axis=1), axis=1
-                )
-            elif one_norm:
-                ## Compute max rews for sample_ws
-                #  shape (T, nchain * ntasks, acs_dim)
-                batch_sample_acs = self._batch_controller(
-                    batch_init_states, batch_sample_ws, us0=batch_user_acs
-                )
-                _, _, batch_info = self._batch_runner(
-                    batch_init_states, batch_sample_acs, weights=batch_sample_ws
-                )
-                #  shape nfeats * (nchain * ntasks, n_normalizers + 1)
-                batch_norm_feats = batch_info["feats_sum"].expand_dims(axis=1)
+            ird_obs.get_features_sum(tasks)
 
-            #  shape (nchain * ntasks, n_normalizers + 1)
-            batch_norm_costs = (
-                (batch_sample_ws.expand_dims(axis=1) * batch_norm_feats)
-                .onp_array()
-                .sum(axis=0)
-            ) / nfeats
-            #  shape (nchain * ntasks, )
-            batch_norm_rews = -onp.log(nnorms + 1) + logsumexp(
-                -self._beta * batch_norm_costs, axis=1
+            ## Computing Numerator: sample_xxx
+            #  weights shape nfeats * (ntasks * nchain,)
+            sample_obs = ird_obs.tile(nchain)
+            #  shape nfeats * (ntasks * nchain, )
+            sample_obs_ws = sample_obs.weights
+            #  shape nfeats * (ntasks * nchain, )
+            sample_true_ws = sample_ws.repeat(ntasks)
+            #  shape (ntasks * nchain, task_dim)
+            sample_tasks = onp.tile(tasks, (nchain, 1))
+            #  shape (ntasks * nchain,), designer nbatch = ntasks * nchain
+            sample_probs = self._designer._kernel(
+                sample_true_ws, sample_obs_ws, sample_tasks, sample_obs
             )
-            ## Denominator: Average across tasks (nchain * ntasks,) -> (nchain,)
-            norm_rews = batch_norm_rews.reshape((nchain, ntasks)).mean(axis=1)
+            #  shape (ntasks * nchain,) -> (ntasks, nchain)
+            sample_probs = sample_probs.reshape((ntasks, nchain))
 
-            #  shape (nchain * ntasks, )
-            _, batch_user_costs, _ = self._batch_runner(
-                batch_init_states, batch_user_acs, weights=batch_sample_ws
-            )
-            ## Numerator: Average across tasks (nchain * ntasks,) -> (nchain,)
-            batch_user_costs /= nfeats
-
-            user_rews = -self._beta * batch_user_costs.reshape((nchain, ntasks)).mean(
-                axis=1
+            ## Computing Denominator: normal_xxx
+            #  weights shape nfeats * (ntasks * nnorms,)
+            normal_obs = ird_obs.repeat(nnorms)
+            #  shape nfeats * (ntasks * nnorms,)
+            normal_obs_ws = normal_obs.weights
+            #  shape nfeats * (nnorms,)
+            normal_true_ws = DictList(normal.weights)
+            #  shape nfeats * (ntasks * nnorms,)
+            normal_true_ws = normal_true_ws.tile(ntasks)
+            #  shape (ntasks * nnorms, task_dim)
+            normal_tasks = onp.tile(tasks, (nnorms, 1))
+            #  shape (ntasks * nnorms,), Runs (ntasks * nnorms) times
+            normal_probs = self._designer._kernel(
+                normal_true_ws, normal_obs_ws, normal_tasks, normal_obs
             )
 
-            ## Debug
-            # if True:
-            if False:
-                diff = onp.array(batch_norm_costs[0, :] - batch_user_costs[0])
-                print(
-                    f"Diff mean {diff.mean():03f} median {onp.median(diff):03f} std {diff.std():.03f}"
-                )
-                print(
-                    f"sample rew {user_rews} normal costs {norm_rews} diff {user_rews - norm_rews}"
-                )
+            #  shape (ntasks, nnorms,)
+            normal_probs = normal_probs.reshape((ntasks, nnorms))
+            normal_prior_probs = self._designer._prior.log_prob(normal_obs.weights)
+            normal_prior_probs = normal_prior_probs.reshape((ntasks, nnorms))
 
-            log_probs = user_rews - norm_rews
-            log_probs += prior_probs
+            ## Aggregate over tasks
+            #  shape (ntasks, nnorms,) -> (ntasks, )
+            normal_probs = logsumexp(normal_probs + normal_prior_probs, axis=1)
+            # Average across tasks (ntasks, nchain) -> (nchain, )
+            log_probs = (sample_probs - normal_probs).mean(axis=0)
             return log_probs
 
         return likelihood_fn

@@ -7,6 +7,7 @@ Includes:
 from rdb.infer import *
 from numpyro.handlers import seed
 from rdb.optim.utils import *
+from rdb.exps.utils import Profiler
 import numpyro.distributions as dist
 import jax.numpy as np
 import numpy as onp
@@ -63,14 +64,20 @@ class LogUniformPrior(Prior):
         self._log_prior_dict = None
         self._prior_fn = None
 
-    def _build_log_prior(self):
-        log_std = {}
-        for key in self._feature_keys:
-            log_std[key] = dist.Uniform(-self._log_max, self._log_max)
-        log_std[self._normalized_key] = dist.Uniform(
-            -self._normalize_weight, self._normalize_weight
-        )
-        return log_std
+    def _build_log_prior(self, keys=None):
+        if keys is None:
+            keys = self._feature_keys
+        for key in keys:
+            self._log_prior_dict[key] = dist.Uniform(-self._log_max, self._log_max)
+
+            def fn(val, dist=self._log_prior_dict[key]):
+                log_val = np.log(val)
+                low = dist.low
+                high = dist.high
+                outside = np.logical_or(log_val < low, log_val > high)
+                return np.where(outside, -np.inf, dist.log_prob(log_val))
+
+            self._log_prob_dict[key] = jax.jit(fn)
 
     def update_key(self, rng_key):
         """Resets feature_keys."""
@@ -78,34 +85,17 @@ class LogUniformPrior(Prior):
         print("Feature keys of prior function reset.")
         # Reset feature keys, log_std and proposal function
         self._feature_keys = copy.deepcopy(self._initial_keys)
-        self._log_prior_dict = self._build_log_prior()
+        self._log_prior_dict = {}
+        self._log_prob_dict = {}
+        self._build_log_prior()
         self._prior_fn = self._build_function()
 
     def add_feature(self, key):
         if key not in self._feature_keys:
             print(f"Proposal Updated for key: {key}")
             self._feature_keys.append(key)
-            self._log_prior_dict[key] = dist.Uniform(-self._log_max, self._log_max)
+            self._build_log_prior([key])
             self._prior_fn = self._build_function()
-
-    def _check_range(self, key, val, dist_):
-        """Check the range of val against prior dist.
-
-        Note:
-            * numpyro.dist does not handle range in a "quiet" way
-              e.g. `dist.Uniform(0, 1).log_prob(10)` will not give 0.
-            * Let's fix this
-
-        """
-        assert isinstance(
-            dist_, dist.Uniform
-        ), "Only uniform distribution currently supported"
-
-        log_val = onp.log(val)
-        low = dist_.low
-        high = dist_.high
-        outside = onp.logical_or(log_val < low, log_val > high)
-        return onp.where(outside, -onp.inf, dist_.log_prob(log_val))
 
     def log_prob(self, state):
         """Log probability of the reiceived state."""
@@ -115,9 +105,9 @@ class LogUniformPrior(Prior):
             self.add_feature(key)
         nbatch = len(state)
         log_prob = onp.zeros(nbatch)
-        for key, dist_ in self._log_prior_dict.items():
+        for key in self._log_prior_dict.keys():
             val = state[key]
-            pkey = self._check_range(key, val, dist_)
+            pkey = self._log_prob_dict[key](val)
             if key == self._normalized_key and onp.any(onp.isinf(pkey)):
                 assert False, "Not properly normalized"
             log_prob += pkey

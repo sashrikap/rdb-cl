@@ -34,6 +34,8 @@ class OptimizerMPC(object):
         T=None,
         features_keys=[],
         method="lbfgs",
+        name="",
+        test_mode=False,
     ):
         """Construct Optimizer.
 
@@ -66,7 +68,9 @@ class OptimizerMPC(object):
         self._replan = replan
         self._horizon = horizon
         self._T = T
+        self._name = name
         self._method = method
+        self._test_mode = test_mode
         self._u_shape = None
         if self._T is None:
             self._T = horizon
@@ -76,6 +80,18 @@ class OptimizerMPC(object):
         self.h_traj = h_traj
         self.h_csum = h_csum
         self.h_grad_u = h_grad_u
+
+    @property
+    def T(self):
+        return self._T
+
+    @property
+    def xdim(self):
+        return self._xdim
+
+    @property
+    def udim(self):
+        return self._udim
 
     def cost_u(self, x0, us, weights):
         """Compute costs.
@@ -159,12 +175,14 @@ class OptimizerMPC(object):
         t_compile = None
         u_shape = (n_batch, self._horizon, self._udim)
         if self._u_shape is None:
-            print(f"JIT - Optimizer first compile: u0 {u_shape}")
+            print(f"JIT - Controller: {self._name}")
+            print(f"JIT - Controller first compile: u0 {u_shape}")
             self._u_shape = u_shape
             t_compile = time()
         elif u_shape != self._u_shape:
+            print(f"JIT - Controller: {self._name}")
             print(
-                f"JIT - Optimizer recompile: u0 {u_shape}, previously {self._u_shape}"
+                f"JIT - Controller recompile: u0 {u_shape}, previously {self._u_shape}"
             )
             self._u_shape = u_shape
             t_compile = time()
@@ -175,6 +193,10 @@ class OptimizerMPC(object):
                 us0 = np.zeros(u_shape)
             else:
                 raise NotImplementedError(f"Initialization undefined for '{init}'")
+
+        # Pytest mode
+        if self._test_mode:
+            return us0
 
         # Reshape to T-first
         #  shape (nbatch, T, u_dim) -> (T, nbatch, u_dim)
@@ -197,7 +219,7 @@ class OptimizerMPC(object):
 
                 if t_compile is not None:
                     print(
-                        f"JIT - Optimizer finish compile in {time() - t_compile:.3f}s: u0 {self._u_shape}"
+                        f"JIT - Controller finish compile in {time() - t_compile:.3f}s: u0 {self._u_shape}"
                     )
                 opt_u.append(opt_u_t[0])
                 xs_t = self.h_traj(x_t, opt_u_t)
@@ -222,7 +244,7 @@ class OptimizerMPC(object):
             u_info = {"du": grad_u, "xs": xs, "cost_fn": csum_u_x0, "costs": costs}
             if t_compile is not None:
                 print(
-                    f"JIT - Optimizer finish compile in {time() - t_compile:.3f}s: u0 {self._u_shape}"
+                    f"JIT - Controller finish compile in {time() - t_compile:.3f}s: u0 {self._u_shape}"
                 )
 
         #  shape (T, nbatch, udim)
@@ -255,6 +277,8 @@ class OptimizerScipy(OptimizerMPC):
         T=None,
         features_keys=[],
         method="lbfgs",
+        name="",
+        test_mode=False,
     ):
         """Construct Optimizer.
 
@@ -292,6 +316,8 @@ class OptimizerScipy(OptimizerMPC):
             T=T,
             features_keys=features_keys,
             method=method,
+            name=name,
+            test_mode=test_mode,
         )
         ## Rollout functions
         self.h_traj = self._scipy_wrapper(h_traj)
@@ -417,6 +443,8 @@ class OptimizerJax(OptimizerMPC):
         T=None,
         features_keys=[],
         method="adam",
+        name="",
+        test_mode=False,
     ):
         super().__init__(
             h_traj,
@@ -429,6 +457,8 @@ class OptimizerJax(OptimizerMPC):
             T=T,
             features_keys=features_keys,
             method=method,
+            name=name,
+            test_mode=test_mode,
         )
 
     def _minimize(self, fn, grad_fn, us0):

@@ -30,8 +30,8 @@ class Particles(object):
 
     Note:
         * Supports caching. E.g.
-        >>> particles.get_feats(task1, task1_name) # first time slow
-        >>> particles.get_feats(task1, task1_name) # second time cached
+        >>> particles.get_feats(tasks) # first time slow
+        >>> particles.get_feats(tasks) # second time cached
 
     """
 
@@ -83,10 +83,31 @@ class Particles(object):
         self._expanded_name = f"weights_seed_{str(self._rng_key)}_{self._save_name}"
 
     def build_cache(self):
-        self._sample_feats = {}
-        self._sample_feats_sum = {}
-        self._sample_violations = {}
-        self._sample_actions = {}
+        self._cache_feats = {}
+        self._cache_costs = {}
+        self._cache_feats_sum = {}
+        self._cache_violations = {}
+        self._cache_actions = {}
+
+    def _merge_dict(self, dicta, dictb):
+        """Used when merging with another Particles. Keep common key, value pairs."""
+        out = {}
+        assert isinstance(dicta, dict) and isinstance(dictb, dict)
+        for common_key in [k for k in dicta if k in dictb]:
+            if isinstance(dicta[common_key], DictList):
+                out[common_key] = dicta[common_key].concat(dictb[common_key])
+            else:
+                out[common_key] = onp.concatenate(
+                    [dicta[common_key], dictb[common_key]]
+                )
+        return out
+
+    def _index_dict(self, dict_, idx):
+        """Used when indexing Particles. Index on every task."""
+        out = {}
+        for key, val in dict_.items():
+            out[key] = val[idx]
+        return out
 
     @property
     def rng_key(self):
@@ -107,19 +128,68 @@ class Particles(object):
             save_dir=self._save_dir,
         )
 
-    def add_weights(self, weights):
-        """Add more weight samples.
-        """
-        assert isinstance(weights, DictList)
-        new_weights = self.weights.concat(weights)
-        return self._clone(new_weights)
+    def combine(self, ps):
+        """Combine with new particles and merge experience (intersection).
 
-    def tile_weights(self, num):
+        Returns a new Particles object and leaves self untouched.
+
+        """
+        assert isinstance(ps, Particles)
+        new_weights = self.weights.concat(ps.weights)
+        new_ps = self._clone(new_weights)
+        ## Merge cache
+        new_ps._cache_feats = self._merge_dict(self._cache_feats, ps._cache_feats)
+        new_ps._cache_costs = self._merge_dict(self._cache_costs, ps._cache_costs)
+        new_ps._cache_feats_sum = self._merge_dict(
+            self._cache_feats_sum, ps._cache_feats_sum
+        )
+        new_ps._cache_violations = self._merge_dict(
+            self._cache_violations, ps._cache_violations
+        )
+        new_ps._cache_actions = self._merge_dict(self._cache_actions, ps._cache_actions)
+        return new_ps
+
+    def tile(self, num):
         new_weights = self.weights.tile(num, axis=0)
-        return self._clone(new_weights)
+        new_ps = self._clone(new_weights)
+        for key in self.cached_names:
+            new_ps._cache_feats[key] = self._cache_feats[key].tile(num, axis=0)
+            new_ps._cache_feats_sum[key] = self._cache_feats_sum[key].tile(num, axis=0)
+            new_ps._cache_violations[key] = self._cache_violations[key].tile(
+                num, axis=0
+            )
+            new_ps._cache_costs[key] = onp.tile(self._cache_costs[key], num)
+            acs_shape = [1] * len(self._cache_actions[key].shape)
+            acs_shape[0] = num
+            new_ps._cache_actions[key] = onp.tile(self._cache_actions[key], acs_shape)
+        return new_ps
+
+    def repeat(self, num):
+        new_weights = self.weights.repeat(num, axis=0)
+        new_ps = self._clone(new_weights)
+        for key in self.cached_names:
+            new_ps._cache_feats[key] = self._cache_feats[key].repeat(num, axis=0)
+            new_ps._cache_feats_sum[key] = self._cache_feats_sum[key].repeat(
+                num, axis=0
+            )
+            new_ps._cache_violations[key] = self._cache_violations[key].repeat(
+                num, axis=0
+            )
+            new_ps._cache_costs[key] = onp.repeat(self._cache_costs[key], num, axis=0)
+            new_ps._cache_actions[key] = onp.repeat(
+                self._cache_actions[key], num, axis=0
+            )
+        return new_ps
 
     @property
     def weights(self):
+        """Access weights.
+
+        Output:
+            weights (DictList): particle weights
+                shape: nfeats * (nweights, )
+
+        """
         return self._weights
 
     @weights.setter
@@ -130,13 +200,20 @@ class Particles(object):
 
     @property
     def cached_names(self):
-        return list(self._sample_feats.keys())
+        return list(self._cache_feats.keys())
+
+    def get_task_name(self, task):
+        assert len(onp.array(task).shape) == 1, "Task must be 1D"
+        return str(list(task))
 
     def subsample(self, num_samples=None):
         """Subsample from current list.
 
         Usage:
             * Simulate designer.
+
+        Output:
+            ps (Particles(num_samples))
 
         """
         assert self._random_choice is not None, "Need to initialize"
@@ -159,92 +236,236 @@ class Particles(object):
             for key, val in ws.items():
                 print(f"  {key}: {val:.3f}")
 
-    def get_features(self, task, task_name, desc=None):
+    def get_features(self, tasks, desc=None):
         """Compute expected features for sample weights on task.
 
         Return:
-            features (DictList): (nfeats, nparticles)
+            features (DictList): nfeats * (ntasks, nparticles, T)
 
         Note:
             * Computing feature is costly. Caches features under task_name.
 
         """
-        if task_name not in self.cached_names:
-            self._cache_task(task, task_name, desc)
-        return self._sample_feats[task_name]
+        self.compute_tasks(tasks, desc=desc)
+        all_feats = []
+        for task in tasks:
+            #  shape nfeats * (nparticles, T)
+            feats = self._cache_feats[self.get_task_name(task)]
+            all_feats.append(feats)
+        return DictList(all_feats)
 
-    def get_features_sum(self, task, task_name, desc=None):
+    def get_features_sum(self, tasks, desc=None):
         """Compute expected feature sums for sample weights on task.
 
         Return:
-            feats_sum (DictList): (nfeats, nparticles)
+            feats_sum (DictList): nfeats * (ntasks, nparticles)
 
         """
-        if task_name not in self.cached_names:
-            self._cache_task(task, task_name, desc)
-        return self._sample_feats_sum[task_name]
+        self.compute_tasks(tasks, desc=desc)
+        all_feats_sum = []
+        for task in tasks:
+            #  shape nfeats * (nparticles)
+            feats_sum = self._cache_feats_sum[self.get_task_name(task)]
+            all_feats_sum.append(feats_sum)
+        return DictList(all_feats_sum)
 
-    def get_violations(self, task, task_name, desc=None):
+    def get_costs(self, tasks, desc=None):
+        """Compute expected feature sums for sample weights on task.
+
+        Return:
+            feats_sum (DictList): (ntasks, nfeats, nparticles)
+
+        """
+        self.compute_tasks(tasks, desc=desc)
+        all_costs = []
+        for task in tasks:
+            #  shape nfeats * (nparticles)
+            all_costs.append(self._cache_costs[self.get_task_name(task)])
+        return DictList(all_costs)
+
+    def get_violations(self, tasks, desc=None):
         """Compute violations sum (cached) for sample weights on task.
 
         Return:
-            violations (DictList): (nvios, nparticles)
+            violations (DictList): nvios * (ntasks, nparticles)
 
         """
-        if task_name not in self.cached_names:
-            self._cache_task(task, task_name, desc)
-        violations = self._sample_violations[task_name]
-        vios_sum = violations.sum(axis=1)
-        return vios_sum
+        self.compute_tasks(tasks, desc=desc)
+        all_vios = []
+        for task in tasks:
+            #  shape nvios * (nparticles, T)
+            violations = self._cache_violations[self.get_task_name(task)]
+            #  shape nvios * (nparticles)
+            vios_sum = violations.sum(axis=1)
+            all_vios.append(vios_sum)
+        return DictList(all_vios)
 
-    def get_actions(self, task, task_name, desc=None):
+    def get_actions(self, tasks, desc=None):
         """Compute actions (cached) for sample weights on task.
 
         Return:
-            actions (ndarray): (nparticles, T, udim)
+            actions (ndarray): (ntasks, nparticles, T, udim)
 
         """
-        if task_name not in self.cached_names:
-            self._cache_task(task, task_name, desc)
-        return self._sample_actions[task_name]
+        self.compute_tasks(tasks, desc=desc)
+        acs = [self._cache_actions[self.get_task_name(task)] for task in tasks]
+        return onp.array(acs)
 
-    def _cache_task(self, task, task_name, desc=None):
+    def compute_tasks(self, tasks, vectorize=True, desc=None):
+        """Compute multiple tasks at once.
+
+        Args:
+            vectorize (bool): flatten tasks and compute with 1 pass.
+
+        Note:
+            * vectorize will feed (ntasks * nweights) inputs into controller & runner,
+            which may cause extra compile time.
+
+        """
         if self._env is None:
             self._env = self._env_fn()
-        state = self._env.get_init_state(task)
-        actions, feats, feats_sum, violations = collect_trajs(
-            self.weights, state, self._controller, self._runner, desc=desc
-        )
-        self._sample_actions[task_name] = actions
-        self._sample_feats[task_name] = feats
-        self._sample_feats_sum[task_name] = feats_sum
-        self._sample_violations[task_name] = violations
+        ntasks = len(tasks)
+        nweights = len(self.weights)
 
-    def dump_task(self, task, task_name):
+        T, udim = self._controller.T, self._controller.udim
+        cached = [self.get_task_name(task) in self.cached_names for task in tasks]
+
+        if vectorize:
+            ## Rollout (nweights * ntasks) in one expanded vector
+            if all(cached):
+                return
+            #  shape (ntasks, state_dim)
+            states = self._env.get_init_states(onp.array(tasks))
+            #  states (ntasks * nweights, state_dim)
+            #  weights nfeats * (ntasks * nweights)
+            batch_states, batch_weights = cross_product(
+                states, self.weights, onp.array, DictList
+            )
+            batch_acs, batch_costs, batch_feats, batch_feats_sum, batch_vios = collect_trajs(
+                batch_weights, batch_states, self._controller, self._runner, desc=desc
+            )
+            #  shape (ntasks, nweights, T, acs_dim)
+            all_actions = batch_acs.reshape((ntasks, nweights, T, udim))
+            #  shape (ntasks, nweights)
+            all_costs = batch_costs.reshape((ntasks, nweights))
+            #  shape (ntasks, nweights, T)
+            all_feats = batch_feats.reshape((ntasks, nweights, T))
+            #  shape (ntasks, nweights)
+            all_feats_sum = batch_feats_sum.reshape((ntasks, nweights))
+            #  shape (ntasks, nweights, T)
+            all_vios = batch_vios.reshape((ntasks, nweights, T))
+        else:
+            ## Rollout (nweights,) iteratively for each task in (ntasks,)
+            all_actions, all_vios, all_costs = [], [], []
+            all_feats, all_feats_sum = [], []
+            for task_i in tasks:
+                name_i = self.get_task_name(task_i)
+                if name_i not in self.cached_names:
+                    state_i = self._env.get_init_states([task_i])
+                    batch_states = onp.tile(state_i, (nweights, 1))
+                    acs, costs, feats, feats_sum, vios = collect_trajs(
+                        self.weights, batch_states, self._controller, self._runner
+                    )
+                    all_actions.append(acs)
+                    all_feats.append(feats)
+                    all_costs.append(costs)
+                    all_feats_sum.append(feats_sum)
+                    all_vios.append(vios)
+                else:
+                    all_actions.append(self._cache_actions[name_i])
+                    all_feats.append(self._cache_feats[name_i])
+                    all_costs.append(self._cache_costs[name_i])
+                    all_feats_sum.append(self._cache_feats_sum[name_i])
+                    all_vios.append(self._cache_violations[name_i])
+
+        ## Cache
+        for i, task in enumerate(tasks):
+            task_name = self.get_task_name(task)
+            self._cache_actions[task_name] = all_actions[i]
+            self._cache_feats[task_name] = all_feats[i]
+            self._cache_costs[task_name] = all_costs[i]
+            self._cache_feats_sum[task_name] = all_feats_sum[i]
+            self._cache_violations[task_name] = all_vios[i]
+
+    def __getitem__(self, key):
+        """Indexing by key or by index.
+        """
+        if (
+            isinstance(key, int)
+            or isinstance(key, onp.ndarray)
+            or isinstance(key, np.ndarray)
+            or isinstance(key, list)
+        ):
+            # index
+            new_ws = self.weights[key]
+            if len(onp.array(key).shape) == 0:
+                new_ws = [new_ws]
+            new_ws = DictList(new_ws)
+            new_ps = self._clone(new_ws)
+            new_ps._cache_feats = self._index_dict(self._cache_feats, key)
+            new_ps._cache_costs = self._index_dict(self._cache_costs, key)
+            new_ps._cache_feats_sum = self._index_dict(self._cache_feats_sum, key)
+            new_ps._cache_violations = self._index_dict(self._cache_violations, key)
+            new_ps._cache_actions = self._index_dict(self._cache_actions, key)
+            return new_ps
+
+        else:
+            raise NotImplementedError
+        return val
+
+    def __len__(self):
+        return len(self.weights)
+
+    def __iter__(self):
+        """Iterator to do `for d in dictlist`"""
+        self.n = 0
+        return self
+
+    def __next__(self):
+        if self.n < len(self):
+            result = self[self.n]
+            self.n += 1
+            return result
+        else:
+            raise StopIteration
+
+    def dump_tasks(self, tasks):
         """Dump data from current Particles instance.
 
         Usage:
-            >>> particles2.merge(particles1.dump_task(task, task_name))
+            >>> particles2.merge_task(particles1.dump_task(task, task_name))
+
         """
-        return dict(
-            task=task,
-            task_name=task_name,
-            actions=self._sample_actions[task_name],
-            feats=self._sample_feats[task_name],
-            feats_sum=self._sample_feats_sum[task_name],
-            violations=self._sample_violations[task_name],
-        )
+        out = {}
+        for task in tasks:
+            try:
+                task_name = self.get_task_name(task)
+            except:
+                import pdb
 
-    def merge(self, data):
+                pdb.set_trace()
+            out[task_name] = dict(
+                task=task,
+                task_name=task_name,
+                actions=self._cache_actions[task_name],
+                feats=self._cache_feats[task_name],
+                feats_sum=self._cache_feats_sum[task_name],
+                violations=self._cache_violations[task_name],
+            )
+        return out
+
+    def merge_tasks(self, tasks, data):
         """Merge dumped data from another Particles instance."""
-        task_name = data["task_name"]
-        if task_name not in self.cached_names:
-            self._sample_actions[task_name] = data["actions"]
-            self._sample_feats[task_name] = data["feats"]
-            self._sample_feats_sum[task_name] = data["feats_sum"]
-            self._sample_violations[task_name] = data["violations"]
+        for task in tasks:
+            task_name = self.get_task_name(task)
+            assert task_name in data
+            if task_name not in self.cached_names:
+                self._cache_actions[task_name] = data[task_name]["actions"]
+                self._cache_feats[task_name] = data[task_name]["feats"]
+                self._cache_feats_sum[task_name] = data[task_name]["feats_sum"]
+                self._cache_violations[task_name] = data[task_name]["violations"]
 
-    def compare_with(self, task, task_name, target, verbose=False):
+    def compare_with(self, task, target, verbose=False):
         """Compare with a set of target weights (usually true weights). Returns log
         prob ratio of reward, measured by target w.
 
@@ -267,16 +488,16 @@ class Particles(object):
             assert len(target.weights) == 1, "Can only compare with 1 target weights."
             ## Compare reward difference
             #  shape (nfeats, nbatch, )
-            this_fsums = self.get_features_sum(task, task_name)
-            that_fsums = target.get_features_sum(task, task_name)
+            this_fsums = self.get_features_sum([task])[0]
+            that_fsums = target.get_features_sum([task])[0]
             #  shape (nfeats, nbatch, )
             diff_costs = target_ws * (this_fsums - that_fsums)
             #  shape (nbatch, )
             diff_rews = -1 * diff_costs.onp_array().sum(axis=0)
             ## Compare violation difference
             #  shape (nvios, nbatch)
-            this_vios = self.get_violations(task, task_name)
-            that_vios = target.get_violations(task, task_name)
+            this_vios = self.get_violations([task])[0]
+            that_vios = target.get_violations([task])[0]
             diff_vios = this_vios - that_vios
             #  shape (nbatch)
             diff_vios = diff_vios.onp_array().sum(axis=0)
@@ -287,10 +508,10 @@ class Particles(object):
             return diff_rews, diff_vios
         else:
             this_ws = self.weights
-            this_fsums = self.get_features_sum(task, task_name)
+            this_fsums = self.get_features_sum(task)
             this_costs = this_ws * this_fsums
             this_rews = -1 * this_costs.onp_array().sum(axis=0)
-            this_vios = self.get_violations(task, task_name)
+            this_vios = self.get_violations(task)
             this_vios = this_vios.onp_array().sum(axis=0)
             return this_rews, this_vios
 
@@ -434,7 +655,7 @@ class Particles(object):
             max_weights=max_weights,
         )
 
-    def visualize_comparisons(self, tasks, task_names, target, fig_name):
+    def visualize_comparisons(self, tasks, target, fig_name):
         """Visualize comparison with target on multiple tasks.
 
         Note:
@@ -442,15 +663,14 @@ class Particles(object):
 
         Args:
             tasks (ndarray): (ntasks, xdim)
-            task_names (list)
             perfs (list): performance, ususally output from self.compare_with
 
         """
         assert len(self.weights) == 1, "Can only visualize one weight sample"
         diff_rews, diff_vios = [], []
-        for task, task_name in zip(tasks, task_names):
+        for task in zip(tasks):
             # (nbatch,)
-            diff_rew, diff_vio = self.compare_with(task, task_name, target)
+            diff_rew, diff_vio = self.compare_with(task, target)
             diff_rews.append(diff_rew)
             diff_vios.append(diff_vio)
         # Dims: (n_tasks, nbatch,) -> (n_tasks,)
@@ -465,7 +685,7 @@ class Particles(object):
             auxiliary_labels=["Perf diff"],
             path=f"{prefix}_violations_{fig_name}.png",
             title="Violations",
-            yrange=[-20, 20],
+            yrange=[-10, 10],
         )
         # Ranking performance and violations (based on performance)
         plot_rankings(
@@ -475,76 +695,5 @@ class Particles(object):
             auxiliary_labels=["Violations"],
             path=f"{prefix}_performance_{fig_name}.png",
             title="Performance",
-            yrange=[-20, 20],
+            yrange=[-10, 10],
         )
-
-    # def diagnose(
-    #     self,
-    #     task,
-    #     task_name,
-    #     target,
-    #     diagnose_N,
-    #     prefix,
-    #     thumbnail=False,
-    #     desc=None,
-    #     video=True,
-    # ):
-    #     """Look at top/mid/bottom * diagnose_N particles and their performance. Record videos.
-
-    #     Note:
-    #         * A somewhat brittle function for debugging. May be subject to changes
-
-    #     Args:
-    #         prefix: include directory info e.g. "data/exp_xxx/save_"
-    #         params (dict) : experiment parameters
-
-    #     """
-    #     if self._env is None:
-    #         self._env = self._env_fn()
-    #     init_state = self._env.get_init_state(task)
-
-    #     if thumbnail:
-    #         tbn_path = f"{prefix}_task.png"
-    #         self._runner.collect_thumbnail(init_state, path=tbn_path)
-
-    #     if video:
-    #         assert len(self.weights) >= diagnose_N * 3
-    #         diff_rews, diff_vios = self.compare_with(task, task_name, target)
-    #         ranks = onp.argsort(diff_rews)
-    #         top_N_idx = ranks[-diagnose_N:]
-    #         mid_N_idx = ranks[
-    #             math.floor((len(ranks) - diagnose_N) / 2) : math.floor(
-    #                 (len(ranks) + diagnose_N) / 2
-    #             )
-    #         ]
-    #         low_N_idx = list(ranks[:diagnose_N])
-    #         top_N_idx, mid_N_idx, low_N_idx = (
-    #             list(top_N_idx),
-    #             list(mid_N_idx),
-    #             list(low_N_idx),
-    #         )
-    #         actions = np.array(self.get_actions(task, task_name))
-    #         top_rews, top_acs = diff_rews[top_N_idx], actions[top_N_idx]
-    #         mid_rews, mid_acs = diff_rews[mid_N_idx], actions[mid_N_idx]
-    #         low_rews, low_acs = diff_rews[low_N_idx], actions[low_N_idx]
-    #         mean_diff = diff_rews.mean()
-
-    #         map_particles = self.map_estimate(diagnose_N)
-    #         map_acs = np.array(map_particles.get_actions(task, task_name))
-    #         map_rews, map_vios = map_particles.compare_with(task, task_name, target)
-
-    #         for label, group_rews, group_acs in zip(
-    #             ["map", "top", "mid", "low"],
-    #             [map_rews, top_rews, mid_rews, low_rews],
-    #             [map_acs, top_acs, mid_acs, low_acs],
-    #         ):
-    #             for rew, acs in zip(group_rews, group_acs):
-    #                 file_path = (
-    #                     f"{prefix}label_{label}_mean_{mean_diff:.3f}_rew_{rew:.3f}.mp4"
-    #                 )
-    #                 # Collect proxy reward paths
-    #                 self._runner.collect_mp4(init_state, acs, path=file_path)
-    #             # Collect true reward paths
-    #             target_acs = self._controller(init_state, weights=target.weights[0])
-    #             target_path = f"{prefix}label_{label}_mean_{mean_diff:.3f}_true.mp4"
-    #             self._runner.collect_mp4(init_state, target_acs, path=target_path)

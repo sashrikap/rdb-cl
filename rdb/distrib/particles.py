@@ -42,11 +42,11 @@ class ParticleWorkerSingle(object):
     def initialize_done(self):
         return self._initialized
 
-    def compute(self, rng_key, weights, task, task_name):
+    def compute(self, rng_key, weights, tasks):
         self._particles.update_key(rng_key)
         self._particles.update_weights(weights)
-        self._particles.get_features(task, task_name)
-        self._compute_result = self._particles.dump_task(task, task_name)
+        self._particles.get_features(tasks)
+        self._compute_result = self._particles.dump_tasks(tasks)
         return self._compute_result
 
     def get_result(self):
@@ -88,16 +88,15 @@ class ParticleServer(object):
             for worker in self._workers:
                 worker.initialize()
 
-    def compute_tasks(self, particles, tasks, task_names, verbose=True):
+    def compute_tasks(self, particles, tasks, verbose=True):
         if particles is None:
             return
         # Filter existing tasks
-        new_tasks, new_task_names = [], []
-        for task, task_name in zip(tasks, task_names):
-            if task_name not in particles.cached_names:
+        new_tasks = []
+        for task in tasks:
+            if particles.get_task_name(task) not in particles.cached_names:
                 new_tasks.append(task)
-                new_task_names.append(task_name)
-        tasks, task_names = new_tasks, new_task_names
+        tasks = new_tasks
 
         num_tasks = len(tasks)
         iterations = math.ceil(num_tasks / self._num_workers)
@@ -110,33 +109,29 @@ class ParticleServer(object):
             idx_start = itr * self._num_workers
             idx_end = min((itr + 1) * self._num_workers, num_tasks)
             itr_tasks = tasks[idx_start:idx_end]
-            itr_names = task_names[idx_start:idx_end]
 
             if self._parallel:
                 # Schedule
                 for wi in range(idx_end - idx_start):
+                    tasks = [itr_tasks[wi]]
                     self._workers[wi].compute.remote(
-                        particles.rng_key,
-                        particles.weights,
-                        itr_tasks[wi],
-                        itr_names[wi],
+                        particles.rng_key, particles.weights, tasks
                     )
                 # Retrieve
                 for wi in range(idx_end - idx_start):
+                    tasks = [itr_tasks[wi]]
                     result = ray.get(self._workers[wi].get_result.remote())
-                    particles.merge(result)
+                    particles.merge_tasks(tasks, result)
                     if verbose:
                         pbar.update(1)
 
             else:
                 for wi in range(idx_end - idx_start):
+                    tasks = [itr_tasks[wi]]
                     result = self._workers[wi].compute(
-                        particles.rng_key,
-                        particles.weights,
-                        itr_tasks[wi],
-                        itr_names[wi],
+                        particles.rng_key, particles.weights, tasks
                     )
-                    particles.merge(result)
+                    particles.merge_tasks(tasks, result)
                     if verbose:
                         pbar.update(1)
 

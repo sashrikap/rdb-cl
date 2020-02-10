@@ -26,48 +26,48 @@ NUM_VISUALIZE_TASKS: 1024
 ## Designer settigns
 USER_TRUE_W: False
 
-## Full sampling
-NUM_WARMUPS: 200
-NUM_NORMALIZERS: 100
-NUM_SAMPLES: 2000
-NUM_EVAL_MAP: 2
-SAVE_NAME: "200206"
-NUM_DESIGNER_WARMUPS: 20
-NUM_DESIGNERS: 200
-# DESIGNER_EXP_MODE: "designer_convergence_true_w_prior_tasks"
-# DESIGNER_EXP_MODE: "designer_convergence_true_w_random_tasks"
-# DESIGNER_EXP_MODE: "designer_convergence_random_w_random_tasks"
-DESIGNER_EXP_MODE: "designer_convergence_true_w_more_features"
+# ## Full sampling
+# NUM_WARMUPS: 200
+# NUM_NORMALIZERS: 1000
+# DESIGNER_NUM_NORMALIZERS: 1000
+# NUM_SAMPLES: 1000
+# NUM_EVAL_MAP: 2
+# SAVE_NAME: "200209"
+# NUM_DESIGNER_WARMUPS: 200
+# NUM_DESIGNERS: 1000
+# # DESIGNER_EXP_MODE: "designer_convergence_true_w_prior_tasks_beta_50_var_0.25"
+# # DESIGNER_EXP_MODE: "designer_convergence_true_w_random_tasks_beta_50_var_0.25"
+# # DESIGNER_EXP_MODE: "designer_convergence_random_w_random_tasks_beta_50_var_0.25"
+# DESIGNER_EXP_MODE: "designer_convergence_true_w_more_features_beta_50_var_0.25"
 
-GCP_LABEL: "ird_extendnorm_noacross"
-IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks_onenorm_across_beta_100_var_0.25"
-# IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks_onenorm_beta_800"
-# IRD_EXP_MODE: "ird_convergence_true_w_random_tasks"
-# IRD_EXP_MODE: "ird_convergence_random_w_random_tasks"
-# IRD_EXP_MODE: "ird_convergence_true_w_more_features"
+# GCP_LABEL: "ird_extendnorm_noacross"
+# IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks_beta_50_var_0.25"
+# # IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks_beta_800"
+# # IRD_EXP_MODE: "ird_convergence_true_w_random_tasks"
+# # IRD_EXP_MODE: "ird_convergence_random_w_random_tasks"
+# # IRD_EXP_MODE: "ird_convergence_true_w_more_features"
 
 ## Testing
-# NUM_WARMUPS: 10
-# NUM_NORMALIZERS: 50
-# NUM_SAMPLES: 10
-# NUM_DESIGNER_WARMUPS: 8
-# NUM_DESIGNERS: 8
-# NUM_EVAL_TASKS: 2
-# NUM_EVAL_MAP: 1
-# SAVE_NAME: "test"
-# # DESIGNER_EXP_MODE: "designer_convergence_true_w_prior_tasks"
-# # DESIGNER_EXP_MODE: "designer_convergence_true_w_random_tasks"
-# IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks"
+NUM_WARMUPS: 10
+NUM_NORMALIZERS: 50
+DESIGNER_NUM_NORMALIZERS: 20
+NUM_SAMPLES: 10
+NUM_DESIGNER_WARMUPS: 8
+NUM_DESIGNERS: 8
+NUM_EVAL_TASKS: 2
+NUM_EVAL_MAP: 1
+SAVE_NAME: "test"
+# DESIGNER_EXP_MODE: "designer_convergence_true_w_prior_tasks"
+DESIGNER_EXP_MODE: "designer_convergence_true_w_random_tasks"
+IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks"
 
-# NUM_EVAL_WORKERS: 1
-# PARALLEL: False
 
 ## Plotting & weight scaling
-MAX_WEIGHT: 20.0
+MAX_WEIGHT: 15.0
 HIST_BINS: 200
-BETA: 100
-DESIGNER_PROPOSAL_VAR: 1.
-IRD_PROPOSAL_VAR: 0.2
+BETA: 50
+DESIGNER_PROPOSAL_VAR: 0.25
+IRD_PROPOSAL_VAR: 0.25
 
 ## MPC Specific
 HORIZON: 10

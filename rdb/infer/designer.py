@@ -15,7 +15,6 @@ from numpyro.handlers import seed
 from tqdm.auto import tqdm, trange
 from rdb.infer.dictlist import DictList
 from rdb.infer.particles import Particles
-from rdb.infer.utils import random_choice
 
 
 class Designer(PGM):
@@ -36,12 +35,13 @@ class Designer(PGM):
         self,
         rng_key,
         env_fn,
-        controller,
-        runner,
+        controller_fn,
         beta,
         true_w,
         prior,
         proposal,
+        normalized_key,
+        num_normalizers,
         sample_method="mh",
         sampler_args={},
         save_root="",
@@ -49,25 +49,32 @@ class Designer(PGM):
         use_true_w=False,
         weight_params={},
         num_prior_tasks=0,
-        normalized_key=None,
     ):
         self._rng_key = rng_key
         self._env_fn = env_fn
         self._env = env_fn()
-        self._controller = controller
-        self._runner = runner
+        self._build_controllers(controller_fn)
         self._true_w = true_w
         if self._true_w is not None:
-            self._truth = self.create_particles([true_w], "designer_truth")
+            self._truth = self.create_particles(
+                weights=[true_w],
+                controller=self._one_controller,
+                runner=self._one_runner,
+                save_name="designer_truth",
+            )
         else:
             self._truth = None
         self._use_true_w = use_true_w
         self._normalized_key = normalized_key
+        self._num_normalizers = num_normalizers
+        self._normalizer = None
         # Sampling Prior and kernel
         self._prior = prior
         self._kernel = self._build_kernel(beta)
         # Cache
-        super().__init__(rng_key, self._kernel, proposal, sample_method, sampler_args)
+        super().__init__(
+            rng_key, self._kernel, prior, proposal, sample_method, sampler_args
+        )
         self._save_root = save_root
         self._exp_name = exp_name
         self._save_dir = f"{save_root}/{exp_name}"
@@ -77,13 +84,29 @@ class Designer(PGM):
         self._prior_tasks = []
         self._num_prior_tasks = num_prior_tasks
 
-    def create_particles(self, weights, save_name):
+    def _build_controllers(self, controller_fn):
+        self._controller, self._runner = controller_fn(self._env, "Designer Core")
+        self._norm_controller, self._norm_runner = controller_fn(
+            self._env, "Designer Norm"
+        )
+        self._one_controller, self._one_runner = controller_fn(
+            self._env, "Designer One"
+        )
+        self._sample_controller, self._sample_runner = controller_fn(
+            self._env, "Designer Sample"
+        )
+
+    def create_particles(self, weights, controller=None, runner=None, save_name=""):
         weights = DictList(weights)
+        if controller is None:
+            controller = self._controller
+        if runner is None:
+            runner = self._runner
         return Particles(
             rng_key=self._rng_key,
             env_fn=self._env_fn,
-            controller=self._controller,
-            runner=self._runner,
+            controller=controller,
+            runner=runner,
             weights=weights,
             save_name=save_name,
             normalized_key=self._normalized_key,
@@ -93,35 +116,37 @@ class Designer(PGM):
             env=self._env,
         )
 
-    def simulate(self, new_task, task_name, save_name):
-        """Sample 1 set of weights from b(design_w) given true_w.
+    def simulate(self, new_tasks, save_name):
+        """Sample 1 set of weights from b(design_w) given true_w and prior tasks.
+
+        Example:
+            >>> designer.simulate(task, "designer_task_1")
 
         Args:
-            new_task: new environment task
-            task_name (str):
+            new_tasks: new environment task
+                shape (1, task_dim)
             save_name (save_name): name for saving parameters and visualizations
 
         """
         print(f"Sampling Designer (prior={len(self._prior_tasks)}): {save_name}")
         if self._use_true_w:
-            sample_ws = onp.array([self._true_w])
+            return self._truth
         else:
-            # Sample based on prior tasks + new_task
+            assert self._prior_tasks is not None, "Need >=0 prior tasks."
+            ## Sample based on prior tasks + new_tasks
             if len(self._prior_tasks) == 0:
-                #  shape (1, task_dim)
-                assert len(new_task.shape) == 2
-                sample_tasks = new_task
+                assert len(new_tasks.shape) == 2 and len(new_tasks) == 1
+                tasks = new_tasks
             else:
-                sample_tasks = onp.concatenate([self._prior_tasks, new_task])
-            # init_state = self._prior(1)[0]
-            init_state = None
+                tasks = onp.concatenate([self._prior_tasks, new_tasks])
+
+            ## Preemp computation
+            self._normalizer.compute_tasks(tasks, vectorize=False)
+            ## Sample
             sample_ws, info = self._sampler.sample(
-                obs=self._true_w,
-                tasks=sample_tasks,
-                init_state=init_state,
-                name=save_name,
+                obs=self._truth.weights[0], tasks=tasks, init_state=None, name=save_name
             )
-            # Visualize multiple MCMC chains to check convergence.
+            ## Visualize multiple MCMC chains to check convergence.
             visualize_chains(
                 chains=info["all_chains"],
                 rates=info["rates"],
@@ -129,10 +154,15 @@ class Designer(PGM):
                 title=save_name,
                 **self._weight_params,
             )
-        sample_ws = DictList(sample_ws)
-        samples = self.create_particles(sample_ws, save_name=save_name)
-        samples.visualize(true_w=self.true_w, obs_w=None)
-        return samples.subsample(1)
+            sample_ws = DictList(sample_ws)
+            samples = self.create_particles(
+                sample_ws,
+                controller=self._one_controller,
+                runner=self._one_runner,
+                save_name=save_name,
+            )
+            samples.visualize(true_w=self.true_w, obs_w=None)
+            return samples.subsample(1)
 
     def reset_prior_tasks(self):
         assert (
@@ -159,7 +189,14 @@ class Designer(PGM):
 
     @true_w.setter
     def true_w(self, w):
+        print("Designer truth updated")
         self._true_w = w
+        self._truth = self.create_particles(
+            weights=[w],
+            controller=self._one_controller,
+            runner=self._one_runner,
+            save_name="designer_truth",
+        )
 
     @property
     def truth(self):
@@ -177,71 +214,85 @@ class Designer(PGM):
         self._prior.update_key(rng_key)
         self._random_choice = seed(random_choice, rng_key)
         self.reset_prior_tasks()
-
-    def _cross(self, data_a, data_b, type_a, type_b):
-        """To do compuation on each a for each b.
-
-        Performs Cross product: (num_a,) x (num_b,) -> (num_a * num_b,).
-
-        Output:
-            batch_a (type_a): shape (num_a * num_b,)
-            batch_b (type_b): shape (num_a * num_b,)
-
-        """
-
-        pairs = list(itertools.product(data_a, data_b))
-        batch_a, batch_b = zip(*pairs)
-        return type_a(batch_a), type_b(batch_b)
+        norm_ws = self._prior.sample(self._num_normalizers)
+        self._normalizer = self.create_particles(
+            norm_ws,
+            save_name="designer_normalizer",
+            runner=self._norm_runner,
+            controller=self._norm_controller,
+        )
 
     def _build_kernel(self, beta):
-        def likelihood_fn(true_w, sample_ws, tasks):
+        def likelihood_fn(true_ws, sample_ws, tasks, sample=None):
             """Designer forward likelihood p(design_w | true_w).
 
             Args:
-                true_w (DictList): designer's true w in mind
-                    shape: (nweight, 1)
-                sample_ws (DictList): current sampled w
-                    shape: (nweight, nchain, 1)
+                true_ws (dict): designer's true w in mind
+                    shape: nfeats * (nbatch, )
+                sample_ws (DictList(nbatch)): current sampled w, batched
+                    shape: nfeats * (nbatch, )
                 tasks (ndarray): prior tasks
                     shape: (ntasks, task_dim)
+                sample (Particles): if provided, Particles(sample_ws) with injected experience (speed-up)
+
+            Note:
+                * nbatch dimension has two uses
+                  (1) nbatch=nchain in designer.sample
+                  (1) nbatch=nnorm in ird.sample
+                * To stabilize MH sampling
+                  (1) average across tasks (instead of sum)
+                  (2) average across features costs (instead of sum)
 
             Return:
-                log_probs (ndarray): (nchain, )
+                log_probs (ndarray): (nbatch, )
 
             """
-            assert self._prior_tasks is not None, "Need >=0 prior tasks."
-            assert len(tasks) == self._num_prior_tasks + 1
 
-            prior_probs = self._prior.log_prob(sample_ws)
-            sample_ws = sample_ws.prepare(self._env.features_keys)
+            normal = self._normalizer
             nfeats = sample_ws.num_keys
-            nchain = len(sample_ws)
+            nbatch = len(sample_ws)
             ntasks = len(tasks)
+            nnorms = len(normal.weights)
+            assert true_ws.shape == (nbatch,)
+            if sample is None:
+                sample = self.create_particles(
+                    weights=sample_ws,
+                    controller=self._sample_controller,
+                    runner=self._sample_runner,
+                    save_name="designer_sample",
+                )
+            else:
+                assert sample.weights.shape == sample_ws.shape
 
-            ## Calculuate likelihood on each sample each task
-            ## Cross product: (nchain,) x (ntasks,) -> (nchain * ntasks,)
-            batch_ws, batch_tasks = self._cross(sample_ws, tasks, DictList, onp.array)
-            true_ws = DictList(true_w, expand_dims=True).repeat(nchain * ntasks, axis=0)
+            #  shape nfeats * (ntasks, 1)
+            truth = true_ws.expand_dims(axis=1)
 
-            ## Costs -> (nchain * ntasks,)
-            states = self.env.get_init_states(batch_tasks)
-            actions = self._controller(states, batch_ws)
-            _, costs, info = self._runner(states, actions, weights=true_ws)
+            ## Computing Numerator: sample_xxx
+            #  shape nfeats * (ntasks, nbatch)
+            sample_feats_sum = sample.get_features_sum(tasks)
+            #  shape (nfeats, ntasks, nbatch)
+            sample_costs = (truth * sample_feats_sum).onp_array()
+            assert sample_costs.shape == (nfeats, ntasks, nbatch)
+            #  shape (nfeats, ntasks, nbatch) -> (nbatch, ), average across features and tasks
+            sample_rews = (-beta * sample_costs).mean(axis=(0, 1))
 
-            ## Average across tasks
-            #  shape (nchain * ntasks) -> (nchain, ntasks) -> (nchain,)
-            #  To stabilize MH sampling
-            #  (1) average across tasks (instead of sum)
-            #  (2) average across features costs (instead of sum)
-            log_probs = onp.zeros(nchain)
-            costs = costs.reshape((nchain, ntasks)).mean(axis=1) / nfeats
-            rews = -beta * costs
+            ## Denominator: normal_xxx
+            #  shape nfeats * (ntasks, nnorms)
+            normal_feats_sum = normal.get_features_sum(tasks)
+            #  shape (nfeats, ntasks, nnorms)
+            normal_costs = (truth * normal_feats_sum).onp_array()
+            assert normal_costs.shape == (nfeats, ntasks, nnorms)
+            #  shape (nfeats, ntasks, nnorms) -> (ntasks,) across features & norms
+            normal_rews = logsumexp(-beta * normal_costs.mean(axis=0), axis=1)
+            normal_rews -= onp.log(nnorms)
 
-            log_probs += rews
-            log_probs += prior_probs
+            #  shape (nbatch, ntasks)
+            log_probs = sample_rews[:, None] - normal_rews[None, :]
+            #  shape (nbatch, ntasks) -> (nbatch,)
+            log_probs = log_probs.mean(axis=1)
             # if True:
             if False:
-                print(f"Designer prob {log_probs:.3f}", actions.mean())
+                print(f"Designer prob {log_probs:.3f}")
             return log_probs
 
         return likelihood_fn
@@ -259,8 +310,7 @@ class DesignerInteractive(Designer):
         self,
         rng_key,
         env_fn,
-        controller,
-        runner,
+        controller_fn,
         name="Default",
         save_dir="",
         normalized_key=None,
@@ -268,8 +318,7 @@ class DesignerInteractive(Designer):
         super().__init__(
             rng_key=rng_key,
             env_fn=env_fn,
-            controller=controller,
-            runner=runner,
+            controller_fn=controller_fn,
             beta=None,
             truth=None,
             prior=None,
@@ -284,14 +333,14 @@ class DesignerInteractive(Designer):
         self._user_inputs = []
         self._normalized_key = normalized_key
 
-    def sample(self, task, task_name, verbose=True, itr=0):
+    def sample(self, task, verbose=True, itr=0):
         raise NotImplementedError
 
     @property
     def name(self):
         return self._name
 
-    def simulate(self, task, task_name, save_name):
+    def simulate(self, task, save_name):
         """Interactively query weight input.
 
         In Jupyter Notebook:
