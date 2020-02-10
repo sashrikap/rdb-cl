@@ -256,11 +256,15 @@ class ExperimentMCMC(object):
                 ## Keeps only 2 prior tasks
                 prior_tasks = self._all_designer_prior_tasks[:2]
             prior_w = self._all_designer_prior_ws[n_prior]
+
+            ## Set designer data
             self._designer.prior_tasks = prior_tasks
             self._designer.true_w = prior_w
-            obs = self._designer.simulate(
-                new_tasks, save_name=f"designer_prior_{n_prior:02d}"
-            )
+
+            ## Sample Designer
+            num_samples = self._designer._sampler.num_samples
+            save_name = f"designer_sample_{num_samples:04d}_prior_{n_prior:02d}"
+            obs = self._designer.simulate(new_tasks, save_name=save_name)
 
             ## Visualize performance
             obs.visualize_comparisons(
@@ -293,7 +297,8 @@ class ExperimentMCMC(object):
             obs = [
                 self._designer.create_particles([w], save_name=obs_name) for w in obs_ws
             ]
-            belief_name = f"ird_obs_{num_obs:02d}"
+            num_samples = self._model._sampler.num_samples
+            belief_name = f"ird_sample_{num_samples:04d}_obs_{num_obs:02d}"
             belief = self._model.sample(tasks=obs_tasks, obs=obs, save_name=belief_name)
 
             ## Reset designer prior tasks

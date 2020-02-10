@@ -668,7 +668,7 @@ class Particles(object):
         """
         assert len(self.weights) == 1, "Can only visualize one weight sample"
         diff_rews, diff_vios = [], []
-        for task in zip(tasks):
+        for task in tasks:
             # (nbatch,)
             diff_rew, diff_vio = self.compare_with(task, target)
             diff_rews.append(diff_rew)

@@ -223,11 +223,33 @@ class Designer(PGM):
         )
 
     def _build_kernel(self, beta):
+        @partial(jax.jit, static_argnums=(2,))
+        def _batch_fn(batch_arr, normal_arr, out_shape):
+            """Multiply, average and logsumexp two very costly array in likelihood_fn.
+
+            Args:
+                batch_arr (ndarray): (nfeats, 1, nbatch, 1)
+                normal_arr (ndarray): (nfeats, ntasks, 1, nnorms)
+                out_shape (tuple): (ntasks, nbatch, nnorms)
+
+            """
+
+            def _mult_add(i, sum_):
+                return sum_ + np.multiply(batch_arr[i], normal_arr[i])
+
+            assert len(batch_arr.shape) == len(normal_arr.shape) == 4
+            # return batch_arr * normal_arr
+            nfeats = len(batch_arr)
+            sum_ = np.zeros(out_shape)
+            sum_ = jax.lax.fori_loop(0, nfeats, _mult_add, sum_)
+            mean_arr = sum_ / nfeats
+            return np_logsumexp(-beta * mean_arr, axis=2)
+
         def likelihood_fn(true_ws, sample_ws, tasks, sample=None):
             """Designer forward likelihood p(design_w | true_w).
 
             Args:
-                true_ws (dict): designer's true w in mind
+                true_ws (DictList): designer's true w in mind
                     shape: nfeats * (nbatch, )
                 sample_ws (DictList(nbatch)): current sampled w, batched
                     shape: nfeats * (nbatch, )
@@ -236,9 +258,10 @@ class Designer(PGM):
                 sample (Particles): if provided, Particles(sample_ws) with injected experience (speed-up)
 
             Note:
+                * For performance, nbatch & nnorms can be huge in practice
                 * nbatch dimension has two uses
                   (1) nbatch=nchain in designer.sample
-                  (1) nbatch=nnorm in ird.sample
+                  (1) nbatch=nnorms in ird.sample
                 * To stabilize MH sampling
                   (1) average across tasks (instead of sum)
                   (2) average across features costs (instead of sum)
@@ -249,10 +272,11 @@ class Designer(PGM):
             """
 
             normal = self._normalizer
-            nfeats = sample_ws.num_keys
             nbatch = len(sample_ws)
             ntasks = len(tasks)
             nnorms = len(normal.weights)
+            # nfeats = sample_ws.num_keys
+            nfeats = len(self._env.features_keys)
             assert true_ws.shape == (nbatch,)
             if sample is None:
                 sample = self.create_particles(
@@ -263,9 +287,8 @@ class Designer(PGM):
                 )
             else:
                 assert sample.weights.shape == sample_ws.shape
-
-            #  shape nfeats * (ntasks, 1)
-            truth = true_ws.expand_dims(axis=1)
+            #  shape nfeats * (1, nbatch)
+            truth = true_ws.expand_dims(axis=0).prepare(self._env.features_keys)
 
             ## Computing Numerator: sample_xxx
             #  shape nfeats * (ntasks, nbatch)
@@ -275,21 +298,30 @@ class Designer(PGM):
             assert sample_costs.shape == (nfeats, ntasks, nbatch)
             #  shape (nfeats, ntasks, nbatch) -> (nbatch, ), average across features and tasks
             sample_rews = (-beta * sample_costs).mean(axis=(0, 1))
+            assert sample_rews.shape == (nbatch,)
 
-            ## Denominator: normal_xxx
+            ## Computing Denominator: normal_xxx
             #  shape nfeats * (ntasks, nnorms)
             normal_feats_sum = normal.get_features_sum(tasks)
-            #  shape (nfeats, ntasks, nnorms)
-            normal_costs = (truth * normal_feats_sum).onp_array()
-            assert normal_costs.shape == (nfeats, ntasks, nnorms)
-            #  shape (nfeats, ntasks, nnorms) -> (ntasks,) across features & norms
-            normal_rews = logsumexp(-beta * normal_costs.mean(axis=0), axis=1)
+            #  shape (nfeats, ntasks, 1, nnorms)
+            normal_feats_sum = normal_feats_sum.expand_dims(1).numpy_array()
+            #  shape (nfeats, 1, nbatch, 1)
+            normal_truth = truth.expand_dims(2).numpy_array()
+            #  shape (ntasks, nbatch)
+            normal_rews = _batch_fn(
+                normal_truth, normal_feats_sum, (ntasks, nbatch, nnorms)
+            )
+            assert normal_rews.shape == (ntasks, nbatch)
+            #  shape (ntasks, nbatch, nnorms) -> (ntasks, nbatch) across features & norms
+            # normal_rews = logsumexp(-beta * normal_costs, axis=2)
             normal_rews -= onp.log(nnorms)
+            assert normal_rews.shape == (ntasks, nbatch)
 
-            #  shape (nbatch, ntasks)
-            log_probs = sample_rews[:, None] - normal_rews[None, :]
-            #  shape (nbatch, ntasks) -> (nbatch,)
-            log_probs = log_probs.mean(axis=1)
+            ## Computing Probs
+            #  shape (ntasks, nbatch)
+            log_probs = sample_rews[None, :] - normal_rews
+            #  shape (ntasks, nbatch) -> (nbatch,)
+            log_probs = log_probs.mean(axis=0)
             # if True:
             if False:
                 print(f"Designer prob {log_probs:.3f}")

@@ -28,6 +28,13 @@ def logsumexp(vs, axis=-1):
     return max_v + onp.log(sum_exp)
 
 
+def np_logsumexp(vs, axis=-1):
+    max_v = np.max(vs, axis=axis)
+    ds = vs - np.max(vs, axis=axis, keepdims=True)
+    sum_exp = np.exp(ds).sum(axis=axis)
+    return max_v + np.log(sum_exp)
+
+
 def random_choice(items, num, probs=None, replacement=True):
     """Randomly sample from items.
 

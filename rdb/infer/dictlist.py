@@ -94,12 +94,7 @@ class DictList(dict):
         ):
             if expand_dims:
                 data = [self._expand_dict(d) for d in data]
-            try:
-                data = self._stack_dict_by_keys(data)
-            except:
-                import pdb
-
-                pdb.set_trace()
+            data = self._stack_dict_by_keys(data)
             super().__init__(data)
         else:
             raise NotImplementedError

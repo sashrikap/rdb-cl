@@ -22,44 +22,46 @@ NUM_EVAL_TASKS: 16384
 NUM_VISUALIZE_TASKS: 1024
 
 
+GCP_LABEL: "ird_extendnorm_noacross"
+
 
 ## Designer settigns
 USER_TRUE_W: False
 
 # ## Full sampling
-# NUM_WARMUPS: 200
-# NUM_NORMALIZERS: 1000
-# DESIGNER_NUM_NORMALIZERS: 1000
-# NUM_SAMPLES: 1000
-# NUM_EVAL_MAP: 2
-# SAVE_NAME: "200209"
-# NUM_DESIGNER_WARMUPS: 200
-# NUM_DESIGNERS: 1000
-# # DESIGNER_EXP_MODE: "designer_convergence_true_w_prior_tasks_beta_50_var_0.25"
-# # DESIGNER_EXP_MODE: "designer_convergence_true_w_random_tasks_beta_50_var_0.25"
-# # DESIGNER_EXP_MODE: "designer_convergence_random_w_random_tasks_beta_50_var_0.25"
-# DESIGNER_EXP_MODE: "designer_convergence_true_w_more_features_beta_50_var_0.25"
+NUM_WARMUPS: 200
+NUM_NORMALIZERS: 500
+DESIGNER_NUM_NORMALIZERS: 200
+NUM_SAMPLES: 500
+NUM_EVAL_MAP: 2
+SAVE_NAME: "200209"
+NUM_DESIGNER_WARMUPS: 200
+NUM_DESIGNERS: 1000
+DESIGNER_EXP_MODE: "designer_convergence_true_w_prior_tasks_norm_200_beta_50_var_0.25"
+# DESIGNER_EXP_MODE: "designer_convergence_true_w_random_tasks_norm_200_beta_50_var_0.25"
+# DESIGNER_EXP_MODE: "designer_convergence_random_w_random_tasks_norm_200_beta_50_var_0.25"
+# DESIGNER_EXP_MODE: "designer_convergence_true_w_more_features_norm_200_beta_50_var_0.25"
 
-# GCP_LABEL: "ird_extendnorm_noacross"
-# IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks_beta_50_var_0.25"
-# # IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks_beta_800"
-# # IRD_EXP_MODE: "ird_convergence_true_w_random_tasks"
-# # IRD_EXP_MODE: "ird_convergence_random_w_random_tasks"
-# # IRD_EXP_MODE: "ird_convergence_true_w_more_features"
+IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks_norm_500_beta_50_var_0.25"
+# IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks_beta_800"
+# IRD_EXP_MODE: "ird_convergence_true_w_random_tasks"
+# IRD_EXP_MODE: "ird_convergence_random_w_random_tasks"
+# IRD_EXP_MODE: "ird_convergence_true_w_more_features"
+
 
 ## Testing
-NUM_WARMUPS: 10
-NUM_NORMALIZERS: 50
-DESIGNER_NUM_NORMALIZERS: 20
-NUM_SAMPLES: 10
-NUM_DESIGNER_WARMUPS: 8
-NUM_DESIGNERS: 8
-NUM_EVAL_TASKS: 2
-NUM_EVAL_MAP: 1
-SAVE_NAME: "test"
+# NUM_WARMUPS: 10
+# NUM_NORMALIZERS: 50
+# DESIGNER_NUM_NORMALIZERS: 20
+# NUM_SAMPLES: 10
+# NUM_DESIGNER_WARMUPS: 8
+# NUM_DESIGNERS: 8
+# NUM_EVAL_TASKS: 2
+# NUM_EVAL_MAP: 1
+# SAVE_NAME: "test"
 # DESIGNER_EXP_MODE: "designer_convergence_true_w_prior_tasks"
-DESIGNER_EXP_MODE: "designer_convergence_true_w_random_tasks"
-IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks"
+# # DESIGNER_EXP_MODE: "designer_convergence_true_w_random_tasks"
+# IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks"
 
 
 ## Plotting & weight scaling

@@ -270,7 +270,7 @@ class IRDOptimalControl(PGM):
             runner=self._sample_runner,
             controller=self._sample_controller,
         )
-        samples.visualize(true_w=self.designer.true_w, obs_w=last_obs_w)
+        samples.visualize(true_w=self.designer.true_w, obs_w=obs_ws[-1])
         return samples
 
     def create_particles(self, weights, save_name, runner, controller):
@@ -322,7 +322,7 @@ class IRDOptimalControl(PGM):
 
                 pdb.set_trace()
 
-            ## Pre-empt task computations
+            ## ======= Pre-empt task computations =======
             #  shape nfeats * (ntasks,)
             ird_obs_ws = DictList(obs_ws[0])
             #  weights shape nfeats * (ntasks,)
@@ -334,7 +334,7 @@ class IRDOptimalControl(PGM):
             )
             ird_obs.get_features_sum(tasks)
 
-            ## Computing Numerator: sample_xxx
+            ## ======= Computing Numerator: sample_xxx =======
             #  weights shape nfeats * (ntasks * nchain,)
             sample_obs = ird_obs.tile(nchain)
             #  shape nfeats * (ntasks * nchain, )
@@ -350,7 +350,7 @@ class IRDOptimalControl(PGM):
             #  shape (ntasks * nchain,) -> (ntasks, nchain)
             sample_probs = sample_probs.reshape((ntasks, nchain))
 
-            ## Computing Denominator: normal_xxx
+            ## ======= Computing Denominator: normal_xxx =======
             #  weights shape nfeats * (ntasks * nnorms,)
             normal_obs = ird_obs.repeat(nnorms)
             #  shape nfeats * (ntasks * nnorms,)
@@ -365,17 +365,18 @@ class IRDOptimalControl(PGM):
             normal_probs = self._designer._kernel(
                 normal_true_ws, normal_obs_ws, normal_tasks, normal_obs
             )
-
             #  shape (ntasks, nnorms,)
             normal_probs = normal_probs.reshape((ntasks, nnorms))
-            normal_prior_probs = self._designer._prior.log_prob(normal_obs.weights)
-            normal_prior_probs = normal_prior_probs.reshape((ntasks, nnorms))
-
-            ## Aggregate over tasks
+            #  shape (ntasks, nnorms,)
+            normal_prior_probs = self._prior.log_prob(normal_obs.weights).reshape(
+                (ntasks, nnorms)
+            )
             #  shape (ntasks, nnorms,) -> (ntasks, )
             normal_probs = logsumexp(normal_probs + normal_prior_probs, axis=1)
-            # Average across tasks (ntasks, nchain) -> (nchain, )
-            log_probs = (sample_probs - normal_probs).mean(axis=0)
+
+            ## ======= Average across tasks =======
+            #  shape (ntasks, nchain) -> (nchain, )
+            log_probs = (sample_probs - normal_probs[:, None]).mean(axis=0)
             return log_probs
 
         return likelihood_fn
