@@ -366,10 +366,6 @@ class Designer(PGM):
             normal_feats_sum = normal_feats_sum.expand_dims(1).numpy_array()
             #  shape (nfeats, 1, nbatch, 1)
             normal_truth = true_ws.expand_dims(2).numpy_array()
-            #  shape (ntasks, nbatch)
-            # normal_rews = _batch_fn(
-            #     normal_truth, normal_feats_sum, (ntasks, nbatch, nnorms)
-            # )
             #  shape (ntasks, nbatch, nnorms_1)
             normal_rews = _batch_extend_fn(
                 normal_truth,

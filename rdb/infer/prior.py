@@ -69,7 +69,9 @@ class LogUniformPrior(Prior):
             keys = self._feature_keys
         for key in keys:
             if key == self._normalized_key:
-                self._log_prior_dict[key] = dist.Uniform(-self._normalize_weight, self._normalize_weight)
+                self._log_prior_dict[key] = dist.Uniform(
+                    -self._normalize_weight, self._normalize_weight
+                )
             else:
                 self._log_prior_dict[key] = dist.Uniform(-self._log_max, self._log_max)
 

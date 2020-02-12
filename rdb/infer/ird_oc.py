@@ -319,8 +319,8 @@ class IRDOptimalControl(PGM):
             assert obs_ws.shape == (nchain, ntasks)
 
             ## ==========================================
-            ## ======= Pre-empt task computations =======
-            #  shape nfeats * (ntasks,)
+            ## ======= Pre-empt heavy optimiations ======
+            #  shape nfeats * (ntasks,), equivalent across chains
             ird_obs_ws = DictList(obs_ws[0])
             #  weights shape nfeats * (ntasks,)
             ird_obs = self.create_particles(
@@ -328,39 +328,37 @@ class IRDOptimalControl(PGM):
                 controller=self._sample_controller,
                 runner=self._sample_runner,
             )
-            #  shape (ntasks, 1, T, acs_dim)
+            #  shape (ntasks, ntasks, T, acs_dim)
             ird_acs = ird_obs.get_actions(tasks)
+            #  shape (ntasks, T, acs_dim)
+            ird_acs = ird_acs[onp.diag_indices(ntasks)]
             #  weights shape nfeats * (nchain,)
             ird_truth = self.create_particles(
                 weights=sample_ws,
                 controller=self._batch_controller,
                 runner=self._batch_runner,
             )
-            #  shape (ntasks, nchain, T, acs_dim)
-            ird_us0 = ird_acs.repeat(nchain, axis=1)
+            #  shape (nchain, ntasks, T, acs_dim)
+            ird_us0 = onp.repeat([ird_acs], nchain, axis=0)
             ird_truth.compute_tasks(tasks, us0=ird_us0)
-            # import pdb; pdb.set_trace()
-            # ird_truth_acs1 = ird_truth.get_actions(tasks)
-            # ird_truth2 = ird_truth._clone(ird_truth.weights)
-            # ird_truth_acs2 = ird_truth2.get_actions(tasks)
             #  shape (ntasks, nnorms, T, acs_dim)
-            normal_us0 = ird_acs.repeat(nnorms, axis=1)
+            normal_us0 = ird_acs[:, None].repeat(nnorms, axis=1)
             #  weights shape nfeats * (nnorms,)
             normal.compute_tasks(tasks, us0=normal_us0)
 
             ## ===============================================
             ## ======= Computing Numerator: sample_xxx =======
-            #  weights shape nfeats * (ntasks * nchain,)
-            sample_obs = ird_obs.repeat(nchain)
-            #  shape nfeats * (ntasks * nchain, )
+            #  weights shape nfeats * (nchain * ntasks,)
+            sample_obs = ird_obs.tile(nchain)
+            #  shape nfeats * (nchain * ntasks, )
             sample_obs_ws = sample_obs.weights
-            #  shape nfeats * (ntasks * nchain, )
-            sample_true_ws = sample_ws.tile(ntasks)
-            #  shape (ntasks * nchain, task_dim)
-            sample_tasks = onp.repeat(tasks, nchain, axis=0)
-            #  weights shape nfeats * (ntasks * nchain,)
+            #  shape nfeats * (nchain * ntasks, )
+            sample_true_ws = sample_ws.repeat(ntasks)
+            #  shape (nchain * ntasks, task_dim)
+            sample_tasks = onp.tile(tasks, (nchain, 1))
+            #  weights shape nfeats * (nchain * ntasks,)
             sample_truth = ird_truth.repeat(ntasks)
-            #  shape (ntasks * nchain,), designer nbatch = ntasks * nchain
+            #  shape (nchain * ntasks,), designer nbatch = nchain * ntasks
             sample_probs = self._designer._kernel(
                 sample_true_ws,
                 sample_obs_ws,
@@ -368,9 +366,8 @@ class IRDOptimalControl(PGM):
                 sample=sample_obs,
                 truth=sample_truth,
             )
-            # import pdb; pdb.set_trace()
-            #  shape (ntasks * nchain,) -> (ntasks, nchain)
-            sample_probs = sample_probs.reshape((ntasks, nchain))
+            #  shape (nchain * ntasks) -> (nchain, ntasks)
+            sample_probs = sample_probs.reshape((nchain, ntasks))
 
             ## =================================================
             ## ======= Computing Denominator: normal_xxx =======
@@ -401,8 +398,8 @@ class IRDOptimalControl(PGM):
             normal_probs = logsumexp(normal_probs, axis=1) - onp.log(nnorms_1)
 
             ## ======= Average across tasks =======
-            #  shape (ntasks, nchain) -> (nchain, )
-            log_probs = (sample_probs - normal_probs[:, None]).mean(axis=0)
+            #  shape (nchain, ntasks) -> (nchain, )
+            log_probs = (sample_probs - normal_probs).mean(axis=1)
             log_probs += self._prior.log_prob(sample_ws)
             return log_probs
 

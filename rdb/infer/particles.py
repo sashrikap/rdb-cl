@@ -16,6 +16,7 @@ import copy
 import math
 import os
 
+
 class Particles(object):
     """Finite sample set. Used to model belief distribution, normalizer, etc for reward weights design.
 
@@ -96,7 +97,9 @@ class Particles(object):
             if isinstance(dicta[common_key], DictList):
                 out[common_key] = dicta[common_key].concat(dictb[common_key])
             else:
-                out[common_key] = onp.concatenate([dicta[common_key], dictb[common_key]])
+                out[common_key] = onp.concatenate(
+                    [dicta[common_key], dictb[common_key]]
+                )
         return out
 
     def _index_dict(self, dict_, idx):
@@ -137,11 +140,14 @@ class Particles(object):
         ## Merge cache
         new_ps._cache_feats = self._merge_dict(self._cache_feats, ps._cache_feats)
         new_ps._cache_costs = self._merge_dict(self._cache_costs, ps._cache_costs)
-        new_ps._cache_feats_sum = self._merge_dict(self._cache_feats_sum, ps._cache_feats_sum)
-        new_ps._cache_violations = self._merge_dict(self._cache_violations, ps._cache_violations)
+        new_ps._cache_feats_sum = self._merge_dict(
+            self._cache_feats_sum, ps._cache_feats_sum
+        )
+        new_ps._cache_violations = self._merge_dict(
+            self._cache_violations, ps._cache_violations
+        )
         new_ps._cache_actions = self._merge_dict(self._cache_actions, ps._cache_actions)
         return new_ps
-
 
     def tile(self, num):
         new_weights = self.weights.tile(num, axis=0)
@@ -149,23 +155,30 @@ class Particles(object):
         for key in self.cached_names:
             new_ps._cache_feats[key] = self._cache_feats[key].tile(num, axis=0)
             new_ps._cache_feats_sum[key] = self._cache_feats_sum[key].tile(num, axis=0)
-            new_ps._cache_violations[key] = self._cache_violations[key].tile(num, axis=0)
+            new_ps._cache_violations[key] = self._cache_violations[key].tile(
+                num, axis=0
+            )
             new_ps._cache_costs[key] = onp.tile(self._cache_costs[key], num)
             acs_shape = [1] * len(self._cache_actions[key].shape)
             acs_shape[0] = num
             new_ps._cache_actions[key] = onp.tile(self._cache_actions[key], acs_shape)
         return new_ps
 
-
     def repeat(self, num):
         new_weights = self.weights.repeat(num, axis=0)
         new_ps = self._clone(new_weights)
         for key in self.cached_names:
             new_ps._cache_feats[key] = self._cache_feats[key].repeat(num, axis=0)
-            new_ps._cache_feats_sum[key] = self._cache_feats_sum[key].repeat(num, axis=0)
-            new_ps._cache_violations[key] = self._cache_violations[key].repeat(num, axis=0)
+            new_ps._cache_feats_sum[key] = self._cache_feats_sum[key].repeat(
+                num, axis=0
+            )
+            new_ps._cache_violations[key] = self._cache_violations[key].repeat(
+                num, axis=0
+            )
             new_ps._cache_costs[key] = onp.repeat(self._cache_costs[key], num, axis=0)
-            new_ps._cache_actions[key] = onp.repeat(self._cache_actions[key], num, axis=0)
+            new_ps._cache_actions[key] = onp.repeat(
+                self._cache_actions[key], num, axis=0
+            )
         return new_ps
 
     @property
@@ -298,7 +311,6 @@ class Particles(object):
         acs = [self._cache_actions[self.get_task_name(task)] for task in tasks]
         return onp.array(acs)
 
-
     def compute_tasks(self, tasks, us0=None, vectorize=True, desc=None):
         """Compute multiple tasks at once.
 
@@ -327,12 +339,21 @@ class Particles(object):
             states = self._env.get_init_states(onp.array(tasks))
             #  batch_states (ntasks * nweights, state_dim)
             #  batch_weights nfeats * (ntasks * nweights)
-            batch_states, batch_weights = cross_product(states, self.weights, onp.array, DictList)
+            batch_states, batch_weights = cross_product(
+                states, self.weights, onp.array, DictList
+            )
             #  shape (ntasks * nweights, T, udim)
             batch_us0 = None
             if us0 is not None:
                 batch_us0 = us0.reshape((-1, T, udim))
-            batch_acs, batch_costs, batch_feats, batch_feats_sum, batch_vios = collect_trajs(batch_weights, batch_states, self._controller, self._runner, desc=desc, us0=batch_us0)
+            batch_acs, batch_costs, batch_feats, batch_feats_sum, batch_vios = collect_trajs(
+                batch_weights,
+                batch_states,
+                self._controller,
+                self._runner,
+                desc=desc,
+                us0=batch_us0,
+            )
             #  shape (ntasks, nweights, T, acs_dim)
             all_actions = batch_acs.reshape((ntasks, nweights, T, udim))
             #  shape (ntasks, nweights)
@@ -361,7 +382,13 @@ class Particles(object):
                     #  shape (nweights, task_dim)
                     batch_states = onp.tile(state_i, (nweights, 1))
                     us0_i = batch_us0[ti]
-                    acs, costs, feats, feats_sum, vios = collect_trajs(self.weights, batch_states, self._controller, self._runner, us0=us0_i)
+                    acs, costs, feats, feats_sum, vios = collect_trajs(
+                        self.weights,
+                        batch_states,
+                        self._controller,
+                        self._runner,
+                        us0=us0_i,
+                    )
                     all_actions.append(acs)
                     all_feats.append(feats)
                     all_costs.append(costs)
@@ -437,7 +464,9 @@ class Particles(object):
             try:
                 task_name = self.get_task_name(task)
             except:
-                import pdb; pdb.set_trace()
+                import pdb
+
+                pdb.set_trace()
             out[task_name] = dict(
                 task=task,
                 task_name=task_name,
