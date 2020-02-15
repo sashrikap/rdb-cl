@@ -461,12 +461,7 @@ class Particles(object):
         """
         out = {}
         for task in tasks:
-            try:
-                task_name = self.get_task_name(task)
-            except:
-                import pdb
-
-                pdb.set_trace()
+            task_name = self.get_task_name(task)
             out[task_name] = dict(
                 task=task,
                 task_name=task_name,

@@ -98,7 +98,7 @@ class MetropolisHasting(Inference):
     Note:
         * Basic Implementation.
         * When sampling, initialize from observation.
-        * By default, state uses onp.array. Also supports rdb.infer.dictlist
+        * By default, state uses np.array. Also supports rdb.infer.dictlist
 
     Args:
         num_samples (int): number of samples to return
@@ -139,11 +139,11 @@ class MetropolisHasting(Inference):
         self._use_dictlist = use_dictlist
 
     def _concatenate(self, array_a, array_b):
-        """DictList does not support onp.concatenate."""
+        """DictList does not support np.concatenate."""
         if self._use_dictlist and isinstance(array_a, DictList):
             return array_a.concat(array_b)
         else:
-            return onp.concatenate([array_a, array_b])
+            return np.concatenate([array_a, array_b])
 
     def _vectorize_state(self, state):
         """Vectorize for batch sampling.
@@ -157,9 +157,9 @@ class MetropolisHasting(Inference):
         """
         if self._use_dictlist:
             #  shape nfeats * (nstate, ...)
-            return DictList([state for _ in range(self._num_chains)])
+            return DictList([state for _ in range(self._num_chains)], jax=True)
         else:
-            return onp.repeat(state[None, :], self._num_chains, axis=0)
+            return np.repeat(state[None, :], self._num_chains, axis=0)
 
     def _mh_step(self, obs, state, logpr, *args, **kwargs):
         """Metropolis hasing step.
@@ -179,31 +179,40 @@ class MetropolisHasting(Inference):
         assert len(state) == self._num_chains
 
         ## Sample next state (nbatch, xdim)
+        # with Profiler("MH Proposal"):
         next_state = self._proposal(state)
-        next_logpr = onp.array(self._kernel(obs, next_state, **kwargs))
-        logp_ratio = onp.array(next_logpr - logpr)
-
+        # with Profiler("MH Kernel 1"):
+        next_logpr = self._kernel(obs, next_state, **kwargs)
+        # with Profiler("MH Others 1.1"):
+        # with Profiler("MH Others 1.4"):
+        logp_ratio = next_logpr - logpr
+        # print(type(next_logpr), type(logpr))
+        # with Profiler("MH Others 1.5"):
         ## Accept or not (nbatch,)
-        coin_flip = onp.log(self._coin_flip())
+        coin_flip = np.log(self._coin_flip())
 
-        # if False:
-        if True:
+        if False:
+            # if True:
             print(f"next {next_logpr} curr {logpr} ratio {logp_ratio} flip {coin_flip}")
-
-        accept = coin_flip < onp.array(logp_ratio)
+        # with Profiler("MH Others 2"):
+        accept = coin_flip < np.array(logp_ratio)
 
         ## Check and mask out -inf
-        pos_inf = onp.logical_and(onp.isinf(next_logpr), next_logpr > 0)
-        neg_inf = onp.isneginf(next_logpr)
+        pos_inf = np.logical_and(np.isinf(next_logpr), next_logpr > 0)
+        neg_inf = np.isneginf(next_logpr)
         assert not any(pos_inf)
-        next_logpr[neg_inf] = 0.0
+        # with Profiler("MH Others 3"):
+        next_logpr = jax.ops.index_update(next_logpr, neg_inf, 0.0)
+        # next_logpr[neg_inf] = 0.0
 
         ## Accept for next state
-        not_accept = onp.logical_not(accept)
+        # with Profiler("MH Others 4"):
+        not_accept = np.logical_not(accept)
         #  shape (nbatch, )
         next_logpr = next_logpr * accept + logpr * not_accept
         #  shape (nbatch, xdim)
         next_state = next_state * accept + state * not_accept
+        # with Profiler("MH Others 5"):
         assert next_logpr.shape == (self._num_chains,)
         assert next_state.shape == state.shape
         return accept, next_state, next_logpr
@@ -265,6 +274,7 @@ class MetropolisHasting(Inference):
             accept, state, log_prob = self._mh_step(
                 obs, state, log_prob, *args, **kwargs
             )
+            log_prob = np.array(log_prob)
             warmup_accepts.append(accept)
             rate, num = self._get_counts(warmup_accepts, chain=0)
             pbar.n, pbar.last_print_n = i + 1, i + 1
@@ -291,11 +301,13 @@ class MetropolisHasting(Inference):
 
         ## Check multi-chain result shapes
         #  samples (nsteps, self._num_chains, xdim...)
-        samples = onp.array(samples)
+        if self._use_dictlist:
+            samples = DictList(samples)
+        else:
+            samples = np.array(samples)
         #  accepts (nsteps, self._num_chains)
-        accepts = onp.array(accepts)
+        accepts = np.array(accepts)
         assert accepts.shape == (nsteps, self._num_chains)
-
         ## Summarize and select accepted
         rates = self._summarize(samples, accepts, name)
         accepted_chains = self._accepted_samples(samples, accepts)
@@ -310,7 +322,7 @@ class MetropolisHasting(Inference):
             accepts (list): one or multiple chains.
 
         """
-        accepts = onp.array(accepts)
+        accepts = np.array(accepts)
         # Take first chain
         assert chain < accepts.shape[1]
         rate = accepts[:, chain].sum() / len(accepts[:, chain])
@@ -324,7 +336,7 @@ class MetropolisHasting(Inference):
             accepts (list): one or multiple chains.
 
         """
-        accepts = onp.array(accepts)
+        accepts = np.array(accepts)
         rates = []
         for chain in range(self._num_chains):
             rate, num = self._get_counts(accepts, chain=chain)
@@ -343,13 +355,9 @@ class MetropolisHasting(Inference):
 
         accepted_samples = []
         for chain in range(self._num_chains):
-            chain_samples = [s[chain] for s in samples]
+            chain_samples = samples[:, chain]
             chain_accepts = accepts[:, chain]
-            if self._use_dictlist:
-                chain_samples = DictList(chain_samples)
-            else:
-                chain_samples = onp.array(chain_samples)
-            accepted_samples.append(chain_samples[chain_accepts])
+            accepted_samples.append(chain_samples[list(chain_accepts)])
         assert len(accepted_samples[0]) == self._num_samples
         return accepted_samples
 

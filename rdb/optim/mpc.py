@@ -211,6 +211,8 @@ def build_mpc(
         optimizer_cls = OptimizerScipy
     elif engine == "jax":
         optimizer_cls = OptimizerJax
+    elif engine == "numpyro":
+        optimizer_cls = OptimizerNumPyro
     else:
         raise NotImplementedError
 

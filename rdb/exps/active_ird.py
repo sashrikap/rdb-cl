@@ -228,6 +228,8 @@ class ExperimentActiveIRD(object):
     def _propose_task(self, candidates, all_beliefs, all_obs, all_tasks, fn_key):
         """Find best next task for this active function.
 
+        Computation: n_particles(~1k) * n_active(~100) tasks
+
         Args:
             candidates (list): potential next tasks
             all_beliefs (list): all beliefs so far, usually only the last one is useful
@@ -267,6 +269,8 @@ class ExperimentActiveIRD(object):
 
     def _evaluate(self, fn_name, belief, eval_tasks):
         """Evaluate current sampled belief on eval task.
+
+        Computation: n_map(~4) * n_eval(5~10k) tasks
 
         Note:
             self._num_eval_map: use MAP estimate particle, intead of whole population, to estimate.

@@ -23,7 +23,8 @@ BENCHMARK_BATCH = True
 MAKE_MP4 = False
 # ENGINE = "scipy"
 # METHOD = "lbfgs"
-ENGINE = "jax"
+# ENGINE = "jax"
+ENGINE = "numpyro"
 METHOD = "adam"
 # ENV_NAME = "Week3_02-v0"  # Highway
 # TASK = (0.2, -0.7)
@@ -34,11 +35,11 @@ METHOD = "adam"
 # TASK = (0.4, -0.7, -0.10, 0.2)
 # TASK = (-0.20000005, -5.9604645e-08, -0.16, 0.19999993)
 ENV_NAME = "Week6_02-v1"  # Two Blockway
-# TASK = (-0.7, -0.7, 0.13, 0.4, -0.13, 0.4)
+TASK = (-0.7, -0.7, 0.13, 0.4, -0.13, 0.4)
 # TASK = [-0.1, -0, -0.08, 0.2, 0.04, 0.7]
 # ENV_NAME = "Week6_03-v0"  # Three Blockway
 # TASK = (0.2, -0.7, 0.0, 0.4, -0.13, 0.8, 0.13, -0.8)
-TASK = "RANDOM"
+# TASK = "RANDOM"
 
 env = gym.make(ENV_NAME)
 env.reset()
@@ -79,8 +80,18 @@ if not DUMMY_ACTION:
     )
     state = copy.deepcopy(env.state)
     t1 = time()
-    actions = optimizer(state, weights=weights, batch=False)
+    # actions = optimizer(state, weights=weights, batch=False)
+    w_list = DictList([weights])
+    w_list = w_list.prepare(env.features_keys)
+    import pdb
+
+    pdb.set_trace()
+    actions = optimizer(state, weights=None, weights_arr=w_list.numpy_array())
+    import pdb
+
+    pdb.set_trace()
     traj, cost, info = runner(state, actions, weights=weights, batch=False)
+    print("cost", cost)
     if BENCHMARK > 0:
         t_compile = time() - t1
         print(f"Compile time {t_compile:.3f}")

@@ -24,12 +24,13 @@ def launch(params_dict):
             gcp_label = f"{params_dict['GCP_LABEL']}_{key_str}"
 
         launch_mode = mode.GCPMode(
-            zone="us-west1-a",
+            # zone="us-west1-a",
+            zone="us-east1-b",
             instance_type="n1-standard-4",
             # zone="us-west2-a",  # 40 c2 isntance
             # zone="us-east1-b",  # 8 c2 isntance
             # instance_type="c2-standard-4",
-            preemptible=True,
+            preemptible=False,
             # preemptible=True,
             gcp_image="active-ird-rss-v01",
             gcp_image_project="aerial-citron-264318",
@@ -72,8 +73,8 @@ if __name__ == "__main__":
     else:
         # params = {"RANDOM_KEYS": list(range(26, 36)), "NUM_EVAL_WORKERS": 8}
         params = {
-            # "RANDOM_KEYS": list(range(6)),
             "RANDOM_KEYS": list(range(4)),
+            # "RANDOM_KEYS": list(range(4, 8)),
             # "RANDOM_KEYS": [20, 21, 22, 23, 24],
             "NUM_EVAL_WORKERS": 2,
         }

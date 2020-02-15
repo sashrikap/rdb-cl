@@ -22,6 +22,7 @@ import jax
 import jax.numpy as np
 import numpy as onp
 from rdb.infer.designer import Designer, DesignerInteractive
+from jax.scipy.special import logsumexp as jax_logsumexp
 from numpyro.handlers import scale, condition, seed
 from rdb.infer.particles import Particles
 from rdb.infer.pgm import PGM
@@ -77,8 +78,8 @@ class IRDOptimalControl(PGM):
         eval_server,
         beta,
         true_w,
-        prior,
-        proposal,
+        prior_fn,
+        proposal_fn,
         ## Weight parameters
         normalized_key,
         num_normalizers=-1,
@@ -86,7 +87,8 @@ class IRDOptimalControl(PGM):
         sample_method="mh",
         sample_args={},  # "num_warmups": 100, "num_samples": 200
         ## Designer
-        designer_proposal=None,
+        designer_prior_fn=None,
+        designer_proposal_fn=None,
         designer_num_normalizers=-1,
         designer_args={},
         num_prior_tasks=0,
@@ -109,7 +111,7 @@ class IRDOptimalControl(PGM):
         # Rationality
         self._beta = beta
         # Sampling functions
-        self._prior = prior
+        self._prior = prior_fn()
         self._num_normalizers = num_normalizers
         self._normalizer = None
         self._normalized_key = normalized_key
@@ -123,7 +125,7 @@ class IRDOptimalControl(PGM):
         self._exp_name = exp_name
         self._save_dir = f"{save_root}/{exp_name}"
         super().__init__(
-            rng_key, self._kernel, prior, proposal, sample_method, sample_args
+            rng_key, self._kernel, prior_fn(), proposal_fn(), sample_method, sample_args
         )
         # assume designer uses the same beta, prior and prior proposal
         self._interactive_mode = interactive_mode
@@ -138,15 +140,15 @@ class IRDOptimalControl(PGM):
             )
         else:
             # Normal Mode
-            assert designer_proposal is not None, "Must specify designer proposal"
+            assert designer_proposal_fn is not None, "Must specify designer proposal"
             self._designer = Designer(
                 rng_key=rng_key,
                 env_fn=self.env_fn,
                 controller_fn=controller_fn,
                 beta=beta,
                 true_w=true_w,
-                prior=prior,
-                proposal=designer_proposal,
+                prior_fn=designer_prior_fn,
+                proposal_fn=designer_proposal_fn,
                 sample_method=sample_method,
                 sampler_args=designer_args,
                 use_true_w=use_true_w,
@@ -200,7 +202,7 @@ class IRDOptimalControl(PGM):
         self._designer.update_key(rng_key)
         self._prior.update_key(rng_key)
         """Build sampling-based normalizer by randomly sampling weights."""
-        normal_ws = self._prior(self._num_normalizers)
+        normal_ws = self._prior(self._num_normalizers, jax=True)
         self._prior.log_prob(normal_ws)
         self._normalizer = self.create_particles(
             normal_ws,
@@ -247,14 +249,23 @@ class IRDOptimalControl(PGM):
         ## Preempt computations
         self._normalizer.compute_tasks(tasks, vectorize=False)
         #  shape nfeats * (ntasks,)
-        obs_ws = DictList([ob.weights for ob in obs]).squeeze(axis=1)
+        obs_ws = DictList([ob.weights for ob in obs], jax=True).squeeze(axis=1)
         assert obs_ws.shape == (ntasks,)
+
+        ird_obs_ws = DictList(obs_ws[0], jax=True)
+        #  weights shape nfeats * (ntasks,)
+        ird_obs = self.create_particles(
+            weights=ird_obs_ws,
+            controller=self._sample_controller,
+            runner=self._sample_runner,
+        )
 
         sample_ws, info = self._sampler.sample(
             obs=obs_ws,  # all obs so far
             init_state=obs_ws[-1],  # initialize with last obs
             tasks=tasks,
             name=save_name,
+            ird_obs=ird_obs,
         )
         num_samples = len(info["all_chains"][0])
         visualize_chains(
@@ -310,7 +321,8 @@ class IRDOptimalControl(PGM):
 
         """
 
-        def likelihood_fn(obs_ws, sample_ws, tasks):
+        def likelihood_fn(obs_ws, sample_ws, tasks, ird_obs):
+            # with Profiler("IRDOC Assert"):
             normal = self._normalizer
             nnorms = len(normal.weights)
             nfeats = sample_ws.num_keys
@@ -321,30 +333,26 @@ class IRDOptimalControl(PGM):
             ## ==========================================
             ## ======= Pre-empt heavy optimiations ======
             #  shape nfeats * (ntasks,), equivalent across chains
-            ird_obs_ws = DictList(obs_ws[0])
-            #  weights shape nfeats * (ntasks,)
-            ird_obs = self.create_particles(
-                weights=ird_obs_ws,
-                controller=self._sample_controller,
-                runner=self._sample_runner,
-            )
-            #  shape (ntasks, ntasks, T, acs_dim)
-            ird_acs = ird_obs.get_actions(tasks)
-            #  shape (ntasks, T, acs_dim)
-            ird_acs = ird_acs[onp.diag_indices(ntasks)]
+            # with Profiler("IRDOC Preemt"):
+            # #  shape (ntasks, ntasks, T, acs_dim)
+            # ird_acs = ird_obs.get_actions(tasks)
+            # #  shape (ntasks, T, acs_dim)
+            # ird_acs = ird_acs[np.diag_indices(ntasks)]
             #  weights shape nfeats * (nchain,)
-            ird_truth = self.create_particles(
-                weights=sample_ws,
-                controller=self._batch_controller,
-                runner=self._batch_runner,
-            )
-            #  shape (nchain, ntasks, T, acs_dim)
-            ird_us0 = onp.repeat([ird_acs], nchain, axis=0)
-            ird_truth.compute_tasks(tasks, us0=ird_us0)
+            # ird_truth = self.create_particles(
+            #     weights=sample_ws,
+            #     controller=self._batch_controller,
+            #     runner=self._batch_runner,
+            # )
+            # #  shape (nchain, ntasks, T, acs_dim)
+            # ird_us0 = np.repeat(np.array([ird_acs]), nchain, axis=0)
+            # ird_truth.compute_tasks(tasks, us0=ird_us0)
             #  shape (ntasks, nnorms, T, acs_dim)
-            normal_us0 = ird_acs[:, None].repeat(nnorms, axis=1)
+            # normal_us0 = ird_acs[:, None].repeat(nnorms, axis=1)
             #  weights shape nfeats * (nnorms,)
-            normal.compute_tasks(tasks, us0=normal_us0)
+            # normal.compute_tasks(tasks, us0=normal_us0)
+
+            # with Profiler("IRDOC Sample - Prepare"):
 
             ## ===============================================
             ## ======= Computing Numerator: sample_xxx =======
@@ -357,18 +365,20 @@ class IRDOptimalControl(PGM):
             #  shape (nchain * ntasks, task_dim)
             sample_tasks = onp.tile(tasks, (nchain, 1))
             #  weights shape nfeats * (nchain * ntasks,)
-            sample_truth = ird_truth.repeat(ntasks)
+            # sample_truth = ird_truth.repeat(ntasks)
             #  shape (nchain * ntasks,), designer nbatch = nchain * ntasks
             sample_probs = self._designer._kernel(
                 sample_true_ws,
                 sample_obs_ws,
                 sample_tasks,
                 sample=sample_obs,
-                truth=sample_truth,
+                # truth=sample_truth,
+                truth=sample_obs,
             )
             #  shape (nchain * ntasks) -> (nchain, ntasks)
             sample_probs = sample_probs.reshape((nchain, ntasks))
 
+            # with Profiler("IRDOC Normalizer - Prepare"):
             ## =================================================
             ## ======= Computing Denominator: normal_xxx =======
             nnorms_1 = nnorms + 1
@@ -377,30 +387,41 @@ class IRDOptimalControl(PGM):
             #  shape nfeats * (ntasks * nnorms_1,)
             normal_obs_ws = normal_obs.weights
             #  shape nfeats * (nnorms,)
-            normal_true_ws = DictList(normal.weights)
-            #  shape nfeats * (ntasks * nnorms_1,)
-            normal_true_ws = normal_true_ws.tile(ntasks).concat(ird_obs_ws)
+            normal_true_ws = DictList(normal.weights, jax=True)
+            #  shape nfeats * (ntasks, nnorms,)
+            normal_true_ws = normal_true_ws.expand_dims(0).repeat(ntasks, axis=0)
+            #  shape nfeats * (ntasks, nnorms_1,)
+            normal_true_ws = normal_true_ws.concat(ird_obs_ws.expand_dims(1), axis=1)
+            #  shape nfeats * (ntasks, nnorms_1,) -> (ntasks * nnorms_1,)
+            normal_true_ws = normal_true_ws.flatten()
             #  shape (ntasks * nnorms_1, task_dim)
             normal_tasks = onp.repeat(tasks, nnorms_1, axis=0)
             #  weights shape nfeats * (ntasks * nnorms_1,)
             normal_truth = normal.tile(ntasks).combine(ird_obs)
             #  shape (ntasks * nnorms_1,), Runs (ntasks * nnorms_1) times
+            # with Profiler("IRDOC Normalizer - Designer"):
             normal_probs = self._designer._kernel(
                 normal_true_ws,
                 normal_obs_ws,
                 normal_tasks,
                 sample=normal_obs,
                 truth=normal_truth,
+                ird_normalizer=True,
             )
+            # with Profiler("IRDOC Normalizer - Wrap up 1"):
             #  shape (ntasks, nnorms_1,)
             normal_probs = normal_probs.reshape((ntasks, nnorms_1))
             #  shape (ntasks, nnorms_1,) -> (ntasks, )
-            normal_probs = logsumexp(normal_probs, axis=1) - onp.log(nnorms_1)
-
+            # with Profiler("IRDOC Normalizer - Wrap up 2.2"):
+            # normal_probs = logsumexp(normal_probs, axis=1) - np.log(nnorms_1)
+            normal_probs = jax_logsumexp(normal_probs, axis=1) - np.log(nnorms_1)
+            # with Profiler("IRDOC Normalizer - Wrap up 3"):
             ## ======= Average across tasks =======
             #  shape (nchain, ntasks) -> (nchain, )
             log_probs = (sample_probs - normal_probs).mean(axis=1)
+            # with Profiler("IRDOC Normalizer - Wrap up 4"):
             log_probs += self._prior.log_prob(sample_ws)
+            # print(log_probs)
             return log_probs
 
         return likelihood_fn

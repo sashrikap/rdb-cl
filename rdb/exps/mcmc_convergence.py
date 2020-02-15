@@ -286,6 +286,7 @@ class ExperimentMCMC(object):
         all_tasks = self._designer.env.all_tasks
 
         for num_obs in range(1, self._max_ird_obs_num):
+            # for num_obs in range(3, 4):
 
             print(f"Experiment mode ({self._rng_key}): {exp_mode}")
             print(f"Observation number: {num_obs}")

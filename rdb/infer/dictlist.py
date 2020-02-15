@@ -75,14 +75,18 @@ class DictList(dict):
             useful when later batching data
     """
 
-    def __init__(self, data, expand_dims=False):
+    def __init__(self, data, expand_dims=False, jax=False):
+        self._np = np if jax else onp
+        self._jax = jax
         if isinstance(data, dict):
+            if isinstance(data, DictList):
+                self._jax = data._jax
             # Ensure every value is stored as array
             new_data = OrderedDict()
             if expand_dims:
                 data = self._expand_dict(data)
             for key, val in data.items():
-                val = onp.array(val)
+                val = self._np.array(val)
                 assert len(val.shape) > 0
                 new_data[key] = val
             super().__init__(new_data)
@@ -109,14 +113,14 @@ class DictList(dict):
             keys = dicts[0].keys()
             out = OrderedDict()
             for key in keys:
-                out[key] = onp.stack([d[key] for d in dicts])
+                out[key] = self._np.stack([d[key] for d in dicts])
             return out
 
     def _expand_dict(self, dict_):
         """Utility function."""
         out = OrderedDict()
         for key, val in dict_.items():
-            out[key] = onp.array([val])
+            out[key] = self._np.array([val])
         return out
 
     def __len__(self):
@@ -158,7 +162,7 @@ class DictList(dict):
         """Append dictionary to end."""
         assert isinstance(dict_, dict)
         for key, val in self.items():
-            self[key] = onp.concatenate([val, [dict_[key]]], axis=axis)
+            self[key] = self._np.concatenate([val, [dict_[key]]], axis=axis)
         self._assert_shape()
 
     def concat(self, dictlist, axis=0):
@@ -166,15 +170,22 @@ class DictList(dict):
         assert isinstance(dictlist, DictList)
         data = OrderedDict()
         for key, val in self.items():
-            data[key] = onp.concatenate([val, dictlist[key]], axis=axis)
-        return DictList(data)
+            data[key] = self._np.concatenate([val, dictlist[key]], axis=axis)
+        return DictList(data, jax=self._jax)
 
     def repeat(self, num, axis=0):
         """Repeat num times along given axis."""
         data = OrderedDict()
         for key, val in self.items():
-            data[key] = onp.repeat(val, num, axis=axis)
-        return DictList(data)
+            data[key] = self._np.repeat(val, num, axis=axis)
+        return DictList(data, jax=self._jax)
+
+    def flatten(self):
+        """Flatten values."""
+        data = OrderedDict()
+        for key, val in self.items():
+            data[key] = val.flatten()
+        return DictList(data, jax=self._jax)
 
     def tile(self, num, axis=0):
         """Tile num times along existing 0-th dimension."""
@@ -183,8 +194,8 @@ class DictList(dict):
         for key, val in self.items():
             new_shape = [1] * len(val.shape)
             new_shape[axis] = num
-            data[key] = onp.tile(val, new_shape)
-        return DictList(data)
+            data[key] = self._np.tile(val, new_shape)
+        return DictList(data, jax=self._jax)
 
     def expand_dims(self, axis=0):
         """Expand dimension."""
@@ -194,9 +205,9 @@ class DictList(dict):
             axis = [axis]
         for key, val in self.items():
             for ax in axis:
-                val = onp.expand_dims(val, axis=ax)
+                val = self._np.expand_dims(val, axis=ax)
             data[key] = val
-        return DictList(data)
+        return DictList(data, jax=self._jax)
 
     def squeeze(self, axis=0):
         """Suqueeze dimension."""
@@ -206,16 +217,16 @@ class DictList(dict):
             axis = [axis]
         for key, val in self.items():
             for ax in axis:
-                val = onp.squeeze(val, axis=ax)
+                val = self._np.squeeze(val, axis=ax)
             data[key] = val
-        return DictList(data)
+        return DictList(data, jax=self._jax)
 
     def transpose(self):
         """Transpose every value."""
         data = OrderedDict()
         for key, val in self.items():
             data[key] = val.T
-        return DictList(data)
+        return DictList(data, jax=self._jax)
 
     def sum(self, axis, keepdims=False):
         """Sum each value by axis.
@@ -228,10 +239,10 @@ class DictList(dict):
         assert axis != 0, f"Cannot sum across batch"
         data = OrderedDict()
         for key, val in self.items():
-            data[key] = onp.sum(val, axis=axis, keepdims=keepdims)
+            data[key] = self._np.sum(val, axis=axis, keepdims=keepdims)
         if len(shape) > 1:
             # value >= 2D, resulting sum >= 1D
-            return DictList(data)
+            return DictList(data, jax=self._jax)
         else:
             return data
 
@@ -242,7 +253,7 @@ class DictList(dict):
         norm_val = self[key]
         for key, val in self.items():
             data[key] = val / norm_val
-        return DictList(data)
+        return DictList(data, jax=self._jax)
 
     def normalize_across_keys(self):
         """Normalize all values such that ||w_i||_2 = 1.
@@ -258,7 +269,7 @@ class DictList(dict):
         data = OrderedDict()
         for key, val in self.items():
             data[key] = copy.deepcopy(val)
-        return DictList(data)
+        return DictList(data, jax=self._jax)
 
     def __mul__(self, data):
         """Multiply with another dictlist.
@@ -271,7 +282,7 @@ class DictList(dict):
         else:
             for key, val in self.items():
                 out[key] = data * self[key]
-        return DictList(out)
+        return DictList(out, jax=self._jax)
 
     def __add__(self, dict_):
         """Add another dictlist.
@@ -281,7 +292,7 @@ class DictList(dict):
         for key, val in self.items():
             assert key in dict_
             data[key] = dict_[key] + self[key]
-        return DictList(data)
+        return DictList(data, jax=self._jax)
 
     def __sub__(self, dict_):
         """Subtract another dictlist.
@@ -291,7 +302,7 @@ class DictList(dict):
         for key, val in self.items():
             assert key in dict_
             data[key] = self[key] - dict_[key]
-        return DictList(data)
+        return DictList(data, jax=self._jax)
 
     def sum_values(self):
         """Sum all values.
@@ -309,10 +320,10 @@ class DictList(dict):
         ), f"Cannot average axis {axis}, current DictList: nkeys={shape[0]} value {shape[1:]}"
         data = OrderedDict()
         for key, val in self.items():
-            data[key] = onp.mean(val, axis=axis, keepdims=keepdims)
+            data[key] = self._np.mean(val, axis=axis, keepdims=keepdims)
         if len(shape) > 1:
             # value >= 2D, resulting mean >= 1D
-            return DictList(data)
+            return DictList(data, jax=self._jax)
         else:
             return data
 
@@ -323,14 +334,14 @@ class DictList(dict):
             keys = sorted(self.keys())
         for key in keys:
             out[key] = self[key]
-        return DictList(out)
+        return DictList(out, jax=self._jax)
 
     def reshape(self, shape):
         """Reshape values"""
         out = OrderedDict()
         for key, val in self.items():
             out[key] = val.reshape(shape)
-        return DictList(out)
+        return DictList(out, jax=self._jax)
 
     def prepare(self, features_keys):
         """Return copy of self, weiht keys sorted.
@@ -338,10 +349,10 @@ class DictList(dict):
         out = OrderedDict()
         for key in features_keys:
             if key not in self.keys():
-                out[key] = onp.zeros(self.shape)
+                out[key] = self._np.zeros(self.shape)
             else:
                 out[key] = self[key]
-        return DictList(out)
+        return DictList(out, jax=self._jax)
 
     def numpy_array(self):
         """Return stacked values in jax.numpy
@@ -350,7 +361,18 @@ class DictList(dict):
             out (ndarray): (num_feats, n_batch)
 
         """
+        # return np.array(list(self.values()))
         return np.array(list(self.values()))
+
+    def clone(self, jax=False):
+        """Return jax.numpy.
+
+        Output:
+            out (ndarray): (num_feats, n_batch)
+
+        """
+        # return np.array(list(self.values()))
+        return DictList(self, jax=jax)
 
     def onp_array(self):
         """Return stacked values
@@ -389,23 +411,24 @@ class DictList(dict):
             val = dict.__getitem__(self, key)
         elif (
             isinstance(key, int)
-            or isinstance(key, onp.ndarray)
+            or isinstance(key, self._np.ndarray)
             or isinstance(key, np.ndarray)
             or isinstance(key, list)
+            or isinstance(key, tuple)
+            or isinstance(key, slice)
         ):
             # index
             output = OrderedDict()
-            idx = key
             for k, val in self.items():
-                output[k] = val[idx]
+                output[k] = val[key]
             if len(self.shape) == 1:
                 if isinstance(key, int):
                     # normal dict
                     return output
                 else:
-                    return DictList(output)
+                    return DictList(output, jax=self._jax)
             else:
-                return DictList(output)
+                return DictList(output, jax=self._jax)
         else:
             raise NotImplementedError
         return val

@@ -43,8 +43,14 @@ class ParticleWorkerSingle(object):
         return self._initialized
 
     def compute(self, rng_key, weights, tasks):
+        """Compute weights * tasks.
+
+        Note:
+            * In general good to avoid re-compiling.
+
+        """
         self._particles.update_key(rng_key)
-        self._particles.update_weights(weights)
+        self._particles.weights = weights
         self._particles.get_features(tasks)
         self._compute_result = self._particles.dump_tasks(tasks)
         return self._compute_result
@@ -89,6 +95,13 @@ class ParticleServer(object):
                 worker.initialize()
 
     def compute_tasks(self, particles, tasks, verbose=True):
+        """Compute all tasks for all particle weights.
+
+        Note:
+            * Run forward passes nweights * ntasks / nbatch times.
+            * Has nworkers.
+
+        """
         if particles is None:
             return
         # Filter existing tasks
@@ -100,9 +113,7 @@ class ParticleServer(object):
 
         num_tasks = len(tasks)
         iterations = math.ceil(num_tasks / self._num_workers)
-
-        if verbose:
-            pbar = tqdm(total=num_tasks, desc="Particle Server")
+        pbar = tqdm(total=num_tasks, desc="Particle Server")
 
         # Loop through tasks using workers
         for itr in range(iterations):
@@ -122,8 +133,7 @@ class ParticleServer(object):
                     tasks = [itr_tasks[wi]]
                     result = ray.get(self._workers[wi].get_result.remote())
                     particles.merge_tasks(tasks, result)
-                    if verbose:
-                        pbar.update(1)
+                    pbar.update(1)
 
             else:
                 for wi in range(idx_end - idx_start):
@@ -132,10 +142,8 @@ class ParticleServer(object):
                         particles.rng_key, particles.weights, tasks
                     )
                     particles.merge_tasks(tasks, result)
-                    if verbose:
-                        pbar.update(1)
+                    pbar.update(1)
 
-        if verbose:
-            pbar.close()
+        pbar.close()
 
         # return particles

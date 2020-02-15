@@ -43,24 +43,22 @@ def main(random_key):
     assert design_data["ENV_NAME"] == ENV_NAME, "Environment name mismatch"
 
     ## Prior sampling & likelihood functions for PGM
-    prior = LogUniformPrior(
-        rng_key=None,
-        normalized_key=NORMALIZED_KEY,
-        feature_keys=FEATURE_KEYS,
-        log_max=MAX_WEIGHT,
-    )
-    ird_proposal = IndGaussianProposal(
-        rng_key=None,
-        normalized_key=NORMALIZED_KEY,
-        feature_keys=FEATURE_KEYS,
-        proposal_var=IRD_PROPOSAL_VAR,
-    )
-    designer_proposal = IndGaussianProposal(
-        rng_key=None,
-        normalized_key=NORMALIZED_KEY,
-        feature_keys=FEATURE_KEYS,
-        proposal_var=DESIGNER_PROPOSAL_VAR,
-    )
+    def prior_fn(name=""):
+        return LogUniformPrior(
+            rng_key=None,
+            normalized_key=NORMALIZED_KEY,
+            feature_keys=FEATURE_KEYS,
+            log_max=MAX_WEIGHT,
+            name=name,
+        )
+
+    def proposal_fn(var):
+        return IndGaussianProposal(
+            rng_key=None,
+            normalized_key=NORMALIZED_KEY,
+            feature_keys=FEATURE_KEYS,
+            proposal_var=var,
+        )
 
     ## Evaluation Server
     # eval_server = ParticleServer(
@@ -77,8 +75,8 @@ def main(random_key):
         eval_server=eval_server,
         beta=BETA,
         true_w=None,
-        prior=prior,
-        proposal=ird_proposal,
+        prior_fn=prior_fn,
+        proposal_fn=partial(proposal_fn, var=IRD_PROPOSAL_VAR),
         num_normalizers=NUM_NORMALIZERS,
         sample_args={
             "num_warmups": NUM_WARMUPS,
@@ -86,7 +84,8 @@ def main(random_key):
             "num_chains": NUM_IRD_CHAINS,
             "use_dictlist": True,
         },
-        designer_proposal=designer_proposal,
+        designer_prior_fn=prior_fn,
+        designer_proposal_fn=partial(proposal_fn, var=DESIGNER_PROPOSAL_VAR),
         designer_num_normalizers=DESIGNER_NUM_NORMALIZERS,
         designer_args={
             "num_warmups": NUM_DESIGNER_WARMUPS,

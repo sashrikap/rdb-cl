@@ -184,7 +184,9 @@ class Runner(object):
         # display(Video(mp4_path, width=FRAME_WIDTH))
         display(Image(path))
 
-    def __call__(self, x0, actions, weights, batch=True):
+    def __call__(
+        self, x0, actions, weights=None, weights_arr=None, batch=True, jax=False
+    ):
         """Run optimization.
 
         Args:
@@ -211,12 +213,12 @@ class Runner(object):
         """
         assert self._roll_costs is not None, "Cost function improperly defined"
 
-        weights_arr = (
-            DictList(weights, expand_dims=not batch)
-            .prepare(self._env.features_keys)
-            .numpy_array()
-        )
-
+        if weights_arr is None:
+            weights_arr = (
+                DictList(weights, expand_dims=not batch)
+                .prepare(self._env.features_keys)
+                .numpy_array()
+            )
         # Track JIT recompile
         t_compile = None
         a_shape = actions.shape
@@ -238,34 +240,42 @@ class Runner(object):
         actions = actions.swapaxes(0, 1)
         #  shape (T, nbatch, xdim)
         xs = self._roll_forward(x0, actions)
-        #  shape (T, nbatch,)
-        costs = self._roll_costs(x0, actions, weights_arr)
-        #  shape (nbatch, T,)
-        costs = costs.swapaxes(0, 1)
+        if jax:
+            xs = np.array(xs)
+        else:
+            xs = onp.array(xs)
+
+        costs, cost_sum = None, None
+        if weights_arr is not None:
+            #  shape (T, nbatch,)
+            costs = self._roll_costs(x0, actions, weights_arr)
+            #  shape (nbatch, T,)
+            costs = costs.swapaxes(0, 1)
+            #  shape (nbatch, )
+            cost_sum = costs.sum(axis=1)
+
         #  shape nfeats * (T, nbatch)
-        feats = DictList(self._roll_features(x0, actions))
+        feats = DictList(self._roll_features(x0, actions), jax=jax)
         #  shape nfeats * (nbatch, T)
         feats = feats.transpose()
+
+        # Compute features
+        #  shape nfeats * (nbatch,)
+        feats_sum = feats.sum(axis=1)
+        #  shape ncons * (T, nbatch,)
+        violations = DictList(self._env.constraints_fn(xs, actions), jax=jax)
+        violations = violations.transpose()
+        #  shape ncons * (nbatch, T,)
+        vios_sum = violations.sum(axis=1)
+        #  shape nneta * (T, nbatch,)
+        metadata = DictList(self._env.metadata_fn(xs, actions), jax=jax)
+        metadata = metadata.transpose()
 
         # Track JIT recompile
         if t_compile is not None:
             print(
                 f"JIT - Runner finish compile in {time() - t_compile:.3f}s: ac {self._a_shape}"
             )
-
-        # Compute features
-        #  shape (nbatch, )
-        cost_sum = costs.sum(axis=1)
-        #  shape nfeats * (nbatch,)
-        feats_sum = feats.sum(axis=1)
-        #  shape ncons * (T, nbatch,)
-        violations = DictList(self._env.constraints_fn(xs, actions))
-        violations = violations.transpose()
-        #  shape ncons * (nbatch, T,)
-        vios_sum = violations.sum(axis=1)
-        #  shape nneta * (T, nbatch,)
-        metadata = DictList(self._env.metadata_fn(xs, actions))
-        metadata = metadata.transpose()
 
         # DictList conveniently deals with list of dicts
         info = {}
@@ -277,4 +287,4 @@ class Runner(object):
         info["vios_sum"] = vios_sum
         info["metadata"] = metadata
 
-        return onp.array(xs), cost_sum, info
+        return xs, cost_sum, info

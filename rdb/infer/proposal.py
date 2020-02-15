@@ -93,7 +93,7 @@ class IndGaussianProposal(Proposal):
     def _build_function(self):
         """Build proposal function."""
 
-        def proposal_fn(state):
+        def proposal_fn(state, jax=False):
             assert isinstance(state, DictList), "State must be dictionary type"
             assert self._log_std_dict is not None, "Must initialize with random seed"
             keys, vals = list(state.keys()), list(state.values())
@@ -103,12 +103,12 @@ class IndGaussianProposal(Proposal):
                 log_val = np.log(val)
                 next_log_val = numpyro.sample("next_log_val", dist.Normal(log_val, std))
                 next_vals.append(np.exp(next_log_val))
-            next_state = DictList(dict(zip(keys, next_vals)))
+            next_state = DictList(dict(zip(keys, next_vals)), jax=jax)
             return next_state
 
         return seed(proposal_fn, self._rng_key)
 
-    def __call__(self, state):
+    def __call__(self, state, jax=False):
         assert (
             self._proposal_fn is not None
         ), "Need to initialize with random seed by `update_key`"
@@ -117,5 +117,5 @@ class IndGaussianProposal(Proposal):
 
         for key in state.keys():
             self.add_feature(key)
-        state = self._proposal_fn(state)
+        state = self._proposal_fn(state, jax=jax)
         return state

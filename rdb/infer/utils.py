@@ -22,6 +22,7 @@ from functools import partial
 
 
 def logsumexp(vs, axis=-1):
+    print("Inside logsumexp", type(vs))
     max_v = onp.max(vs, axis=axis)
     ds = vs - onp.max(vs, axis=axis, keepdims=True)
     sum_exp = onp.exp(ds).sum(axis=axis)

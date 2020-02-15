@@ -4,7 +4,8 @@ Wrappers around different scipy.minimize packages for MPC.
 
 """
 
-from jax.experimental import optimizers
+import jax.experimental.optimizers as jax_optimizers
+import numpyro.optim as np_optimizers
 from scipy.optimize import minimize, basinhopping
 from rdb.optim.utils import *
 from rdb.infer import *
@@ -146,14 +147,16 @@ class OptimizerMPC(object):
         """
         raise NotImplementedError
 
-    def __call__(self, x0, weights, batch=True, us0=None, init="zeros"):
+    def __call__(
+        self, x0, weights, batch=True, us0=None, weights_arr=None, init="zeros"
+    ):
         """Run Optimizer.
 
         Args:
             x0 (ndarray), initial state
                 shape (nbatch, xdim)
             weights (dict/DictList), weights
-                shape nfeats * (nbatch)
+                shape nfeats * (nbatch,)
             us0 (ndarray), initial actions
                 shape (nbatch, T, xdim)
             batch (bool), batch mode. If `true`, weights and output are batched
@@ -163,13 +166,15 @@ class OptimizerMPC(object):
                 shape (nbatch, T, udim)
 
         """
-        weights_arr = (
-            DictList(weights, expand_dims=not batch)
-            .prepare(self._features_keys)
-            .numpy_array()
-        )
+        if weights_arr is None:
+            weights_arr = (
+                DictList(weights, expand_dims=not batch)
+                .prepare(self._features_keys)
+                .numpy_array()
+            )
         assert len(weights_arr.shape) == 2
-        n_batch = weights_arr.shape[1]
+        assert len(x0.shape) == 2
+        n_batch = len(x0)
 
         # Track JIT recompile
         t_compile = None
@@ -472,12 +477,12 @@ class OptimizerJax(OptimizerMPC):
         """
         if self._method == "momentum":
             # Bad, try not to use momentum
-            opt_init, opt_update, get_params = optimizers.momentum(
+            opt_init, opt_update, get_params = jax_optimizers.momentum(
                 step_size=1e-3, mass=0.9
             )
             num_steps = 200
         elif self._method == "adam":
-            opt_init, opt_update, get_params = optimizers.adam(
+            opt_init, opt_update, get_params = jax_optimizers.adam(
                 step_size=3e-2, b1=0.9, b2=0.99, eps=1e-8
             )
             num_steps = 100
@@ -494,6 +499,85 @@ class OptimizerJax(OptimizerMPC):
         opt_state = opt_init(us0)
         for i in range(num_steps):
             opt_state = step(i, opt_state)
+        us = get_params(opt_state)
+
+        info = {}
+        info["grad"] = grad_fn(us)
+        info["cost"] = fn(us)
+        info["us"] = us
+        return info
+
+
+class OptimizerNumPyro(OptimizerMPC):
+    """NumPyro Optimizer for optimal control.
+
+    Includes Numpyro-powered vectorized optimizers. The advantage over JAX optimizers is that it works better with Numpyro inference.
+
+    """
+
+    def __init__(
+        self,
+        h_traj,
+        h_grad_u,
+        h_csum,
+        xdim,
+        udim,
+        horizon,
+        replan=True,
+        T=None,
+        features_keys=[],
+        method="adam",
+        name="",
+        test_mode=False,
+    ):
+        super().__init__(
+            h_traj,
+            h_grad_u,
+            h_csum,
+            xdim,
+            udim,
+            horizon,
+            replan=replan,
+            T=T,
+            features_keys=features_keys,
+            method=method,
+            name=name,
+            test_mode=test_mode,
+        )
+
+    def _minimize(self, fn, grad_fn, us0):
+        """Optimize fn using jax library.
+
+        Args:
+            fn (fn): cost function
+            grad_fn (fn): gradient function
+            us0 (ndarray): initial action guess (T, nbatch, udim)
+
+        """
+        if self._method == "momentum":
+            # Bad, try not to use momentum
+            optim = np_optimizers.Momentum(step_size=1e-3, mass=0.9)
+            num_steps = 200
+        elif self._method == "adam":
+            optim = np_optimizers.Adam(step_size=3e-2, b1=0.9, b2=0.99, eps=1e-8)
+            num_steps = 100
+        else:
+            raise NotImplementedError
+
+        get_params = lambda optim_state: optim.get_params(optim_state)
+        opt_update = lambda grads, optim_state: optim.update(grads, optim_state)
+        opt_init = lambda params: optim.init(params)
+
+        # Define a compiled update step
+        # @jax.jit
+        def step(opt_state):
+            us = get_params(opt_state)
+            g = grad_fn(us)
+            return opt_update(g, opt_state)
+
+        opt_state = opt_init(us0)
+        for i in range(num_steps):
+            opt_state = step(opt_state)
         us = get_params(opt_state)
 
         info = {}
