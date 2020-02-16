@@ -546,7 +546,9 @@ class Particles(object):
         new_ps = self._clone(new_weights)
         return new_ps
 
-    def entropy(self, bins, max_weights, verbose=True, method="histogram"):
+    def entropy(
+        self, bins, max_weights, verbose=True, method="histogram", log_scale=True
+    ):
         """Estimate entropy.
 
         Args:
@@ -568,7 +570,9 @@ class Particles(object):
         # Omit normalized weight
         del data[self._normalized_key]
         #  shape (nfeats - 1, nbatch)
-        data = onp.log(data.onp_array())
+        data = data.onp_array()
+        if not log_scale:
+            data = onp.log(data)
         if method == "gaussian":
             # scipy gaussian kde requires transpose
             kernel = gaussian_kde(data)
@@ -593,7 +597,7 @@ class Particles(object):
                 entropy += ent
         return entropy
 
-    def map_estimate(self, num_map, method="histogram"):
+    def map_estimate(self, num_map, method="histogram", log_scale=True):
         """Find maximum a posteriori estimate from current samples.
 
         Note:
@@ -605,7 +609,9 @@ class Particles(object):
         # Omit first weight
         del data[self._normalized_key]
         #  shape (nfeats - 1, nbatch)
-        data = onp.log(data.onp_array())
+        data = data.onp_array()
+        if not log_scale:
+            data = onp.log(data)
 
         if method == "histogram":
             assert (
@@ -622,8 +628,13 @@ class Particles(object):
                     which_bins, return_index=True, return_counts=True
                 )
                 for val, ct in zip(unique_vals, counts):
-                    val_bins_idx = which_bins == val
-                    probs[val_bins_idx] += float(ct) / len(row)
+                    try:
+                        val_bins_idx = which_bins == val
+                        probs[val_bins_idx] += float(ct) / len(row)
+                    except:
+                        import pdb
+
+                        pdb.set_trace()
             map_idxs = onp.argsort(-1 * probs)[:num_map]
             map_weights = self.weights[map_idxs]
             # MAP esimate usually used for evaluation; thread-safe to provide self._env

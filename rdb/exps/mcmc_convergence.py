@@ -223,9 +223,10 @@ class ExperimentMCMC(object):
     def _make_random_weights(self, keys):
         weights = OrderedDict()
         for key in keys:
-            weights[key] = np.exp(self._random_weight())
-        for key, val in weights.items():
-            weights[key] = val / weights[self._normalized_key]
+            if key == self._normalized_key:
+                weights[key] = 1.0
+            else:
+                weights[key] = np.exp(self._random_weight())
         return weights
 
     def run_designer(self, exp_mode):
@@ -262,7 +263,9 @@ class ExperimentMCMC(object):
             self._designer.true_w = prior_w
 
             ## Sample Designer
-            num_samples = self._designer._sampler.num_samples
+            num_samples = self._exp_params["DESIGNER_ARGS"]["sample_args"][
+                "num_samples"
+            ]
             save_name = f"designer_sample_{num_samples:04d}_prior_{n_prior:02d}"
             obs = self._designer.simulate(new_tasks, save_name=save_name)
 
@@ -298,7 +301,7 @@ class ExperimentMCMC(object):
             obs = [
                 self._designer.create_particles([w], save_name=obs_name) for w in obs_ws
             ]
-            num_samples = self._model._sampler.num_samples
+            num_samples = self._exp_params["IRD_ARGS"]["sample_args"]["num_samples"]
             belief_name = f"ird_sample_{num_samples:04d}_obs_{num_obs:02d}"
             belief = self._model.sample(tasks=obs_tasks, obs=obs, save_name=belief_name)
 
@@ -312,8 +315,8 @@ class ExperimentMCMC(object):
         self._random_choice = seed(random_choice, rng_key)
         random_weight = partial(
             random_uniform,
-            low=-self._exp_params["MAX_WEIGHT"],
-            high=self._exp_params["MAX_WEIGHT"],
+            low=-self._exp_params["WEIGHT_PARAMS"]["max_weights"],
+            high=self._exp_params["WEIGHT_PARAMS"]["max_weights"],
         )
         self._random_weight = seed(random_weight, rng_key)
         if self._fixed_task_seed is not None:

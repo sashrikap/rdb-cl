@@ -14,6 +14,38 @@ from rdb.exps.utils import Profiler
 from tqdm.auto import tqdm, trange
 from numpyro.handlers import seed
 from functools import partial
+from numpyro.infer import HMC, MCMC, NUTS, SA, MH
+
+
+# ========================================================
+# ============= Numpyro Interface Tools ==================
+# ========================================================
+
+
+def get_numpyro_sampler(
+    name, model, init_args={}, sampler_args={"num_warmup": 10, "num_sample": 10}
+):
+    """
+    Build numpyro kernel.
+
+    Args:
+        name (str)
+        model (fn): designer/IRD model
+        init_args (dict): initialization args
+
+    """
+    assert name in ["MH", "HMC", "NUTS", "SA"]
+    if name == "MH":
+        kernel = MH(model, **init_args)
+    elif name == "HMC":
+        kernel = HMC(model, **init_args)
+    elif name == "NUTS":
+        kernel = NUTS(model, **init_args)
+    elif name == "SA":
+        kernel = SA(model, **init_args)
+    else:
+        raise NotImplementedError
+    return MCMC(kernel, progress_bar=True, **sampler_args)
 
 
 # ========================================================
@@ -147,7 +179,10 @@ def visualize_chains(chains, rates, fig_dir, title, **kwargs):
     """Visualize multiple MCMC chains to check convergence.
 
     Args:
-        chains (list): list of accepted chains, [(n_samples, n_weights), ...]
+        chains (DictList): list of accepted chains
+            shape: nfeats * (nchains, nsamples)
+        rates (list): acceptance rates
+            shape: (nchains,)
         num_plots=10, visualize ~10%, 20%...99% samples
         fig_dir (str): directory to save the figure
         title (str): figure name, gets padded with plot index

@@ -53,7 +53,7 @@ def plot_weights(
     n_values = len(weights_dicts[0].values())
     fig, axs = plt.subplots(n_values, 1, figsize=(20, 2 * n_values), dpi=80)
     for i, key in enumerate(sorted(list(weights_dicts[0].keys()))):
-        values = [onp.log(s[key]) if log_scale else s[key] for s in weights_dicts]
+        values = [onp.log(s[key]) if not log_scale else s[key] for s in weights_dicts]
         n, bins, patches = axs[i].hist(
             values,
             bins,
@@ -73,7 +73,7 @@ def plot_weights(
             if d is None:
                 continue
             val = d[key]
-            if log_scale:
+            if not log_scale:
                 val = onp.log(val)
             axs[i].axvline(x=val, c=c)
             # add 0.05 gap so that labels don't overlap
@@ -99,11 +99,13 @@ def plot_weights_comparison(
     bins=100,
     log_scale=True,
     loc="upper right",
+    **kwargs,
 ):
     """Plot different lists weights for visualizing (e.g. MCMC convergence).
 
     Args:
-        highlight_dicts (list): list of weight dictionaries
+        all_weights_dicts (list(DictList)): list of weight dictionaries
+            shape: list(nfeats * (nsamples,))
         highlight_colors (list): list of colors for highlighting these weights
         all_labels (list):
         highlight_labels (list): list of labels for denoting these weights
@@ -120,19 +122,15 @@ def plot_weights_comparison(
         if len(weights_dicts) == 0:
             continue
 
-        n_values = len(weights_dicts[0].values())
+        n_values = len(list(weights_dicts.keys()))
         if axs is None:
             fig, axs = plt.subplots(n_values, 1, figsize=(20, 2 * n_values), dpi=80)
         # For each key in all dicts of that chain
-        for i, key in enumerate(sorted(list(weights_dicts[0].keys()))):
+        for i, key in enumerate(sorted(list(weights_dicts.keys()))):
             n_weights = len(weights_dicts)
-            values = []
-            for wi in range(n_weights):
-                weight_i = weights_dicts[wi]
-                values.append(onp.log(weight_i[key]) if log_scale else weight_i[key])
-            # Hacky: only take 1st dimension of weight_i[key], which works for visualizing
-            # weights (only 1dim), but not other things
-            values = onp.array(values)
+            values = onp.array(list(weights_dicts[key]))
+            if not log_scale:
+                values = onp.log(values)
             n, bins, patches = axs[i].hist(
                 values,
                 bins,

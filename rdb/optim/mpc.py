@@ -18,14 +18,12 @@ from rdb.optim.runner import Runner
 from rdb.exps.utils import Profiler
 from jax.lax import fori_loop, scan
 from jax.ops import index_update
-from jax.config import config
 import jax.random as random
 import jax.numpy as np
 import numpy as onp
 import jax
 
 key = random.PRNGKey(0)
-config.update("jax_enable_x64", True)
 
 
 # =====================================================
