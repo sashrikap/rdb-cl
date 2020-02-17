@@ -255,7 +255,9 @@ class Runner(object):
             cost_sum = costs.sum(axis=1)
 
         #  shape nfeats * (T, nbatch)
-        feats = DictList(self._roll_features(x0, actions), jax=jax)
+        feats = DictList(self._roll_features(x0, actions), jax=jax).prepare(
+            self._env.features_keys
+        )
         #  shape nfeats * (nbatch, T)
         feats = feats.transpose()
 
@@ -263,12 +265,16 @@ class Runner(object):
         #  shape nfeats * (nbatch,)
         feats_sum = feats.sum(axis=1)
         #  shape ncons * (T, nbatch,)
-        violations = DictList(self._env.constraints_fn(xs, actions), jax=jax)
+        violations = DictList(self._env.constraints_fn(xs, actions), jax=jax).prepare(
+            self._env.features_keys
+        )
         violations = violations.transpose()
         #  shape ncons * (nbatch, T,)
         vios_sum = violations.sum(axis=1)
         #  shape nneta * (T, nbatch,)
-        metadata = DictList(self._env.metadata_fn(xs, actions), jax=jax)
+        metadata = DictList(self._env.metadata_fn(xs, actions), jax=jax).prepare(
+            self._env.features_keys
+        )
         metadata = metadata.transpose()
 
         # Track JIT recompile

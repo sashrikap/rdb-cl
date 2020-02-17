@@ -53,18 +53,18 @@ def main(random_key):
 
     ## Prior sampling & likelihood functions for PGM
     def prior_fn(name=""):
-        # return LogUniformPrior(
-        #     normalized_key=WEIGHT_PARAMS["normalized_key"],
-        #     feature_keys=WEIGHT_PARAMS["feature_keys"],
-        #     log_max=WEIGHT_PARAMS["max_weights"],
-        #     name=name,
-        # )
-        return LogNormalPrior(
+        return LogUniformPrior(
             normalized_key=WEIGHT_PARAMS["normalized_key"],
             feature_keys=WEIGHT_PARAMS["feature_keys"],
-            std=WEIGHT_PARAMS["max_weights"] / 2,
+            log_max=WEIGHT_PARAMS["max_weights"],
             name=name,
         )
+        # return LogNormalPrior(
+        #     normalized_key=WEIGHT_PARAMS["normalized_key"],
+        #     feature_keys=WEIGHT_PARAMS["feature_keys"],
+        #     std=WEIGHT_PARAMS["max_weights"] / 2,
+        #     name=name,
+        # )
 
     ## Evaluation Server
     # eval_server = ParticleServer(

@@ -355,20 +355,28 @@ class Designer(object):
             ## ======= Computing Numerator: sample_xxx =======
             #  shape (nfeats, ntasks, nbatch)
             sample_costs = true_ws * sample_feats_sum
-            #  shape (nfeats, ntasks, nbatch) -> (nbatch, ), average across features and tasks
-            sample_rews = (-beta * sample_costs).mean(axis=(0, 1))
+            #  shape (nfeats, ntasks, nbatch) -> (ntasks, nbatch, ), average across features
+            sample_rews = (-beta * sample_costs).mean(axis=0)
+            #  shape (nbatch,)
+            # sample_rews = sample_rews.sum(axis=0)
+            sample_rews = sample_rews.mean(axis=0)
             assert sample_rews.shape == (nbatch,)
 
             ## =================================================
             ## ======= Computing Denominator: normal_xxx =======
-            #  shape (nfeats, ntasks, nbatch, 1)
-            normal_truth = np.expand_dims(true_ws.repeat(ntasks, axis=1), axis=3)
+            #  shape (nfeats, 1, nbatch, 1)
+            normal_truth = np.expand_dims(true_ws, axis=3)
             #  shape (nfeats, ntasks, nbatch, nnorms + 1)
-            normal_feats_sum = np.concatenate([normal_feats_sum, normal_truth], axis=3)
+            normal_feats_sum = np.concatenate(
+                [normal_feats_sum, np.expand_dims(sample_feats_sum, axis=3)], axis=3
+            )
+            #  shape (nfeats, ntasks, nbatch, nnorms + 1)
+            normal_costs = normal_truth * normal_feats_sum
             #  shape (ntasks, nbatch, nnorms + 1)
-            normal_rews = (normal_truth * normal_feats_sum).mean(axis=0)
+            normal_rews = (-beta * normal_costs).mean(axis=0)
             #  shape (nbatch, nnorms + 1)
-            normal_rews = normal_rews.sum(axis=0)
+            # normal_rews = normal_rews.sum(axis=0)
+            normal_rews = normal_rews.mean(axis=0)
             #  shape (nbatch,)
             normal_rews = jax_logsumexp(normal_rews, axis=1) - np.log(nnorms + 1)
             assert normal_rews.shape == (nbatch,)
