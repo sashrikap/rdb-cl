@@ -1,0 +1,667 @@
+"""MCMC Inference Algorithms.
+
+Given p(y | theta), estimate p(theta | y)
+
+Includes:
+    * Metropolis-Hasting Numpyro version (written as plug-in)
+    * Metropolis-Hasting Custon version
+
+Used for:
+    * Active Inverse Reward Design Experiments
+    * Divide and Conquer IRD
+
+Credits:
+    * Jerry Z. He 2019-2020
+
+"""
+
+import os
+import jax
+import copy
+import numpyro
+import numpy as onp
+import jax.numpy as np
+import numpyro.distributions as dist
+from numpyro.handlers import block, seed, substitute, trace, scale, condition
+from jax import jit, lax, partial, pmap, random, vmap, device_get, device_put
+from numpyro.infer.mcmc import MCMCKernel
+from jax.flatten_util import ravel_pytree
+from rdb.infer.dictlist import DictList
+from abc import ABC, abstractmethod
+from rdb.exps.utils import Profiler
+from collections import namedtuple
+from tqdm.auto import tqdm, trange
+from numpyro.infer.util import (
+    init_to_uniform,
+    get_potential_fn,
+    find_valid_initial_params,
+    log_density,
+)
+from numpyro.util import (
+    not_jax_tracer,
+    while_loop,
+    cond,
+    copy_docs_from,
+    fori_collect,
+    fori_loop,
+    identity,
+    not_jax_tracer,
+    cached_by,
+)
+from jax import random
+
+
+class Inference(object):
+    """ Generic Inference Class
+
+    Args:
+        kernel (fn)
+
+    Example:
+        >>> data = self.kernel() # p(obs | theta) p(theta)
+
+    Notes:
+        kernel: p(theta) p(obs | theta)
+
+    """
+
+    def __init__(
+        self, rng_key, kernel, prior, proposal, num_samples, num_warmups, num_chains=1
+    ):
+        self._rng_key = rng_key
+        self._kernel = kernel
+        self._prior = prior
+        self._proposal = proposal
+        self._num_samples = num_samples
+        self._num_warmups = num_warmups
+        assert (
+            isinstance(num_chains, int) and num_chains > 0
+        ), f"Cannot use {num_chains} chains"
+        self._num_chains = num_chains
+
+    @property
+    def num_samples(self):
+        return self._num_samples
+
+    @property
+    def kernel(self):
+        return self._kernel
+
+    def update_key(self, rng_key):
+        self._rng_key = rng_key
+
+    def sample(self, obs, *args, **kwargs):
+        """Estimate p(theta | obs).
+
+        Notes:
+            [1] Estimate marginal p(obs)
+            [2] Sample p(obs, theta) = p(obs | theta) p(theta)
+            [3] Divide p(obs, theta) / p(obs)
+
+        """
+        raise NotImplementedError
+
+    def marginal(self):
+        """ Estimate p(obs) = sum_{theta} [p(obs | theta) p(theta)].
+
+        Notes:
+            [1] Randomly sample theta, condition on `obs`
+            [2] Sum up samples
+
+        """
+        raise NotImplementedError
+
+
+# =========================================================================
+# ======================== RDB MCMC Algorithm =============================
+# =========================================================================
+
+
+class RDB_MH(Inference):
+    """Metropolis-Hasting Algorithm.
+
+    Note:
+        * Basic Implementation.
+        * When sampling, initialize from observation.
+        * By default, state uses np.array. Also supports rdb.infer.dictlist
+
+    Args:
+        num_samples (int): number of samples to return
+        num_warmups (int): number of warmup iterations
+        proposal (Proposal): given one sample, return next
+        num_chains (int): if >=1, use 1st chain for sampling, others for convergence checking
+        kernel (fn): inference kernel
+        use_dictlist (bool): state represented by DictList
+
+    Kernel args:
+        obs (ndarray): (obs_dim, )
+        state (ndarray): (obs_dim, )
+        tasks (ndarray): (ntasks, )
+
+    """
+
+    def __init__(
+        self,
+        rng_key,
+        kernel,
+        prior,
+        proposal,
+        num_samples,
+        num_warmups,
+        num_chains=1,
+        use_dictlist=False,
+    ):
+        super().__init__(
+            rng_key,
+            kernel=kernel,
+            prior=prior,
+            proposal=proposal,
+            num_samples=num_samples,
+            num_warmups=num_warmups,
+            num_chains=num_chains,
+        )
+        self._coin_flip = None
+        self._use_dictlist = use_dictlist
+
+    def _concatenate(self, array_a, array_b):
+        """DictList does not support np.concatenate."""
+        if self._use_dictlist and isinstance(array_a, DictList):
+            return array_a.concat(array_b)
+        else:
+            return np.concatenate([array_a, array_b])
+
+    def _vectorize_state(self, state):
+        """Vectorize for batch sampling.
+
+        Args:
+            state: (state_dim, ...)
+
+        Output:
+            state: (nchains, state_dim, ...)
+
+        """
+        if self._use_dictlist:
+            #  shape nfeats * (nstate, ...)
+            return DictList([state for _ in range(self._num_chains)], jax=True)
+        else:
+            return np.repeat(state[None, :], self._num_chains, axis=0)
+
+    def _mh_step(self, obs, state, logpr, *args, **kwargs):
+        """Metropolis hasing step.
+
+        Args:
+            obs (ndarray): (xdim, ...)
+            state (ndarray): current sample state (nbatch, xdim, ...)
+
+        Output:
+            accept (bool array): (nbatch,)
+            next_state (ndarray): (nbatch, xdim, ...)
+            next_log_prob: (nbatch,)
+
+        """
+
+        assert self._rng_key is not None, "Need to initialize with random key"
+        assert len(state) == self._num_chains
+
+        ## Sample next state (nbatch, xdim)
+        # with Profiler("MH Proposal"):
+        next_state = self._proposal(state)
+        # with Profiler("MH Kernel 1"):
+        next_logpr = self._kernel(obs, next_state, **kwargs)
+        # with Profiler("MH Others 1.1"):
+        # with Profiler("MH Others 1.4"):
+        logp_ratio = next_logpr - logpr
+        # print(type(next_logpr), type(logpr))
+        # with Profiler("MH Others 1.5"):
+        ## Accept or not (nbatch,)
+        coin_flip = np.log(self._coin_flip())
+
+        if False:
+            # if True:
+            print(f"next {next_logpr} curr {logpr} ratio {logp_ratio} flip {coin_flip}")
+        # with Profiler("MH Others 2"):
+        accept = coin_flip < np.array(logp_ratio)
+
+        ## Check and mask out -inf
+        pos_inf = np.logical_and(np.isinf(next_logpr), next_logpr > 0)
+        neg_inf = np.isneginf(next_logpr)
+        assert not any(pos_inf)
+        # with Profiler("MH Others 3"):
+        next_logpr = jax.ops.index_update(next_logpr, neg_inf, 0.0)
+        # next_logpr[neg_inf] = 0.0
+
+        ## Accept for next state
+        # with Profiler("MH Others 4"):
+        not_accept = np.logical_not(accept)
+        #  shape (nbatch, )
+        next_logpr = next_logpr * accept + logpr * not_accept
+        #  shape (nbatch, xdim)
+        next_state = next_state * accept + state * not_accept
+        # with Profiler("MH Others 5"):
+        assert next_logpr.shape == (self._num_chains,)
+        assert next_state.shape == state.shape
+        return accept, next_state, next_logpr
+
+    def _create_coin_flip(self):
+        def raw_fn():
+            return numpyro.sample("accept", dist.Uniform(0, 1))
+
+        def raw_fn_multi():
+            return numpyro.sample(
+                "accept", dist.Uniform(0, 1), sample_shape=(self._num_chains,)
+            )
+
+        return seed(raw_fn_multi, self._rng_key)
+
+    def update_key(self, rng_key):
+        self._rng_key = rng_key
+        self._proposal.update_key(rng_key)
+        self._coin_flip = self._create_coin_flip()
+
+    def sample(
+        self,
+        obs,
+        init_state=None,
+        num_warmups=None,
+        num_samples=None,
+        name="",
+        *args,
+        **kwargs,
+    ):
+        """Vectorized MH Sample.
+
+        Args:
+            obs (ndarray/DictList): observation
+                shape (ndarray): (state_dim,)
+                shape (DictList): nkeys * (state_dim,)
+            init_state (xdim,), use expand_dims=True
+
+        """
+
+        if num_warmups is None:
+            num_warmups = self._num_warmups
+        if num_samples is None:
+            num_samples = self._num_samples
+        ## Preprocessing
+        state = init_state if init_state is not None else obs
+
+        ## Expand dimension into batch-first
+        obs = self._vectorize_state(obs)
+        state = self._vectorize_state(state)
+        log_prob = self._kernel(obs, state, **kwargs)
+        assert log_prob.shape == (self._num_chains,)
+
+        ## Warm-up phase
+        warmup_accepts = []
+        print(f"MH Samplint Chains={self._num_chains}")
+        pbar = tqdm(total=self._num_warmups, desc="MH Warmup")
+        for i in range(self._num_warmups):
+            accept, state, log_prob = self._mh_step(
+                obs, state, log_prob, *args, **kwargs
+            )
+            log_prob = np.array(log_prob)
+            warmup_accepts.append(accept)
+            rate, num = self._get_counts(warmup_accepts, chain=0)
+            pbar.n, pbar.last_print_n = i + 1, i + 1
+            pbar.refresh()
+            pbar.set_description(f"MH Warmup {name}; Accept {100 * rate:.1f}%")
+
+        ## Actual sampling phase (idential to warmup)
+        samples = []
+        accepts = []
+        pbar = tqdm(total=num_samples, desc="MH Sampling")
+        num = 0
+        nsteps = 0
+        while not num == num_samples:
+            accept, state, log_prob = self._mh_step(
+                obs, state, log_prob, *args, **kwargs
+            )
+            accepts.append(accept)
+            samples.append(state)
+            nsteps += 1
+            rate, num = self._get_counts(accepts, chain=0)
+            pbar.n, pbar.last_print_n = num, num
+            pbar.refresh()
+            pbar.set_description(f"MH Sampling {name}; Accept {100 * rate:.1f}%")
+
+        ## Check multi-chain result shapes
+        #  samples (nsteps, self._num_chains, xdim...)
+        if self._use_dictlist:
+            samples = DictList(samples)
+        else:
+            samples = np.array(samples)
+        #  accepts (nsteps, self._num_chains)
+        accepts = np.array(accepts)
+        assert accepts.shape == (nsteps, self._num_chains)
+        ## Summarize and select accepted
+        rates = self._summarize(samples, accepts, name)
+        accepted_chains = self._accepted_samples(samples, accepts)
+        info = {"all_chains": accepted_chains, "rates": rates}
+        main_chain = accepted_chains[0]
+        return main_chain, info
+
+    def _get_counts(self, accepts, chain=0):
+        """Calculate acceptance rate.
+
+        Args:
+            accepts (list): one or multiple chains.
+
+        """
+        accepts = np.array(accepts)
+        # Take first chain
+        assert chain < accepts.shape[1]
+        rate = accepts[:, chain].sum() / len(accepts[:, chain])
+        num = accepts[:, chain].sum()
+        return rate, num
+
+    def _summarize(self, samples, accepts, name):
+        """Summary after one MCMC sample round.
+
+        Args:
+            accepts (list): one or multiple chains.
+
+        """
+        accepts = np.array(accepts)
+        rates = []
+        for chain in range(self._num_chains):
+            rate, num = self._get_counts(accepts, chain=chain)
+            print(f"{name} MH chain {chain} rate {rate:.3f} accept {num}")
+            rates.append(rate)
+        return rates
+
+    def _accepted_samples(self, samples, accepts):
+        """Select accepted samples from the main chain.
+
+        Args:
+            samples (ndarray): (nsteps, nchains, xdim)
+            accepts (ndarray): (nsteps, nchains, 1)
+
+        """
+
+        accepted_samples = []
+        for chain in range(self._num_chains):
+            chain_samples = samples[:, chain]
+            chain_accepts = accepts[:, chain]
+            accepted_samples.append(chain_samples[list(chain_accepts)])
+        assert len(accepted_samples[0]) == self._num_samples
+        return accepted_samples
+
+
+# =========================================================================
+# ======================== Numpyro MCMC Algorithm =========================
+# =========================================================================
+
+
+MHState = namedtuple(
+    "MHState",
+    [
+        "i",
+        "z",
+        "curr_log_prob",
+        "num_steps",
+        "mean_accept_prob",
+        "rng_key",
+        "diverging",
+    ],
+)
+"""
+A :func:`~collections.namedtuple` consisting of the following fields:
+
+ - **curr_state** - current state.
+ - **rng_key** - random number generator seed used for the iteration.
+"""
+
+
+def mh_draws(state, proposal_var, rng_key=None):
+    """
+    Draw next state for metropolis hasting.
+
+    :param jax.random.PRNGKey rng_key: source of the randomness, defaults to `jax.random.PRNGKey(0)`.
+    """
+    rng_key = random.PRNGKey(0) if rng_key is None else rng_key
+
+    sample_val = (
+        lambda mean: random.normal(rng_key, mean.shape) * np.sqrt(proposal_var) + mean
+    )
+
+    return sample_val(state)
+
+
+def mh(model, proposal_var, max_val):
+    r"""
+    Metropolis Hasting inference.
+
+    **References:**
+
+    :param potential_fn: Python callable that computes the potential energy
+        given input parameters. The input parameters to `potential_fn` can be
+        any python collection type, provided that `init_params` argument to
+        `init_kernel` has the same type.
+    :param potential_fn_gen: Python callable that when provided with model
+        arguments / keyword arguments returns `potential_fn`. This
+        may be provided to do inference on the same model with changing data.
+        If the data shape remains the same, we can compile `sample_kernel`
+        once, and use the same for multiple inference runs.
+    :param kinetic_fn: Python callable that returns the kinetic energy given
+        inverse mass matrix and momentum. If not provided, the default is
+        euclidean kinetic energy.
+    :return: a tuple of callables (`init_kernel`, `sample_kernel`), the first
+        one to initialize the sampler, and the second one to generate samples
+        given an existing one.
+
+    .. warning::
+        Instead of using this interface directly, we would highly recommend you
+        to use the higher level :class:`numpyro.infer.MCMC` API instead.
+
+    """
+
+    mh_proposal_var = None
+    wa_steps = None
+
+    def init_kernel(
+        init_params,
+        num_warmup,
+        model_args=(),
+        model_kwargs=None,
+        rng_key=random.PRNGKey(0),
+    ):
+        """
+        Initializes the MH sampler.
+
+        :param init_params: Initial parameters to begin sampling. The type must
+            be consistent with the input type to `potential_fn`.
+        :param int num_warmup: Number of warmup steps; samples generated
+            during warmup are discarded.
+        :param tuple model_args: Model arguments if `potential_fn_gen` is specified.
+        :param dict model_kwargs: Model keyword arguments if `potential_fn_gen` is specified.
+        :param jax.random.PRNGKey rng_key: random key to be used as the source of
+            randomness.
+
+        """
+        nonlocal mh_proposal_var, wa_steps
+        wa_steps = num_warmup
+        mh_proposal_var = proposal_var
+        z = init_params
+        kwargs = {} if model_kwargs is None else model_kwargs
+        init_log_prob, _ = log_density(model, model_args, model_kwargs, init_params)
+        mh_state = MHState(0.0, z, init_log_prob, 0.0, 0.0, rng_key, False)
+        return device_put(mh_state)
+
+    def _next(curr_state, curr_log_prob, model_args, model_kwargs, rng_key):
+
+        curr_flat, unravel_fn = ravel_pytree(curr_state)
+        next_log_prob, next_flat = -np.inf, curr_flat
+        init_val = (next_flat, next_log_prob, False, 0.0, rng_key)
+
+        def _cond_fn(val):
+            (_, _, accept, _, _) = val
+            return np.logical_not(accept)
+
+        def _step_mh(rng_key):
+            next_flat = mh_draws(curr_flat, mh_proposal_var, rng_key)
+            next_state = unravel_fn(next_flat)
+            next_log_prob, _ = log_density(model, model_args, model_kwargs, next_state)
+            return next_flat, next_log_prob
+
+        def _body_fn(val):
+            (_, _, _, n, rng_key) = val
+            rng_key, rng_mh_sample, rng_mh_step = random.split(rng_key, 3)
+            next_flat, next_log_prob = _step_mh(rng_mh_step)
+
+            accept_log_prob = (
+                next_log_prob - curr_log_prob
+            )  # Forward logit minus last logit
+            coin_flip_prob = np.log(
+                random.uniform(rng_mh_sample, accept_log_prob.shape)
+            )
+
+            feasible = np.all((next_flat < max_val) * (next_flat > -1 * max_val))
+            accept = np.logical_and(coin_flip_prob < accept_log_prob, feasible)
+            return (next_flat, next_log_prob, accept, n + 1.0, rng_key)
+
+        terminal_val = while_loop(_cond_fn, _body_fn, init_val)
+        (next_flat, next_log_prob, _, n, rng_key) = terminal_val
+        next_state = unravel_fn(next_flat)
+
+        return next_state, next_log_prob, n, 1.0 / n
+
+    def sample_kernel(mh_state, model_args=(), model_kwargs=None):
+        """
+        Given an existing :data:`~numpyro.infer.mcmc.MHState`, run MH with fixed (possibly adapted)
+        step size and return a new :data:`~numpyro.infer.mcmc.MHState`.
+
+        :param mh_state: Current sample (and associated state).
+        :param tuple model_args: Model arguments if `potential_fn_gen` is specified.
+        :param dict model_kwargs: Model keyword arguments if `potential_fn_gen` is specified.
+        :return: new proposed :data:`~numpyro.infer.mcmc.MHState` from simulating
+            Hamiltonian dynamics given existing state.
+
+        """
+        model_kwargs = {} if model_kwargs is None else model_kwargs
+        rng_key, rng_next_key = random.split(mh_state.rng_key)
+
+        next_state, next_log_prob, num_steps, accept_prob = _next(
+            mh_state.z, mh_state.curr_log_prob, model_args, model_kwargs, rng_next_key
+        )
+
+        itr = mh_state.i + 1
+        n = np.where(mh_state.i < wa_steps, itr, itr - wa_steps)
+        mean_accept_prob = (
+            mh_state.mean_accept_prob + (accept_prob - mh_state.mean_accept_prob) / n
+        )
+
+        return MHState(
+            itr, next_state, next_log_prob, num_steps, mean_accept_prob, rng_key, False
+        )
+
+    # Make `init_kernel` and `sample_kernel` visible from the global scope once
+    # `mh` is called for sphinx doc generation.
+    if "SPHINX_BUILD" in os.environ:
+        mh.init_kernel = init_kernel
+        mh.sample_kernel = sample_kernel
+
+    return init_kernel, sample_kernel
+
+
+class NumPyro_MH(MCMCKernel):
+    """
+    Metropolis Hasting inference.
+
+    :param model: Python callable containing Pyro :mod:`~numpyro.primitives`.
+        If model is provided, `potential_fn` will be inferred using the model.
+    :param float proposal_var: Proposal variance
+    :param callable init_strategy: a per-site initialization function.
+        See :ref:`init_strategy` section for available functions.
+    """
+
+    def __init__(
+        self,
+        model=None,
+        proposal_var=None,
+        max_val=np.inf,
+        init_strategy=init_to_uniform(),
+    ):
+        self._model = model
+        self._proposal_var = proposal_var
+        self._max_val = max_val
+        self._algo = "MH"
+        # Set on first call to init
+        self._postprocess_fn = None
+        self._sample_fn = None
+        self._init_fn = None
+        self._init_strategy = init_strategy
+
+    def _init_state(self, rng_key, model_args, model_kwargs):
+        self._init_fn, self._sample_fn = mh(
+            self._model, proposal_var=self._proposal_var, max_val=self._max_val
+        )
+
+    @property
+    def model(self):
+        return self._model
+
+    @copy_docs_from(MCMCKernel.init)
+    def init(
+        self, rng_key, num_warmup, init_params=None, model_args=(), model_kwargs={}
+    ):
+        # non-vectorized
+        if rng_key.ndim == 1:
+            rng_key, rng_key_init_model = random.split(rng_key)
+        # vectorized
+        else:
+            rng_key, rng_key_init_model = np.swapaxes(vmap(random.split)(rng_key), 0, 1)
+            # we need only a single key for initializing PE / constraints fn
+            rng_key_init_model = rng_key_init_model[0]
+        if not self._init_fn:
+            self._init_state(rng_key_init_model, model_args, model_kwargs)
+        # Find valid initial params
+        if self._model and not init_params:
+            init_params, is_valid = find_valid_initial_params(
+                rng_key,
+                self._model,
+                init_strategy=self._init_strategy,
+                param_as_improper=True,
+                model_args=model_args,
+                model_kwargs=model_kwargs,
+            )
+            if not_jax_tracer(is_valid):
+                if device_get(~np.all(is_valid)):
+                    raise RuntimeError(
+                        "Cannot find valid initial parameters. "
+                        "Please check your model again."
+                    )
+        mh_init_fn = lambda init_params, rng_key: self._init_fn(  # noqa: E731
+            init_params,
+            num_warmup,
+            rng_key=rng_key,
+            model_args=model_args,
+            model_kwargs=model_kwargs,
+        )
+        if rng_key.ndim == 1:
+            init_state = mh_init_fn(init_params, rng_key)
+        else:
+            # XXX it is safe to run mh_init_fn under vmap despite that mh_init_fn changes some
+            # nonlocal variables: momentum_generator, wa_update, trajectory_len, max_treedepth,
+            # wa_steps because those variables do not depend on traced args: init_params, rng_key.
+            init_state = vmap(mh_init_fn)(init_params, rng_key)
+            sample_fn = vmap(self._sample_fn, in_axes=(0, None, None))
+            self._sample_fn = sample_fn
+        return init_state
+
+    @copy_docs_from(MCMCKernel.postprocess_fn)
+    def postprocess_fn(self, args, kwargs):
+        if self._postprocess_fn is None:
+            return identity
+        return self._postprocess_fn(*args, **kwargs)
+
+    def sample(self, state, model_args, model_kwargs):
+        """
+        Run MH from the given :data:`~numpyro.infer.mcmc.MHState` and return the resulting
+        :data:`~numpyro.infer.mcmc.MHState`.
+
+        :param MHState state: Represents the current state.
+        :param model_args: Arguments provided to the model.
+        :param model_kwargs: Keyword arguments provided to the model.
+        :return: Next `state` after running MH.
+        """
+        return self._sample_fn(state, model_args, model_kwargs)

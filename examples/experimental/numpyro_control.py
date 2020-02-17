@@ -173,7 +173,12 @@ def ird_experimental():
 
     # dummy compilation
     def cost_fn(weights_arr):
-        actions = untraceable_controller(np.array(weights_arr))[0]
+        # actions = untraceable_controller(np.array(weights_arr))[0]
+        with jax.disable_jit():
+            state = np.repeat(env.state, nbatch, axis=0)
+            actions = optimizer(
+                state, weights=None, weights_arr=weights_arr, batch=False
+            )
         print("actions", actions.shape)
         # traj, costs, info = runner(
         #     state, actions, weights=None, weights_arr=np.array(weights_arr), jax=True
@@ -184,9 +189,12 @@ def ird_experimental():
         cost = actions.sum()
         return cost
 
-    jax.jit(cost_fn)(weights_arr)
-    cost_grad = jax.grad(cost_fn)
-    # import pdb; pdb.set_trace()
+    # jax.jit(cost_fn)(weights_arr)
+    # cost_fn(weights_arr)
+    # cost_grad = jax.grad(cost_fn)
+    import pdb
+
+    pdb.set_trace()
     cost = cost_fn(weights_arr)
     # import pdb; pdb.set_trace()
     cost_g = cost_grad(weights_arr)
@@ -208,7 +216,7 @@ def main():
 
     print("Starting inference...")
     rng_key = random.PRNGKey(2)
-    kernel = NUTS(ird_experimental)
+    kernel = MH(ird_experimental, proposal_var=0.05)
     num_warmup = 20
     num_samples = 40
     mcmc = MCMC(

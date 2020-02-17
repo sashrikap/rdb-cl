@@ -288,7 +288,7 @@ class ExperimentMCMC(object):
         assert self._random_task_choice is not None
         all_tasks = self._designer.env.all_tasks
 
-        for num_obs in range(1, self._max_ird_obs_num):
+        for num_obs in range(1, len(self._all_ird_obs_ws)):
             # for num_obs in range(3, 4):
 
             print(f"Experiment mode ({self._rng_name}): {exp_mode}")

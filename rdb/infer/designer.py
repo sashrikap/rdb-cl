@@ -86,8 +86,8 @@ class Designer(object):
         self._prior = None
         self._model = None
         self._sampler = None
-        self._likelihood_ird = None
-        self._likelihood_designer = None
+        self._likelihood = self._build_likelihood(self._beta)
+        self._likelihood_ird = self._build_likelihood(self._beta)
         self._sample_args = sample_args
         self._sample_method = sample_method
         self._sample_init_args = sample_init_args
@@ -104,7 +104,7 @@ class Designer(object):
 
     @property
     def likelihood(self):
-        return self._likelihood_designer
+        return self._likelihood
 
     @property
     def likelihood_ird(self):
@@ -179,28 +179,40 @@ class Designer(object):
         if self._use_true_w:
             return self._truth
         else:
-            assert self._prior_tasks is not None, "Need >=0 prior tasks."
             ## Sample based on prior tasks + new_tasks
+            assert self._prior_tasks is not None, "Need >=0 prior tasks."
             if len(self._prior_tasks) == 0:
                 assert len(new_tasks.shape) == 2 and len(new_tasks) == 1
                 tasks = new_tasks
             else:
                 tasks = onp.concatenate([self._prior_tasks, new_tasks])
 
-            ## Pre-empt computation
+            ## ==============================================================
+            ## =================== Pre-empt Computations ====================
             self._normalizer.compute_tasks(tasks, vectorize=False)
-            ## Sample
-            true_ws = self._truth.weights
+
+            ## ==============================================================
+            ## ======================= MCMC Sampling ========================
+            self._model = self._build_model(self._likelihood)
+            self._sampler = get_rdb_sampler(
+                self._sample_method,
+                self._model,
+                self._sample_init_args,
+                self._sample_args,
+            )
+            # with jax.disable_jit():
             self._rng_key, rng_sampler = random.split(self._rng_key, 2)
             self._sampler.run(
                 rng_sampler,
                 nbatch=1,
-                true_ws=true_ws,
+                true_ws=self._truth.weights,
                 tasks=tasks,
-                init_params=true_ws[0],
+                init_params=self._truth.weights[0],
             )
+
+            ## ==============================================================
+            ## ====================== Analyze Samples =======================
             samples = self._sampler.get_samples()
-            ## Visualize multiple MCMC chains to check convergence.
             visualize_chains(
                 chains=samples,
                 rates=info["rates"],
@@ -281,16 +293,7 @@ class Designer(object):
             log_scale=False,
         )
         # Build likelihood and model
-        self._build_sampler()
-
-    def _build_sampler(self):
         self._prior = self._prior_fn("designer")
-        self._model = self._build_model(self._likelihood_designer)
-        self._likelihood_designer = self._build_likelihood(self._beta)
-        self._likelihood_ird = self._build_likelihood(self._beta)
-        self._sampler = get_numpyro_sampler(
-            self._sample_method, self._model, self._sample_init_args, self._sample_args
-        )
 
     def _build_model(self, likelihood_fn):
         """Build Designer PGM model."""
@@ -332,8 +335,8 @@ class Designer(object):
                   (1) nbatch=nchain in designer.sample
                   (1) nbatch=nnorms in ird.sample
                 * To stabilize MH sampling
-                  (1) average across tasks (instead of sum)
-                  (2) average across features costs (instead of sum)
+                  (1) sum across tasks
+                  (2) average across features
 
             Return:
                 log_probs (ndarray): (nbatch, )

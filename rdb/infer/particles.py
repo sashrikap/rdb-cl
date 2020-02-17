@@ -10,6 +10,7 @@ from numpyro.handlers import scale, condition, seed
 from fast_histogram import histogram1d
 from scipy.stats import gaussian_kde
 from rdb.exps.utils import Profiler
+from jax import random
 import jax.numpy as np
 import numpy as onp
 import copy
@@ -80,8 +81,8 @@ class Particles(object):
             self._random_choice = seed(random_choice, rng_key)
 
     def update_key(self, rng_key):
-        self._rng_key = rng_key
-        self._random_choice = seed(random_choice, rng_key)
+        self._rng_key, rng_choice = random.split(rng_key)
+        self._random_choice = seed(random_choice, rng_choice)
         self._expanded_name = f"weights_seed_{self._rng_name}_{self._save_name}"
 
     def build_cache(self):

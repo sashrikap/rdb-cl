@@ -41,24 +41,23 @@ USER_TRUE_W: False
 ## Full sampling
 IRD_ARGS:
   num_normalizers: 200
-  # sample_method: "MH"
-  # sample_init_args:
-  #   proposal_var: 1
-  #   max_val: 15.0
-  sample_method: "HMC"
+  sample_method: "MH"
+  sample_init_args:
+    proposal_var: 2
+    max_val: 15.0
+  # sample_method: "HMC"
   # sample_method: "NUTS"
   # sample_init_args:
   #   step_size: 0.2
   sample_args:
     num_warmup: 200
-    num_samples: 1000
-    num_chains: 1
+    num_samples: 2000
+    num_chains: 3
   # exp_name: "ird_convergence_random_w_random_tasks_norm_1000_beta_10_var_5"
   # exp_name: "ird_convergence_true_w_random_tasks_norm_1000_beta_10_var_5"
   # exp_name: "ird_convergence_true_w_prior_tasks_norm_1000_beta_100_var_1"
-  # exp_name: "ird_convergence_true_w_prior_tasks_mean_norm_200_beta_10_var_1"
-  # exp_name: "ird_convergence_true_w_prior_tasks_nuts_norm_1000_beta_100_var_1"
-  exp_name: "ird_convergence_true_w_prior_tasks_hmc_mean_norm_1000_beta_100_var_1"
+  exp_name: "ird_convergence_true_w_prior_tasks_sum_norm_200_beta_10_var_2"
+  # exp_name: "ird_convergence_true_w_random_tasks_sum_norm_200_beta_10_var_2"
 
 DESIGNER_ARGS:
   num_normalizers: 200
@@ -69,7 +68,7 @@ DESIGNER_ARGS:
   sample_args:
     num_samples: 1000
     num_warmup: 200
-    num_chains: 1
+    num_chains: 3
   beta: 10
   use_true_w: False
   true_w: NULL

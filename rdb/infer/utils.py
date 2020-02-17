@@ -14,11 +14,13 @@ from rdb.exps.utils import Profiler
 from tqdm.auto import tqdm, trange
 from numpyro.handlers import seed
 from functools import partial
-from numpyro.infer import HMC, MCMC, NUTS, SA, MH
+from numpyro.infer import HMC, MCMC, NUTS, SA
+from rdb.infer.mcmc import NumPyro_MH, RDB_MH
 
+# from rdb.infer.mcmc import MH as RDB_MH
 
 # ========================================================
-# ============= Numpyro Interface Tools ==================
+# ============= Sampling Interface Tools =================
 # ========================================================
 
 
@@ -36,13 +38,34 @@ def get_numpyro_sampler(
     """
     assert name in ["MH", "HMC", "NUTS", "SA"]
     if name == "MH":
-        kernel = MH(model, **init_args)
+        kernel = NumPyro_MH(model, **init_args)
     elif name == "HMC":
         kernel = HMC(model, **init_args)
     elif name == "NUTS":
         kernel = NUTS(model, **init_args)
     elif name == "SA":
         kernel = SA(model, **init_args)
+    else:
+        raise NotImplementedError
+    return MCMC(kernel, progress_bar=True, **sampler_args)
+
+
+def get_rdb_sampler(
+    name, model, init_args={}, sampler_args={"num_warmup": 10, "num_sample": 10}
+):
+    """
+    Build rdb kernel, which shares API as numpyro but avoids jitting the model.
+    Currently only Metropolis Hasting implemented.
+
+    Args:
+        name (str)
+        model (fn): designer/IRD model
+        init_args (dict): initialization args
+
+    """
+    assert name in ["MH"]
+    if name == "MH":
+        kernel = RDB_MH(model, **init_args)
     else:
         raise NotImplementedError
     return MCMC(kernel, progress_bar=True, **sampler_args)

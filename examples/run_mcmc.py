@@ -6,7 +6,7 @@ Note:
 """
 import numpyro
 
-numpyro.set_host_device_count(4)
+numpyro.set_host_device_count(3)
 
 from rdb.exps.mcmc_convergence import ExperimentMCMC
 from rdb.exps.active import ActiveInfoGain, ActiveRatioTest, ActiveRandom

@@ -1,7 +1,6 @@
 """Inverse Reward Design Module for Optimal Control.
 
 Includes:
-[1] General PGM inference API
 [2] Reward Design with Divide and Conquer
 [3] Different ways (max_norm/sample/hybrid) to approximate IRD normalizer
 [4] Designer Class
@@ -25,9 +24,7 @@ from rdb.infer.designer import Designer, DesignerInteractive
 from jax.scipy.special import logsumexp as jax_logsumexp
 from numpyro.handlers import scale, condition, seed
 from rdb.infer.particles import Particles
-from rdb.infer.pgm import PGM
 from tqdm.auto import tqdm, trange
-from rdb.infer.algos import *
 from rdb.infer.utils import *
 from rdb.exps.utils import *
 from os.path import join
@@ -301,9 +298,7 @@ class IRDOptimalControl(object):
 
             ## ==================================================
             ## ================= Aggregate tasks ================
-            log_prob = (sample_probs - normal_probs).mean()
-            # import pdb; pdb.set_trace()
-            # log_prob = (sample_probs - normal_probs).sum()
+            log_prob = (sample_probs - normal_probs).sum()
             return log_prob
 
         return _model
@@ -344,8 +339,8 @@ class IRDOptimalControl(object):
 
         print(f"Sampling IRD (obs={len(obs)}): {save_name}")
 
-        ## ==========================================
-        ## ============= MCMC Sampling ==============
+        ## ==============================================================
+        ## ======================= MCMC Sampling ========================
         #  shape nfeats * (ntasks,)
         observe_ws = DictList([ob.weights for ob in obs], jax=True).squeeze(1)
         ird_model = self._build_model(observe_ws, tasks)
@@ -357,16 +352,16 @@ class IRDOptimalControl(object):
         if num_chains > 1:
             #   shape nfeats * (nchains,) -> nfeats * (nchains, 1)
             init_params = init_params.repeat(num_chains, axis=0).expand_dims(1)
-        self._rng_key, rng_sampler = random.split(self._rng_key, 2)
         # with jax.disable_jit():
+        self._rng_key, rng_sampler = random.split(self._rng_key, 2)
         sampler.run(
             rng_sampler,
             init_params=dict(init_params),
             extra_fields=["mean_accept_prob"],
         )
 
-        ## ==========================================
-        ## ============ Analyze Samples =============
+        ## ==============================================================
+        ## ====================== Analyze Samples =======================
         sample_ws = sampler.get_samples(group_by_chain=True)
         #  shape nfeats * (nchains, nsample, 1) -> (nchains, nsample)
         sample_ws = DictList(sample_ws).squeeze(axis=2)
