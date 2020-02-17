@@ -221,6 +221,20 @@ class DictList(dict):
             data[key] = val
         return DictList(data, jax=self._jax)
 
+    def log(self):
+        """Return log value"""
+        data = OrderedDict()
+        for key, val in self.items():
+            data[key] = self._np.log(val)
+        return DictList(data, jax=self._jax)
+
+    def exp(self):
+        """Return log value"""
+        data = OrderedDict()
+        for key, val in self.items():
+            data[key] = self._np.exp(val)
+        return DictList(data, jax=self._jax)
+
     def transpose(self):
         """Transpose every value."""
         data = OrderedDict()

@@ -249,7 +249,7 @@ class ExperimentMCMC(object):
         ## Simulate
         for n_prior in range(len(self._all_designer_prior_tasks)):
 
-            print(f"Experiment mode ({self._rng_key}) {exp_mode}")
+            print(f"Experiment mode ({self._rng_name}) {exp_mode}")
             print(f"Prior task number: {n_prior}")
 
             prior_tasks = self._all_designer_prior_tasks[:n_prior]
@@ -291,7 +291,7 @@ class ExperimentMCMC(object):
         for num_obs in range(1, self._max_ird_obs_num):
             # for num_obs in range(3, 4):
 
-            print(f"Experiment mode ({self._rng_key}): {exp_mode}")
+            print(f"Experiment mode ({self._rng_name}): {exp_mode}")
             print(f"Observation number: {num_obs}")
 
             ## Simulate
@@ -309,16 +309,22 @@ class ExperimentMCMC(object):
             self._designer.prior_tasks = all_tasks
 
     def update_key(self, rng_key):
-        self._rng_key = rng_key
-        self._designer.update_key(rng_key)
-        self._model.update_key(rng_key)
-        self._random_choice = seed(random_choice, rng_key)
+        self._rng_name = str(rng_key)
+        self._rng_key, rng_designer, rng_model, rng_choice, rng_weight = random.split(
+            rng_key, 5
+        )
+
+        self._designer.rng_name = str(rng_key)
+        self._designer.update_key(rng_designer)
+        self._model.rng_name = str(rng_key)
+        self._model.update_key(rng_model)
+        self._random_choice = seed(random_choice, rng_choice)
         random_weight = partial(
             random_uniform,
             low=-self._exp_params["WEIGHT_PARAMS"]["max_weights"],
             high=self._exp_params["WEIGHT_PARAMS"]["max_weights"],
         )
-        self._random_weight = seed(random_weight, rng_key)
+        self._random_weight = seed(random_weight, rng_weight)
         if self._fixed_task_seed is not None:
             self._random_task_choice = seed(random_choice, self._fixed_task_seed)
         else:

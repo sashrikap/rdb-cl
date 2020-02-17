@@ -7,6 +7,7 @@ import numpy as onp
 import jax.numpy as np
 import numpyro, itertools
 from time import time
+from jax import random
 from os.path import join
 from rdb.exps.utils import *
 from functools import partial
@@ -34,7 +35,6 @@ class Designer(object):
 
     def __init__(
         self,
-        rng_key,
         env_fn,
         controller_fn,
         beta,
@@ -55,7 +55,9 @@ class Designer(object):
         use_true_w=False,
         num_prior_tasks=0,
     ):
-        self._rng_key = rng_key
+        self._rng_key = None
+        self._rng_name = None
+        # Environment settings
         self._env_fn = env_fn
         self._env = env_fn()
         self._build_controllers(controller_fn)
@@ -112,6 +114,14 @@ class Designer(object):
     def normalizer(self):
         return self._normalizer
 
+    @property
+    def rng_name(self):
+        return self._rng_name
+
+    @rng_name.setter
+    def rng_name(self, name):
+        self._rng_name = name
+
     def _build_controllers(self, controller_fn):
         self._controller, self._runner = controller_fn(self._env, "Designer Core")
         self._norm_controller, self._norm_runner = controller_fn(
@@ -127,14 +137,20 @@ class Designer(object):
             self._env, "Designer Sample"
         )
 
-    def create_particles(self, weights, controller=None, runner=None, save_name=""):
+    def create_particles(
+        self, weights, controller=None, runner=None, save_name="", log_scale=False
+    ):
         weights = DictList(weights)
+        if log_scale:
+            weights = weights.exp()
         if controller is None:
             controller = self._controller
         if runner is None:
             runner = self._runner
+        self._rng_key, rng_particles = random.split(self._rng_key, 2)
         return Particles(
-            rng_key=self._rng_key,
+            rng_name=self._rng_name,
+            rng_key=rng_particles,
             env_fn=self._env_fn,
             controller=controller,
             runner=runner,
@@ -175,8 +191,9 @@ class Designer(object):
             self._normalizer.compute_tasks(tasks, vectorize=False)
             ## Sample
             true_ws = self._truth.weights
+            self._rng_key, rng_sampler = random.split(self._rng_key, 2)
             self._sampler.run(
-                self._rng_key,
+                rng_sampler,
                 nbatch=1,
                 true_ws=true_ws,
                 tasks=tasks,
@@ -197,6 +214,7 @@ class Designer(object):
                 controller=self._one_controller,
                 runner=self._one_runner,
                 save_name=save_name,
+                log_scale=True,
             )
             particles.visualize(true_w=self.true_w, obs_w=None)
             return particles.subsample(1)
@@ -248,18 +266,19 @@ class Designer(object):
         return self._beta
 
     def update_key(self, rng_key):
-        self._rng_key = rng_key
+        self._rng_key, rng_truth, rng_choice, rng_norm = random.split(rng_key, 4)
         if self._truth is not None:
-            self._truth.update_key(rng_key)
-        self._random_choice = seed(random_choice, rng_key)
+            self._truth.update_key(rng_truth)
+        self._random_choice = seed(random_choice, rng_choice)
         self.reset_prior_tasks()
         ## Sample normaling factor
-        self._norm_prior = seed(self._prior_fn("designer_norm"), rng_key)
+        self._norm_prior = seed(self._prior_fn("designer_norm"), rng_norm)
         self._normalizer = self.create_particles(
             self._norm_prior(self._num_normalizers),
             save_name="designer_normalizer",
             runner=self._norm_runner,
             controller=self._norm_controller,
+            log_scale=False,
         )
         # Build likelihood and model
         self._build_sampler()
@@ -346,8 +365,10 @@ class Designer(object):
             normal_truth = np.expand_dims(true_ws.repeat(ntasks, axis=1), axis=3)
             #  shape (nfeats, ntasks, nbatch, nnorms + 1)
             normal_feats_sum = np.concatenate([normal_feats_sum, normal_truth], axis=3)
+            #  shape (ntasks, nbatch, nnorms + 1)
+            normal_rews = (normal_truth * normal_feats_sum).mean(axis=0)
             #  shape (nbatch, nnorms + 1)
-            normal_rews = (normal_truth * normal_feats_sum).mean(axis=(0, 1))
+            normal_rews = normal_rews.sum(axis=0)
             #  shape (nbatch,)
             normal_rews = jax_logsumexp(normal_rews, axis=1) - np.log(nnorms + 1)
             assert normal_rews.shape == (nbatch,)
@@ -419,7 +440,7 @@ class DesignerInteractive(Designer):
         init_state = self.env.get_init_state(task)
         # Visualize task
         image_path = (
-            f"{self._save_dir}/key_{self._rng_key}_user_trial_0_task_{str(task)}.png"
+            f"{self._save_dir}/key_{self._rng_name}_user_trial_0_task_{str(task)}.png"
         )
         self._runner.nb_show_thumbnail(init_state, image_path, clear=False)
         # Query user input
@@ -439,7 +460,7 @@ class DesignerInteractive(Designer):
                 # Visualize trajectory
                 acs = self._controller(init_state, user_in_w)
                 num_weights = len(self._user_inputs)
-                video_path = f"{self._save_dir}/key_{self._rng_key}_user_trial_{num_weights}_task_{str(task)}.mp4"
+                video_path = f"{self._save_dir}/key_{self._rng_name}_user_trial_{num_weights}_task_{str(task)}.mp4"
                 print("Received Weights")
                 pp.pprint(user_in_w)
                 self._runner.nb_show_mp4(init_state, acs, path=video_path, clear=False)
@@ -448,8 +469,10 @@ class DesignerInteractive(Designer):
                 print("Invalid input.")
                 continue
         user_w = DictList([self._user_inputs[-1]])
+        self._rng_key, rng_particles = random.split(self._rng_key, 2)
         return Particles(
-            rng_key=self._rng_key,
+            rng_name=self._rng_name,
+            rng_key=rng_particles,
             env_fn=self._env_fn,
             controller=self._controller,
             runner=self._runner,

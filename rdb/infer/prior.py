@@ -41,8 +41,8 @@ class Prior(object):
         raise NotImplementedError
 
 
-class LogUniformPrior(Prior):
-    """Independent Log Uniform Prior i.e. log(val) ~ uniform.
+class LogNormalPrior(Prior):
+    """Independent Log Uniform Prior i.e. log(val) ~ Normal.
 
     Args:
         log_max (float): log range (-log_max, log_max)
@@ -53,10 +53,9 @@ class LogUniformPrior(Prior):
 
     """
 
-    def __init__(self, normalized_key, feature_keys, log_max, name=""):
+    def __init__(self, normalized_key, feature_keys, std, name=""):
         self._name = name
-        self._log_max = log_max
-        self._log_normalized = 1e-2
+        self._std = std
         self._normalized_key = normalized_key
         self._initial_keys = copy.deepcopy(feature_keys)
         self._feature_keys = copy.deepcopy(feature_keys)
@@ -75,13 +74,57 @@ class LogUniformPrior(Prior):
         output = OrderedDict()
         for key in self._feature_keys:
             if key == self._normalized_key:
-                val = np.ones((num_samples,))
+                val = np.zeros((num_samples,))
+            else:
+                val = numpyro.sample(
+                    key,
+                    dist.Normal(loc=0.0, scale=self._std),
+                    sample_shape=(num_samples,),
+                )
+            output[key] = np.exp(val)
+        output = DictList(output, jax=jax)
+        return output
+
+
+class LogUniformPrior(Prior):
+    """Independent Log Uniform Prior i.e. log(val) ~ uniform.
+
+    Args:
+        log_max (float): log range (-log_max, log_max)
+        feature_keys (list): initial list of features
+
+    Out:
+        out (DictList): (nkeys, num_samples)
+
+    """
+
+    def __init__(self, normalized_key, feature_keys, log_max, name=""):
+        self._name = name
+        self._log_max = log_max
+        self._normalized_key = normalized_key
+        self._initial_keys = copy.deepcopy(feature_keys)
+        self._feature_keys = copy.deepcopy(feature_keys)
+
+    def add_feature(self, key):
+        if key not in self._feature_keys:
+            print(f"Proposal Updated for key: {key}")
+            self._feature_keys.append(key)
+
+    @property
+    def feature_keys(self):
+        return self._feature_keys
+
+    def __call__(self, num_samples, jax=True):
+        assert num_samples > 0, "Must sample > 0 samples"
+        output = OrderedDict()
+        for key in self._feature_keys:
+            if key == self._normalized_key:
+                val = np.zeros((num_samples,))
             else:
                 max_val = self._log_max
                 val = numpyro.sample(
                     key, dist.Uniform(-max_val, max_val), sample_shape=(num_samples,)
                 )
             output[key] = np.exp(val)
-        # output = DictList(output, expand_dims=num_samples == 1, jax=jax)
         output = DictList(output, jax=jax)
         return output

@@ -53,10 +53,16 @@ def main(random_key):
 
     ## Prior sampling & likelihood functions for PGM
     def prior_fn(name=""):
-        return LogUniformPrior(
+        # return LogUniformPrior(
+        #     normalized_key=WEIGHT_PARAMS["normalized_key"],
+        #     feature_keys=WEIGHT_PARAMS["feature_keys"],
+        #     log_max=WEIGHT_PARAMS["max_weights"],
+        #     name=name,
+        # )
+        return LogNormalPrior(
             normalized_key=WEIGHT_PARAMS["normalized_key"],
             feature_keys=WEIGHT_PARAMS["feature_keys"],
-            log_max=WEIGHT_PARAMS["max_weights"],
+            std=WEIGHT_PARAMS["max_weights"] / 2,
             name=name,
         )
 
@@ -66,7 +72,6 @@ def main(random_key):
     # )
     eval_server = None
     designer = Designer(
-        rng_key=rng_key,
         env_fn=env_fn,
         controller_fn=controller_fn,
         prior_fn=prior_fn,
@@ -77,7 +82,6 @@ def main(random_key):
     )
 
     ird_model = IRDOptimalControl(
-        rng_key=None,
         env_id=ENV_NAME,
         env_fn=env_fn,
         controller_fn=controller_fn,

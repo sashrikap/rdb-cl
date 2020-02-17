@@ -25,7 +25,7 @@ class Particles(object):
         rng_key (jax.random): if None, need to call `particles.update_key()`
         env_fn (fn): environment creation function, use `env_fn` instead of `env` to prevent multi-threaded tampering
         env (object): environment object, only pass in if you are sure its safe.
-        save_name (str): save file name, e.g. "weights_seed_{str(self._rng_key)}_{name}"
+        save_name (str): save file name, e.g. "weights_seed_{self._rng_name}_{name}"
         weight_params (dict): for histogram visualization: MAX_WEIGHT, NUM_BINS, etc
 
     Note:
@@ -37,6 +37,7 @@ class Particles(object):
 
     def __init__(
         self,
+        rng_name,
         rng_key,
         env_fn,
         controller,
@@ -57,10 +58,11 @@ class Particles(object):
         ## Sample weights
         assert isinstance(weights, DictList)
         self._rng_key = rng_key
+        self._rng_name = rng_name
         self._weight_params = weight_params
         self._normalized_key = normalized_key
         self._weights = weights.normalize_by_key(self._normalized_key)
-        self._expanded_name = f"{save_name}_seed_{str(self._rng_key)}"
+        self._expanded_name = f"{save_name}_seed_{self._rng_name}"
         self._save_name = save_name
         ## File system
         self._fig_dir = fig_dir
@@ -80,7 +82,7 @@ class Particles(object):
     def update_key(self, rng_key):
         self._rng_key = rng_key
         self._random_choice = seed(random_choice, rng_key)
-        self._expanded_name = f"weights_seed_{str(self._rng_key)}_{self._save_name}"
+        self._expanded_name = f"weights_seed_{self._rng_name}_{self._save_name}"
 
     def build_cache(self):
         self._cache_feats = {}
@@ -115,6 +117,7 @@ class Particles(object):
 
     def _clone(self, weights):
         return Particles(
+            rng_name=self._rng_name,
             rng_key=self._rng_key,
             env_fn=self._env_fn,
             controller=self._controller,
@@ -682,6 +685,7 @@ class Particles(object):
             path=f"{self._fig_dir}/{self._expanded_name}.png",
             title="Proxy Reward; true (red), obs (black) map (magenta)",
             max_weights=max_weights,
+            log_scale=False,
         )
 
     def visualize_comparisons(self, tasks, target, fig_name):
@@ -706,7 +710,7 @@ class Particles(object):
         diff_rews = onp.array(diff_rews).mean(axis=1)
         diff_vios = onp.array(diff_vios).mean(axis=1)
         # Ranking violations and performance (based on violation)
-        prefix = f"{self._fig_dir}/designer_seed_{str(self._rng_key)}"
+        prefix = f"{self._fig_dir}/designer_seed_{self._rng_name}"
         plot_rankings(
             main_val=diff_vios,
             main_label="Violations",

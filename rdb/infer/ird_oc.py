@@ -31,6 +31,7 @@ from rdb.infer.algos import *
 from rdb.infer.utils import *
 from rdb.exps.utils import *
 from os.path import join
+from jax import random
 from time import time
 
 pp = pprint.PrettyPrinter(indent=4)
@@ -70,7 +71,6 @@ class IRDOptimalControl(object):
 
     def __init__(
         self,
-        rng_key,
         env_id,
         env_fn,
         controller_fn,
@@ -92,7 +92,8 @@ class IRDOptimalControl(object):
         save_root="data",
         exp_name="active_ird_exp1",
     ):
-        self._rng_key = rng_key
+        self._rng_key = None
+        self._rng_name = None
         # Environment settings
         self._env_id = env_id
         self._env_fn = env_fn
@@ -148,22 +149,30 @@ class IRDOptimalControl(object):
     def eval_server(self):
         return self._eval_server
 
+    @property
+    def rng_name(self):
+        return self._rng_name
+
+    @rng_name.setter
+    def rng_name(self, name):
+        self._rng_name = name
+
     # @property
     # def interactive_mode(self):
     #     return self._interactive_mode
 
     def update_key(self, rng_key):
         """ Update random key """
-        self._rng_key = rng_key
-        self._designer.update_key(rng_key)
+        self._rng_key, rng_norm = random.split(rng_key, 2)
         ## Sample normaling factor
         self._prior = self._prior_fn("ird")
-        self._norm_prior = seed(self._prior_fn("ird_norm"), rng_key)
+        self._norm_prior = seed(self._prior_fn("ird_norm"), rng_norm)
         self._normalizer = self.create_particles(
             self._norm_prior(self._num_normalizers),
             save_name="ird_normalizer",
             runner=self._normal_runner,
             controller=self._normal_controller,
+            log_scale=False,
         )
 
     def _build_controllers(self, controller_fn):
@@ -212,7 +221,10 @@ class IRDOptimalControl(object):
 
         #  shape (nfeats, ntasks, nnorms)
         designer_normal_fsum = self._designer.normalizer.get_features_sum(tasks)
-        designer_normal_fsum = designer_normal_fsum.numpy_array()
+        #  shape (nfeats, 1, ntasks, nnorms)
+        designer_normal_fsum = np.expand_dims(
+            designer_normal_fsum.numpy_array(), axis=1
+        )
         nnorms = normal_feats_sum.shape[2]
         nfeats = obs_ws.shape[0]
         ntasks = len(tasks)
@@ -223,13 +235,16 @@ class IRDOptimalControl(object):
         assert normal_feats_sum.shape == (nfeats, ntasks, nnorms)
 
         ## Designer kernels
-        designer_likelihood = self._designer.likelihood_ird
+        designer_likelihood = partial(
+            self._designer.likelihood_ird,
+            sample_feats_sum=obs_feats_sum,
+            normal_feats_sum=designer_normal_fsum,
+        )
         v_designer_likelihood = jax.vmap(designer_likelihood)
 
         def _model():
             """
             Forward likelihood `p(w_obs | w_true)` for observed data, used as MCMC kernel.
-
 
             Vars:
                 obs_ws (ndarray): observed weights from user.
@@ -263,15 +278,9 @@ class IRDOptimalControl(object):
             sample_true_ws = np.repeat(sample_ws, ntasks, axis=1)
             #  shape (1, ntasks, task_dim)
             sample_tasks = tasks[None, :]
-            #  shape (nfeats, 1, ntasks, d_nnorms)
-            sample_designer_normal_fsum = np.expand_dims(designer_normal_fsum, axis=1)
             #  shape (ntasks,), designer nbatch = ntasks
             sample_probs = designer_likelihood(
-                true_ws=sample_true_ws,
-                sample_ws=sample_obs_ws,
-                tasks=sample_tasks,
-                sample_feats_sum=obs_feats_sum,
-                normal_feats_sum=sample_designer_normal_fsum,
+                true_ws=sample_true_ws, sample_ws=sample_obs_ws, tasks=sample_tasks
             )
 
             ## =================================================
@@ -285,26 +294,17 @@ class IRDOptimalControl(object):
             normal_true_ws = np.concatenate([normal_true_ws, obs_ws[None, :]], axis=0)
             #  shape (nnorms_1, 1, ntasks, task_dim)
             normal_tasks = np.repeat(sample_tasks[None, :], nnorms_1, axis=0)
-            #  shape (nnorms_1, nfeats, 1, ntasks)
-            normal_obs_feats_sum = np.repeat(obs_feats_sum[None, :], nnorms_1, axis=0)
-            #  shape (nnorms_1, nfeats, 1, ntasks, d_nnorms)
-            normal_designer_normal_fsum = np.repeat(
-                sample_designer_normal_fsum[None, :], nnorms_1, axis=0
-            )
             #  shape (nnorms_1, ntasks)
             normal_probs = v_designer_likelihood(
-                normal_true_ws,
-                normal_obs_ws,
-                normal_tasks,
-                normal_obs_feats_sum,
-                normal_designer_normal_fsum,
+                normal_true_ws, normal_obs_ws, normal_tasks
             )
             #  shape (nnorms_1, ntasks) -> (ntasks, )
             normal_probs = jax_logsumexp(normal_probs, axis=0) - np.log(nnorms_1)
 
             ## ==================================================
-            ## ============== Average across tasks ==============
-            log_probs = (sample_probs - normal_probs).mean()
+            ## ================= Aggregate tasks ================
+            # log_probs = (sample_probs - normal_probs).mean()
+            log_probs = (sample_probs - normal_probs).sum()
             numpyro.factor("ird_log_probs", log_probs)
 
         return _model
@@ -373,13 +373,14 @@ class IRDOptimalControl(object):
             self._sample_method, ird_model, self._sample_init_args, self._sample_args
         )
         num_chains = self._sample_args["num_chains"]
-        init_params = obs[-1].weights.repeat(num_chains, axis=0)
+        init_params = obs[-1].weights.log()
         if num_chains > 1:
             #   shape nfeats * (nchains,) -> nfeats * (nchains, 1)
-            init_params = init_params.expand_dims(1)
+            init_params = init_params.repeat(num_chains, axis=0).expand_dims(1)
         # with jax.disable_jit():
+        self._rng_key, rng_sampler = random.split(self._rng_key, 2)
         sampler.run(
-            self._rng_key,
+            rng_sampler,
             init_params=dict(init_params),
             extra_fields=["mean_accept_prob"],
         )
@@ -389,7 +390,7 @@ class IRDOptimalControl(object):
         sample_ws = sampler.get_samples(group_by_chain=True)
         #  shape nfeats * (nchains, nsample, 1) -> (nchains, nsample)
         sample_ws = DictList(sample_ws).squeeze(axis=2)
-        sample_ws[self._normalized_key] = np.ones(sample_ws.shape)
+        sample_ws[self._normalized_key] = np.zeros(sample_ws.shape)
         sample_info = sampler.get_extra_fields(group_by_chain=True)
         sample_rates = sample_info["mean_accept_prob"][:, -1]
         num_samples = sample_ws.shape[1]
@@ -397,7 +398,7 @@ class IRDOptimalControl(object):
             chains=sample_ws,
             rates=sample_rates,
             fig_dir=f"{self._save_dir}/mcmc",
-            title=f"seed_{str(self._rng_key)}_{save_name}_samples_{num_samples}",
+            title=f"seed_{self._rng_name}_{save_name}_samples_{num_samples}",
             **self._weight_params,
         )
         samples = self.create_particles(
@@ -405,14 +406,21 @@ class IRDOptimalControl(object):
             save_name=save_name,
             runner=self._sample_runner,
             controller=self._sample_controller,
+            log_scale=True,
         )
         samples.visualize(true_w=self.designer.true_w, obs_w=obs_ws[-1])
         return samples
 
-    def create_particles(self, weights, runner, controller, save_name=""):
+    def create_particles(
+        self, weights, runner, controller, save_name="", log_scale=False
+    ):
         weights = DictList(weights)
+        if log_scale:
+            weights = weights.exp()
+        self._rng_key, rng_particle = random.split(self._rng_key, 2)
         return Particles(
-            rng_key=self._rng_key,
+            rng_name=self._rng_name,
+            rng_key=rng_particle,
             env_fn=self._env_fn,
             controller=controller,
             runner=runner,
