@@ -15,8 +15,8 @@ setup(
         "matplotlib",
         "gym",
         "numpyro @ https://github.com/hzyjerry/numpyro/tarball/master#egg=numpyro"
-        "jax==0.1.53",
-        "jaxlib==0.1.36",  # numpyro installs the correct version
+        "jax==0.1.54",
+        "jaxlib==0.1.38",  # numpyro installs the correct version
         "moviepy",
         "fast-histogram",
         "pygame",

@@ -100,9 +100,8 @@ def test_mh_algo(num_chains):
     print(samples.mean(axis=0))
 
 
-@pytest.mark.parametrize(
-    "num_chains, num_tasks", list(itertools.product([5, 10, 30], [2, 4]))
-)
+@pytest.mark.parametrize("num_chains", [5, 10, 30])
+@pytest.mark.parametrize("num_tasks", [2, 4])
 def test_mh_algo_state_2d(num_chains, num_tasks):
     state = onp.zeros((5, 2))
     key = random.PRNGKey(1)
@@ -180,10 +179,9 @@ class dict_prior(object):
         return onp.zeros(len(data))
 
 
-@pytest.mark.parametrize(
-    "xdim, num_chains, num_tasks",
-    list(itertools.product([1, 5], [1, 2, 10, 30], [2, 4])),
-)
+@pytest.mark.parametrize("xdim", [1, 5])
+@pytest.mark.parametrize("num_chains", [1, 2, 10, 30])
+@pytest.mark.parametrize("num_tasks", [2, 4])
 def test_mh_algo_dict(xdim, num_chains, num_tasks):
     num_tasks = 3
     weight_dim = 2

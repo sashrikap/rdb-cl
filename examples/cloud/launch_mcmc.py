@@ -25,9 +25,10 @@ def launch(params_dict):
 
         launch_mode = mode.GCPMode(
             # zone="us-west1-a",
-            zone="us-east1-b",
+            # zone="us-east1-b",
             instance_type="n1-standard-4",
-            # zone="us-west2-a",  # 40 c2 isntance
+            zone="us-west2-a",  # 40 c2 isntance, 6 n2 instance
+            # instance_type="c2-standard-2",
             # zone="us-east1-b",  # 8 c2 isntance
             # instance_type="c2-standard-4",
             preemptible=False,

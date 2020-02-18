@@ -495,7 +495,6 @@ class OptimizerJax(OptimizerMPC):
             num_steps = 100
         else:
             raise NotImplementedError
-
         # Define a compiled update step
         # @jax.jit
         def step(i, opt_state):

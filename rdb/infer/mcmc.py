@@ -160,7 +160,7 @@ def mh(model, proposal_var, max_val, jit=True):
         init_val = (next_flat, next_log_prob, False, 0.0, rng_key)
 
         def _cond_fn(val):
-            """while not _cond_fn()."""
+            """while _cond_fn()."""
             (_, _, accept, _, _) = val
             return np.logical_not(accept)
 
@@ -180,7 +180,9 @@ def mh(model, proposal_var, max_val, jit=True):
             coin_flip_prob = np.log(
                 random.uniform(rng_mh_sample, accept_log_prob.shape)
             )
-            feasible = np.all((next_flat < max_val) * (next_flat > -1 * max_val))
+            feasible = np.all(
+                np.logical_and(next_flat < max_val, next_flat > -1 * max_val)
+            )
             accept = np.logical_and(coin_flip_prob < accept_log_prob, feasible)
             return (next_flat, next_log_prob, accept, n + 1.0, rng_key)
 
@@ -190,10 +192,8 @@ def mh(model, proposal_var, max_val, jit=True):
         else:
             # Avoid JIT-compile for forward model that has inner-optimization (e.g. designer)
             curr_val = init_val
-            done = False
-            while not done:
+            while _cond_fn(curr_val):
                 curr_val = _body_fn(curr_val)
-                done = not _cond_fn(curr_val)
             terminal_val = curr_val
         (next_flat, next_log_prob, _, n, rng_key) = terminal_val
         next_state = unravel_fn(next_flat)

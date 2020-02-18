@@ -266,14 +266,14 @@ class Runner(object):
         feats_sum = feats.sum(axis=1)
         #  shape ncons * (T, nbatch,)
         violations = DictList(self._env.constraints_fn(xs, actions), jax=jax).prepare(
-            self._env.features_keys
+            self._env.constraints_keys
         )
         violations = violations.transpose()
         #  shape ncons * (nbatch, T,)
         vios_sum = violations.sum(axis=1)
         #  shape nneta * (T, nbatch,)
         metadata = DictList(self._env.metadata_fn(xs, actions), jax=jax).prepare(
-            self._env.features_keys
+            self._env.metadata_keys
         )
         metadata = metadata.transpose()
 

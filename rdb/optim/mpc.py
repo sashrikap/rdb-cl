@@ -150,14 +150,15 @@ def build_features(udim, horizon, roll_forward, f_feat):
 def build_mpc(
     env,
     f_cost,
-    horizon,
-    dt,
+    horizon=10,
+    dt=0.1,
     replan=True,
     T=None,
     engine="scipy",
     method="lbfgs",
     name="",
     test_mode=False,
+    **kwargs
 ):
     """Create MPC controller.
 

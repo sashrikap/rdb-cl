@@ -227,7 +227,7 @@ class Designer(object):
 
             ## ==============================================================
             ## =================== Pre-empt Computations ====================
-            self._normalizer.compute_tasks(tasks, vectorize=False)
+            self._normalizer.compute_tasks(tasks, vectorize=True)
 
             ## ==============================================================
             ## ======================= MCMC Sampling ========================
@@ -261,7 +261,7 @@ class Designer(object):
                 chains=sample_ws,
                 rates=sample_rates,
                 fig_dir=f"{self._save_dir}/mcmc",
-                title=save_name,
+                title=f"seed_{self._rng_name}_{save_name}_samples_{num_samples}",
                 **self._weight_params,
             )
             particles = self.create_particles(
@@ -285,42 +285,47 @@ class Designer(object):
         nfeats = len(feats_keys)
         nnorms = len(self._normalizer.weights)
         ntasks = len(tasks)
-        #  shape (nfeats, nchain)
-        true_ws = (
-            self._truth.weights.prepare(feats_keys).repeat(nchain, axis=0).numpy_array()
-        )
+        #  shape (nfeats, 1)
+        true_ws = self._truth.weights.prepare(feats_keys).numpy_array()
         ## ============= Pre-empt heavy optimiations =============
+        #  shape (nfeats, ntasks, 1)
+        true_feats_sum = (
+            self._truth.get_features_sum(tasks).prepare(feats_keys).numpy_array()
+        )
         #  shape (nfeats, ntasks, nnorms)
         normal_feats_sum = (
             self._normalizer.get_features_sum(tasks).prepare(feats_keys).numpy_array()
         )
-        #  shape (nfeats, ntasks, nchain, nnorms)
-        normal_feats_sum = np.repeat(
-            np.expand_dims(normal_feats_sum, axis=2), nchain, axis=2
-        )
-        assert true_ws.shape == (nfeats, nchain)
-        assert normal_feats_sum.shape == (nfeats, ntasks, nchain, nnorms)
+        #  shape (nfeats, ntasks, 1, nnorms)
+        normal_feats_sum = np.expand_dims(normal_feats_sum, axis=2)
+        assert true_ws.shape == (nfeats, 1)
+        assert normal_feats_sum.shape == (nfeats, ntasks, 1, nnorms)
 
         def _model():
-            #  shape nfeats * (nchain,)
-            new_ws = self._prior(nchain).prepare(feats_keys)
+            #  shape nfeats * (1,)
+            new_ws = self._prior(1).prepare(feats_keys)
             sample_ps = self.create_particles(
                 new_ws,
                 controller=self._sample_controller,
                 runner=self._sample_runner,
                 log_scale=False,
-                jax=True,
+                jax=False,
             )
             sample_ws = new_ws.numpy_array()
             ## ======= Not jit-able optimization: requires scipy/jax optimizer ======
-            sample_ps.compute_tasks(tasks, jax=True)
-            #  shape (nfeats, ntasks, nchain)
+            sample_ps.compute_tasks(tasks, jax=False)
+            #  shape (nfeats, ntasks, 1)
             sample_feats_sum = (
                 sample_ps.get_features_sum(tasks).prepare(feats_keys).numpy_array()
             )
-            assert sample_feats_sum.shape == (nfeats, ntasks, nchain)
+            assert sample_feats_sum.shape == (nfeats, ntasks, 1)
             log_probs = self._likelihood(
-                true_ws, sample_ws, tasks, sample_feats_sum, normal_feats_sum
+                true_ws,
+                sample_ws,
+                tasks,
+                true_feats_sum,
+                sample_feats_sum,
+                normal_feats_sum,
             )
             assert len(log_probs) == 1
             numpyro.factor("designer_log_prob", log_probs[0])
@@ -331,7 +336,14 @@ class Designer(object):
         """Build likelihood kernel."""
 
         @jax.jit
-        def _likelihood(true_ws, sample_ws, tasks, sample_feats_sum, normal_feats_sum):
+        def _likelihood(
+            true_ws,
+            sample_ws,
+            tasks,
+            true_feats_sum,
+            sample_feats_sum,
+            normal_feats_sum,
+        ):
             """
             Main likelihood function. Used in Designer and Designer Inversion (IRD Kernel).
             Designer forward likelihood p(design_w | true_w).
@@ -343,16 +355,19 @@ class Designer(object):
                     shape: (ntasks, nbatch, task_dim)
                 sample_ws (ndarray): current sampled w, batched
                     shape: (nfeats, nbatch)
+                true_feats_sum (ndarray): features of true ws
+                    shape: (nfeats, ntasks, nbatch)
                 sample_feats_sum (ndarray): sample features
                     shape: (nfeats, ntasks, nbatch)
                 normal_feats_sum (ndarray): normalizer features
                     shape: (nfeats, ntasks, nbatch, nnorms)
 
             Note:
+                * In IRD kernel, `sample_feats_sum` is used as proxy for `true_feats_sum`
                 * For performance, nbatch & nnorms can be huge in practice
                   nbatch * nnorms ~ 2000 * 200 in IRD kernel
                 * nbatch dimension has two uses
-                  (1) nbatch=nchain in designer.sample
+                  (1) nbatch=1 in designer.sample
                   (1) nbatch=nnorms in ird.sample
                 * To stabilize MH sampling
                   (1) sum across tasks
@@ -368,6 +383,7 @@ class Designer(object):
             nnorms = normal_feats_sum.shape[3]
             assert true_ws.shape == (nfeats, nbatch)
             assert sample_ws.shape == (nfeats, nbatch)
+            assert true_feats_sum.shape == (nfeats, ntasks, nbatch)
             assert sample_feats_sum.shape == (nfeats, ntasks, nbatch)
             assert normal_feats_sum.shape == (nfeats, ntasks, nbatch, nnorms)
 
@@ -391,7 +407,7 @@ class Designer(object):
             normal_truth = np.expand_dims(true_ws, axis=3)
             #  shape (nfeats, ntasks, nbatch, nnorms + 1)
             normal_feats_sum = np.concatenate(
-                [normal_feats_sum, np.expand_dims(sample_feats_sum, axis=3)], axis=3
+                [normal_feats_sum, np.expand_dims(true_feats_sum, axis=3)], axis=3
             )
             #  shape (nfeats, ntasks, nbatch, nnorms + 1)
             normal_costs = normal_truth * normal_feats_sum

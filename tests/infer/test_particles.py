@@ -81,10 +81,9 @@ def test_index(num_weights):
     assert len(ps2.weights) == 2
 
 
-@pytest.mark.parametrize(
-    "num_weights, num_tile, num_tasks",
-    list(itertools.product([1, 5], [1, 2, 3], [4, 6])),
-)
+@pytest.mark.parametrize("num_weights", [1, 5])
+@pytest.mark.parametrize("num_tile", [1, 2, 3])
+@pytest.mark.parametrize("num_tasks", [4, 6])
 def test_tile(num_weights, num_tile, num_tasks):
     ps = all_particles[num_weights]
     tasks = env.all_tasks[:num_tasks]
@@ -219,9 +218,8 @@ def test_entropy(num_weights):
     ent = ps.entropy(bins=5, max_weights=10)
 
 
-@pytest.mark.parametrize(
-    "num_weights, num_map", list(itertools.product([10, 20], [1, 2, 5]))
-)
+@pytest.mark.parametrize("num_weights", [10, 20])
+@pytest.mark.parametrize("num_map", [1, 2, 5])
 def test_map_estimate(num_weights, num_map):
     ps = all_particles[num_weights]
     map_ps = ps.map_estimate(num_map)

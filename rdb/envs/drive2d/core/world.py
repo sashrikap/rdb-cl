@@ -229,6 +229,10 @@ class DriveWorld(gym.Env):
     def constraints_keys(self):
         return tuple(self._constraints_dict.keys())
 
+    @property
+    def metadata_keys(self):
+        return tuple(self._metadata_dict.keys())
+
     def _compile(self):
         self._dynamics_fn = jax.jit(self._dynamics_fn)
         self._features_fn = jax.jit(self._features_fn)

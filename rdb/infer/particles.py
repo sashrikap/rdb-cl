@@ -316,7 +316,9 @@ class Particles(object):
         acs = [self._cache_actions[self.get_task_name(task)] for task in tasks]
         return onp.array(acs)
 
-    def compute_tasks(self, tasks, us0=None, vectorize=True, desc=None, jax=False):
+    def compute_tasks(
+        self, tasks, us0=None, vectorize=True, desc=None, max_batch=-1, jax=False
+    ):
         """Compute multiple tasks at once.
 
         Args:
@@ -332,7 +334,7 @@ class Particles(object):
             self._env = self._env_fn()
         ntasks = len(tasks)
         nweights = len(self.weights)
-
+        feats_keys = self._env.features_keys
         T, udim = self._controller.T, self._controller.udim
         cached = [self.get_task_name(task) in self.cached_names for task in tasks]
 
@@ -341,24 +343,26 @@ class Particles(object):
             if all(cached):
                 return
             #  shape (ntasks, state_dim)
-            states = self._env.get_init_states(np.array(tasks))
+            states = self._env.get_init_states(onp.array(tasks))
             #  batch_states (ntasks * nweights, state_dim)
             #  batch_weights nfeats * (ntasks * nweights)
             batch_states, batch_weights = cross_product(
-                states, self.weights, np.array, partial(DictList, jax=jax)
+                states, self.weights, onp.array, partial(DictList, jax=jax)
             )
             #  shape (ntasks * nweights, T, udim)
             batch_us0 = None
             if us0 is not None:
                 batch_us0 = us0.reshape((-1, T, udim))
+            batch_weights_arr = batch_weights.prepare(feats_keys).numpy_array()
             batch_acs, batch_costs, batch_feats, batch_feats_sum, batch_vios = collect_trajs(
-                batch_weights,
+                batch_weights_arr,
                 batch_states,
                 self._controller,
                 self._runner,
                 desc=desc,
                 us0=batch_us0,
                 jax=jax,
+                max_batch=max_batch,
             )
             #  shape (ntasks, nweights, T, acs_dim)
             all_actions = batch_acs.reshape((ntasks, nweights, T, udim))
@@ -380,6 +384,7 @@ class Particles(object):
                 batch_us0 = us0.reshape((-1, T, udim)).expand_dims(axis=1)
             else:
                 batch_us0 = [None] * ntasks
+            weights_arr = self.weights.prepare(feats_keys).numpy_array()
             for ti, task_i in enumerate(tasks):
                 name_i = self.get_task_name(task_i)
                 if name_i not in self.cached_names:
@@ -389,12 +394,13 @@ class Particles(object):
                     batch_states = np.tile(state_i, (nweights, 1))
                     us0_i = batch_us0[ti]
                     acs, costs, feats, feats_sum, vios = collect_trajs(
-                        self.weights,
+                        weights_arr,
                         batch_states,
                         self._controller,
                         self._runner,
                         us0=us0_i,
                         jax=jax,
+                        max_batch=max_batch,
                     )
                     all_actions.append(acs)
                     all_feats.append(feats)
@@ -480,7 +486,13 @@ class Particles(object):
         return out
 
     def merge_tasks(self, tasks, data):
-        """Merge dumped data from another Particles instance."""
+        """Merge dumped data from another Particles instance.
+
+        Args:
+            tasks (ndarray): (ntasks, task_dim)
+            data (dict): task_name -> {"actions": (nweights, T, task_dim), ...}
+
+        """
         for task in tasks:
             task_name = self.get_task_name(task)
             assert task_name in data
@@ -489,6 +501,23 @@ class Particles(object):
                 self._cache_feats[task_name] = data[task_name]["feats"]
                 self._cache_feats_sum[task_name] = data[task_name]["feats_sum"]
                 self._cache_violations[task_name] = data[task_name]["violations"]
+
+    def merge_bulk_tasks(self, tasks, bulk_data):
+        """Merge dumped data from bulk data.
+
+        Args:
+            tasks (ndarray): (ntasks, task_dim)
+            data (dict): {"actions": (ntasks, nweights, T, task_dim), ...}
+
+        """
+        assert len(tasks) == len(bulk_data["actions"])
+        for ti, task in enumerate(tasks):
+            task_name = self.get_task_name(task)
+            if task_name not in self.cached_names:
+                self._cache_actions[task_name] = bulk_data["actions"][ti]
+                self._cache_feats[task_name] = bulk_data["feats"][ti]
+                self._cache_feats_sum[task_name] = bulk_data["feats_sum"][ti]
+                self._cache_violations[task_name] = bulk_data["violations"][ti]
 
     def compare_with(self, task, target, verbose=False):
         """Compare with a set of target weights (usually true weights). Returns log
@@ -635,13 +664,8 @@ class Particles(object):
                     which_bins, return_index=True, return_counts=True
                 )
                 for val, ct in zip(unique_vals, counts):
-                    try:
-                        val_bins_idx = which_bins == val
-                        probs[val_bins_idx] += float(ct) / len(row)
-                    except:
-                        import pdb
-
-                        pdb.set_trace()
+                    val_bins_idx = which_bins == val
+                    probs[val_bins_idx] += float(ct) / len(row)
             map_idxs = onp.argsort(-1 * probs)[:num_map]
             map_weights = self.weights[map_idxs]
             # MAP esimate usually used for evaluation; thread-safe to provide self._env
@@ -655,7 +679,7 @@ class Particles(object):
         assert self._save_dir is not None, "Need to specify save directory."
         path = f"{self._save_dir}/{self._expanded_name}.npz"
         with open(path, "wb+") as f:
-            np.savez(f, weights=self.weights)
+            np.savez(f, weights=dict(self.weights))
 
     def load(self):
         path = f"{self._save_dir}/{self._expanded_name}.npz"

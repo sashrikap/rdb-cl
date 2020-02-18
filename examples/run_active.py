@@ -4,6 +4,10 @@ Note:
     * See (rdb.exps.active_ird.py) for more details.
 
 """
+import numpyro
+
+numpyro.set_host_device_count(3)
+
 from rdb.exps.active_ird import ExperimentActiveIRD
 from rdb.exps.active import ActiveInfoGain, ActiveRatioTest, ActiveRandom
 from rdb.distrib.particles import ParticleServer
@@ -28,9 +32,9 @@ def main(random_key, evaluate=False):
     if evaluate:
         # Load pre-saved parameters and update
         print(
-            f"\n======== Evaluating exp {EXP_NAME} from {SAVE_ROOT}/{SAVE_NAME}========\n"
+            f"\n======== Evaluating exp {EXP_ARGS['save_name']} from {SAVE_ROOT}/{EXP_ARGS['save_name']}========\n"
         )
-        params_path = f"{SAVE_ROOT}/{SAVE_NAME}/{EXP_NAME}/params_{str(rng_key)}.yaml"
+        params_path = f"{SAVE_ROOT}/{EXP_ARGS['save_name']}/{EXP_ARGS['save_name']}/params_{str(rng_key)}.yaml"
         assert os.path.isfile(params_path)
         eval_params = load_params(params_path)
         locals().update(eval_params)
@@ -42,74 +46,67 @@ def main(random_key, evaluate=False):
         env.reset()
         return env
 
-    def controller_fn(env):
+    def controller_fn(env, name=""):
         controller, runner = build_mpc(
-            env, env.main_car.cost_runtime, HORIZON, env.dt, replan=False
+            env,
+            env.main_car.cost_runtime,
+            dt=env.dt,
+            replan=False,
+            name=name,
+            **CONTROLLER_ARGS,
         )
         return controller, runner
 
-    ## Prior sampling & likelihood functions for PGM
-    prior = LogUniformPrior(
-        rng_key=None,
-        normalized_key=NORMALIZED_KEY,
-        feature_keys=FEATURE_KEYS,
-        log_max=MAX_WEIGHT,
-    )
-    ird_proposal = IndGaussianProposal(
-        rng_key=None,
-        normalized_key=NORMALIZED_KEY,
-        feature_keys=FEATURE_KEYS,
-        proposal_var=IRD_PROPOSAL_VAR,
-    )
-    designer_proposal = IndGaussianProposal(
-        rng_key=None,
-        normalized_key=NORMALIZED_KEY,
-        feature_keys=FEATURE_KEYS,
-        proposal_var=DESIGNER_PROPOSAL_VAR,
-    )
-
     ## Evaluation Server
     eval_server = ParticleServer(
-        env_fn, controller_fn, num_workers=NUM_EVAL_WORKERS, parallel=PARALLEL
+        env_fn,
+        controller_fn,
+        num_workers=EVAL_ARGS["num_eval_workers"],
+        parallel=EVAL_ARGS["parallel"],
+        normalized_key=WEIGHT_PARAMS["normalized_key"],
+        weight_params=WEIGHT_PARAMS,
+        max_batch=EVAL_ARGS["max_batch"],
     )
-    weight_params = {"bins": HIST_BINS, "max_weights": MAX_WEIGHT}
+    # eval_server = None
+    ## Prior sampling & likelihood functions for PGM
+    def prior_fn(name=""):
+        return LogUniformPrior(
+            normalized_key=WEIGHT_PARAMS["normalized_key"],
+            feature_keys=WEIGHT_PARAMS["feature_keys"],
+            log_max=WEIGHT_PARAMS["max_weights"],
+            name=name,
+        )
+
+    designer = Designer(
+        env_fn=env_fn,
+        controller_fn=controller_fn,
+        prior_fn=prior_fn,
+        weight_params=WEIGHT_PARAMS,
+        normalized_key=WEIGHT_PARAMS["normalized_key"],
+        save_root=f"{SAVE_ROOT}/{EXP_ARGS['save_name']}",
+        **DESIGNER_ARGS,
+    )
 
     ird_model = IRDOptimalControl(
-        rng_key=None,
         env_id=ENV_NAME,
         env_fn=env_fn,
         controller_fn=controller_fn,
         eval_server=eval_server,
-        beta=BETA,
-        true_w=TRUE_W,
-        prior=prior,
-        proposal=ird_proposal,
-        num_normalizers=NUM_NORMALIZERS,
-        sample_args={
-            "num_warmups": NUM_WARMUPS,
-            "num_samples": NUM_SAMPLES,
-            "num_chains": NUM_IRD_CHAINS,
-            "use_particles": True,
-        },
-        designer_proposal=designer_proposal,
-        designer_args={
-            "num_warmups": NUM_DESIGNER_WARMUPS,
-            "num_samples": NUM_DESIGNERS,
-            "num_chains": NUM_DESIGNER_CHAINS,
-            "use_particles": True,
-        },
-        weight_params=weight_params,
-        use_true_w=USER_TRUE_W,
-        num_prior_tasks=NUM_PRIOR_TASKS,
-        normalized_key=NORMALIZED_KEY,
-        save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
-        exp_name=f"{EXP_NAME}",
+        designer=designer,
+        prior_fn=prior_fn,
+        normalized_key=WEIGHT_PARAMS["normalized_key"],
+        weight_params=WEIGHT_PARAMS,
+        save_root=f"{SAVE_ROOT}/{EXP_ARGS['save_name']}",
+        **IRD_ARGS,
     )
-
     ## Active acquisition function for experiment
     active_fns = {
         "infogain": ActiveInfoGain(
-            rng_key=None, model=ird_model, beta=BETA, params=weight_params, debug=False
+            rng_key=None,
+            model=ird_model,
+            beta=DESIGNER_ARGS["beta"],
+            params=WEIGHT_PARAMS,
+            debug=False,
         ),
         "ratiomean": ActiveRatioTest(
             rng_key=None, model=ird_model, method="mean", debug=False
@@ -119,9 +116,8 @@ def main(random_key, evaluate=False):
         ),
         "random": ActiveRandom(rng_key=None, model=ird_model),
     }
-    keys = list(active_fns.keys())
-    for key in keys:
-        if key not in ACTIVE_FNS:
+    for key in list(active_fns.keys()):
+        if key not in ACTIVE_ARGS["active_fns"]:
             del active_fns[key]
 
     ## Task sampling seed
@@ -132,18 +128,20 @@ def main(random_key, evaluate=False):
 
     experiment = ExperimentActiveIRD(
         ird_model,
+        designer,
         active_fns,
+        true_w=TRUE_W,
         eval_server=eval_server,
-        iterations=EXP_ITERATIONS,
-        num_eval_tasks=NUM_EVAL_TASKS,
-        num_eval_map=NUM_EVAL_MAP,
-        num_active_tasks=NUM_ACTIVE_TASKS,
-        num_active_sample=NUM_ACTIVE_SAMPLES,
+        iterations=EXP_ARGS["exp_iterations"],
+        num_eval_tasks=EXP_ARGS["num_eval_tasks"],
+        num_eval_map=EXP_ARGS["num_eval_map"],
+        num_active_tasks=ACTIVE_ARGS["num_active_tasks"],
+        num_active_sample=ACTIVE_ARGS["num_active_sample"],
         fixed_task_seed=fixed_task_seed,
-        save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
-        exp_name=f"{EXP_NAME}",
+        save_root=f"{SAVE_ROOT}/{EXP_ARGS['save_name']}",
+        exp_name=f"{EXP_ARGS['EXP_NAME']}",
         exp_params=PARAMS,
-        normalized_key=NORMALIZED_KEY,
+        normalized_key=WEIGHT_PARAMS["normalized_key"],
     )
 
     """ Experiment """
@@ -175,26 +173,3 @@ if __name__ == "__main__":
         NUM_EVAL_WORKERS = 4
     for ki in copy.deepcopy(RANDOM_KEYS):
         main(random_key=ki, evaluate=EVALUATE)
-
-
-# # TODO: find true w
-# true_w = {
-#     "dist_cars": 1.0,
-#     "dist_lanes": 0.1,
-#     "dist_fences": 0.6,
-#     "speed": 0.5,
-#     "control": 0.16,
-# }
-# # Training Environment
-# task = (-0.4, 0.3)
-
-# TODO: find true w
-# true_w = {
-#     "dist_cars": 1.0,
-#     "dist_lanes": 0.1,
-#     "dist_fences": 0.6,
-#     "speed": 0.5,
-#     "control": 0.16,
-# }
-# # Training Environment
-# task = (-0.4, 0.3)

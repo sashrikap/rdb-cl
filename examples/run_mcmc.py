@@ -44,7 +44,12 @@ def main(random_key):
 
     def controller_fn(env, name=""):
         controller, runner = build_mpc(
-            env, env.main_car.cost_runtime, HORIZON, env.dt, replan=False, name=name
+            env,
+            env.main_car.cost_runtime,
+            dt=env.dt,
+            replan=False,
+            name=name,
+            **CONTROLLER_ARGS,
         )
         return controller, runner
 
@@ -59,12 +64,6 @@ def main(random_key):
             log_max=WEIGHT_PARAMS["max_weights"],
             name=name,
         )
-        # return LogNormalPrior(
-        #     normalized_key=WEIGHT_PARAMS["normalized_key"],
-        #     feature_keys=WEIGHT_PARAMS["feature_keys"],
-        #     std=WEIGHT_PARAMS["max_weights"] / 2,
-        #     name=name,
-        # )
 
     ## Evaluation Server
     # eval_server = ParticleServer(

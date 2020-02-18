@@ -17,14 +17,14 @@ DRAW_HEAT = False
 # DRAW_HEAT = False
 REPLAN = False
 # BENCHMARK = 100
-BENCHMARK = -1
-BENCHMARK_SINGLE = False
+BENCHMARK = 100
+BENCHMARK_SINGLE = True
 BENCHMARK_BATCH = True
 MAKE_MP4 = False
 # ENGINE = "scipy"
 # METHOD = "lbfgs"
-# ENGINE = "jax"
-ENGINE = "numpyro"
+ENGINE = "jax"
+# ENGINE = "numpyro"
 METHOD = "adam"
 # ENV_NAME = "Week3_02-v0"  # Highway
 # TASK = (0.2, -0.7)
@@ -83,13 +83,7 @@ if not DUMMY_ACTION:
     # actions = optimizer(state, weights=weights, batch=False)
     w_list = DictList([weights])
     w_list = w_list.prepare(env.features_keys)
-    import pdb
-
-    pdb.set_trace()
     actions = optimizer(state, weights=None, weights_arr=w_list.numpy_array())
-    import pdb
-
-    pdb.set_trace()
     traj, cost, info = runner(state, actions, weights=weights, batch=False)
     print("cost", cost)
     if BENCHMARK > 0:

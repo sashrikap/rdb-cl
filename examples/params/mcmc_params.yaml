@@ -1,37 +1,52 @@
-BETA: 50
-DESIGNER_NUM_NORMALIZERS: 200
-DESIGNER_PROPOSAL_VAR: 0.25
+DESIGNER_ARGS:
+  beta: 50
+  exp_name: designer_convergence_true_w_prior_tasks_sum_norm_200_beta_50_var_2
+  num_normalizers: 200
+  sample_args:
+    num_chains: 1
+    num_samples: 300
+    num_warmup: 100
+  sample_init_args:
+    max_val: 15.0
+    proposal_var: 2
+  sample_method: MH
+  true_w: null
+  use_true_w: false
 ENV_NAME: Week6_01-v1
+EXPERIMENT_ARGS:
+  num_eval_map: 2
+  num_eval_tasks: 16384
+  num_visualize_tasks: 1024
 EXP_ITERATIONS: 24
-FEATURE_KEYS:
-- dist_cars
-- dist_lanes
-- dist_fences
-- dist_objects
-- speed
-- control
 FIXED_TASK_SEED: 0
 GCP_LABEL: ird_sample_1000_norm_200
-HIST_BINS: 200
 HORIZON: 10
-IRD_EXP_MODE: ird_convergence_true_w_random_tasks_norm_200_beta_50_var_0.5
-IRD_PROPOSAL_VAR: 0.2
-MAX_WEIGHT: 15.0
-NORMALIZED_KEY: dist_cars
-NUM_DESIGNERS: 1000
-NUM_DESIGNER_CHAINS: 3
-NUM_DESIGNER_WARMUPS: 200
+IRD_ARGS:
+  num_normalizers: 200
+  sample_args:
+    num_chains: 3
+    num_samples: 2000
+    num_warmup: 200
+  sample_init_args:
+    max_val: 15.0
+    proposal_var: 2
+  sample_method: MH
 NUM_EVAL_MAP: 2
-NUM_EVAL_TASKS: 16384
 NUM_EVAL_WORKERS: 2
-NUM_IRD_CHAINS: 3
-NUM_NORMALIZERS: 200
 NUM_PRIOR_MODE: design
-NUM_SAMPLES: 1000
-NUM_VISUALIZE_TASKS: 1024
-NUM_WARMUPS: 200
 PARALLEL: true
 RANDOM_KEYS:
 - 3
-SAVE_NAME: '200212'
+SAVE_NAME: '200216'
 USER_TRUE_W: false
+WEIGHT_PARAMS:
+  bins: 200
+  feature_keys:
+  - dist_cars
+  - dist_lanes
+  - dist_fences
+  - dist_objects
+  - speed
+  - control
+  max_weights: 15.0
+  normalized_key: dist_cars

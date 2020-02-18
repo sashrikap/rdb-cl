@@ -97,6 +97,7 @@ class IRDOptimalControl(object):
         self._env = env_fn()
         self._build_controllers(controller_fn)
         self._eval_server = eval_server
+        self._interactive_mode = interactive_mode
 
         # Rationality
         self._designer = designer
@@ -154,9 +155,9 @@ class IRDOptimalControl(object):
     def rng_name(self, name):
         self._rng_name = name
 
-    # @property
-    # def interactive_mode(self):
-    #     return self._interactive_mode
+    @property
+    def interactive_mode(self):
+        return self._interactive_mode
 
     def update_key(self, rng_key):
         """ Update random key """
@@ -243,6 +244,7 @@ class IRDOptimalControl(object):
             self._designer.likelihood_ird,
             sample_ws=obs_ws,
             tasks=obs_tasks,
+            true_feats_sum=obs_feats_sum,
             sample_feats_sum=obs_feats_sum,
             normal_feats_sum=designer_normal_fsum,
         )
@@ -299,17 +301,6 @@ class IRDOptimalControl(object):
             return log_prob
 
         return _model
-
-    def simulate_designer(self, task, save_name):
-        """Sample one w from b(w) on task
-
-        Args:
-            path (str): path to save png
-            params (dict): visualization params
-            save_name (str)
-
-        """
-        return self._designer.simulate(task, save_name=save_name)
 
     def sample(self, tasks, obs, save_name, verbose=True):
         """Sample b(w) for true weights given obs.weights.
