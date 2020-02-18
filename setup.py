@@ -14,7 +14,7 @@ setup(
         "pyglet==1.3.2",
         "matplotlib",
         "gym",
-        "numpyro==0.2.4",
+        "numpyro @ https://github.com/hzyjerry/numpyro/tarball/master#egg=numpyro"
         "jax==0.1.53",
         "jaxlib==0.1.36",  # numpyro installs the correct version
         "moviepy",

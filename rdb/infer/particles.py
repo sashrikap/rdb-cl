@@ -10,6 +10,7 @@ from numpyro.handlers import scale, condition, seed
 from fast_histogram import histogram1d
 from scipy.stats import gaussian_kde
 from rdb.exps.utils import Profiler
+from functools import partial
 from jax import random
 import jax.numpy as np
 import numpy as onp
@@ -315,7 +316,7 @@ class Particles(object):
         acs = [self._cache_actions[self.get_task_name(task)] for task in tasks]
         return onp.array(acs)
 
-    def compute_tasks(self, tasks, us0=None, vectorize=True, desc=None):
+    def compute_tasks(self, tasks, us0=None, vectorize=True, desc=None, jax=False):
         """Compute multiple tasks at once.
 
         Args:
@@ -340,11 +341,11 @@ class Particles(object):
             if all(cached):
                 return
             #  shape (ntasks, state_dim)
-            states = self._env.get_init_states(onp.array(tasks))
+            states = self._env.get_init_states(np.array(tasks))
             #  batch_states (ntasks * nweights, state_dim)
             #  batch_weights nfeats * (ntasks * nweights)
             batch_states, batch_weights = cross_product(
-                states, self.weights, onp.array, DictList
+                states, self.weights, np.array, partial(DictList, jax=jax)
             )
             #  shape (ntasks * nweights, T, udim)
             batch_us0 = None
@@ -357,6 +358,7 @@ class Particles(object):
                 self._runner,
                 desc=desc,
                 us0=batch_us0,
+                jax=jax,
             )
             #  shape (ntasks, nweights, T, acs_dim)
             all_actions = batch_acs.reshape((ntasks, nweights, T, udim))
@@ -384,7 +386,7 @@ class Particles(object):
                     #  shape (1, task_dim)
                     state_i = self._env.get_init_states([task_i])
                     #  shape (nweights, task_dim)
-                    batch_states = onp.tile(state_i, (nweights, 1))
+                    batch_states = np.tile(state_i, (nweights, 1))
                     us0_i = batch_us0[ti]
                     acs, costs, feats, feats_sum, vios = collect_trajs(
                         self.weights,
@@ -392,6 +394,7 @@ class Particles(object):
                         self._controller,
                         self._runner,
                         us0=us0_i,
+                        jax=jax,
                     )
                     all_actions.append(acs)
                     all_feats.append(feats)

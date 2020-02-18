@@ -148,7 +148,14 @@ class OptimizerMPC(object):
         raise NotImplementedError
 
     def __call__(
-        self, x0, weights, batch=True, us0=None, weights_arr=None, init="zeros"
+        self,
+        x0,
+        weights,
+        batch=True,
+        us0=None,
+        weights_arr=None,
+        init="zeros",
+        jax=False,
     ):
         """Run Optimizer.
 
@@ -168,7 +175,7 @@ class OptimizerMPC(object):
         """
         if weights_arr is None:
             weights_arr = (
-                DictList(weights, expand_dims=not batch)
+                DictList(weights, expand_dims=not batch, jax=jax)
                 .prepare(self._features_keys)
                 .numpy_array()
             )

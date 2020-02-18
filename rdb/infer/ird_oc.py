@@ -221,19 +221,16 @@ class IRDOptimalControl(object):
             .expand_dims(0)
             .numpy_array()
         )
-
         #   shape nfeats * (nnorms,)
         normal_ws = self._normalizer.weights
         #  shape (nfeats, nnorms)
         normal_ws = normal_ws.prepare(feats_keys).numpy_array()
-
         #  shape (nfeats, ntasks, d_nnorms)
         designer_normal_fsum = self._designer.normalizer.get_features_sum(tasks)
         #  shape (nfeats, 1, ntasks, d_nnorms)
         designer_normal_fsum = np.expand_dims(
             designer_normal_fsum.prepare(feats_keys).numpy_array(), axis=1
         )
-
         #  shape (1, ntasks, task_dim)
         obs_tasks = tasks[None, :]
 
@@ -344,14 +341,16 @@ class IRDOptimalControl(object):
         #  shape nfeats * (ntasks,)
         observe_ws = DictList([ob.weights for ob in obs], jax=True).squeeze(1)
         ird_model = self._build_model(observe_ws, tasks)
-        sampler = get_numpyro_sampler(
+        sampler = get_ird_sampler(
             self._sample_method, ird_model, self._sample_init_args, self._sample_args
         )
         num_chains = self._sample_args["num_chains"]
         init_params = obs[-1].weights.log()
         if num_chains > 1:
-            #   shape nfeats * (nchains,) -> nfeats * (nchains, 1)
-            init_params = init_params.repeat(num_chains, axis=0).expand_dims(1)
+            #  shape nfeats * (nchains, 1)
+            # init_params = init_params.repeat(num_chains, axis=0).expand_dims(1)
+            init_params = init_params.expand_dims(0).repeat(num_chains, axis=0)
+
         # with jax.disable_jit():
         self._rng_key, rng_sampler = random.split(self._rng_key, 2)
         sampler.run(

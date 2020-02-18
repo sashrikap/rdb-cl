@@ -15,7 +15,7 @@ from tqdm.auto import tqdm, trange
 from numpyro.handlers import seed
 from functools import partial
 from numpyro.infer import HMC, MCMC, NUTS, SA
-from rdb.infer.mcmc import NumPyro_MH, RDB_MH
+from rdb.infer.mcmc import MH
 
 # from rdb.infer.mcmc import MH as RDB_MH
 
@@ -24,7 +24,7 @@ from rdb.infer.mcmc import NumPyro_MH, RDB_MH
 # ========================================================
 
 
-def get_numpyro_sampler(
+def get_ird_sampler(
     name, model, init_args={}, sampler_args={"num_warmup": 10, "num_sample": 10}
 ):
     """
@@ -38,7 +38,7 @@ def get_numpyro_sampler(
     """
     assert name in ["MH", "HMC", "NUTS", "SA"]
     if name == "MH":
-        kernel = NumPyro_MH(model, **init_args)
+        kernel = MH(model, **init_args)
     elif name == "HMC":
         kernel = HMC(model, **init_args)
     elif name == "NUTS":
@@ -50,7 +50,7 @@ def get_numpyro_sampler(
     return MCMC(kernel, progress_bar=True, **sampler_args)
 
 
-def get_rdb_sampler(
+def get_designer_sampler(
     name, model, init_args={}, sampler_args={"num_warmup": 10, "num_sample": 10}
 ):
     """
@@ -63,12 +63,15 @@ def get_rdb_sampler(
         init_args (dict): initialization args
 
     """
+    # # Force chains = 1
+    # sampler_args = copy.deepcopy(sampler_args)
+    assert sampler_args["num_chains"] == 1
     assert name in ["MH"]
     if name == "MH":
-        kernel = RDB_MH(model, **init_args)
+        kernel = MH(model, jit=False, **init_args)
     else:
         raise NotImplementedError
-    return MCMC(kernel, progress_bar=True, **sampler_args)
+    return MCMC(kernel, progress_bar=True, jit_model=False, **sampler_args)
 
 
 # ========================================================
@@ -157,7 +160,7 @@ def cross_product(data_a, data_b, type_a, type_b):
     return type_a(batch_a), type_b(batch_b)
 
 
-def collect_trajs(ws, states, controller, runner, us0=None, desc=None):
+def collect_trajs(ws, states, controller, runner, us0=None, desc=None, jax=False):
     """Utility for collecting features.
 
     Args:
@@ -184,12 +187,15 @@ def collect_trajs(ws, states, controller, runner, us0=None, desc=None):
     assert len(states.shape) == 2 and len(states) == len(ws)
     assert len(ws.shape) == 1
     if us0 is not None:
-        us0 = onp.array(us0)
+        if jax:
+            us0 = np.array(us0)
+        else:
+            us0 = onp.array(us0)
         assert len(us0.shape) == 3 and len(us0) == len(ws)
     ## acs (nbatch, T, udim)
-    actions = controller(states, us0=us0, weights=ws)
+    actions = controller(states, us0=us0, weights=ws, jax=jax)
     ## xs (T, nbatch, xdim), costs (nbatch)
-    xs, costs, info = runner(states, actions, weights=ws)
+    xs, costs, info = runner(states, actions, weights=ws, jax=jax)
     return actions, costs, info["feats"], info["feats_sum"], info["violations"]
 
 

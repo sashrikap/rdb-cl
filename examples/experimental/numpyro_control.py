@@ -13,6 +13,7 @@ from jax.scipy.special import logsumexp
 from scipy.stats import gaussian_kde
 from jax.interpreters import xla, ad
 from numpyro.infer import MCMC, NUTS
+from rdb.infer.mcmc import MH
 from rdb.optim.mpc import build_mpc
 from jax import abstract_arrays
 from jax import lax, random
@@ -22,7 +23,7 @@ from rdb.infer import *
 env = gym.make("Week6_02-v1")
 env.reset()
 main_car = env.main_car
-nbatch = 5
+nbatch = 1
 horizon = 10
 T = 10
 
@@ -104,69 +105,16 @@ def jax_sum(weights_arr, feats_arr):
     return np.mean(weights_arr * feats_arr)
 
 
+keys = env.features_keys
+
+
 def ird_experimental():
-    dist_cars = np.exp(
-        numpyro.sample("dist_cars", dist.Uniform(-10, 10), sample_shape=(nbatch,))
-    )
-    dist_lanes = np.exp(
-        numpyro.sample("dist_lanes", dist.Uniform(-10, 10), sample_shape=(nbatch,))
-    )
-    dist_objects = np.exp(
-        numpyro.sample("dist_objects", dist.Uniform(-10, 10), sample_shape=(nbatch,))
-    )
-    speed = np.exp(
-        numpyro.sample("speed", dist.Uniform(-10, 10), sample_shape=(nbatch,))
-    )
-    speed_over = np.exp(
-        numpyro.sample("speed_over", dist.Uniform(-10, 10), sample_shape=(nbatch,))
-    )
-    speed_under = np.exp(
-        numpyro.sample("speed_under", dist.Uniform(-10, 10), sample_shape=(nbatch,))
-    )
-    control = np.exp(
-        numpyro.sample("control", dist.Uniform(-10, 10), sample_shape=(nbatch,))
-    )
-    control_thrust = np.exp(
-        numpyro.sample("control_thrust", dist.Uniform(-10, 10), sample_shape=(nbatch,))
-    )
-    control_brake = np.exp(
-        numpyro.sample("control_brake", dist.Uniform(-10, 10), sample_shape=(nbatch,))
-    )
-    control_turn = np.exp(
-        numpyro.sample("control_turn", dist.Uniform(-10, 10), sample_shape=(nbatch,))
-    )
-    dist_fences = np.exp(
-        numpyro.sample("dist_fences", dist.Uniform(-10, 10), sample_shape=(nbatch,))
-    )
     weights_arr = np.array(
         [
-            dist_cars,
-            dist_lanes,
-            dist_objects,
-            speed,
-            speed_over,
-            speed_under,
-            control,
-            control_thrust,
-            control_brake,
-            control_turn,
-            dist_fences,
+            numpyro.sample(key, dist.Uniform(-10, 10), sample_shape=(nbatch,))
+            for key in keys
         ]
     )
-    weights = {
-        "dist_cars": dist_cars,
-        "dist_lanes": dist_lanes,
-        "speed": speed,
-        "dist_objects": dist_objects,
-        "speed_over": speed_over,
-        "speed_under": speed_under,
-        "control": control,
-        "control_thrust": control_thrust,
-        "control_turn": control_turn,
-        "control_brake": control_brake,
-        "dist_fences": dist_fences,
-    }
-
     # weights_onp = {"dist_cars": onp.array(dist_cars)}
 
     state = np.repeat(env.state, nbatch, axis=0)
@@ -174,33 +122,18 @@ def ird_experimental():
     # dummy compilation
     def cost_fn(weights_arr):
         # actions = untraceable_controller(np.array(weights_arr))[0]
-        with jax.disable_jit():
-            state = np.repeat(env.state, nbatch, axis=0)
-            actions = optimizer(
-                state, weights=None, weights_arr=weights_arr, batch=False
-            )
+        # with jax.disable_jit():
+        state = np.repeat(env.state, nbatch, axis=0)
+        actions = optimizer(state, weights=None, weights_arr=weights_arr, batch=False)
         print("actions", actions.shape)
-        # traj, costs, info = runner(
-        #     state, actions, weights=None, weights_arr=np.array(weights_arr), jax=True
-        # )
-        # weights_arr = DictList([weights], jax=True).numpy_array()
-        # feats_sum = info["feats_sum"].numpy_array()
-        # cost = costs.mean(axis=0)
-        cost = actions.sum()
+        traj, costs, info = runner(
+            state, actions, weights=None, weights_arr=np.array(weights_arr), jax=True
+        )
+        cost = costs.mean(axis=0)
+        # cost = actions.sum()
         return cost
 
-    # jax.jit(cost_fn)(weights_arr)
-    # cost_fn(weights_arr)
-    # cost_grad = jax.grad(cost_fn)
-    import pdb
-
-    pdb.set_trace()
     cost = cost_fn(weights_arr)
-    # import pdb; pdb.set_trace()
-    cost_g = cost_grad(weights_arr)
-    import pdb
-
-    pdb.set_trace()
     beta = 5
     log_prob = -1 * beta * cost
     numpyro.factor("forward_log_prob", log_prob)
@@ -216,16 +149,20 @@ def main():
 
     print("Starting inference...")
     rng_key = random.PRNGKey(2)
-    kernel = MH(ird_experimental, proposal_var=0.05)
+    init_params = {}
+    for key in keys:
+        init_params[key] = np.ones((nbatch,))
+    kernel = MH(ird_experimental, proposal_var=0.05, jit=False)
     num_warmup = 20
     num_samples = 40
     mcmc = MCMC(
         kernel,
         20,
         40,
+        jit_model=False,
         progress_bar=False if "NUMPYRO_SPHINXBUILD" in os.environ else True,
     )
-    mcmc.run(rng_key)
+    mcmc.run(rng_key, init_params=init_params)
     samples = mcmc.get_samples()
     import pdb
 

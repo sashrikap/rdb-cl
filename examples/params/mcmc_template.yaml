@@ -66,13 +66,14 @@ DESIGNER_ARGS:
     proposal_var: 2
     max_val: 15.0
   sample_args:
-    num_samples: 1000
+    num_samples: 600
     num_warmup: 200
-    num_chains: 3
+    num_chains: 1
   beta: 10
   use_true_w: False
   true_w: NULL
   exp_name: "designer_convergence_true_w_prior_tasks_norm_200_beta_10_var_2"
+  # exp_name: "designer_convergence_true_w_random_tasks_norm_200_beta_10_var_2"
 
 # ## Test sampling
 # IRD_ARGS:
