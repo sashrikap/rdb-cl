@@ -14,9 +14,9 @@ setup(
         "pyglet==1.3.2",
         "matplotlib",
         "gym",
-        "numpyro",
-        "jax",
-        # "jaxlib",  # numpyro installs the correct version
+        "numpyro @ https://github.com/hzyjerry/numpyro/tarball/master#egg=numpyro"
+        "jax==0.1.54",
+        "jaxlib==0.1.38",  # numpyro installs the correct version
         "moviepy",
         "fast-histogram",
         "pygame",

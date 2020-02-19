@@ -134,6 +134,6 @@ class Profiler(object):
         step_semicolon = ":" if step_name else ""
         if self.verbose:
             print(
-                f"{self.name}{step_semicolon + step_name}: {duration:.3f} seconds {1/duration:.3f} fps"
+                f"{self.name}{step_semicolon + step_name}: {duration:.3f} seconds {1/(duration + 1e-3):.3f} fps"
             )
         return duration

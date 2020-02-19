@@ -3,6 +3,7 @@
 import numpy as onp
 import jax.numpy as np
 import jax
+import math
 import copy, os
 import numpyro
 import numpyro.distributions as dist
@@ -14,6 +15,67 @@ from rdb.exps.utils import Profiler
 from tqdm.auto import tqdm, trange
 from numpyro.handlers import seed
 from functools import partial
+from numpyro.infer import HMC, MCMC, NUTS, SA
+from rdb.infer.mcmc import MH
+
+# from rdb.infer.mcmc import MH as RDB_MH
+
+# ========================================================
+# ============= Sampling Interface Tools =================
+# ========================================================
+
+
+def get_ird_sampler(
+    name, model, init_args={}, sampler_args={"num_warmup": 10, "num_sample": 10}
+):
+    """
+    Build numpyro kernel.
+
+    Args:
+        name (str)
+        model (fn): designer/IRD model
+        init_args (dict): initialization args
+
+    """
+    assert name in ["MH", "HMC", "NUTS", "SA"]
+    if name == "MH":
+        kernel = MH(model, **init_args)
+    elif name == "HMC":
+        kernel = HMC(model, **init_args)
+    elif name == "NUTS":
+        kernel = NUTS(model, **init_args)
+    elif name == "SA":
+        kernel = SA(model, **init_args)
+    else:
+        raise NotImplementedError
+    return MCMC(kernel, progress_bar=True, **sampler_args)
+
+
+def get_designer_sampler(
+    name, model, init_args={}, sampler_args={"num_warmup": 10, "num_sample": 10}
+):
+    """
+    Build rdb kernel, which shares API as numpyro but avoids jitting the model.
+    Currently only Metropolis Hasting implemented.
+
+    Args:
+        name (str)
+        model (fn): designer/IRD model
+        init_args (dict): initialization args
+
+    """
+    assert name in ["MH"]
+    if name == "MH":
+        kernel = MH(model, jit=False, **init_args)
+    else:
+        raise NotImplementedError
+    return MCMC(
+        kernel,
+        progress_bar=True,
+        jit_model=False,
+        chain_method="sequential",
+        **sampler_args,
+    )
 
 
 # ========================================================
@@ -22,6 +84,7 @@ from functools import partial
 
 
 def logsumexp(vs, axis=-1):
+    print("Inside logsumexp", type(vs))
     max_v = onp.max(vs, axis=axis)
     ds = vs - onp.max(vs, axis=axis, keepdims=True)
     sum_exp = onp.exp(ds).sum(axis=axis)
@@ -101,11 +164,20 @@ def cross_product(data_a, data_b, type_a, type_b):
     return type_a(batch_a), type_b(batch_b)
 
 
-def collect_trajs(ws, states, controller, runner, us0=None, desc=None):
+def collect_trajs(
+    weights_arr,
+    states,
+    controller,
+    runner,
+    us0=None,
+    desc=None,
+    jax=False,
+    max_batch=-1,
+):
     """Utility for collecting features.
 
     Args:
-        ws (DictList): nfeats * (nbatch)
+        weights_arr (ndarray): (nfeats, nbatch)
         states (ndarray): initial state for the task
             shape (nbatch, xdim)
         us0 (ndarray) initial action
@@ -119,22 +191,81 @@ def collect_trajs(ws, states, controller, runner, us0=None, desc=None):
         violations (DictList): nvios * (nbatch, T)
 
     """
-    feats = []
-    feats_sum = []
-    violations = []
-    actions = []
-    num_ws = len(ws)
-    assert isinstance(ws, DictList)
-    assert len(states.shape) == 2 and len(states) == len(ws)
-    assert len(ws.shape) == 1
+    feats = None
+    feats_sum = None
+    violations = None
+    actions = None
+    xdim = states.shape[1]
+    nfeats = weights_arr.shape[0]
+    nbatch = weights_arr.shape[1]
+    assert len(states.shape) == 2 and len(states) == nbatch
     if us0 is not None:
-        us0 = onp.array(us0)
-        assert len(us0.shape) == 3 and len(us0) == len(ws)
-    ## acs (nbatch, T, udim)
-    actions = controller(states, us0=us0, weights=ws)
-    ## xs (T, nbatch, xdim), costs (nbatch)
-    xs, costs, info = runner(states, actions, weights=ws)
-    return actions, costs, info["feats"], info["feats_sum"], info["violations"]
+        if jax:
+            us0 = np.array(us0)
+        else:
+            us0 = onp.array(us0)
+        assert len(us0.shape) == 3 and len(us0) == nbatch
+
+    if max_batch == -1:
+        ## acs (nbatch, T, udim)
+        actions = controller(
+            states, us0=us0, weights=None, weights_arr=weights_arr, jax=jax
+        )
+        ## xs (T, nbatch, xdim), costs (nbatch)
+        xs, costs, info = runner(
+            states, actions, weights=None, weights_arr=weights_arr, jax=jax
+        )
+        feats, feats_sum, violations = (
+            info["feats"],
+            info["feats_sum"],
+            info["violations"],
+        )
+
+    else:
+        num_iterations = math.ceil(nbatch / max_batch)
+        for it in range(num_iterations):
+            it_begin = it * max_batch
+            it_end = min((it + 1) * max_batch, nbatch)
+            valid_i = onp.ones(max_batch, dtype=bool)
+            idxs = onp.zeros(nbatch, dtype=bool)
+            idxs[it_begin:it_end] = True
+            states_i = states[list(idxs)]
+            us0_i = None if not us0 else us0[list(idxs)]
+            weights_arr_i = weights_arr[:, list(idxs)]
+            if it == num_iterations - 1:
+                # Pad state/weight pairs with 0 (valid=False)
+                valid_i[it_end - it_begin :] = False
+                num_pad = num_iterations * max_batch - nbatch
+                states_pad = np.zeros((num_pad, xdim))
+                states_i = np.concatenate([states_i, states_pad], axis=0)
+                weights_pad = np.ones((nfeats, num_pad))
+                weights_arr_i = np.concatenate([weights_arr_i, weights_pad], axis=1)
+                if us0_i:
+                    us0_pad = np.zeros((num_pad, us0_i.shape[1]))
+                    us0_i = np.concatenate([us0_i, us0_pad], axis=0)
+            actions_i = controller(
+                states_i, us0=us0_i, weights=None, weights_arr=weights_arr_i, jax=jax
+            )
+            ## xs (T, nbatch, xdim), costs (nbatch)
+            xs_i, costs_i, info_i = runner(
+                states_i, actions_i, weights=None, weights_arr=weights_arr_i, jax=jax
+            )
+            feats_i, feats_sum_i = info_i["feats"], info_i["feats_sum"]
+            violations_i = info_i["violations"]
+            if it == 0:
+                actions = actions_i[list(valid_i)]
+                costs = costs_i[list(valid_i)]
+                feats = feats_i[list(valid_i)]
+                feats_sum = feats_sum_i[list(valid_i)]
+                violations = violations_i[list(valid_i)]
+            else:
+                actions = np.concatenate([actions, actions_i[list(valid_i)]], axis=0)
+                costs = np.concatenate([costs, costs_i[list(valid_i)]], axis=0)
+                feats = feats.concat(feats_i[list(valid_i)], axis=0)
+                feats_sum = feats_sum.concat(feats_sum_i[list(valid_i)], axis=0)
+                violations = violations.concat(violations_i[list(valid_i)], axis=0)
+
+    return actions, costs, feats, feats_sum, violations
 
 
 # ========================================================
@@ -146,7 +277,10 @@ def visualize_chains(chains, rates, fig_dir, title, **kwargs):
     """Visualize multiple MCMC chains to check convergence.
 
     Args:
-        chains (list): list of accepted chains, [(n_samples, n_weights), ...]
+        chains (DictList): list of accepted chains
+            shape: nfeats * (nchains, nsamples)
+        rates (list): acceptance rates
+            shape: (nchains,)
         num_plots=10, visualize ~10%, 20%...99% samples
         fig_dir (str): directory to save the figure
         title (str): figure name, gets padded with plot index

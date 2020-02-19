@@ -75,6 +75,7 @@ class ExperimentMCMC(object):
         self._max_ird_obs_num = 10
         # Test incremental # features
         self._nfeats_start = 5
+        self._last_time = None
 
     def _load_design(self, exp_mode):
         """Different mode of designer experiments.
@@ -223,9 +224,10 @@ class ExperimentMCMC(object):
     def _make_random_weights(self, keys):
         weights = OrderedDict()
         for key in keys:
-            weights[key] = np.exp(self._random_weight())
-        for key, val in weights.items():
-            weights[key] = val / weights[self._normalized_key]
+            if key == self._normalized_key:
+                weights[key] = 1.0
+            else:
+                weights[key] = np.exp(self._random_weight())
         return weights
 
     def run_designer(self, exp_mode):
@@ -248,7 +250,8 @@ class ExperimentMCMC(object):
         ## Simulate
         for n_prior in range(len(self._all_designer_prior_tasks)):
 
-            print(f"Experiment mode ({self._rng_key}) {exp_mode}")
+            self._log_time(f"Designer Prior {n_prior} Begin")
+            print(f"Experiment mode ({self._rng_name}) {exp_mode}")
             print(f"Prior task number: {n_prior}")
 
             prior_tasks = self._all_designer_prior_tasks[:n_prior]
@@ -262,19 +265,22 @@ class ExperimentMCMC(object):
             self._designer.true_w = prior_w
 
             ## Sample Designer
-            num_samples = self._designer._sampler.num_samples
+            num_samples = self._exp_params["DESIGNER_ARGS"]["sample_args"][
+                "num_samples"
+            ]
             save_name = f"designer_sample_{num_samples:04d}_prior_{n_prior:02d}"
             obs = self._designer.simulate(new_tasks, save_name=save_name)
 
             ## Visualize performance
-            obs.visualize_comparisons(
-                tasks=viz_tasks,
-                target=self._designer.truth,
-                fig_name=f"prior_{n_prior:02d}",
-            )
+            # obs.visualize_comparisons(
+            #     tasks=viz_tasks,
+            #     target=self._designer.truth,
+            #     fig_name=f"prior_{n_prior:02d}",
+            # )
 
             ## Reset designer prior tasks
             self._designer.prior_tasks = all_tasks
+            self._log_time(f"Designer Prior {n_prior} End")
 
     def run_ird(self, exp_mode):
         """Run IRD on task, varying the number of past observations."""
@@ -285,9 +291,11 @@ class ExperimentMCMC(object):
         assert self._random_task_choice is not None
         all_tasks = self._designer.env.all_tasks
 
-        for num_obs in range(1, self._max_ird_obs_num):
+        for num_obs in range(1, len(self._all_ird_obs_ws)):
+            # for num_obs in range(3, 4):
 
-            print(f"Experiment mode ({self._rng_key}): {exp_mode}")
+            self._log_time(f"IRD Obs {num_obs} Begin")
+            print(f"Experiment mode ({self._rng_name}): {exp_mode}")
             print(f"Observation number: {num_obs}")
 
             ## Simulate
@@ -297,24 +305,40 @@ class ExperimentMCMC(object):
             obs = [
                 self._designer.create_particles([w], save_name=obs_name) for w in obs_ws
             ]
-            num_samples = self._model._sampler.num_samples
+            num_samples = self._exp_params["IRD_ARGS"]["sample_args"]["num_samples"]
             belief_name = f"ird_sample_{num_samples:04d}_obs_{num_obs:02d}"
             belief = self._model.sample(tasks=obs_tasks, obs=obs, save_name=belief_name)
 
             ## Reset designer prior tasks
             self._designer.prior_tasks = all_tasks
+            self._log_time(f"IRD Obs {num_obs} End")
+
+    def _log_time(self, caption=""):
+        if self._last_time is not None:
+            secs = time() - self._last_time
+            h = secs // (60 * 60)
+            m = (secs - h * 60 * 60) // 60
+            s = secs - (h * 60 * 60) - (m * 60)
+            print(f">>> Active IRD {caption} Time: {int(h)}h {int(m)}m {s:.2f}s")
+        self._last_time = time()
 
     def update_key(self, rng_key):
-        self._rng_key = rng_key
-        self._designer.update_key(rng_key)
-        self._model.update_key(rng_key)
-        self._random_choice = seed(random_choice, rng_key)
+        self._rng_name = str(rng_key)
+        self._rng_key, rng_designer, rng_model, rng_choice, rng_weight = random.split(
+            rng_key, 5
+        )
+
+        self._designer.rng_name = str(rng_key)
+        self._designer.update_key(rng_designer)
+        self._model.rng_name = str(rng_key)
+        self._model.update_key(rng_model)
+        self._random_choice = seed(random_choice, rng_choice)
         random_weight = partial(
             random_uniform,
-            low=-self._exp_params["MAX_WEIGHT"],
-            high=self._exp_params["MAX_WEIGHT"],
+            low=-self._exp_params["WEIGHT_PARAMS"]["max_weights"],
+            high=self._exp_params["WEIGHT_PARAMS"]["max_weights"],
         )
-        self._random_weight = seed(random_weight, rng_key)
+        self._random_weight = seed(random_weight, rng_weight)
         if self._fixed_task_seed is not None:
             self._random_task_choice = seed(random_choice, self._fixed_task_seed)
         else:

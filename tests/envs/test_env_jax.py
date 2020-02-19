@@ -2,6 +2,15 @@ import jax.numpy as np
 import jax
 
 
+def test_vmap_array():
+    def fun(val1, val2):
+        return np.sum(val1 * val2)
+
+    arr1 = np.array([[1.0, 2.0], [3, 4.0]])
+    arr2 = np.array([[3.0, 1.0], [3, 4.0]])
+    out = jax.vmap(fun)(arr1, arr2)
+
+
 def test_vmap():
     def fun(val1, val2):
         return {"a": val1 + val2, "b": val1 + val2 * 2}

@@ -64,8 +64,9 @@ optimizer, runner = build_mpc(
 )
 
 
-@pytest.mark.parametrize("num_weights", [1, 5, 10])
-def test_collect_trajs(num_weights):
+@pytest.mark.parametrize("num_weights", [1, 5, 10, 20])
+@pytest.mark.parametrize("max_batch", [1, 2, 8])
+def test_collect_trajs(num_weights, max_batch):
     key = random.PRNGKey(0)
     random_choice_fn = seed(random_choice, key)
     tasks = random_choice_fn(env.all_tasks, num_weights)
@@ -81,9 +82,10 @@ def test_collect_trajs(num_weights):
 
     nfeatures = len(env.features_keys)
     nvios = len(env.constraints_keys)
+    weights_arr = weights.prepare(env.features_keys).numpy_array()
 
     actions, costs, feats, feats_sum, vios = collect_trajs(
-        weights, states, optimizer, runner
+        weights_arr, states, optimizer, runner, max_batch=max_batch
     )
     udim = 2
     assert actions.shape == (num_weights, T, udim)

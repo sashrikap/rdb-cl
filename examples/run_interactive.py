@@ -68,12 +68,6 @@ def run_interactive(active_fn_name, random_keys=None, load_design=-1, evaluate=F
         feature_keys=p.FEATURE_KEYS,
         log_max=p.MAX_WEIGHT,
     )
-    ird_proposal = IndGaussianProposal(
-        rng_key=None,
-        normalized_key=p.NORMALIZED_KEY,
-        feature_keys=p.FEATURE_KEYS,
-        proposal_var=p.IRD_PROPOSAL_VAR,
-    )
 
     ## Evaluation Server
     eval_server = ParticleServer(
@@ -91,7 +85,6 @@ def run_interactive(active_fn_name, random_keys=None, load_design=-1, evaluate=F
         prior=prior,
         num_normalizers=p.NUM_NORMALIZERS,
         normalized_key=p.NORMALIZED_KEY,
-        proposal=ird_proposal,
         sample_args={
             "num_warmups": p.NUM_WARMUPS,
             "num_samples": p.NUM_SAMPLES,

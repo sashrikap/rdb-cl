@@ -63,7 +63,9 @@ class ExperimentActiveIRD(object):
     def __init__(
         self,
         model,
+        designer,
         active_fns,
+        true_w,
         eval_server,
         iterations=10,
         num_eval_tasks=4,
@@ -74,7 +76,7 @@ class ExperimentActiveIRD(object):
         fixed_candidates=None,
         fixed_belief_tasks=None,
         normalized_key=None,
-        design_data={},
+        design_data=None,
         num_load_design=-1,
         save_root="data/active_ird_exp1",
         exp_name="active_ird_exp1",
@@ -82,10 +84,13 @@ class ExperimentActiveIRD(object):
     ):
         # Inverse Reward Design Model
         self._model = model
+        self._designer = designer
+        self._true_w = true_w
         self._active_fns = active_fns
         self._eval_server = eval_server
         # Random key & function
         self._rng_key = None
+        self._rng_name = None
         self._random_choice = None
         self._random_task_choice = None
         self._fixed_task_seed = fixed_task_seed
@@ -126,15 +131,26 @@ class ExperimentActiveIRD(object):
             self._all_obs[key], self._all_beliefs[key] = [], []
 
     def update_key(self, rng_key):
-        self._rng_key = rng_key
-        self._model.update_key(rng_key)
-        self._random_choice = seed(random_choice, rng_key)
+        # Set name
+        self._rng_name = str(rng_key)
+        self._model.rng_name = str(rng_key)
+        self._designer.rng_name = str(rng_key)
+        # Model and designer
+        self._rng_key, rng_model, rng_designer, rng_choice, rng_active = random.split(
+            rng_key, 5
+        )
+        self._model.update_key(rng_model)
+        self._designer.update_key(rng_designer)
+        self._designer.true_w = self._true_w
+        self._random_choice = seed(random_choice, rng_choice)
         if self._fixed_task_seed is not None:
             self._random_task_choice = seed(random_choice, self._fixed_task_seed)
         else:
             self._random_task_choice = self._random_choice
-        for fn in self._active_fns.values():
-            fn.update_key(rng_key)
+        # Active functions
+        rng_active_keys = random.split(rng_active, len(list(self._active_fns.keys())))
+        for fn, rng_key_fn in zip(list(self._active_fns.values()), rng_active_keys):
+            fn.update_key(rng_key_fn)
 
     def run(self, plot_candidates=False):
         """Main function 1: Run experiment from task.
@@ -145,7 +161,7 @@ class ExperimentActiveIRD(object):
 
         """
         print(
-            f"\n============= Main Experiment ({self._rng_key}): {self._exp_name} ============="
+            f"\n============= Main Experiment ({self._rng_name}): {self._exp_name} ============="
         )
         self._log_time("Begin")
         self._build_cache()
@@ -167,7 +183,7 @@ class ExperimentActiveIRD(object):
             self._all_candidates.append(candidates)
 
             ### Run Active IRD on Candidates ###
-            print(f"\nActive IRD ({self._rng_key}) iteration {itr}")
+            print(f"\nActive IRD ({self._rng_name}) iteration {itr}")
             for key in self._active_fns.keys():
                 all_beliefs = self._all_beliefs[key]
                 all_obs = self._all_obs[key]
@@ -187,15 +203,15 @@ class ExperimentActiveIRD(object):
                 self._log_time(f"Itr {itr} {key} Propose")
 
                 ## Simulate Designer
-                obs = self._model.simulate_designer(
-                    task=task, save_name=f"designer_method_{key}_itr_{itr:02d}"
+                obs = self._designer.simulate(
+                    onp.array([task]), save_name=f"designer_method_{key}_itr_{itr:02d}"
                 )
                 self._all_obs[key].append(obs)
                 self._log_time(f"Itr {itr} {key} Designer")
 
                 ## IRD Sampling w/ Divide And Conquer
                 belief = self._model.sample(
-                    tasks=self._all_tasks[key],
+                    tasks=onp.array(self._all_tasks[key]),
                     obs=self._all_obs[key],
                     save_name=f"ird_belief_method_{key}_itr_{itr:02d}",
                 )
@@ -227,6 +243,8 @@ class ExperimentActiveIRD(object):
 
     def _propose_task(self, candidates, all_beliefs, all_obs, all_tasks, fn_key):
         """Find best next task for this active function.
+
+        Computation: n_particles(~1k) * n_active(~100) tasks
 
         Args:
             candidates (list): potential next tasks
@@ -268,6 +286,8 @@ class ExperimentActiveIRD(object):
     def _evaluate(self, fn_name, belief, eval_tasks):
         """Evaluate current sampled belief on eval task.
 
+        Computation: n_map(~4) * n_eval(5~10k) tasks
+
         Note:
             self._num_eval_map: use MAP estimate particle, intead of whole population, to estimate.
 
@@ -276,14 +296,17 @@ class ExperimentActiveIRD(object):
             * Violations.
 
         """
-        if self._model.interactive_mode and self._model.designer.run_from_ipython():
+        if self._model.interactive_mode and self._designer.run_from_ipython():
             # Interactive mode, skip evaluation to speed up
             avg_violate = 0.0
             avg_perform = 0.0
         else:
             # Compute belief features
             belief = belief.map_estimate(self._num_eval_map)
-            target = self._model.designer.truth
+            target = self._designer.truth
+            import pdb
+
+            pdb.set_trace()
             self._eval_server.compute_tasks(belief, eval_tasks, verbose=True)
             self._eval_server.compute_tasks(target, eval_tasks, verbose=True)
 
@@ -371,7 +394,9 @@ class ExperimentActiveIRD(object):
         """
         # Load eval data
         self._build_cache()
-        eval_path = f"{load_dir}/{self._exp_name}/{self._exp_name}_seed_{str(self._rng_key)}.npz"
+        eval_path = (
+            f"{load_dir}/{self._exp_name}/{self._exp_name}_seed_{self._rng_name}.npz"
+        )
         if not os.path.isfile(eval_path):
             print(f"Failed to load {eval_path}")
             return False
@@ -398,7 +423,7 @@ class ExperimentActiveIRD(object):
         # Load truth
         if "truth" in eval_data:
             true_ws = [eval_data["true_w"].item()]
-            self._model.designer.truth.weights = true_ws
+            self._designer.truth.weights = true_ws
         # Load parameters and check
         if "exp_params" in eval_data:
             exp_params = eval_data["exp_params"].item()
@@ -411,11 +436,7 @@ class ExperimentActiveIRD(object):
         weight_dir = f"{load_dir}/{self._exp_name}/save"
         for key in self._active_fns.keys():
             weight_files = sorted(
-                [
-                    f
-                    for f in os.listdir(weight_dir)
-                    if key in f and str(self._rng_key) in f
-                ]
+                [f for f in os.listdir(weight_dir) if key in f and self._rng_name in f]
             )
             for file in weight_files:
                 weight_filepath = os.path.join(weight_dir, file)
@@ -446,16 +467,16 @@ class ExperimentActiveIRD(object):
         exp_dir = f"{self._save_root}/{self._exp_name}"
         os.makedirs(exp_dir, exist_ok=True)
         ## Save experiment parameters
-        save_params(f"{exp_dir}/params_{str(self._rng_key)}.yaml", self._exp_params)
+        save_params(f"{exp_dir}/params_{self._rng_name}.yaml", self._exp_params)
         ## Save evaluation history
         np_obs = {}
         for key in self._all_obs.keys():
             np_obs[key] = [ob.weights[0] for ob in self._all_obs[key]]
         data = dict(
-            seed=str(self._rng_key),
+            seed=self._rng_name,
             exp_params=self._exp_params,
             env_id=str(self._model.env_id),
-            true_w=self._model.designer.true_w,
+            true_w=self._designer.true_w,
             curr_obs=np_obs,
             curr_tasks=self._all_tasks,
             eval_hist=self._active_eval_hist,
@@ -465,13 +486,12 @@ class ExperimentActiveIRD(object):
             if self._num_eval_tasks > 0
             else [],  # do not save when eval onall tasks (too large)
         )
-        path = f"{self._save_root}/{self._exp_name}/{self._exp_name}_seed_{str(self._rng_key)}.npz"
+        path = f"{self._save_root}/{self._exp_name}/{self._exp_name}_seed_{self._rng_name}.npz"
         with open(path, "wb+") as f:
             np.savez(f, **data)
         print("save", exp_dir)
-
         ## Save belief sample information
-        true_w = self._model.designer.true_w
+        true_w = self._designer.true_w
         for key in self._all_beliefs.keys():
             for itr, belief in enumerate(self._all_beliefs[key]):
                 if itr < len(np_obs[key]):
@@ -500,7 +520,7 @@ class ExperimentActiveIRD(object):
 
         """
         print(
-            f"\n============= Evaluate Candidates ({self._rng_key}): {self._save_root} {self._exp_name} ============="
+            f"\n============= Evaluate Candidates ({self._rng_name}): {self._save_root} {self._exp_name} ============="
         )
         if not self._load_cache(self._save_root):
             return
@@ -528,7 +548,7 @@ class ExperimentActiveIRD(object):
 
         """
         print(
-            f"\n============= Designer MCMC ({self._rng_key}): prior={self._num_load_design} ============="
+            f"\n============= Designer MCMC ({self._rng_name}): prior={self._num_load_design} ============="
         )
         self._log_time("Begin")
         self._build_cache()
@@ -536,7 +556,7 @@ class ExperimentActiveIRD(object):
         belief = self._model.sample(
             self._all_tasks[key],
             obs=self._all_obs[key],
-            save_name=f"weights_seed_{str(self._rng_key)}_prior_{num_load}",
+            save_name=f"weights_seed_{self._rng_name}_prior_{num_load}",
         )
         self._log_time("End")
 
@@ -562,7 +582,7 @@ class ExperimentActiveIRD(object):
                     other_keys.append(key)
 
             # Ranking plot
-            file = f"key_{self._rng_key}_cand_itr_{itr}_fn_{fn_key}_ranking.png"
+            file = f"key_{self._rng_name}_cand_itr_{itr}_fn_{fn_key}_ranking.png"
             path = os.path.join(ranking_dir, file)
             print(f"Candidate plot saved to {path}")
             plot_rankings(

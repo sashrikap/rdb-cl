@@ -24,6 +24,7 @@ def test_dict_init():
     assert w.shape == (1, 1)
     assert w.num_keys == 2
     assert_equal(result, w)
+    assert_equal(result, w[:, :])
 
     data = {"a": [1], "b": [1]}
     w = DictList(data)
@@ -180,9 +181,11 @@ def test_expand_dims():
     w1 = w.expand_dims(1)
     result1 = {"a": [[1], [2]], "b": [[1], [3]]}
     assert_equal(w1, result1)
+    assert_equal(w1[:, :], result1)
     w2 = w.expand_dims((1, 0))
     result2 = {"a": [[[1], [2]]], "b": [[[1], [3]]]}
     assert_equal(w2, result2)
+    assert_equal(w2[:, :, :], result2)
 
 
 def test_expand_dims():
@@ -190,9 +193,11 @@ def test_expand_dims():
     w = DictList(data).squeeze(axis=1)
     result = {"a": [1, 2], "b": [1, 3]}
     assert_equal(w, result)
+    assert_equal(w[:], result)
     data = {"a": [[[1], [2]]], "b": [[[1], [3]]]}
     w = DictList(data).squeeze(axis=(0, 1))
     assert_equal(w, result)
+    assert_equal(w[:], result)
 
 
 def test_sum():

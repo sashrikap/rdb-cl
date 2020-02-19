@@ -1,13 +1,12 @@
 # ENV_NAME: "Week6_01-v0"
 
 #RANDOM_KEYS: [0, 1, 2, 3]
+# RANDOM_KEYS: [21]
 RANDOM_KEYS: [22]
 NUM_EVAL_WORKERS: 4
 FIXED_TASK_SEED: 0
 
 PARALLEL: True
-NUM_IRD_CHAINS: 3
-NUM_DESIGNER_CHAINS: 3
 
 
 NUM_PRIOR_MODE: "design"
@@ -15,48 +14,142 @@ NUM_PRIOR_MODE: "design"
 
 
 
-
 EXP_ITERATIONS: 24
 ENV_NAME: "Week6_01-v1"
-NUM_EVAL_TASKS: 16384
-NUM_VISUALIZE_TASKS: 1024
+## MPC Specific
+CONTROLLER_ARGS:
+  horizon: 10
+  engine: "scipy"
+  method: "lbfgs"
+  # engine: "jax"
+  # method: "adam"
 
 
-GCP_LABEL: "ird_extendnorm_noacross"
+GCP_LABEL: "ird_sample_1000_norm_200"
 
 
 ## Designer settigns
 USER_TRUE_W: False
-
-# ## Full sampling
-NUM_WARMUPS: 200
-NUM_NORMALIZERS: 200
-# NUM_NORMALIZERS: 400
-DESIGNER_NUM_NORMALIZERS: 200
-NUM_SAMPLES: 1000
-NUM_EVAL_MAP: 2
-SAVE_NAME: "200211"
-NUM_DESIGNER_WARMUPS: 200
-NUM_DESIGNERS: 1000
-DESIGNER_EXP_MODE: "designer_convergence_true_w_prior_tasks_norm_200_beta_50_var_0.25"
+# DESIGNER_EXP_MODE: "designer_convergence_true_w_prior_tasks_norm_200_beta_50_var_0.25"
 # DESIGNER_EXP_MODE: "designer_convergence_true_w_random_tasks_norm_200_beta_50_var_0.25"
 # DESIGNER_EXP_MODE: "designer_convergence_random_w_random_tasks_norm_200_beta_50_var_0.25"
 # DESIGNER_EXP_MODE: "designer_convergence_true_w_more_features_norm_200_beta_50_var_0.25"
 
-IRD_PROPOSAL_VAR: 1
-IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks_norm_200_beta_50_var_1"
-# IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks_beta_800"
-# IRD_EXP_MODE: "ird_convergence_true_w_random_tasks"
-# IRD_EXP_MODE: "ird_convergence_random_w_random_tasks"
-# IRD_EXP_MODE: "ird_convergence_true_w_more_features"
+
+# IRD_PROPOSAL_VARS: [1.0, 0.5, 0.2]
+# IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks_norm_200_beta_50_var_1"
+# IRD_EXP_MODE: "ird_convergence_true_w_random_tasks_norm_200_beta_50_var_1"
+# IRD_EXP_MODE: "ird_convergence_random_w_random_tasks_norm_200_beta_50_var_1"
+# IRD_EXP_MODE: "ird_convergence_true_w_more_features_norm_200_beta_50_var_1"
+
+
+
+## Full sampling
+IRD_ARGS:
+  num_normalizers: 200
+  sample_method: "MH"
+  sample_init_args:
+    proposal_var: 2
+    max_val: 15.0
+  # sample_method: "HMC"
+  # sample_method: "NUTS"
+  # sample_init_args:
+  #   step_size: 0.2
+  sample_args:
+    num_warmup: 200
+    num_samples: 2000
+    num_chains: 3
+  # exp_name: "ird_convergence_random_w_random_tasks_norm_1000_beta_10_var_5"
+  # exp_name: "ird_convergence_true_w_random_tasks_norm_1000_beta_10_var_5"
+  # exp_name: "ird_convergence_true_w_prior_tasks_norm_1000_beta_100_var_1"
+  # exp_name: "ird_convergence_true_w_prior_tasks_sum_norm_200_beta_10_var_2"
+  # exp_name: "ird_convergence_true_w_random_tasks_sum_norm_200_beta_50_var_2"
+
+DESIGNER_ARGS:
+  num_normalizers: 200
+  sample_method: "MH"
+  sample_init_args:
+    proposal_var: 0.5
+    max_val: 15.0
+  sample_args:
+    num_samples: 1000
+    num_warmup: 100
+    num_chains: 1
+  beta: 50
+  use_true_w: False
+  true_w: NULL
+  # exp_name: "designer_convergence_true_w_prior_tasks_norm_200_beta_50_var_2"
+  exp_name: "designer_convergence_true_w_prior_tasks_mean_norm_200_beta_50_var_2"
+  # exp_name: "designer_convergence_true_w_random_tasks_mean_norm_200_beta_50_var_2"
+SAVE_NAME: "200216"
+
+
+# ## Test sampling
+# IRD_ARGS:
+#   num_normalizers: 10
+#   sample_init_args:
+#     proposal_var: 1
+#   sample_args:
+#     num_warmup: 12
+#     num_samples: 8
+#     num_chains: 3
+#   sample_method: "MH"
+#   # exp_name: "ird_convergence_random_w_random_tasks_norm_200_beta_50_var_1"
+#   exp_name: "ird_convergence_true_w_prior_tasks_norm_200_beta_50_var_1"
+
+
+# DESIGNER_ARGS:
+#   num_normalizers: 7
+#   sample_init_args:
+#     proposal_var: 0.25
+#   sample_args:
+#     num_samples: 15
+#     num_warmup: 14
+#     num_chains: 1
+#   beta: 10
+#   # use_true_w: True
+#   use_true_w: False
+#   true_w: NULL
+#   sample_method: "MH"
+#   exp_name: "designer_convergence_true_w_prior_tasks_norm_200_beta_50_var_1"
+
+# SAVE_NAME: "test"
+
+
+
+WEIGHT_PARAMS:
+  ## Plotting & weight scaling
+  normalized_key: "dist_cars"
+  max_weights: 15.0
+  bins: 200
+  feature_keys:
+  - "dist_cars"
+  - "dist_lanes"
+  - "dist_fences"
+  - "dist_objects"
+  - "speed"
+  - "control"
+
+
+
+EXPERIMENT_ARGS:
+  num_eval_tasks: 16384
+  num_eval_map: 2
+  num_visualize_tasks: 1024
+  ## Weight and task specific
+
+
+
+NUM_EVAL_MAP: 2
+
 
 
 ## Testing
-# NUM_WARMUPS: 10
+# NUM_WARMUP: 10
 # NUM_NORMALIZERS: 50
 # DESIGNER_NUM_NORMALIZERS: 20
 # NUM_SAMPLES: 10
-# NUM_DESIGNER_WARMUPS: 8
+# NUM_DESIGNER_WARMUP: 8
 # NUM_DESIGNERS: 8
 # NUM_EVAL_TASKS: 2
 # NUM_EVAL_MAP: 1
@@ -64,24 +157,3 @@ IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks_norm_200_beta_50_var_1"
 # DESIGNER_EXP_MODE: "designer_convergence_true_w_prior_tasks"
 # # DESIGNER_EXP_MODE: "designer_convergence_true_w_random_tasks"
 # IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks"
-
-
-## Plotting & weight scaling
-MAX_WEIGHT: 15.0
-HIST_BINS: 200
-BETA: 50
-DESIGNER_PROPOSAL_VAR: 0.25
-
-## MPC Specific
-HORIZON: 10
-
-
-## Weight and task specific
-NORMALIZED_KEY: "dist_cars"
-FEATURE_KEYS:
-- "dist_cars"
-- "dist_lanes"
-- "dist_fences"
-- "dist_objects"
-- "speed"
-- "control"

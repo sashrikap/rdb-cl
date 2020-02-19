@@ -10,6 +10,8 @@ from numpyro.handlers import scale, condition, seed
 from fast_histogram import histogram1d
 from scipy.stats import gaussian_kde
 from rdb.exps.utils import Profiler
+from functools import partial
+from jax import random
 import jax.numpy as np
 import numpy as onp
 import copy
@@ -25,7 +27,7 @@ class Particles(object):
         rng_key (jax.random): if None, need to call `particles.update_key()`
         env_fn (fn): environment creation function, use `env_fn` instead of `env` to prevent multi-threaded tampering
         env (object): environment object, only pass in if you are sure its safe.
-        save_name (str): save file name, e.g. "weights_seed_{str(self._rng_key)}_{name}"
+        save_name (str): save file name, e.g. "weights_seed_{self._rng_name}_{name}"
         weight_params (dict): for histogram visualization: MAX_WEIGHT, NUM_BINS, etc
 
     Note:
@@ -37,6 +39,7 @@ class Particles(object):
 
     def __init__(
         self,
+        rng_name,
         rng_key,
         env_fn,
         controller,
@@ -57,10 +60,11 @@ class Particles(object):
         ## Sample weights
         assert isinstance(weights, DictList)
         self._rng_key = rng_key
+        self._rng_name = rng_name
         self._weight_params = weight_params
         self._normalized_key = normalized_key
         self._weights = weights.normalize_by_key(self._normalized_key)
-        self._expanded_name = f"{save_name}_seed_{str(self._rng_key)}"
+        self._expanded_name = f"{save_name}_seed_{self._rng_name}"
         self._save_name = save_name
         ## File system
         self._fig_dir = fig_dir
@@ -78,9 +82,9 @@ class Particles(object):
             self._random_choice = seed(random_choice, rng_key)
 
     def update_key(self, rng_key):
-        self._rng_key = rng_key
-        self._random_choice = seed(random_choice, rng_key)
-        self._expanded_name = f"weights_seed_{str(self._rng_key)}_{self._save_name}"
+        self._rng_key, rng_choice = random.split(rng_key)
+        self._random_choice = seed(random_choice, rng_choice)
+        self._expanded_name = f"weights_seed_{self._rng_name}_{self._save_name}"
 
     def build_cache(self):
         self._cache_feats = {}
@@ -115,6 +119,7 @@ class Particles(object):
 
     def _clone(self, weights):
         return Particles(
+            rng_name=self._rng_name,
             rng_key=self._rng_key,
             env_fn=self._env_fn,
             controller=self._controller,
@@ -311,7 +316,9 @@ class Particles(object):
         acs = [self._cache_actions[self.get_task_name(task)] for task in tasks]
         return onp.array(acs)
 
-    def compute_tasks(self, tasks, us0=None, vectorize=True, desc=None):
+    def compute_tasks(
+        self, tasks, us0=None, vectorize=True, desc=None, max_batch=-1, jax=False
+    ):
         """Compute multiple tasks at once.
 
         Args:
@@ -327,7 +334,7 @@ class Particles(object):
             self._env = self._env_fn()
         ntasks = len(tasks)
         nweights = len(self.weights)
-
+        feats_keys = self._env.features_keys
         T, udim = self._controller.T, self._controller.udim
         cached = [self.get_task_name(task) in self.cached_names for task in tasks]
 
@@ -340,19 +347,22 @@ class Particles(object):
             #  batch_states (ntasks * nweights, state_dim)
             #  batch_weights nfeats * (ntasks * nweights)
             batch_states, batch_weights = cross_product(
-                states, self.weights, onp.array, DictList
+                states, self.weights, onp.array, partial(DictList, jax=jax)
             )
             #  shape (ntasks * nweights, T, udim)
             batch_us0 = None
             if us0 is not None:
                 batch_us0 = us0.reshape((-1, T, udim))
+            batch_weights_arr = batch_weights.prepare(feats_keys).numpy_array()
             batch_acs, batch_costs, batch_feats, batch_feats_sum, batch_vios = collect_trajs(
-                batch_weights,
+                batch_weights_arr,
                 batch_states,
                 self._controller,
                 self._runner,
                 desc=desc,
                 us0=batch_us0,
+                jax=jax,
+                max_batch=max_batch,
             )
             #  shape (ntasks, nweights, T, acs_dim)
             all_actions = batch_acs.reshape((ntasks, nweights, T, udim))
@@ -374,20 +384,23 @@ class Particles(object):
                 batch_us0 = us0.reshape((-1, T, udim)).expand_dims(axis=1)
             else:
                 batch_us0 = [None] * ntasks
+            weights_arr = self.weights.prepare(feats_keys).numpy_array()
             for ti, task_i in enumerate(tasks):
                 name_i = self.get_task_name(task_i)
                 if name_i not in self.cached_names:
                     #  shape (1, task_dim)
                     state_i = self._env.get_init_states([task_i])
                     #  shape (nweights, task_dim)
-                    batch_states = onp.tile(state_i, (nweights, 1))
+                    batch_states = np.tile(state_i, (nweights, 1))
                     us0_i = batch_us0[ti]
                     acs, costs, feats, feats_sum, vios = collect_trajs(
-                        self.weights,
+                        weights_arr,
                         batch_states,
                         self._controller,
                         self._runner,
                         us0=us0_i,
+                        jax=jax,
+                        max_batch=max_batch,
                     )
                     all_actions.append(acs)
                     all_feats.append(feats)
@@ -461,12 +474,7 @@ class Particles(object):
         """
         out = {}
         for task in tasks:
-            try:
-                task_name = self.get_task_name(task)
-            except:
-                import pdb
-
-                pdb.set_trace()
+            task_name = self.get_task_name(task)
             out[task_name] = dict(
                 task=task,
                 task_name=task_name,
@@ -478,7 +486,13 @@ class Particles(object):
         return out
 
     def merge_tasks(self, tasks, data):
-        """Merge dumped data from another Particles instance."""
+        """Merge dumped data from another Particles instance.
+
+        Args:
+            tasks (ndarray): (ntasks, task_dim)
+            data (dict): task_name -> {"actions": (nweights, T, task_dim), ...}
+
+        """
         for task in tasks:
             task_name = self.get_task_name(task)
             assert task_name in data
@@ -487,6 +501,23 @@ class Particles(object):
                 self._cache_feats[task_name] = data[task_name]["feats"]
                 self._cache_feats_sum[task_name] = data[task_name]["feats_sum"]
                 self._cache_violations[task_name] = data[task_name]["violations"]
+
+    def merge_bulk_tasks(self, tasks, bulk_data):
+        """Merge dumped data from bulk data.
+
+        Args:
+            tasks (ndarray): (ntasks, task_dim)
+            data (dict): {"actions": (ntasks, nweights, T, task_dim), ...}
+
+        """
+        assert len(tasks) == len(bulk_data["actions"])
+        for ti, task in enumerate(tasks):
+            task_name = self.get_task_name(task)
+            if task_name not in self.cached_names:
+                self._cache_actions[task_name] = bulk_data["actions"][ti]
+                self._cache_feats[task_name] = bulk_data["feats"][ti]
+                self._cache_feats_sum[task_name] = bulk_data["feats_sum"][ti]
+                self._cache_violations[task_name] = bulk_data["violations"][ti]
 
     def compare_with(self, task, target, verbose=False):
         """Compare with a set of target weights (usually true weights). Returns log
@@ -551,7 +582,9 @@ class Particles(object):
         new_ps = self._clone(new_weights)
         return new_ps
 
-    def entropy(self, bins, max_weights, verbose=True, method="histogram"):
+    def entropy(
+        self, bins, max_weights, verbose=True, method="histogram", log_scale=True
+    ):
         """Estimate entropy.
 
         Args:
@@ -573,7 +606,9 @@ class Particles(object):
         # Omit normalized weight
         del data[self._normalized_key]
         #  shape (nfeats - 1, nbatch)
-        data = onp.log(data.onp_array())
+        data = data.onp_array()
+        if not log_scale:
+            data = onp.log(data)
         if method == "gaussian":
             # scipy gaussian kde requires transpose
             kernel = gaussian_kde(data)
@@ -598,7 +633,7 @@ class Particles(object):
                 entropy += ent
         return entropy
 
-    def map_estimate(self, num_map, method="histogram"):
+    def map_estimate(self, num_map, method="histogram", log_scale=True):
         """Find maximum a posteriori estimate from current samples.
 
         Note:
@@ -610,7 +645,9 @@ class Particles(object):
         # Omit first weight
         del data[self._normalized_key]
         #  shape (nfeats - 1, nbatch)
-        data = onp.log(data.onp_array())
+        data = data.onp_array()
+        if not log_scale:
+            data = onp.log(data)
 
         if method == "histogram":
             assert (
@@ -642,7 +679,7 @@ class Particles(object):
         assert self._save_dir is not None, "Need to specify save directory."
         path = f"{self._save_dir}/{self._expanded_name}.npz"
         with open(path, "wb+") as f:
-            np.savez(f, weights=self.weights)
+            np.savez(f, weights=dict(self.weights))
 
     def load(self):
         path = f"{self._save_dir}/{self._expanded_name}.npz"
@@ -676,6 +713,7 @@ class Particles(object):
             path=f"{self._fig_dir}/{self._expanded_name}.png",
             title="Proxy Reward; true (red), obs (black) map (magenta)",
             max_weights=max_weights,
+            log_scale=False,
         )
 
     def visualize_comparisons(self, tasks, target, fig_name):
@@ -700,7 +738,7 @@ class Particles(object):
         diff_rews = onp.array(diff_rews).mean(axis=1)
         diff_vios = onp.array(diff_vios).mean(axis=1)
         # Ranking violations and performance (based on violation)
-        prefix = f"{self._fig_dir}/designer_seed_{str(self._rng_key)}"
+        prefix = f"{self._fig_dir}/designer_seed_{self._rng_name}"
         plot_rankings(
             main_val=diff_vios,
             main_label="Violations",

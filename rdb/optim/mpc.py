@@ -18,14 +18,12 @@ from rdb.optim.runner import Runner
 from rdb.exps.utils import Profiler
 from jax.lax import fori_loop, scan
 from jax.ops import index_update
-from jax.config import config
 import jax.random as random
 import jax.numpy as np
 import numpy as onp
 import jax
 
 key = random.PRNGKey(0)
-config.update("jax_enable_x64", True)
 
 
 # =====================================================
@@ -152,14 +150,15 @@ def build_features(udim, horizon, roll_forward, f_feat):
 def build_mpc(
     env,
     f_cost,
-    horizon,
-    dt,
+    horizon=10,
+    dt=0.1,
     replan=True,
     T=None,
     engine="scipy",
     method="lbfgs",
     name="",
     test_mode=False,
+    **kwargs
 ):
     """Create MPC controller.
 
@@ -211,6 +210,8 @@ def build_mpc(
         optimizer_cls = OptimizerScipy
     elif engine == "jax":
         optimizer_cls = OptimizerJax
+    elif engine == "numpyro":
+        optimizer_cls = OptimizerNumPyro
     else:
         raise NotImplementedError
 

@@ -1,97 +1,127 @@
-# ENV_NAME: "Week6_01-v0"
-
-
 # RANDOM_KEYS: [26]
 RANDOM_KEYS: [0, 1, 2, 3]
-NUM_EVAL_WORKERS: 16
 FIXED_TASK_SEED: 0
 
-NUM_ACTIVE_TASKS: 72
-PARALLEL: True
-NUM_IRD_CHAINS: 2
-NUM_DESIGNER_CHAINS: 2
-
-# ACTIVE_FNS: ["infogain", "ratiomean", "ratiomin"]
-# EXP_NAME: "active_ird_exp_natural_one_hybrid_ird_1000_1000"
-# EXP_ITERATIONS: 8
-# ENV_NAME: "Week6_01-v1"
-# NUM_EVAL_TASKS: 16384
-
-ACTIVE_FNS: ["random"]
-EXP_NAME: "random_ird_exp_natural_one_hybrid_ird_1000_1000"
-EXP_ITERATIONS: 24
 ENV_NAME: "Week6_01-v1"
-NUM_EVAL_TASKS: 16384
+# ENV_NAME: "Week6_01-v1"
 
-# ACTIVE_FNS: ["infogain", "ratiomean", "ratiomin"]
-# EXP_NAME: "active_ird_exp_natural_two_hybrid_ird_1000_1000"
-# EXP_ITERATIONS: 8
-# ENV_NAME: "Week6_02-v1"
-# NUM_EVAL_TASKS: 16384
-
-# ACTIVE_FNS: ["random"]
-# EXP_NAME: "random_ird_exp_natural_two_hybrid_ird_1000_1000"
-# EXP_ITERATIONS: 24
-# ENV_NAME: "Week6_02-v1"
-# NUM_EVAL_TASKS: 16384
-
-# ACTIVE_FNS: ["infogain", "ratiomean", "ratiomin"]
-# EXP_NAME: "active_ird_exp_natural_three_ird_1000_1000"
-# EXP_ITERATIONS: 8
-# ENV_NAME: "Week6_03-v0"
-# NUM_EVAL_TASKS: 16384
+## MPC Specific
+CONTROLLER_ARGS:
+  horizon: 10
+  engine: "scipy"
+  method: "lbfgs"
+  # engine: "jax"
+  # method: "adam"
 
 
-## Designer settigns
-NUM_PRIOR_TASKS: 3
-USER_TRUE_W: False
 
-## Full sampling
-NUM_WARMUPS: 1000
-NUM_NORMALIZERS: 2000
-NUM_SAMPLES: 1000
-NUM_ACTIVE_SAMPLES: 250
-NUM_EVAL_MAP: 2
-SAVE_NAME: "200128"
-NUM_DESIGNER_WARMUPS: 20
-NUM_DESIGNERS: 200
+# ## Full sampling
+# EXP_ARGS:
+#   num_eval_map: 2
+#   num_eval_tasks: 16384
+#   exp_iterations: 8
+#   save_name: "200128"
+#   EXP_NAME: "random_ird_exp_natural_one_hybrid_ird_1000_1000"
+# ## Designer Settigns
+# DESIGNER_ARGS:
+#   num_normalizers: 200
+#   sample_method: "MH"
+#   sample_init_args:
+#     proposal_var: 0.5
+#     max_val: 15.0
+#   sample_args:
+#     num_samples: 1000
+#     num_warmup: 100
+#     num_chains: 1
+#   beta: 50
+#   use_true_w: True
+#   num_prior_tasks: 2
+#   true_w: NULL
+# ## IRD Settings
+# IRD_ARGS:
+#   num_normalizers: 200
+#   sample_method: "MH"
+#   sample_init_args:
+#     proposal_var: 2
+#     max_val: 15.0
+#   sample_args:
+#     num_warmup: 200
+#     num_samples: 2000
+#     num_chains: 3
+# EVAL_ARGS:
+#   parallel: True
+#   num_eval_workers: 4
+#   max_batch: 1000
+# ACTIVE_ARGS:
+#   num_active_tasks: 72
+#   num_active_sample: 250
+#   # active_fns: ["infogain", "ratiomean", "ratiomin"]
+#   active_fns: ["random"]
+#   # active_fns: ["infogain", "ratiomean", "ratiomin"]
+#   # active_fns: ["random"]
+#   # active_fns: ["infogain", "ratiomean", "ratiomin"]
+
 
 
 ## Testing
-# NUM_WARMUPS: 10
-# NUM_NORMALIZERS: 50
-# NUM_SAMPLES: 10
-# NUM_DESIGNER_WARMUPS: 40
-# NUM_DESIGNERS: 20
-# NUM_ACTIVE_SAMPLES: 5
-# NUM_EVAL_TASKS: 2
-# NUM_EVAL_MAP: 1
-# SAVE_NAME: "test"
+EXP_ARGS:
+  num_eval_map: 2
+  num_eval_tasks: 40
+  exp_iterations: 8
+  save_name: "200128"
+  EXP_NAME: "random_ird_exp_natural_one_hybrid_ird_1000_1000"
+DESIGNER_ARGS:
+  num_normalizers: 10
+  sample_method: "MH"
+  sample_init_args:
+    proposal_var: 0.5
+    max_val: 15.0
+  sample_args:
+    num_samples: 40
+    num_warmup: 10
+    num_chains: 1
+  beta: 50
+  use_true_w: True
+  # use_true_w: False
+  num_prior_tasks: 2
+  true_w: NULL
+IRD_ARGS:
+  num_normalizers: 12
+  sample_method: "MH"
+  sample_init_args:
+    proposal_var: 2
+    max_val: 15.0
+  sample_args:
+    num_warmup: 20
+    num_samples: 30
+    num_chains: 3
+EVAL_ARGS:
+  parallel: True
+  num_eval_workers: 4
+  max_batch: 10
+ACTIVE_ARGS:
+  num_active_tasks: 72
+  num_active_sample: 2
+  # active_fns: ["infogain", "ratiomean", "ratiomin"]
+  active_fns: ["random"]
+  # active_fns: ["infogain", "ratiomean", "ratiomin"]
+  # active_fns: ["random"]
+  # active_fns: ["infogain", "ratiomean", "ratiomin"]
 
 
-# NUM_EVAL_WORKERS: 1
-# PARALLEL: False
 
 ## Plotting & weight scaling
-MAX_WEIGHT: 20.0
-HIST_BINS: 200
-BETA: 16
-DESIGNER_PROPOSAL_VAR: 0.5
-IRD_PROPOSAL_VAR: 0.5
-
-## MPC Specific
-HORIZON: 10
-
-
-## Weight and task specific
-NORMALIZED_KEY: "dist_cars"
-FEATURE_KEYS:
-- "dist_cars"
-- "dist_lanes"
-- "dist_fences"
-- "dist_objects"
-- "speed"
-- "control"
+WEIGHT_PARAMS:
+  normalized_key: "dist_cars"
+  max_weights: 15.0
+  bins: 200
+  feature_keys:
+  - "dist_cars"
+  - "dist_lanes"
+  - "dist_fences"
+  - "dist_objects"
+  - "speed"
+  - "control"
 
 TRUE_W:
     dist_cars: 1.0

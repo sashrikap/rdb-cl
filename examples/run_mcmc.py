@@ -4,6 +4,10 @@ Note:
     * See (rdb.exps.active_ird.py) for more details.
 
 """
+import numpyro
+
+numpyro.set_host_device_count(3)
+
 from rdb.exps.mcmc_convergence import ExperimentMCMC
 from rdb.exps.active import ActiveInfoGain, ActiveRatioTest, ActiveRandom
 from rdb.distrib.particles import ParticleServer
@@ -13,10 +17,15 @@ from functools import partial
 from rdb.exps.utils import *
 from rdb.infer import *
 from jax import random
+import gym, rdb.envs.drive2d
 import numpyro.distributions as dist
 import yaml, argparse, os
+import numpyro
 import copy
 import ray
+
+
+# numpyro.enable_validation()
 
 
 def main(random_key):
@@ -35,7 +44,12 @@ def main(random_key):
 
     def controller_fn(env, name=""):
         controller, runner = build_mpc(
-            env, env.main_car.cost_runtime, HORIZON, env.dt, replan=False, name=name
+            env,
+            env.main_car.cost_runtime,
+            dt=env.dt,
+            replan=False,
+            name=name,
+            **CONTROLLER_ARGS,
         )
         return controller, runner
 
@@ -43,62 +57,40 @@ def main(random_key):
     assert design_data["ENV_NAME"] == ENV_NAME, "Environment name mismatch"
 
     ## Prior sampling & likelihood functions for PGM
-    prior = LogUniformPrior(
-        rng_key=None,
-        normalized_key=NORMALIZED_KEY,
-        feature_keys=FEATURE_KEYS,
-        log_max=MAX_WEIGHT,
-    )
-    ird_proposal = IndGaussianProposal(
-        rng_key=None,
-        normalized_key=NORMALIZED_KEY,
-        feature_keys=FEATURE_KEYS,
-        proposal_var=IRD_PROPOSAL_VAR,
-    )
-    designer_proposal = IndGaussianProposal(
-        rng_key=None,
-        normalized_key=NORMALIZED_KEY,
-        feature_keys=FEATURE_KEYS,
-        proposal_var=DESIGNER_PROPOSAL_VAR,
-    )
+    def prior_fn(name=""):
+        return LogUniformPrior(
+            normalized_key=WEIGHT_PARAMS["normalized_key"],
+            feature_keys=WEIGHT_PARAMS["feature_keys"],
+            log_max=WEIGHT_PARAMS["max_weights"],
+            name=name,
+        )
 
     ## Evaluation Server
     # eval_server = ParticleServer(
     #     env_fn, controller_fn, num_workers=NUM_EVAL_WORKERS, parallel=PARALLEL
     # )
     eval_server = None
-    weight_params = {"bins": HIST_BINS, "max_weights": MAX_WEIGHT}
+    designer = Designer(
+        env_fn=env_fn,
+        controller_fn=controller_fn,
+        prior_fn=prior_fn,
+        weight_params=WEIGHT_PARAMS,
+        normalized_key=WEIGHT_PARAMS["normalized_key"],
+        save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
+        **DESIGNER_ARGS,
+    )
 
     ird_model = IRDOptimalControl(
-        rng_key=None,
         env_id=ENV_NAME,
         env_fn=env_fn,
         controller_fn=controller_fn,
         eval_server=eval_server,
-        beta=BETA,
-        true_w=None,
-        prior=prior,
-        proposal=ird_proposal,
-        num_normalizers=NUM_NORMALIZERS,
-        sample_args={
-            "num_warmups": NUM_WARMUPS,
-            "num_samples": NUM_SAMPLES,
-            "num_chains": NUM_IRD_CHAINS,
-            "use_dictlist": True,
-        },
-        designer_proposal=designer_proposal,
-        designer_num_normalizers=DESIGNER_NUM_NORMALIZERS,
-        designer_args={
-            "num_warmups": NUM_DESIGNER_WARMUPS,
-            "num_samples": NUM_DESIGNERS,
-            "num_chains": NUM_DESIGNER_CHAINS,
-            "use_dictlist": True,
-        },
-        weight_params=weight_params,
-        normalized_key=NORMALIZED_KEY,
+        designer=designer,
+        prior_fn=prior_fn,
+        normalized_key=WEIGHT_PARAMS["normalized_key"],
+        weight_params=WEIGHT_PARAMS,
         save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
-        # exp_name=DESIGNER_EXP_MODE,
-        exp_name=IRD_EXP_MODE,
+        **IRD_ARGS,
     )
 
     ## Task sampling seed
@@ -111,19 +103,18 @@ def main(random_key):
     experiment = ExperimentMCMC(
         ird_model,
         eval_server=eval_server,
-        num_eval_tasks=NUM_EVAL_TASKS,
-        num_eval_map=NUM_EVAL_MAP,
-        num_visualize_tasks=NUM_VISUALIZE_TASKS,
+        normalized_key=WEIGHT_PARAMS["normalized_key"],
         fixed_task_seed=fixed_task_seed,
         design_data=design_data,
         save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
         exp_params=PARAMS,
-        normalized_key=NORMALIZED_KEY,
+        **EXPERIMENT_ARGS,
     )
     """ Experiment """
+    # with jax.disable_jit():
     experiment.update_key(rng_key)
-    # experiment.run_designer(DESIGNER_EXP_MODE)
-    experiment.run_ird(IRD_EXP_MODE)
+    experiment.run_designer(DESIGNER_ARGS["exp_name"])
+    # experiment.run_ird(IRD_ARGS["exp_name"])
 
 
 if __name__ == "__main__":
@@ -139,5 +130,9 @@ if __name__ == "__main__":
     else:
         PARAMS = load_params("/dar_payload/rdb/examples/params/mcmc_params.yaml")
     locals().update(PARAMS)
+
+    # max_chains = max([IRD_ARGS["sample_args"]["num_chains"], DESIGNER_ARGS["sample_args"]["num_chains"]])
+    # numpyro.set_host_device_count(max_chains)
+
     for ki in copy.deepcopy(RANDOM_KEYS):
         main(random_key=ki)
