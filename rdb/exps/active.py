@@ -65,14 +65,20 @@ class ActiveInfoGain(object):
         next_feats_sum = belief.get_features_sum(next_task, desc=desc).squeeze(0)
         ## Histogram identity
         #  shape (nfeats - 1) * (nweights, nbins)
-        which_bins = belief.digitize(matrix=True, **self._weight_params)
+        which_bins = belief.digitize(
+            log_scale=False, matrix=True, **self._weight_params
+        )
         #  shape (nfeats - 1) * (nbins,)
         # curr_probs = belief.hist_probs(**self._weight_params)
         curr_probs = which_bins.sum(axis=0).normalize()
+        max_weights = self._weight_params["max_weights"]
+        bins = self._weight_params["bins"]
+        delta = 2 * max_weights / bins
 
         entropies = []
         for ws_i in belief.weights:
             #  shape (nweights,)
+
             new_costs = DictList(ws_i, expand_dims=True) * next_feats_sum
             new_costs = new_costs.numpy_array().mean(axis=0)
 
@@ -83,15 +89,10 @@ class ActiveInfoGain(object):
             #  shape (nfeats - 1) * (nbins,)
             next_probs = (which_bins * ratio[:, None]).sum(axis=0).normalize()
             # next_belief = belief.resample(next_probs)
-
-            # avoid gaussian entropy (causes NonSingular Matrix issue)
-            # currently uses onp.ma.log which is non-differentiable
-            ent = belief.entropy(
-                hist_probs=next_probs,
-                log_scale=False,
-                method="histogram",
-                **self._weight_params,
-            )
+            next_densities = next_probs * (1 / delta)
+            ent = 0.0
+            for key, density in next_densities.items():
+                ent += -(density * onp.ma.log(onp.abs(density)) * delta).sum()
             if onp.isnan(ent):
                 ent = 1000
                 print("WARNING: Entropy has NaN entropy value")

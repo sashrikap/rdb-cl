@@ -1,38 +1,54 @@
-ACTIVE_FNS:
-- random
-BETA: 16
-DESIGNER_PROPOSAL_VAR: 0.5
+ACTIVE_ARGS:
+  active_fns:
+  - infogain
+  - ratiomean
+  - ratiomin
+  - random
+  num_active_sample: 10
+  num_active_tasks: 72
+CONTROLLER_ARGS:
+  engine: scipy
+  horizon: 10
+  method: lbfgs
+DESIGNER_ARGS:
+  beta: 50
+  num_normalizers: 10
+  num_prior_tasks: 2
+  sample_args:
+    num_chains: 1
+    num_samples: 40
+    num_warmup: 10
+  sample_init_args:
+    max_val: 15.0
+    proposal_var: 0.5
+  sample_method: MH
+  true_w: null
+  use_true_w: true
 ENV_NAME: Week6_01-v1
-EXP_ITERATIONS: 24
-EXP_NAME: random_ird_exp_natural_one_hybrid_ird_1000_1000
-FEATURE_KEYS:
-- dist_cars
-- dist_lanes
-- dist_fences
-- dist_objects
-- speed
-- control
+EVAL_ARGS:
+  max_batch: 10
+  num_active_workers: 2
+  num_eval_workers: 2
+  parallel: true
+EXP_ARGS:
+  EXP_NAME: random_ird_exp_natural_one_hybrid_ird_1000_1000
+  exp_iterations: 8
+  num_eval_map: 2
+  num_eval_tasks: 40
+  save_name: test
 FIXED_TASK_SEED: 0
-HIST_BINS: 200
-HORIZON: 10
-IRD_PROPOSAL_VAR: 0.5
-MAX_WEIGHT: 20.0
-NORMALIZED_KEY: dist_cars
-NUM_ACTIVE_SAMPLES: 250
-NUM_ACTIVE_TASKS: 72
-NUM_DESIGNERS: 200
-NUM_DESIGNER_WARMUPS: 200
-NUM_EVAL_MAP: 2
-NUM_EVAL_TASKS: 16384
-NUM_EVAL_WORKERS: 8
-NUM_NORMALIZERS: 2000
-NUM_PRIOR_TASKS: 3
-NUM_SAMPLES: 1000
-NUM_WARMUPS: 1000
-PARALLEL: true
+IRD_ARGS:
+  num_normalizers: 12
+  sample_args:
+    num_chains: 3
+    num_samples: 30
+    num_warmup: 20
+  sample_init_args:
+    max_val: 15.0
+    proposal_var: 2
+  sample_method: MH
 RANDOM_KEYS:
-- 7
-SAVE_NAME: '200128'
+- 5
 TASK:
 - 0.2
 - -0.7
@@ -45,4 +61,14 @@ TRUE_W:
   dist_lanes: 0.1
   dist_objects: 1.25
   speed: 0.05
-USER_TRUE_W: false
+WEIGHT_PARAMS:
+  bins: 200
+  feature_keys:
+  - dist_cars
+  - dist_lanes
+  - dist_fences
+  - dist_objects
+  - speed
+  - control
+  max_weights: 15.0
+  normalized_key: dist_cars

@@ -10,6 +10,7 @@ General workflow:
 """
 import ray
 import math
+from time import time
 from rdb.infer import *
 from tqdm.auto import tqdm
 
@@ -148,6 +149,7 @@ class ParticleServer(object):
         """
         if particles is None:
             return
+
         # Filter existing tasks
         tasks = onp.array(tasks)
         new_tasks = []
@@ -172,6 +174,9 @@ class ParticleServer(object):
         )
         batch_weights = batch_weights.prepare(self._env.features_keys)
 
+        t_start = time()
+        print(f"Computing {len(states)}x{len(particles.weights)} tasks")
+
         result = None
         num_workers = len(self._workers[batch_name])
         if self._parallel:
@@ -183,12 +188,13 @@ class ParticleServer(object):
             for wi in range(num_workers):
                 idx_start = wi * tasks_per_worker
                 idx_end = (wi + 1) * tasks_per_worker
-                states = batch_states[idx_start:idx_end]
+                states_i = batch_states[idx_start:idx_end]
                 weights = batch_weights[idx_start:idx_end]
                 weights_arr = weights.numpy_array()
-                assert states.shape == (tasks_per_worker, state_dim)
-                assert weights_arr.shape == (nfeats, tasks_per_worker)
-                self._workers[batch_name][wi].compute.remote(weights_arr, states)
+                assert states_i.shape[1] == state_dim
+                assert weights_arr.shape[0] == nfeats
+                assert states_i.shape[0] == weights_arr.shape[1]
+                self._workers[batch_name][wi].compute.remote(weights_arr, states_i)
             # Retrieve
             for wi in range(num_workers):
                 result_w = ray.get(self._workers[batch_name][wi].get_result.remote())
@@ -206,4 +212,9 @@ class ParticleServer(object):
             #   shape (ntasks, nweights, ...)
             result[key] = val.reshape((ntasks, nweights) + val_shape[1:])
         particles.merge_bulk_tasks(tasks, result)
+
+        print(
+            f"Computing {len(states)}x{len(particles.weights)} tasks finished: {(time() - t_start):.3f}s"
+        )
+
         return particles

@@ -659,7 +659,7 @@ class Particles(object):
             out[key] = hist_prob
         return DictList(out)
 
-    def digitize(self, bins, max_weights, matrix=False, **kwargs):
+    def digitize(self, bins, max_weights, log_scale=True, matrix=False, **kwargs):
         """Based on numpy.digitize. Find histogram bin membership of each sample.
 
         Args:
@@ -675,7 +675,10 @@ class Particles(object):
         for key in self.weights.keys():
             if key == self._normalized_key:
                 continue
-            which_bins = onp.digitize(self.weights[key], m_bins)
+            vals = self.weights[key]
+            if not log_scale:
+                vals = onp.log(vals)
+            which_bins = onp.digitize(vals, m_bins, right=True)
             if not matrix:
                 out[key] = which_bins
             else:
@@ -710,7 +713,7 @@ class Particles(object):
             m_bins = onp.linspace(*ranges, bins)
             probs = onp.zeros(data.shape[1])
             for row in data:
-                which_bins = onp.digitize(row, m_bins)
+                which_bins = onp.digitize(row, m_bins, right=True)
                 unique_vals, indices, counts = onp.unique(
                     which_bins, return_index=True, return_counts=True
                 )

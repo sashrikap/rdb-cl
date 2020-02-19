@@ -21,7 +21,7 @@ def launch(params_dict):
         gcp_label = ""
         if "RANDOM_KEYS" in params_dict and "EXP_NAME" in params_dict:
             key_str = "_".join([str(k) for k in params_dict["RANDOM_KEYS"]])
-            gcp_label = f"{params_dict['EXP_NAME']}_{key_str}"
+            gcp_label = f"{params_dict['EXP_ARGS']['EXP_NAME']}_{key_str}"
 
         launch_mode = mode.GCPMode(
             # zone="us-west1-a",
@@ -72,10 +72,10 @@ if __name__ == "__main__":
     else:
         # params = {"RANDOM_KEYS": list(range(26, 36)), "NUM_EVAL_WORKERS": 8}
         params = {
+            "RANDOM_KEYS": list(range(6)),
             # "RANDOM_KEYS": list(range(6)),
-            "RANDOM_KEYS": list(range(8)),
             # "RANDOM_KEYS": [20, 21, 22, 23, 24],
-            "NUM_EVAL_WORKERS": 8,
+            # "NUM_EVAL_WORKERS": 8,
         }
         # params = {"RANDOM_KEYS": [9], "NUM_EVAL_WORKERS": 8}
         all_params = create_params(template, params)
