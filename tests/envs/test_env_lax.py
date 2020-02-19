@@ -5,6 +5,20 @@ import jax
 from time import time
 
 
+def test_while_random():
+    def body(x):
+        i, val, rng_key = x
+        rng_key, rng_random = jax.random.split(rng_key, 2)
+        val += jax.random.uniform(rng_random)
+        return (i + 1, val, rng_key)
+
+    def cond(x):
+        i, val, rng_key = x
+        return i < 10
+
+    i, val, rng_key = lax.while_loop(cond, body, (0, 0.0, jax.random.PRNGKey(0)))
+
+
 def test_while_true():
     u = [1]
 

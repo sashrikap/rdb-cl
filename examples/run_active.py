@@ -57,17 +57,16 @@ def main(random_key, evaluate=False):
         )
         return controller, runner
 
-    ## Evaluation Server
     eval_server = ParticleServer(
         env_fn,
         controller_fn,
-        num_workers=EVAL_ARGS["num_eval_workers"],
         parallel=EVAL_ARGS["parallel"],
         normalized_key=WEIGHT_PARAMS["normalized_key"],
         weight_params=WEIGHT_PARAMS,
         max_batch=EVAL_ARGS["max_batch"],
     )
-    # eval_server = None
+    eval_server.register("Evaluation", EVAL_ARGS["num_eval_workers"])
+    eval_server.register("Active", EVAL_ARGS["num_active_workers"])
     ## Prior sampling & likelihood functions for PGM
     def prior_fn(name=""):
         return LogUniformPrior(
@@ -84,6 +83,7 @@ def main(random_key, evaluate=False):
         weight_params=WEIGHT_PARAMS,
         normalized_key=WEIGHT_PARAMS["normalized_key"],
         save_root=f"{SAVE_ROOT}/{EXP_ARGS['save_name']}",
+        exp_name=f"{EXP_ARGS['EXP_NAME']}",
         **DESIGNER_ARGS,
     )
 
@@ -91,12 +91,12 @@ def main(random_key, evaluate=False):
         env_id=ENV_NAME,
         env_fn=env_fn,
         controller_fn=controller_fn,
-        eval_server=eval_server,
         designer=designer,
         prior_fn=prior_fn,
         normalized_key=WEIGHT_PARAMS["normalized_key"],
         weight_params=WEIGHT_PARAMS,
         save_root=f"{SAVE_ROOT}/{EXP_ARGS['save_name']}",
+        exp_name=f"{EXP_ARGS['EXP_NAME']}",
         **IRD_ARGS,
     )
     ## Active acquisition function for experiment
@@ -105,7 +105,7 @@ def main(random_key, evaluate=False):
             rng_key=None,
             model=ird_model,
             beta=DESIGNER_ARGS["beta"],
-            params=WEIGHT_PARAMS,
+            weight_params=WEIGHT_PARAMS,
             debug=False,
         ),
         "ratiomean": ActiveRatioTest(

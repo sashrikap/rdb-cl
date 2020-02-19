@@ -14,7 +14,6 @@ from rdb.envs.drive2d.core import car, objects, feature, constraints
 from rdb.envs.drive2d.worlds.highway import HighwayDriveWorld
 from functools import partial
 from numpyro.handlers import seed
-from rdb.infer.utils import random_choice
 
 
 class HighwayDriveWorld_Week3(HighwayDriveWorld):

@@ -7,7 +7,6 @@ Full Informed Designer Experiment:
 
 """
 
-from rdb.infer.utils import random_choice
 from rdb.infer.particles import Particles
 from rdb.exps.utils import Profiler
 from numpyro.handlers import seed
@@ -45,7 +44,6 @@ class ExperimentDesignerPrior(object):
         self._num_eval_tasks = num_eval_tasks
         # For designer
         self._max_prior_tasks = 8
-        self._random_choice = None
         self._random_task_choice = None
         self._fixed_task_seed = fixed_task_seed
         # For checkpointing

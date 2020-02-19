@@ -18,7 +18,7 @@ class ParticleWorkerSingle(object):
     def __init__(self, env_fn, controller_fn, normalized_key, weight_params, max_batch):
         self._env_fn = env_fn
         self._env = env_fn()
-        self._controller, self._runner = controller_fn(self._env)
+        self._controller, self._runner = controller_fn(self._env, "Eval Worker")
         self._compute_result = None
         self._initialized = False
         self._max_batch = max_batch
@@ -98,36 +98,47 @@ class ParticleServer(object):
         normalized_key=None,
         weight_params={},
     ):
-        self._num_workers = num_workers
         self._parallel = parallel
         self._max_batch = max_batch
         self._env = env_fn()
-        if parallel:
-            ray.init()
-        else:
-            # Force num_workers = 1
-            self.num_workers = 1
+        self._env_fn = env_fn
+        self._controller_fn = controller_fn
+        self._normalized_key = normalized_key
+        self._weight_params = weight_params
         # Define workers
-        worker_cls = ParticleWorker.remote if parallel else ParticleWorkerSingle
-        self._workers = [
-            worker_cls(env_fn, controller_fn, normalized_key, weight_params, max_batch)
+        self._worker_cls = ParticleWorker.remote if parallel else ParticleWorkerSingle
+        self._initialize_wait = initialize_wait
+        self._workers = {}
+        if self._parallel:
+            ray.init()
+
+    def register(self, batch_name, num_workers):
+        if not self._parallel:
+            num_workers = 1
+        self._workers[batch_name] = [
+            self._worker_cls(
+                self._env_fn,
+                self._controller_fn,
+                self._normalized_key,
+                self._weight_params,
+                self._max_batch,
+            )
             for _ in range(num_workers)
         ]
-        self._initialize_wait = initialize_wait
-        self.initialize()
+        self.initialize(batch_name)
 
-    def initialize(self):
+    def initialize(self, batch_name):
         if self._parallel:
-            for worker in self._workers:
+            for worker in self._workers[batch_name]:
                 worker.initialize.remote()
             if self._initialize_wait:
-                for worker in self._workers:
+                for worker in self._workers[batch_name]:
                     ray.get(worker.initialize_done.remote())
         else:
-            for worker in self._workers:
+            for worker in self._workers[batch_name]:
                 worker.initialize()
 
-    def compute_tasks(self, particles, tasks, verbose=True):
+    def compute_tasks(self, batch_name, particles, tasks, verbose=True):
         """Compute all tasks for all particle weights.
 
         Note:
@@ -144,6 +155,8 @@ class ParticleServer(object):
             if particles.get_task_name(task) not in particles.cached_names:
                 new_tasks.append(task)
         tasks = onp.array(new_tasks)
+        if len(tasks) == 0:
+            return
 
         # Batch nweights * ntasks
         states = self._env.get_init_states(onp.array(tasks))
@@ -160,13 +173,14 @@ class ParticleServer(object):
         batch_weights = batch_weights.prepare(self._env.features_keys)
 
         result = None
+        num_workers = len(self._workers[batch_name])
         if self._parallel:
             # Schedule
             num_batch_tasks = len(batch_states)
-            tasks_per_worker = math.ceil(num_batch_tasks / self._num_workers)
+            tasks_per_worker = math.ceil(num_batch_tasks / num_workers)
 
             # Loop through workers
-            for wi in range(len(self._workers)):
+            for wi in range(num_workers):
                 idx_start = wi * tasks_per_worker
                 idx_end = (wi + 1) * tasks_per_worker
                 states = batch_states[idx_start:idx_end]
@@ -174,14 +188,16 @@ class ParticleServer(object):
                 weights_arr = weights.numpy_array()
                 assert states.shape == (tasks_per_worker, state_dim)
                 assert weights_arr.shape == (nfeats, tasks_per_worker)
-                self._workers[wi].compute.remote(weights_arr, states)
+                self._workers[batch_name][wi].compute.remote(weights_arr, states)
             # Retrieve
-            for wi in range(len(self._workers)):
-                result_w = ray.get(self._workers[wi].get_result.remote())
+            for wi in range(num_workers):
+                result_w = ray.get(self._workers[batch_name][wi].get_result.remote())
                 result = merge_result(result, result_w)
         else:
             batch_weights_arr = batch_weights.numpy_array()
-            result_w = self._workers[0].compute(batch_weights_arr, batch_states)
+            result_w = self._workers[batch_name][0].compute(
+                batch_weights_arr, batch_states
+            )
             result = merge_result(result, result_w)
 
         #  result["actions"] -> (ntasks, nweights, T, udim)

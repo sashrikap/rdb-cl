@@ -7,16 +7,17 @@ import math
 import copy, os
 import numpyro
 import numpyro.distributions as dist
-from rdb.visualize.plot import plot_weights_comparison
+from jax import random
+from functools import partial
+from rdb.infer.mcmc import MH
 from rdb.optim.utils import *
 from rdb.infer.dictlist import *
-from scipy.stats import gaussian_kde
-from rdb.exps.utils import Profiler
-from tqdm.auto import tqdm, trange
 from numpyro.handlers import seed
-from functools import partial
+from tqdm.auto import tqdm, trange
+from rdb.exps.utils import Profiler
+from scipy.stats import gaussian_kde
 from numpyro.infer import HMC, MCMC, NUTS, SA
-from rdb.infer.mcmc import MH
+from rdb.visualize.plot import plot_weights_comparison
 
 # from rdb.infer.mcmc import MH as RDB_MH
 
@@ -83,22 +84,7 @@ def get_designer_sampler(
 # ========================================================
 
 
-def logsumexp(vs, axis=-1):
-    print("Inside logsumexp", type(vs))
-    max_v = onp.max(vs, axis=axis)
-    ds = vs - onp.max(vs, axis=axis, keepdims=True)
-    sum_exp = onp.exp(ds).sum(axis=axis)
-    return max_v + onp.log(sum_exp)
-
-
-def np_logsumexp(vs, axis=-1):
-    max_v = np.max(vs, axis=axis)
-    ds = vs - np.max(vs, axis=axis, keepdims=True)
-    sum_exp = np.exp(ds).sum(axis=axis)
-    return max_v + np.log(sum_exp)
-
-
-def random_choice(items, num, probs=None, replacement=True):
+def random_choice(rng_key, items, num, probs=None, replacement=True):
     """Randomly sample from items.
 
     Usage:
@@ -115,9 +101,7 @@ def random_choice(items, num, probs=None, replacement=True):
         assert probs is None, "Cannot use probs without replacement"
         assert num < len(items), f"Only has {len(items)} items"
         probs = onp.array(probs)
-        arr = numpyro.sample(
-            "random_choice", dist.Uniform(0, 1), sample_shape=(len(items),)
-        )
+        arr = random.uniform(rng_key, shape=(len(items),))
         arr = onp.array(arr)
         idxs = onp.argsort(arr)[:num]
         return [items[idx] for idx in idxs]
@@ -129,7 +113,7 @@ def random_choice(items, num, probs=None, replacement=True):
             assert len(probs) == len(items)
             probs = probs / onp.sum(probs)
         probs = onp.cumsum(probs)
-        arr = numpyro.sample("random_choice", dist.Uniform(0, 1), sample_shape=(num,))
+        arr = random.uniform(rng_key, shape=(num,))
         arr = onp.array(arr)
         output = []
         for i in range(num):
@@ -139,8 +123,8 @@ def random_choice(items, num, probs=None, replacement=True):
         return onp.array(output)
 
 
-def random_uniform(low=0.0, high=1.0):
-    return numpyro.sample("random", dist.Uniform(low, high))
+def random_uniform(rng_key, low=0.0, high=1.0):
+    return random.uniform(rng_key, minval=low, maxval=high)
 
 
 # ========================================================

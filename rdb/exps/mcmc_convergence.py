@@ -50,9 +50,6 @@ class ExperimentMCMC(object):
         self._eval_server = eval_server
         # Random key & function
         self._rng_key = None
-        self._random_weight = None
-        self._random_choice = None
-        self._random_task_choice = None
         self._normalized_key = normalized_key
         self._fixed_task_seed = fixed_task_seed
         # Evaluation & Visualization
@@ -76,6 +73,13 @@ class ExperimentMCMC(object):
         # Test incremental # features
         self._nfeats_start = 5
         self._last_time = None
+
+    def _get_rng_task(self):
+        if self._fixed_task_seed is not None:
+            self._fixed_task_seed, rng_task = random.split(self._fixed_task_seed)
+        else:
+            self._rng_key, rng_task = random.split(self._rng_key)
+        return rng_task
 
     def _load_design(self, exp_mode):
         """Different mode of designer experiments.
@@ -108,7 +112,7 @@ class ExperimentMCMC(object):
         elif "designer_convergence_true_w_random_tasks" in exp_mode:
             ## Use one of Jerry's prior designed w as true w
             ## Test # random tasks vs convergence
-            rand_tasks = self._random_task_choice(all_tasks, num_designs)
+            rand_tasks = random_choice(self._get_rng_task(), all_tasks, num_designs)
             self._all_designer_prior_tasks = rand_tasks
             for d_data in self._design_data["DESIGNS"]:
                 # Treat final design as true_w
@@ -118,7 +122,9 @@ class ExperimentMCMC(object):
         elif "designer_convergence_random_w_random_tasks" in exp_mode:
             ## Use a random w as true w
             ## Test # random tasks vs convergence
-            rand_tasks = onp.array(self._random_task_choice(all_tasks, num_designs))
+            rand_tasks = onp.array(
+                random_choice(self._get_rng_task(), all_tasks, num_designs)
+            )
             self._all_designer_prior_tasks = rand_tasks
             rand_w = self._make_random_weights(
                 self._design_data["DESIGNS"][-1]["WEIGHTS"].keys()
@@ -132,8 +138,8 @@ class ExperimentMCMC(object):
             ## The true w has progressively more random features
             ## Test # features (DOF) vs convergence
             all_keys = self._model.env.features_keys
-            rand_tasks = self._random_task_choice(
-                self._model.env.all_tasks, num_designs
+            rand_tasks = random_choice(
+                self._get_rng_task(), self._model.env.all_tasks, num_designs
             )
             self._all_designer_prior_tasks = rand_tasks
             for di, d_data in enumerate(self._design_data["DESIGNS"]):
@@ -164,7 +170,7 @@ class ExperimentMCMC(object):
             design["WEIGHTS"] = normalize_weights(
                 design["WEIGHTS"], self._normalized_key
             )
-        rand_tasks = onp.array(self._random_task_choice(all_tasks, num_obs))
+        rand_tasks = onp.array(random_choice(self._get_rng_task(), all_tasks, num_obs))
 
         if exp_mode.startswith("designer"):
             ## Designer experiment
@@ -227,7 +233,11 @@ class ExperimentMCMC(object):
             if key == self._normalized_key:
                 weights[key] = 1.0
             else:
-                weights[key] = np.exp(self._random_weight())
+                max_val = self._exp_params["WEIGHT_PARAMS"]["max_weights"]
+                self._rng_key, rng_weights = random.split(self._rng_key)
+                weights[key] = np.exp(
+                    random_uniform(rng_weights, low=-max_val, high=max_val)
+                )
         return weights
 
     def run_designer(self, exp_mode):
@@ -242,11 +252,12 @@ class ExperimentMCMC(object):
         self._load_design(exp_mode)
         save_dir = f"{self._save_root}/{exp_mode}"
 
-        assert self._random_task_choice is not None
         all_tasks = self._designer.env.all_tasks
-        viz_tasks = self._random_task_choice(all_tasks, self._num_visualize_tasks)
+        viz_tasks = random_choice(
+            self._get_rng_task(), all_tasks, self._num_visualize_tasks
+        )
 
-        new_tasks = self._random_task_choice(all_tasks, 1)
+        new_tasks = random_choice(self._get_rng_task(), all_tasks, 1)
         ## Simulate
         for n_prior in range(len(self._all_designer_prior_tasks)):
 
@@ -287,8 +298,6 @@ class ExperimentMCMC(object):
 
         self._load_observations(exp_mode)
         save_dir = f"{self._save_root}/{exp_mode}"
-
-        assert self._random_task_choice is not None
         all_tasks = self._designer.env.all_tasks
 
         for num_obs in range(1, len(self._all_ird_obs_ws)):
@@ -332,14 +341,3 @@ class ExperimentMCMC(object):
         self._designer.update_key(rng_designer)
         self._model.rng_name = str(rng_key)
         self._model.update_key(rng_model)
-        self._random_choice = seed(random_choice, rng_choice)
-        random_weight = partial(
-            random_uniform,
-            low=-self._exp_params["WEIGHT_PARAMS"]["max_weights"],
-            high=self._exp_params["WEIGHT_PARAMS"]["max_weights"],
-        )
-        self._random_weight = seed(random_weight, rng_weight)
-        if self._fixed_task_seed is not None:
-            self._random_task_choice = seed(random_choice, self._fixed_task_seed)
-        else:
-            self._random_task_choice = self._random_choice

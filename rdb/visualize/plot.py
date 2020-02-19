@@ -38,6 +38,7 @@ def plot_weights(
     max_weights=8.0,
     bins=100,
     log_scale=True,
+    **kwargs,
 ):
     """Plot weights for visualizing.
 

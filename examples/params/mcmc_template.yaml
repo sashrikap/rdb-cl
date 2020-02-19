@@ -44,76 +44,76 @@ USER_TRUE_W: False
 
 
 
-## Full sampling
-IRD_ARGS:
-  num_normalizers: 200
-  sample_method: "MH"
-  sample_init_args:
-    proposal_var: 2
-    max_val: 15.0
-  # sample_method: "HMC"
-  # sample_method: "NUTS"
-  # sample_init_args:
-  #   step_size: 0.2
-  sample_args:
-    num_warmup: 200
-    num_samples: 2000
-    num_chains: 3
-  # exp_name: "ird_convergence_random_w_random_tasks_norm_1000_beta_10_var_5"
-  # exp_name: "ird_convergence_true_w_random_tasks_norm_1000_beta_10_var_5"
-  # exp_name: "ird_convergence_true_w_prior_tasks_norm_1000_beta_100_var_1"
-  # exp_name: "ird_convergence_true_w_prior_tasks_sum_norm_200_beta_10_var_2"
-  # exp_name: "ird_convergence_true_w_random_tasks_sum_norm_200_beta_50_var_2"
-
-DESIGNER_ARGS:
-  num_normalizers: 200
-  sample_method: "MH"
-  sample_init_args:
-    proposal_var: 0.5
-    max_val: 15.0
-  sample_args:
-    num_samples: 1000
-    num_warmup: 100
-    num_chains: 1
-  beta: 50
-  use_true_w: False
-  true_w: NULL
-  # exp_name: "designer_convergence_true_w_prior_tasks_norm_200_beta_50_var_2"
-  exp_name: "designer_convergence_true_w_prior_tasks_mean_norm_200_beta_50_var_2"
-  # exp_name: "designer_convergence_true_w_random_tasks_mean_norm_200_beta_50_var_2"
-SAVE_NAME: "200216"
-
-
-# ## Test sampling
+# ## Full sampling
 # IRD_ARGS:
-#   num_normalizers: 10
-#   sample_init_args:
-#     proposal_var: 1
-#   sample_args:
-#     num_warmup: 12
-#     num_samples: 8
-#     num_chains: 3
+#   num_normalizers: 200
 #   sample_method: "MH"
-#   # exp_name: "ird_convergence_random_w_random_tasks_norm_200_beta_50_var_1"
-#   exp_name: "ird_convergence_true_w_prior_tasks_norm_200_beta_50_var_1"
-
+#   sample_init_args:
+#     proposal_var: 2
+#     max_val: 15.0
+#   # sample_method: "HMC"
+#   # sample_method: "NUTS"
+#   # sample_init_args:
+#   #   step_size: 0.2
+#   sample_args:
+#     num_warmup: 200
+#     num_samples: 2000
+#     num_chains: 3
+#   # exp_name: "ird_convergence_random_w_random_tasks_norm_1000_beta_10_var_5"
+#   # exp_name: "ird_convergence_true_w_random_tasks_norm_1000_beta_10_var_5"
+#   # exp_name: "ird_convergence_true_w_prior_tasks_norm_1000_beta_100_var_1"
+#   # exp_name: "ird_convergence_true_w_prior_tasks_sum_norm_200_beta_10_var_2"
+#   # exp_name: "ird_convergence_true_w_random_tasks_sum_norm_200_beta_50_var_2"
 
 # DESIGNER_ARGS:
-#   num_normalizers: 7
+#   num_normalizers: 200
+#   sample_method: "MH"
 #   sample_init_args:
-#     proposal_var: 0.25
+#     proposal_var: 0.5
+#     max_val: 15.0
 #   sample_args:
-#     num_samples: 15
-#     num_warmup: 14
+#     num_samples: 1000
+#     num_warmup: 100
 #     num_chains: 1
-#   beta: 10
-#   # use_true_w: True
+#   beta: 50
 #   use_true_w: False
 #   true_w: NULL
-#   sample_method: "MH"
-#   exp_name: "designer_convergence_true_w_prior_tasks_norm_200_beta_50_var_1"
+#   # exp_name: "designer_convergence_true_w_prior_tasks_norm_200_beta_50_var_2"
+#   exp_name: "designer_convergence_true_w_prior_tasks_mean_norm_200_beta_50_var_2"
+#   # exp_name: "designer_convergence_true_w_random_tasks_mean_norm_200_beta_50_var_2"
+# SAVE_NAME: "200216"
 
-# SAVE_NAME: "test"
+
+## Test sampling
+IRD_ARGS:
+  num_normalizers: 10
+  sample_init_args:
+    proposal_var: 1
+  sample_args:
+    num_warmup: 12
+    num_samples: 8
+    num_chains: 3
+  sample_method: "MH"
+  # exp_name: "ird_convergence_random_w_random_tasks_norm_200_beta_50_var_1"
+  exp_name: "ird_convergence_true_w_prior_tasks_norm_200_beta_50_var_1"
+
+
+DESIGNER_ARGS:
+  num_normalizers: 7
+  sample_init_args:
+    proposal_var: 0.25
+  sample_args:
+    num_samples: 15
+    num_warmup: 14
+    num_chains: 1
+  beta: 10
+  # use_true_w: True
+  use_true_w: False
+  true_w: NULL
+  sample_method: "MH"
+  exp_name: "designer_convergence_true_w_prior_tasks_norm_200_beta_50_var_1"
+
+SAVE_NAME: "test"
 
 
 

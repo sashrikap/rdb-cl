@@ -15,8 +15,8 @@ from rdb.infer.utils import *
 from numpyro.handlers import seed
 from tqdm.auto import tqdm, trange
 from rdb.infer.dictlist import DictList
+from jax.scipy.special import logsumexp
 from rdb.infer.particles import Particles
-from jax.scipy.special import logsumexp as jax_logsumexp
 
 
 class Designer(object):
@@ -65,8 +65,8 @@ class Designer(object):
         if self._true_w is not None:
             self._truth = self.create_particles(
                 weights=DictList([true_w], jax=False),
-                controller=self._one_controller,
-                runner=self._one_runner,
+                controller=self._true_controller,
+                runner=self._true_runner,
                 save_name="designer_truth",
             )
         else:
@@ -97,7 +97,6 @@ class Designer(object):
         self._save_dir = f"{save_root}/{exp_name}"
 
         ## Designer Prior tasks
-        self._random_choice = None
         self._prior_tasks = []
         self._num_prior_tasks = num_prior_tasks
 
@@ -137,11 +136,9 @@ class Designer(object):
         )
 
     def reset_prior_tasks(self):
-        assert (
-            self._random_choice is not None
-        ), "Need to initialize Designer with random seed"
         assert self._num_prior_tasks < len(self._env.all_tasks)
-        tasks = self._random_choice(self._env.all_tasks, self._num_prior_tasks)
+        self._rng_key, rng_choice = random.split(self._rng_key)
+        tasks = random_choice(rng_choice, self._env.all_tasks, self._num_prior_tasks)
         self._prior_tasks = tasks
 
     @property
@@ -165,8 +162,8 @@ class Designer(object):
         self._true_w = w
         self._truth = self.create_particles(
             weights=DictList([w], jax=False),
-            controller=self._one_controller,
-            runner=self._one_runner,
+            controller=self._true_controller,
+            runner=self._true_runner,
             save_name="designer_truth",
         )
 
@@ -183,10 +180,9 @@ class Designer(object):
         return self._beta
 
     def update_key(self, rng_key):
-        self._rng_key, rng_truth, rng_choice, rng_norm = random.split(rng_key, 4)
+        self._rng_key, rng_truth, rng_norm = random.split(rng_key, 3)
         if self._truth is not None:
             self._truth.update_key(rng_truth)
-        self._random_choice = seed(random_choice, rng_choice)
         self.reset_prior_tasks()
         ## Sample normaling factor
         self._norm_prior = seed(self._prior_fn("designer_norm"), rng_norm)
@@ -195,7 +191,6 @@ class Designer(object):
             save_name="designer_normalizer",
             runner=self._norm_runner,
             controller=self._norm_controller,
-            log_scale=False,
         )
         # Build likelihood and model
         self._prior = self._prior_fn("designer")
@@ -265,11 +260,10 @@ class Designer(object):
                 **self._weight_params,
             )
             particles = self.create_particles(
-                sample_ws[0],
+                sample_ws[0].exp(),
                 controller=self._one_controller,
                 runner=self._one_runner,
                 save_name=save_name,
-                log_scale=True,
             )
             particles.visualize(true_w=self.true_w, obs_w=None)
             return particles.subsample(1)
@@ -308,7 +302,6 @@ class Designer(object):
                 new_ws,
                 controller=self._sample_controller,
                 runner=self._sample_runner,
-                log_scale=False,
                 jax=False,
             )
             sample_ws = new_ws.numpy_array()
@@ -417,7 +410,7 @@ class Designer(object):
             # normal_rews = normal_rews.sum(axis=0)
             normal_rews = normal_rews.mean(axis=0)
             #  shape (nbatch,)
-            normal_rews = jax_logsumexp(normal_rews, axis=1) - np.log(nnorms + 1)
+            normal_rews = logsumexp(normal_rews, axis=1) - np.log(nnorms + 1)
             assert normal_rews.shape == (nbatch,)
 
             ## =================================================
@@ -429,17 +422,9 @@ class Designer(object):
         return _likelihood
 
     def create_particles(
-        self,
-        weights,
-        controller=None,
-        runner=None,
-        save_name="",
-        log_scale=False,
-        jax=False,
+        self, weights, controller=None, runner=None, save_name="", jax=False
     ):
         weights = DictList(weights, jax=jax)
-        if log_scale:
-            weights = weights.exp()
         if controller is None:
             controller = self._controller
         if runner is None:
@@ -553,8 +538,8 @@ class DesignerInteractive(Designer):
             rng_name=self._rng_name,
             rng_key=rng_particles,
             env_fn=self._env_fn,
-            controller=self._controller,
-            runner=self._runner,
+            controller=self._one_controller,
+            runner=self._one_runner,
             weights=user_w,
             save_name=f"designer_interactive_{self._name}",
             weight_params=self._weight_params,

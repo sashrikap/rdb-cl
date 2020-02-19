@@ -76,14 +76,9 @@ class Particles(object):
         ## Cache data
         self.build_cache()
         ## Sampling function
-        if rng_key is None:
-            self._random_choice = None
-        else:
-            self._random_choice = seed(random_choice, rng_key)
 
     def update_key(self, rng_key):
         self._rng_key, rng_choice = random.split(rng_key)
-        self._random_choice = seed(random_choice, rng_choice)
         self._expanded_name = f"weights_seed_{self._rng_name}_{self._save_name}"
 
     def build_cache(self):
@@ -221,14 +216,16 @@ class Particles(object):
             ps (Particles(num_samples))
 
         """
-        assert self._random_choice is not None, "Need to initialize"
         if num_samples is None or num_samples < 0:
             return self
         else:
             assert (
                 len(self._weights) >= num_samples
             ), f"Not enough samples for {num_samples}."
-            weights = self._random_choice(self._weights, num_samples, replacement=True)
+            self._rng_key, rng_random = random.split(self._rng_key)
+            weights = random_choice(
+                rng_random, self._weights, num_samples, replacement=True
+            )
             weights = DictList(weights)
             return self._clone(weights)
 
@@ -547,14 +544,14 @@ class Particles(object):
             #  shape (nfeats, nbatch, )
             diff_costs = target_ws * (this_fsums - that_fsums)
             #  shape (nbatch, )
-            diff_rews = -1 * diff_costs.onp_array().sum(axis=0)
+            diff_rews = -1 * diff_costs.onp_array().mean(axis=0)
             ## Compare violation difference
             #  shape (nvios, nbatch)
             this_vios = self.get_violations([task])[0]
             that_vios = target.get_violations([task])[0]
             diff_vios = this_vios - that_vios
             #  shape (nbatch)
-            diff_vios = diff_vios.onp_array().sum(axis=0)
+            diff_vios = diff_vios.onp_array().mean(axis=0)
             if verbose:
                 print(
                     f"Diff rew {len(diff_rews)} items: mean {diff_rews.mean():.3f} std {diff_rews.std():.3f} max {diff_rews.max():.3f} min {diff_rews.min():.3f}"
@@ -564,26 +561,34 @@ class Particles(object):
             this_ws = self.weights
             this_fsums = self.get_features_sum(task)
             this_costs = this_ws * this_fsums
-            this_rews = -1 * this_costs.onp_array().sum(axis=0)
+            this_rews = -1 * this_costs.onp_array().mean(axis=0)
             this_vios = self.get_violations(task)
-            this_vios = this_vios.onp_array().sum(axis=0)
+            this_vios = this_vios.onp_array().mean(axis=0)
             return this_rews, this_vios
 
     def resample(self, probs):
         """Resample from particles using list of new probs. Used for particle filter update."""
-        assert (
-            self._random_choice is not None
-        ), "Must properly initialize particle weights"
         assert len(probs) == len(self.weights)
-        new_weights = self._random_choice(
-            self.weights, num=len(self.weights), probs=probs, replacement=True
+        self._rng_key, rng_random = random.split(self._rng_key)
+        new_weights = random_choice(
+            rng_random,
+            self.weights,
+            num=len(self.weights),
+            probs=probs,
+            replacement=True,
         )
         new_weights = DictList(new_weights)
         new_ps = self._clone(new_weights)
         return new_ps
 
     def entropy(
-        self, bins, max_weights, verbose=True, method="histogram", log_scale=True
+        self,
+        bins,
+        max_weights,
+        verbose=True,
+        method="histogram",
+        log_scale=True,
+        **kwargs,
     ):
         """Estimate entropy.
 
@@ -665,7 +670,8 @@ class Particles(object):
                 )
                 for val, ct in zip(unique_vals, counts):
                     val_bins_idx = which_bins == val
-                    probs[val_bins_idx] += float(ct) / len(row)
+                    prob_ct = ct / len(row)
+                    probs[val_bins_idx] += np.log(prob_ct)
             map_idxs = onp.argsort(-1 * probs)[:num_map]
             map_weights = self.weights[map_idxs]
             # MAP esimate usually used for evaluation; thread-safe to provide self._env
@@ -687,7 +693,7 @@ class Particles(object):
         load_data = np.load(path, allow_pickle=True)
         self._weights = DictList(load_data["weights"].item())
 
-    def visualize(self, true_w=None, obs_w=None):
+    def visualize(self, true_w=None, obs_w=None, **kwargs):
         """Visualize weight belief distribution in histogram.
 
         Shows all weight particles, true weight, observed weight and MAP weights.

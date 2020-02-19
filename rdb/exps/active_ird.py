@@ -43,6 +43,7 @@ from time import time
 import jax.numpy as np
 import numpy as onp
 import copy
+import yaml
 import os
 
 
@@ -91,8 +92,6 @@ class ExperimentActiveIRD(object):
         # Random key & function
         self._rng_key = None
         self._rng_name = None
-        self._random_choice = None
-        self._random_task_choice = None
         self._fixed_task_seed = fixed_task_seed
         self._iterations = iterations
         self._normalized_key = normalized_key
@@ -108,7 +107,7 @@ class ExperimentActiveIRD(object):
         self._exp_params = exp_params
         self._save_root = save_root
         self._exp_name = exp_name
-        self._save_dir = f"{save_root}/{exp_name}"
+        self._save_dir = f"{self._save_root}/{self._exp_name}"
         self._last_time = time()
         # Load design and cache
         self._num_load_design = num_load_design
@@ -142,15 +141,17 @@ class ExperimentActiveIRD(object):
         self._model.update_key(rng_model)
         self._designer.update_key(rng_designer)
         self._designer.true_w = self._true_w
-        self._random_choice = seed(random_choice, rng_choice)
-        if self._fixed_task_seed is not None:
-            self._random_task_choice = seed(random_choice, self._fixed_task_seed)
-        else:
-            self._random_task_choice = self._random_choice
         # Active functions
         rng_active_keys = random.split(rng_active, len(list(self._active_fns.keys())))
         for fn, rng_key_fn in zip(list(self._active_fns.values()), rng_active_keys):
             fn.update_key(rng_key_fn)
+
+    def _get_rng_task(self):
+        if self._fixed_task_seed is not None:
+            self._fixed_task_seed, rng_task = random.split(self._fixed_task_seed)
+        else:
+            self._rng_key, rng_task = random.split(self._rng_key)
+        return rng_task
 
     def run(self, plot_candidates=False):
         """Main function 1: Run experiment from task.
@@ -169,17 +170,16 @@ class ExperimentActiveIRD(object):
         num_eval = self._num_eval_tasks
         if self._num_eval_tasks > len(self._model.env.all_tasks):
             num_eval = -1
-        self._eval_tasks = self._random_task_choice(self._model.env.all_tasks, num_eval)
+        self._eval_tasks = random_choice(
+            self._get_rng_task(), self._model.env.all_tasks, num_eval
+        )
 
         ### Main Experiment Loop ###
         for itr in range(0, self._iterations):
             ## Candidates for next tasks
-            if self._fixed_candidates is not None:
-                candidates = self._fixed_candidates
-            else:
-                candidates = self._random_task_choice(
-                    self._model.env.all_tasks, self._num_active_tasks
-                )
+            candidates = random_choice(
+                self._get_rng_task(), self._model.env.all_tasks, self._num_active_tasks
+            )
             self._all_candidates.append(candidates)
 
             ### Run Active IRD on Candidates ###
@@ -234,7 +234,7 @@ class ExperimentActiveIRD(object):
             self._num_load_design < 0
         ), "Should not propose random task if user design is provided"
         if self._initial_task is None:
-            task = self._random_task_choice(self._model.env.all_tasks, 1)[0]
+            task = random_choice(self._get_rng_task(), self._model.env.all_tasks, 1)[0]
             self._initial_task = task
         else:
             task = self._initial_task
@@ -263,27 +263,31 @@ class ExperimentActiveIRD(object):
             len(all_beliefs) == len(all_obs) == len(all_tasks)
         ), "Observation and tasks mismatch"
         assert len(all_obs) > 0, "Need at least 1 observation"
-
         # Compute belief features
         belief = all_beliefs[-1]
         belief = belief.subsample(self._num_active_sample)
+        active_fn = self._active_fns[fn_key]
+        print(f"Active proposal method {fn_key}: Begin")
         if fn_key != "random":
-            # Random does not need pre-computation
-            self._eval_server.compute_tasks(belief, candidates, verbose=True)
-            self._eval_server.compute_tasks(all_obs[-1], candidates, verbose=True)
+            ## =============== Pre-empt heavy computations =====================
+            self._eval_server.compute_tasks("Active", belief, candidates, verbose=True)
+            self._eval_server.compute_tasks(
+                "Active", all_obs[-1], candidates, verbose=True
+            )
 
         scores = []
         desc = "Evaluaitng candidate tasks"
         for next_task in tqdm(candidates, desc=desc):
             scores.append(
-                self._active_fns[fn_key](next_task, belief, all_obs, verbose=False)
+                active_fn(onp.array([next_task]), belief, all_obs, verbose=False)
             )
         scores = onp.array(scores)
+
         print(f"Function {fn_key} chose task {onp.argmax(scores)} among {len(scores)}")
         next_task = candidates[onp.argmax(scores)]
         return next_task, scores
 
-    def _evaluate(self, fn_name, belief, eval_tasks):
+    def _evaluate(self, fn_key, belief, eval_tasks):
         """Evaluate current sampled belief on eval task.
 
         Computation: n_map(~4) * n_eval(5~10k) tasks
@@ -304,15 +308,17 @@ class ExperimentActiveIRD(object):
             # Compute belief features
             belief = belief.map_estimate(self._num_eval_map)
             target = self._designer.truth
-            import pdb
-
-            pdb.set_trace()
-            self._eval_server.compute_tasks(belief, eval_tasks, verbose=True)
-            self._eval_server.compute_tasks(target, eval_tasks, verbose=True)
+            print(f"Evaluating method {fn_key}: Begin")
+            self._eval_server.compute_tasks(
+                "Evaluation", belief, eval_tasks, verbose=True
+            )
+            self._eval_server.compute_tasks(
+                "Evaluation", target, eval_tasks, verbose=True
+            )
 
             num_violate = 0.0
             performance = 0.0
-            desc = f"Evaluating method {fn_name}"
+            desc = f"Evaluating method {fn_key}"
             for task in tqdm(eval_tasks, desc=desc):
                 diff_perf, diff_vios = belief.compare_with(task, target=target)
                 performance += diff_perf.mean()
@@ -322,7 +328,7 @@ class ExperimentActiveIRD(object):
             avg_perform = float(performance / len(eval_tasks))
             print(f"    Average Violation diff {avg_violate:.2f}")
             print(f"    Average Performance diff {avg_perform:.2f}")
-        self._active_eval_hist[fn_name].append(
+        self._active_eval_hist[fn_key].append(
             {"violation": avg_violate, "perform": avg_perform}
         )
 
@@ -464,11 +470,11 @@ class ExperimentActiveIRD(object):
               - see `rdb.infer.particles.save()`
 
         """
-        exp_dir = f"{self._save_root}/{self._exp_name}"
-        os.makedirs(exp_dir, exist_ok=True)
+        print("Saving to:", self._save_dir)
+        os.makedirs(self._save_dir, exist_ok=True)
         ## Save experiment parameters
-        save_params(f"{exp_dir}/params_{self._rng_name}.yaml", self._exp_params)
-        ## Save evaluation history
+        save_params(f"{self._save_dir}/params_{self._rng_name}.yaml", self._exp_params)
+        ## Save experiment history to npz
         np_obs = {}
         for key in self._all_obs.keys():
             np_obs[key] = [ob.weights[0] for ob in self._all_obs[key]]
@@ -486,10 +492,16 @@ class ExperimentActiveIRD(object):
             if self._num_eval_tasks > 0
             else [],  # do not save when eval onall tasks (too large)
         )
-        path = f"{self._save_root}/{self._exp_name}/{self._exp_name}_seed_{self._rng_name}.npz"
-        with open(path, "wb+") as f:
+        npz_path = f"{self._save_dir}/{self._exp_name}_seed_{self._rng_name}.npz"
+        with open(npz_path, "wb+") as f:
             np.savez(f, **data)
-        print("save", exp_dir)
+        ## Save evaluation history to yaml
+        yaml_path = f"{self._save_dir}/{self._exp_name}_seed_{self._rng_name}.yaml"
+        with open(yaml_path, "w+") as stream:
+            try:
+                yaml.dump(self._active_eval_hist, stream, default_flow_style=False)
+            except yaml.YAMLError as exc:
+                print(exc)
         ## Save belief sample information
         true_w = self._designer.true_w
         for key in self._all_beliefs.keys():
@@ -539,26 +551,6 @@ class ExperimentActiveIRD(object):
                     # self._evaluate(key, belief, eval_tasks)
                     self._save(itr=itr)
                     self._log_time(f"Itr {itr} Method {key} Eval & Save")
-
-    def run_ird_mcmc(self):
-        """Study how many samples it needs for designer to converge.
-
-        Variables:
-            * num prior tasks
-
-        """
-        print(
-            f"\n============= Designer MCMC ({self._rng_name}): prior={self._num_load_design} ============="
-        )
-        self._log_time("Begin")
-        self._build_cache()
-        self._load_design(compute_belief=False)
-        belief = self._model.sample(
-            self._all_tasks[key],
-            obs=self._all_obs[key],
-            save_name=f"weights_seed_{self._rng_name}_prior_{num_load}",
-        )
-        self._log_time("End")
 
     def _plot_candidate_scores(self, itr, debug_dir=None):
         if debug_dir is None:

@@ -16,13 +16,13 @@ Credits:
 
 """
 
-import os
-import jax
-import copy
-import numpyro
-import numpy as onp
-import jax.numpy as np
 import numpyro.distributions as dist
+import jax.numpy as np
+import numpy as onp
+import numpyro
+import copy
+import jax
+import os
 from numpyro.handlers import block, seed, substitute, trace, scale, condition
 from jax import jit, lax, partial, pmap, random, vmap, device_get, device_put
 from numpyro.infer.mcmc import MCMCKernel, _collect_fn

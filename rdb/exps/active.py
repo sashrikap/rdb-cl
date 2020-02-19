@@ -13,11 +13,15 @@ Credits:
 
 import jax.numpy as np
 import numpy as onp
-from rdb.optim.utils import *
-from rdb.infer.utils import logsumexp, random_uniform
+from rdb.infer.utils import random_uniform
+from jax.scipy.special import logsumexp
 from rdb.exps.utils import Profiler
 from numpyro.handlers import seed
+from rdb.optim.utils import *
 from tqdm.auto import tqdm
+from rdb.infer import *
+from jax import random
+from time import time
 
 
 class ActiveInfoGain(object):
@@ -25,33 +29,25 @@ class ActiveInfoGain(object):
 
     Args:
         model (object): IRD Model
-        params (dict): parameters (e.g. histogram) for calling.
+        weight_params (dict): parameters (e.g. histogram) for calling.
 
     """
 
-    def __init__(self, rng_key, model, beta, params={}, debug=False):
+    def __init__(self, rng_key, model, beta, weight_params={}, debug=False):
         self._rng_key = rng_key
         self._model = model
         self._beta = beta
         self._tasks = []
         self._debug = debug
         self._method = "InfoGain"
-        self._params = params
+        self._weight_params = weight_params
+        self._time = None
 
     def update_key(self, rng_key):
         self._rng_key = rng_key
 
-    def _compute_probs(self, new_weights, next_feats_sum):
-        """Computes prob of features (from original w) given new w.
-        """
-        new_costs = multiply_dict_by_keys(new_weights, next_feats_sum)
-        log_probs = -1 * self._beta * np.sum(list(new_costs.values()), axis=0)
-        denom = logsumexp(log_probs)
-        probs = np.exp(log_probs - denom)
-        return probs
-
-    def __call__(self, next_task, next_task_name, belief, all_obs, verbose=True):
-        """Information gain (negative entropy) criteria.
+    def __call__(self, next_task, belief, all_obs, verbose=True):
+        """Information gain (negative entropy) criteria. Higher score the better.
 
         Note:
             * Equivalent to ranking by negative post-obs entropy -H(X|Y)
@@ -59,30 +55,35 @@ class ActiveInfoGain(object):
 
         """
         desc = f"Computing {self._method} acquisition features"
+        if self._time is None:
+            t_start = time()
         if not verbose:
             desc = None
-        next_feats_sum = belief.get_features_sum(next_task, next_task_name, desc=desc)
+
+        #  shape nfeats * (nbatch)
+        next_feats_sum = belief.get_features_sum(next_task, desc=desc).squeeze(0)
 
         entropies = []
-        if belief.test_mode:
-            entropies = np.zeros(len(belief.weights))
-        else:
-            for next_designer_ws in belief.weights:
-                next_probs = self._compute_probs(next_designer_ws, next_feats_sum)
-                next_belief = belief.resample(next_probs)
-                # avoid gaussian entropy (causes NonSingular Matrix issue)
-                # currently uses onp.ma.log which is non-differentiable
-                ent = float(
-                    next_belief.entropy(
-                        bins=self._params["bins"],
-                        method="histogram",
-                        max_weights=self._params["max_weights"],
-                    )
+        for ws_i in belief.weights:
+            #  shape (nbatch,)
+            new_costs = DictList(ws_i, expand_dims=True) * next_feats_sum
+            new_costs = new_costs.numpy_array().mean(axis=0)
+
+            new_rews = -1 * self._beta * new_costs
+            next_probs = np.exp(new_rews - logsumexp(new_rews))
+            next_belief = belief.resample(next_probs)
+
+            # avoid gaussian entropy (causes NonSingular Matrix issue)
+            # currently uses onp.ma.log which is non-differentiable
+            ent = float(
+                next_belief.entropy(
+                    log_scale=False, method="histogram", **self._weight_params
                 )
-                if onp.isnan(ent):
-                    ent = 1000
-                    print("WARNING: Entropy has NaN entropy value")
-                entropies.append(ent)
+            )
+            if onp.isnan(ent):
+                ent = 1000
+                print("WARNING: Entropy has NaN entropy value")
+            entropies.append(ent)
 
         entropies = onp.array(entropies)
         infogain = -1 * onp.mean(entropies)
@@ -92,6 +93,9 @@ class ActiveInfoGain(object):
             print(
                 f"\tEntropies mean {onp.mean(entropies):.3f} std {onp.std(entropies):.3f}"
             )
+        if self._time is None:
+            self._time = time() - t_start
+            print(f"Active InfoGain time: {self._time:.3f}")
 
         return infogain
 
@@ -107,21 +111,8 @@ class ActiveRatioTest(ActiveInfoGain):
         super().__init__(rng_key, model, beta=0.0, debug=debug)
         self._method = method
 
-    def _compute_log_ratios(self, weights, next_feats_sum, user_feats_sum):
-        """Compares user features with belief sample features (from samplw_ws).
-
-        Ratio = exp(next_ws @ user_feats) / exp(next_ws @ next_feats)
-
-        """
-
-        next_costs = multiply_dict_by_keys(weights, next_feats_sum)
-        user_costs = multiply_dict_by_keys(weights, user_feats_sum)
-        diff_costs = subtract_dict_by_keys(user_costs, next_costs)
-        log_ratios = -1 * np.sum(list(diff_costs.values()), axis=0)
-        return np.array(log_ratios)
-
-    def __call__(self, next_task, next_task_name, belief, all_obs, verbose=True):
-        """Disagreement criteria.
+    def __call__(self, next_task, belief, all_obs, verbose=True):
+        """Disagreement criteria.  Higher score the better.
 
         Score = -1 * rew(sample_w, traj_user)/rew(sample_w, traj_sample).
 
@@ -134,26 +125,33 @@ class ActiveRatioTest(ActiveInfoGain):
         ## Last observation
         obs = all_obs[-1]
 
+        if self._time is None:
+            t_start = time()
         if not verbose:
             desc = None
-        next_feats_sum = belief.get_features_sum(next_task, next_task_name, desc=desc)
-        user_feats_sum = obs.get_features_sum(next_task, next_task_name)
-        weights = belief.stack_weights
-        log_ratios = self._compute_log_ratios(weights, next_feats_sum, user_feats_sum)
+        next_feats_sum = belief.get_features_sum(next_task, desc=desc)
+        user_feats_sum = obs.get_features_sum(next_task)
+        #  shape (nweights,)
+        next_costs = (belief.weights * next_feats_sum).numpy_array().mean(axis=0)
+        user_costs = (belief.weights * user_feats_sum).numpy_array().mean(axis=0)
+        ratios = next_costs - user_costs
 
         if self._debug:
-            min_idx = np.argmin(log_ratios)
+            min_idx = np.argmin(ratios)
             print(f"Active method {self._method}")
             print(f"\tMin weight")
             for key, val in belief.weights[min_idx].items():
                 print(f"\t-> {key}: {val:.3f}")
-            print(
-                f"\tRatios mean {np.mean(log_ratios):.3f} std {np.std(log_ratios):.3f}"
-            )
+            print(f"\tRatios mean {np.mean(ratios):.3f} std {np.std(ratios):.3f}")
+
+        if self._time is None:
+            self._time = time() - t_start
+            print(f"Active Ratio time: {self._time:.3f}")
+
         if self._method == "mean":
-            return -1 * np.mean(log_ratios)
+            return np.mean(ratios)
         elif self._method == "min":
-            return -1 * np.min(log_ratios)
+            return np.min(ratios)
         else:
             raise NotImplementedError
 
@@ -168,15 +166,13 @@ class ActiveRandom(ActiveInfoGain):
     def __init__(self, rng_key, model, method="random", debug=False):
         super().__init__(rng_key, model, beta=0.0, debug=debug)
         self._method = method
-        # self._random_uniform = None
-        self._random_uniform = random_uniform
 
     def update_key(self, rng_key):
         self._rng_key = rng_key
-        self._random_uniform = seed(random_uniform, self._rng_key)
 
-    def __call__(self, next_task, next_task_name, belief, all_obs, verbose=True):
+    def __call__(self, next_task, belief, all_obs, verbose=True):
         """Random score
 
         """
-        return self._random_uniform()
+        self._rng_key, rng_random = random.split(self._rng_key)
+        return random_uniform(rng_random)

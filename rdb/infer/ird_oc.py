@@ -21,9 +21,9 @@ import jax
 import jax.numpy as np
 import numpy as onp
 from rdb.infer.designer import Designer, DesignerInteractive
-from jax.scipy.special import logsumexp as jax_logsumexp
 from numpyro.handlers import scale, condition, seed
 from rdb.infer.particles import Particles
+from jax.scipy.special import logsumexp
 from tqdm.auto import tqdm, trange
 from rdb.infer.utils import *
 from rdb.exps.utils import *
@@ -71,7 +71,6 @@ class IRDOptimalControl(object):
         env_id,
         env_fn,
         controller_fn,
-        eval_server,
         designer,
         prior_fn,
         ## Weight parameters
@@ -96,7 +95,6 @@ class IRDOptimalControl(object):
         self._env_fn = env_fn
         self._env = env_fn()
         self._build_controllers(controller_fn)
-        self._eval_server = eval_server
         self._interactive_mode = interactive_mode
 
         # Rationality
@@ -144,10 +142,6 @@ class IRDOptimalControl(object):
         return self._designer
 
     @property
-    def eval_server(self):
-        return self._eval_server
-
-    @property
     def rng_name(self):
         return self._rng_name
 
@@ -170,7 +164,6 @@ class IRDOptimalControl(object):
             save_name="ird_normalizer",
             runner=self._normal_runner,
             controller=self._normal_controller,
-            log_scale=False,
         )
 
     def _build_controllers(self, controller_fn):
@@ -293,7 +286,7 @@ class IRDOptimalControl(object):
             # normal_probs = v_designer_likelihood(normal_true_ws)
             normal_probs = v_designer_likelihood(normal_true_ws)
             #  shape (nnorms_1, ntasks) -> (ntasks, )
-            normal_probs = jax_logsumexp(normal_probs, axis=0) - np.log(nnorms_1)
+            normal_probs = logsumexp(normal_probs, axis=0) - np.log(nnorms_1)
 
             ## ==================================================
             ## ================= Aggregate tasks ================
@@ -314,9 +307,6 @@ class IRDOptimalControl(object):
                 `sample`: use random samples for normalizer;
                 `max_norm`: use max trajectory as normalizer;
                 `hybrid`: use random samples mixed with max trajectory
-
-        TODO:
-            * currently `tasks`, `obs` are ugly lists
 
         """
         tasks = onp.array(tasks)
@@ -367,21 +357,16 @@ class IRDOptimalControl(object):
             **self._weight_params,
         )
         samples = self.create_particles(
-            sample_ws[0],
+            sample_ws[0].exp(),
             save_name=save_name,
             runner=self._sample_runner,
             controller=self._sample_controller,
-            log_scale=True,
         )
         samples.visualize(true_w=self.designer.true_w, obs_w=observe_ws[-1])
         return samples
 
-    def create_particles(
-        self, weights, runner, controller, save_name="", log_scale=False
-    ):
+    def create_particles(self, weights, runner, controller, save_name=""):
         weights = DictList(weights)
-        if log_scale:
-            weights = weights.exp()
         self._rng_key, rng_particle = random.split(self._rng_key, 2)
         return Particles(
             rng_name=self._rng_name,
