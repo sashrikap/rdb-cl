@@ -585,6 +585,7 @@ class Particles(object):
         self,
         bins,
         max_weights,
+        hist_probs=None,
         verbose=True,
         method="histogram",
         log_scale=True,
@@ -607,6 +608,7 @@ class Particles(object):
         FAST_HISTOGRAM = True
 
         ranges = (-max_weights, max_weights)
+        delta = (ranges[1] - ranges[0]) / bins
         data = self.weights.copy()
         # Omit normalized weight
         del data[self._normalized_key]
@@ -620,23 +622,67 @@ class Particles(object):
             N = data.shape[1]
             entropy = -(1.0 / N) * onp.sum(onp.log(kernel(data)))
         elif method == "histogram":
+            if hist_probs is None:
+                hist_probs = self.hist_probs()
+            hist_densities = hist_probs * (1 / delta)
             entropy = 0.0
-            for row in data:
-                if FAST_HISTOGRAM:
-                    hist_count = histogram1d(row, bins=bins, range=ranges)
-                    hist_prob = hist_count / len(row)
-                    delta = (ranges[1] - ranges[0]) / bins
-                    hist_density = hist_prob / delta
-                else:
-                    # density is normalized by bucket width
-                    hist_density, slots = onp.histogram(
-                        row, bins=bins, range=ranges, density=True
-                    )
-                    delta = slots[1] - slots[0]
-                    hist_prob = hist_density * delta
-                ent = -(hist_density * onp.ma.log(onp.abs(hist_density)) * delta).sum()
+            for key, density in hist_densities.items():
+                ent = -(density * onp.ma.log(onp.abs(density)) * delta).sum()
                 entropy += ent
         return entropy
+
+    def hist_probs(self, bins, max_weights, **kwargs):
+        """Histogram probability. How likely does each bin contain samples.
+
+        Return:
+            probs (DictList): shape (nfeats - 1) * (nbins,)
+
+        """
+        out = {}
+        ranges = (-max_weights, max_weights)
+        for key in self.weights.keys():
+            if key == self._normalized_key:
+                continue
+            row = self.weights[key]
+            ## Fast histogram
+            hist_count = histogram1d(row, bins=bins, range=ranges)
+            hist_prob = hist_count / len(row)
+
+            # ## Regular numpy histogram
+            # hist_density, slots = onp.histogram(
+            #     row, bins=bins, range=ranges, density=True
+            # )
+            # delta = slots[1] - slots[0]
+            # hist_prob = hist_density * delta
+            # hist_count = hist_prob * len(row)
+
+            out[key] = hist_prob
+        return DictList(out)
+
+    def digitize(self, bins, max_weights, matrix=False, **kwargs):
+        """Based on numpy.digitize. Find histogram bin membership of each sample.
+
+        Args:
+            matrix (bool):
+                if true, return (nfeats -1) * nbins
+                if false, return (nfeats -1) * (nweights, nbins)
+
+        """
+        out = {}
+        ranges = (-max_weights, max_weights)
+        m_bins = onp.linspace(*ranges, bins)
+        nweights = len(self.weights)
+        for key in self.weights.keys():
+            if key == self._normalized_key:
+                continue
+            which_bins = onp.digitize(self.weights[key], m_bins)
+            if not matrix:
+                out[key] = which_bins
+            else:
+                mat = onp.zeros((nweights, bins))
+                mat[onp.arange(nweights), which_bins] = 1.0
+                out[key] = mat
+        return DictList(out)
 
     def map_estimate(self, num_map, method="histogram", log_scale=True):
         """Find maximum a posteriori estimate from current samples.

@@ -250,7 +250,6 @@ class DictList(dict):
 
         """
         shape = self.shape
-        assert axis != 0, f"Cannot sum across batch"
         data = OrderedDict()
         for key, val in self.items():
             data[key] = self._np.sum(val, axis=axis, keepdims=keepdims)
@@ -284,6 +283,14 @@ class DictList(dict):
         for key, val in self.items():
             data[key] = copy.deepcopy(val)
         return DictList(data, jax=self._jax)
+
+    def normalize(self):
+        """Normalize each value.
+        """
+        out = OrderedDict()
+        for key, val in self.items():
+            out[key] = val / self._np.sum(val)
+        return DictList(out, jax=self._jax)
 
     def __mul__(self, data):
         """Multiply with another dictlist.

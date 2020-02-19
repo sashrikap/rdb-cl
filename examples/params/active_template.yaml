@@ -15,7 +15,7 @@ CONTROLLER_ARGS:
 
 
 
-# ## Full sampling
+## Full sampling
 EXP_ARGS:
   num_eval_map: 32
   # num_eval_tasks: 4000
@@ -58,7 +58,8 @@ EVAL_ARGS:
 ACTIVE_ARGS:
   num_active_tasks: 72
   num_active_sample: 2000
-  active_fns: ["infogain", "ratiomean", "ratiomin"]
+  # active_fns: ["infogain", "ratiomean", "ratiomin"]
+  active_fns: ["infogain"]
   # active_fns: ["random"]
   # active_fns: ["infogain", "ratiomean", "ratiomin"]
   # active_fns: ["random"]
@@ -106,7 +107,8 @@ ACTIVE_ARGS:
 # ACTIVE_ARGS:
 #   num_active_tasks: 72
 #   num_active_sample: 10
-#   active_fns: ["infogain", "ratiomean", "ratiomin"]
+#   # active_fns: ["infogain", "ratiomean", "ratiomin"]
+#   active_fns: ["infogain"]
 #   # active_fns: ["random"]
 #   # active_fns: ["infogain", "ratiomean", "ratiomin"]
 #   # active_fns: ["random"]

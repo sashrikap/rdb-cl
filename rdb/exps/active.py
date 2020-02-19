@@ -52,6 +52,7 @@ class ActiveInfoGain(object):
         Note:
             * Equivalent to ranking by negative post-obs entropy -H(X|Y)
               [H(X) - H(X|Y)] - [H(X) - H(X|Y')] = H(X|Y') - H(X|Y)
+            * Entropy is estimated from histogram
 
         """
         desc = f"Computing {self._method} acquisition features"
@@ -60,25 +61,36 @@ class ActiveInfoGain(object):
         if not verbose:
             desc = None
 
-        #  shape nfeats * (nbatch)
+        #  shape nfeats * (nweights)
         next_feats_sum = belief.get_features_sum(next_task, desc=desc).squeeze(0)
+        ## Histogram identity
+        #  shape (nfeats - 1) * (nweights, nbins)
+        which_bins = belief.digitize(matrix=True, **self._weight_params)
+        #  shape (nfeats - 1) * (nbins,)
+        # curr_probs = belief.hist_probs(**self._weight_params)
+        curr_probs = which_bins.sum(axis=0).normalize()
 
         entropies = []
         for ws_i in belief.weights:
-            #  shape (nbatch,)
+            #  shape (nweights,)
             new_costs = DictList(ws_i, expand_dims=True) * next_feats_sum
             new_costs = new_costs.numpy_array().mean(axis=0)
 
+            #  shape (nweights,)
             new_rews = -1 * self._beta * new_costs
-            next_probs = np.exp(new_rews - logsumexp(new_rews))
-            next_belief = belief.resample(next_probs)
+            ratio = np.exp(new_rews - logsumexp(new_rews))
+
+            #  shape (nfeats - 1) * (nbins,)
+            next_probs = (which_bins * ratio[:, None]).sum(axis=0).normalize()
+            # next_belief = belief.resample(next_probs)
 
             # avoid gaussian entropy (causes NonSingular Matrix issue)
             # currently uses onp.ma.log which is non-differentiable
-            ent = float(
-                next_belief.entropy(
-                    log_scale=False, method="histogram", **self._weight_params
-                )
+            ent = belief.entropy(
+                hist_probs=next_probs,
+                log_scale=False,
+                method="histogram",
+                **self._weight_params,
             )
             if onp.isnan(ent):
                 ent = 1000
