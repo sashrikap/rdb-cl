@@ -304,32 +304,39 @@ class ExperimentActiveIRD(object):
             # Interactive mode, skip evaluation to speed up
             avg_violate = 0.0
             avg_perform = 0.0
+            log_prob_true = 0.0
         else:
             # Compute belief features
-            belief = belief.map_estimate(self._num_eval_map)
+            belief_map = belief.map_estimate(self._num_eval_map, log_scale=False)
             target = self._designer.truth
             print(f"Evaluating method {fn_key}: Begin")
             self._eval_server.compute_tasks(
-                "Evaluation", belief, eval_tasks, verbose=True
+                "Evaluation", belief_map, eval_tasks, verbose=True
             )
             self._eval_server.compute_tasks(
-                "Evaluation", target, eval_tasks, verbose=True
+                "Evaluation", belief_map, eval_tasks, verbose=True
             )
 
             num_violate = 0.0
             performance = 0.0
             desc = f"Evaluating method {fn_key}"
             for task in tqdm(eval_tasks, desc=desc):
-                diff_perf, diff_vios = belief.compare_with(task, target=target)
+                diff_perf, diff_vios = belief_map.compare_with(task, target=target)
                 performance += diff_perf.mean()
                 num_violate += diff_vios.mean()
 
             avg_violate = float(num_violate / len(eval_tasks))
             avg_perform = float(performance / len(eval_tasks))
+            log_prob_true = float(belief.log_prob(self._designer.truth.weights[0]))
             print(f"    Average Violation diff {avg_violate:.2f}")
             print(f"    Average Performance diff {avg_perform:.2f}")
+            print(f"    True Weights Log Prob {log_prob_true:.2f}")
         self._active_eval_hist[fn_key].append(
-            {"violation": avg_violate, "perform": avg_perform}
+            {
+                "violation": avg_violate,
+                "perform": avg_perform,
+                "log_prob_true": log_prob_true,
+            }
         )
 
     def _load_design(self, compute_belief=True):
@@ -584,7 +591,7 @@ class ExperimentActiveIRD(object):
                 other_keys,
                 path=path,
                 title=f"{fn_key}_itr_{itr}",
-                yrange=[-1.2, 1.6],
+                yrange=[-0.4, 2],
                 loc="upper left",
                 normalize=True,
                 delta=0.2,

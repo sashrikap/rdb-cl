@@ -1,3 +1,4 @@
+import numpy as onp
 from functools import partial
 from matplotlib import pyplot as plt
 from os import makedirs
@@ -29,8 +30,9 @@ def forward_env(env, actions, init_state=None, text=None):
         else:
             frames.append(env.render("rgb_array", text=text))
 
-    for act in actions:
-        env.step(act)
+    nacs = actions.shape[1]
+    for ai in range(nacs):
+        env.step(actions[:, ai])
         render_frames()
     # render_frames()
     # TODO: a render bug, need to get rid of the first frame

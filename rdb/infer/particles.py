@@ -58,14 +58,17 @@ class Particles(object):
         self._runner = runner
 
         ## Sample weights
-        assert isinstance(weights, DictList)
         self._rng_key = rng_key
         self._rng_name = rng_name
         self._weight_params = weight_params
         self._normalized_key = normalized_key
-        self._weights = weights.normalize_by_key(self._normalized_key)
-        self._expanded_name = f"{save_name}_seed_{self._rng_name}"
+        if weights is not None:
+            assert isinstance(weights, DictList)
+            self._weights = weights.normalize_by_key(self._normalized_key)
+        else:
+            self._weights = None
         self._save_name = save_name
+        self._expanded_name = f"weights_seed_{self._rng_name}_{self._save_name}"
         ## File system
         self._fig_dir = fig_dir
         self._save_dir = save_dir
@@ -588,7 +591,7 @@ class Particles(object):
         hist_probs=None,
         verbose=True,
         method="histogram",
-        log_scale=True,
+        log_scale=False,
         **kwargs,
     ):
         """Estimate entropy.
@@ -659,7 +662,7 @@ class Particles(object):
             out[key] = hist_prob
         return DictList(out)
 
-    def digitize(self, bins, max_weights, log_scale=True, matrix=False, **kwargs):
+    def digitize(self, bins, max_weights, log_scale=False, matrix=False, **kwargs):
         """Based on numpy.digitize. Find histogram bin membership of each sample.
 
         Args:
@@ -687,7 +690,32 @@ class Particles(object):
                 out[key] = mat
         return DictList(out)
 
-    def map_estimate(self, num_map, method="histogram", log_scale=True):
+    def log_prob(self, weights, method="histogram"):
+        """Log probability of value"""
+        assert (
+            "bins" in self._weight_params and "max_weights" in self._weight_params
+        ), "Particle weight parameters not properly setup."
+        max_weights = self._weight_params["max_weights"]
+        bins = self._weight_params["bins"]
+        ranges = (-max_weights, max_weights)
+        m_bins = onp.linspace(*ranges, bins)
+        log_prob = 0.0
+        for key in weights.keys():
+            row = self.weights[key]
+            unique_vals, indices, counts = onp.unique(
+                onp.digitize(row, m_bins, right=True),
+                return_index=True,
+                return_counts=True,
+            )
+            # which_bin = onp.digitize(, m_bins, right=True)[0]
+            all_counts, _ = onp.histogram(row, bins=bins, range=ranges)
+            hist_count, _ = onp.histogram([weights[key]], bins=bins, range=ranges)
+            ct = onp.sum(hist_count * all_counts)
+            prob_ct = float(ct) / len(row)
+            log_prob += np.log(prob_ct)
+        return log_prob
+
+    def map_estimate(self, num_map, method="histogram", log_scale=False):
         """Find maximum a posteriori estimate from current samples.
 
         Note:
@@ -719,7 +747,7 @@ class Particles(object):
                 )
                 for val, ct in zip(unique_vals, counts):
                     val_bins_idx = which_bins == val
-                    prob_ct = ct / len(row)
+                    prob_ct = float(ct) / len(row)
                     probs[val_bins_idx] += np.log(prob_ct)
             map_idxs = onp.argsort(-1 * probs)[:num_map]
             map_weights = self.weights[map_idxs]
@@ -757,7 +785,7 @@ class Particles(object):
         max_weights = self._weight_params["max_weights"]
 
         num_map = 4  # Magic number for now
-        map_ws = self.map_estimate(num_map).weights
+        map_ws = self.map_estimate(num_map, log_scale=False).weights
         map_ls = [str(i) for i in range(1, 1 + num_map)]
         # Visualize multiple map weights in magenta with ranking labels
         plot_weights(

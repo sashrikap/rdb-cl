@@ -167,6 +167,7 @@ class IRDOptimalControl(object):
         )
 
     def _build_controllers(self, controller_fn):
+        self._mcmc_controller, self._mcmc_runner = controller_fn(self._env, "IRD MCMC")
         self._sample_controller, self._sample_runner = controller_fn(
             self._env, "IRD Sample"
         )
@@ -195,6 +196,8 @@ class IRDOptimalControl(object):
         ## Fill in unused feature keys
         feats_keys = self._env.features_keys
         nnorms = len(self._normalizer.weights)
+        nnorms_1 = nnorms + 1
+        dnnorms = len(self._designer._normalizer.weights)
         nfeats = len(self._env.features_keys)
         ntasks = len(tasks)
 
@@ -215,82 +218,123 @@ class IRDOptimalControl(object):
             .expand_dims(0)
             .numpy_array()
         )
-        #   shape nfeats * (nnorms,)
-        normal_ws = self._normalizer.weights
+        #  shape (ntasks, 1, T, udim)
+        obs_actions = obs_ps.get_actions(tasks)[np.diag_indices(ntasks)][:, None]
+        # #  shape (ntasks, nnorms, T, udim)
+        # obs_actions_norm = np.repeat(obs_actions, nnorms, axis=0)
+        # #  shape (ntasks, dnnorms, T, udim)
+        # obs_actions_dnorm = np.repeat(obs_actions, dnnorms, axis=0)
+
         #  shape (nfeats, nnorms)
+        normal_ws = self._normalizer.weights
         normal_ws = normal_ws.prepare(feats_keys).numpy_array()
+
+        ## =================== Prepare IRD Normalizer ==================
+        # self._normalizer.compute_tasks(tasks, us0=obs_actions_norm)
+        self._normalizer.compute_tasks(tasks)
+        #  shape (nfeats, ntasks, nnorms)
+        ird_normal_fsum = self._normalizer.get_features_sum(tasks)
+        ird_normal_fsum = ird_normal_fsum.prepare(feats_keys).numpy_array()
+        #  shape (nnorms, nfeats, ntasks)
+        ird_normal_fsum = ird_normal_fsum.swapaxes(0, 2).swapaxes(1, 2)
+        #  shape (nnorms, nfeats, 1, ntasks)
+        ird_normal_fsum = ird_normal_fsum[:, :, None]
+
+        ## ================= Prepare Designer Normalizer ================
+        # self._designer._normalizer.compute_tasks(tasks, us0=obs_actions_dnorm)
+        self._designer._normalizer.compute_tasks(tasks)
         #  shape (nfeats, ntasks, d_nnorms)
         designer_normal_fsum = self._designer.normalizer.get_features_sum(tasks)
+        designer_normal_fsum = designer_normal_fsum.prepare(feats_keys).numpy_array()
         #  shape (nfeats, 1, ntasks, d_nnorms)
-        designer_normal_fsum = np.expand_dims(
-            designer_normal_fsum.prepare(feats_keys).numpy_array(), axis=1
-        )
+        designer_normal_fsum = designer_normal_fsum[:, None]
         #  shape (1, ntasks, task_dim)
         obs_tasks = tasks[None, :]
 
         assert obs_ws.shape == (nfeats, ntasks)
         assert normal_ws.shape == (nfeats, nnorms)
         assert obs_feats_sum.shape == (nfeats, 1, ntasks)
+        assert ird_normal_fsum.shape == (nnorms, nfeats, 1, ntasks)
 
         ## Designer kernels
-        designer_likelihood = partial(
+        designer_ll = partial(
             self._designer.likelihood_ird,
+            # true_feats_sum=obs_feats_sum,
             sample_ws=obs_ws,
             tasks=obs_tasks,
-            true_feats_sum=obs_feats_sum,
             sample_feats_sum=obs_feats_sum,
             normal_feats_sum=designer_normal_fsum,
         )
-        v_designer_likelihood = jax.vmap(designer_likelihood)
+        designer_vll = jax.vmap(designer_ll)
 
         def _model():
             #  shape (nfeats, 1)
-            sample_ws = self._prior(1).prepare(feats_keys).numpy_array()
-            log_prob = _likelihood(sample_ws)
+            true_ws = self._prior(1).prepare(feats_keys)
+
+            # ## ======= Not jit-able optimization: requires scipy/jax optimizer ======
+            # true_ps = self.create_particles(
+            #     true_ws, controller=self._sample_controller, runner=self._sample_runner
+            # )
+            # true_ps.compute_tasks(tasks, us0=obs_actions, jax=False)
+            # #  shape (nfeats, ntasks, 1)
+            # true_feats_sum = true_ps.get_features_sum(tasks).prepare(feats_keys)
+            # true_feats_sum = true_feats_sum.numpy_array()
+            # #  shape (nfeats, 1, ntasks)
+            # true_feats_sum = true_feats_sum.swapaxes(1, 2)
+
+            # ## ======= Jit-able cheap alternative ======
+            true_feats_sum = obs_feats_sum
+
+            #  shape (nnorms_1, nfeats, 1, ntasks)
+            ird_normal_fsum_1 = np.concatenate(
+                [true_feats_sum[None, :], ird_normal_fsum], axis=0
+            )
+            true_ws = true_ws.numpy_array()
+            log_prob = _likelihood(true_ws, true_feats_sum, ird_normal_fsum_1)
             numpyro.factor("ird_log_probs", log_prob)
 
-        def _likelihood(sample_ws):
+        @jax.jit
+        def _likelihood(ird_true_ws, ird_true_feats_sum, ird_normal_feats_sum):
             """
             Forward likelihood `p(w_obs | w_true)` for observed data, used as MCMC kernel.
 
             Args:
-                sample_ws (ndarray): sampled weights
+                ird_true_ws (ndarray): sampled weights
                     shape: (nfeats, 1)
+                ird_true_feats_sum (ndarray): features of sampled weights on tasks
+                    shape: (nfeats, 1, ntasks)
+                ird_normal_feats_sum (ndarray): features of normal weights on tasks
+                    shape: (nnorms_1, nfeats, 1, ntasks)
 
             Output:
-                log_probs (ndarray): log probability of sample_ws (1, )
+                log_probs (ndarray): log probability of ird_true_ws (1, )
 
             TODO:
                 * Dynamically changing feature counts
 
             """
-            assert sample_ws.shape == (nfeats, 1)
-
             ## ===============================================
             ## ======= Computing Numerator: sample_xxx =======
             #  shape (nfeats, ntasks)
-            sample_true_ws = np.repeat(sample_ws, ntasks, axis=1)
+            ird_true_ws_n = np.repeat(ird_true_ws, ntasks, axis=1)
             #  shape (ntasks,), designer nbatch = ntasks
-            sample_probs = designer_likelihood(true_ws=sample_true_ws)
+            ird_true_probs = designer_ll(ird_true_ws_n, ird_true_feats_sum)
 
             ## =================================================
             ## ======= Computing Denominator: normal_xxx =======
-            nnorms_1 = nnorms + 1
             #  shape (nnorms_1, nfeats)
-            normal_true_ws = np.concatenate([sample_ws, normal_ws], 1).swapaxes(0, 1)
+            normal_ws_1 = np.concatenate([ird_true_ws, normal_ws], 1).swapaxes(0, 1)
             #  shape (nnorms_1, nfeats, ntasks)
-            normal_true_ws = np.repeat(
-                np.expand_dims(normal_true_ws, axis=2), ntasks, axis=2
-            )
+            normal_ws_1 = np.repeat(normal_ws_1[:, :, None], ntasks, axis=2)
             #  shape (nnorms_1, ntasks)
-            # normal_probs = v_designer_likelihood(normal_true_ws)
-            normal_probs = v_designer_likelihood(normal_true_ws)
+            # ird_normal_probs = designer_vll(ird_normal_true_ws)
+            ird_normal_probs = designer_vll(normal_ws_1, ird_normal_feats_sum)
             #  shape (nnorms_1, ntasks) -> (ntasks, )
-            normal_probs = logsumexp(normal_probs, axis=0) - np.log(nnorms_1)
+            ird_normal_probs = logsumexp(ird_normal_probs, axis=0) - np.log(nnorms_1)
 
             ## ==================================================
             ## ================= Aggregate tasks ================
-            log_prob = (sample_probs - normal_probs).sum()
+            log_prob = (ird_true_probs - ird_normal_probs).mean()
             return log_prob
 
         return _model
@@ -329,7 +373,6 @@ class IRDOptimalControl(object):
         init_params = obs[-1].weights.log()
         if num_chains > 1:
             #  shape nfeats * (nchains, 1)
-            # init_params = init_params.repeat(num_chains, axis=0).expand_dims(1)
             init_params = init_params.expand_dims(0).repeat(num_chains, axis=0)
 
         # with jax.disable_jit():
@@ -342,8 +385,8 @@ class IRDOptimalControl(object):
 
         ## ==============================================================
         ## ====================== Analyze Samples =======================
-        sample_ws = sampler.get_samples(group_by_chain=True)
         #  shape nfeats * (nchains, nsample, 1) -> (nchains, nsample)
+        sample_ws = sampler.get_samples(group_by_chain=True)
         sample_ws = DictList(sample_ws).squeeze(axis=2)
         sample_ws[self._normalized_key] = np.zeros(sample_ws.shape)
         sample_info = sampler.get_extra_fields(group_by_chain=True)

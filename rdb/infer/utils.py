@@ -49,6 +49,7 @@ def get_ird_sampler(
         kernel = SA(model, **init_args)
     else:
         raise NotImplementedError
+    # return MCMC(kernel, progress_bar=True, **sampler_args)
     return MCMC(kernel, progress_bar=True, **sampler_args)
 
 

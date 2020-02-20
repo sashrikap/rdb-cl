@@ -1,14 +1,18 @@
+CONTROLLER_ARGS:
+  engine: scipy
+  horizon: 10
+  method: lbfgs
 DESIGNER_ARGS:
   beta: 50
-  exp_name: designer_convergence_true_w_prior_tasks_sum_norm_200_beta_50_var_2
+  exp_name: designer_convergence_true_w_prior_tasks_mean_norm_200_beta_50_var_2
   num_normalizers: 200
   sample_args:
-    num_chains: 1
-    num_samples: 300
+    num_chains: 2
+    num_samples: 1000
     num_warmup: 100
   sample_init_args:
     max_val: 15.0
-    proposal_var: 2
+    proposal_var: 0.5
   sample_method: MH
   true_w: null
   use_true_w: false
@@ -20,13 +24,13 @@ EXPERIMENT_ARGS:
 EXP_ITERATIONS: 24
 FIXED_TASK_SEED: 0
 GCP_LABEL: ird_sample_1000_norm_200
-HORIZON: 10
 IRD_ARGS:
+  exp_name: ird_convergence_true_w_prior_tasks_norm_200_beta_50_var_2_laplace
   num_normalizers: 200
   sample_args:
-    num_chains: 3
-    num_samples: 2000
-    num_warmup: 200
+    num_chains: 2
+    num_samples: 1000
+    num_warmup: 100
   sample_init_args:
     max_val: 15.0
     proposal_var: 2

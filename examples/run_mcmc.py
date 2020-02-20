@@ -84,7 +84,6 @@ def main(random_key):
         env_id=ENV_NAME,
         env_fn=env_fn,
         controller_fn=controller_fn,
-        eval_server=eval_server,
         designer=designer,
         prior_fn=prior_fn,
         normalized_key=WEIGHT_PARAMS["normalized_key"],

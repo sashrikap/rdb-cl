@@ -492,7 +492,8 @@ class OptimizerJax(OptimizerMPC):
             opt_init, opt_update, get_params = jax_optimizers.adam(
                 step_size=3e-2, b1=0.9, b2=0.99, eps=1e-8
             )
-            num_steps = 100
+            num_steps = 200
+            # num_steps = 100
         else:
             raise NotImplementedError
         # Define a compiled update step

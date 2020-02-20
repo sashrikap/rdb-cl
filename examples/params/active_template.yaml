@@ -1,28 +1,37 @@
-# RANDOM_KEYS: [26]
-RANDOM_KEYS: [0, 1, 2, 3]
+RANDOM_KEYS: [21]
+# RANDOM_KEYS: [22]
+# RANDOM_KEYS: [0, 1, 2, 3]
 FIXED_TASK_SEED: 0
 
 ENV_NAME: "Week6_01-v1"
 # ENV_NAME: "Week6_01-v1"
 
 ## MPC Specific
-CONTROLLER_ARGS:
+IRD_CONTROLLER_ARGS:
   horizon: 10
-  engine: "scipy"
-  method: "lbfgs"
   # engine: "jax"
   # method: "adam"
+  engine: "scipy"
+  method: "lbfgs"
+
+DESIGNER_CONTROLLER_ARGS:
+  horizon: 10
+  # engine: "jax"
+  # method: "adam"
+  engine: "scipy"
+  method: "lbfgs"
 
 
 
-# ## Full sampling
+# # ## Full sampling
 # EXP_ARGS:
 #   num_eval_map: 32
 #   num_eval_tasks: 2000
 #   # num_eval_tasks: 40
-#   exp_iterations: 8
-#   save_name: "200218"
-#   EXP_NAME: "active_ird_exp_ird_beta_50_true_w_irdvar_3"
+#   exp_iterations: 16
+#   save_name: "200219"
+#   EXP_NAME: "active_ird_exp_ird_beta_50_true_w_irdvar_3_lbfgs"
+#   # EXP_NAME: "active_ird_exp_ird_beta_50_true_w_irdvar_3_adam200"
 #   # EXP_NAME: "active_ird_exp_ird_beta_50_prior_2"
 # ## Designer Settigns
 # DESIGNER_ARGS:
@@ -47,9 +56,12 @@ CONTROLLER_ARGS:
 #     proposal_var: 3
 #     max_val: 15.0
 #   sample_args:
-#     num_warmup: 200
-#     num_samples: 4000
-#     num_chains: 3
+#     # num_warmup: 200
+#     # num_samples: 4000
+#     # num_chains: 3
+#     num_warmup: 100
+#     num_samples: 1000
+#     num_chains: 1
 # EVAL_ARGS:
 #   parallel: True
 #   num_eval_workers: 4
@@ -58,9 +70,9 @@ CONTROLLER_ARGS:
 # ACTIVE_ARGS:
 #   num_active_tasks: 72
 #   num_active_sample: 1000
-#   # active_fns: ["infogain", "ratiomean", "ratiomin"]
+#   active_fns: ["infogain", "ratiomean", "ratiomin", "random"]
 #   # active_fns: ["infogain"]
-#   active_fns: ["ratiomean", "ratiomin", "random"]
+#   # active_fns: ["ratiomean", "ratiomin", "random"]
 #   # active_fns: ["infogain", "ratiomean", "ratiomin"]
 #   # active_fns: ["random"]
 #   # active_fns: ["infogain", "ratiomean", "ratiomin"]

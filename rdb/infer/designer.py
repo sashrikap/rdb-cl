@@ -283,13 +283,11 @@ class Designer(object):
         true_ws = self._truth.weights.prepare(feats_keys).numpy_array()
         ## ============= Pre-empt heavy optimiations =============
         #  shape (nfeats, ntasks, 1)
-        true_feats_sum = (
-            self._truth.get_features_sum(tasks).prepare(feats_keys).numpy_array()
-        )
+        true_feats_sum = self._truth.get_features_sum(tasks).prepare(feats_keys)
+        true_feats_sum = true_feats_sum.numpy_array()
         #  shape (nfeats, ntasks, nnorms)
-        normal_feats_sum = (
-            self._normalizer.get_features_sum(tasks).prepare(feats_keys).numpy_array()
-        )
+        normal_feats_sum = self._normalizer.get_features_sum(tasks).prepare(feats_keys)
+        normal_feats_sum = normal_feats_sum.numpy_array()
         #  shape (nfeats, ntasks, 1, nnorms)
         normal_feats_sum = np.expand_dims(normal_feats_sum, axis=2)
         assert true_ws.shape == (nfeats, 1)
@@ -298,25 +296,24 @@ class Designer(object):
         def _model():
             #  shape nfeats * (1,)
             new_ws = self._prior(1).prepare(feats_keys)
+            sample_ws = new_ws.numpy_array()
+            ## ======= Not jit-able optimization: requires scipy/jax optimizer ======
             sample_ps = self.create_particles(
                 new_ws,
                 controller=self._sample_controller,
                 runner=self._sample_runner,
                 jax=False,
             )
-            sample_ws = new_ws.numpy_array()
-            ## ======= Not jit-able optimization: requires scipy/jax optimizer ======
             sample_ps.compute_tasks(tasks, jax=False)
             #  shape (nfeats, ntasks, 1)
-            sample_feats_sum = (
-                sample_ps.get_features_sum(tasks).prepare(feats_keys).numpy_array()
-            )
+            sample_feats_sum = sample_ps.get_features_sum(tasks).prepare(feats_keys)
+            sample_feats_sum = sample_feats_sum.numpy_array()
             assert sample_feats_sum.shape == (nfeats, ntasks, 1)
             log_probs = self._likelihood(
                 true_ws,
+                true_feats_sum,
                 sample_ws,
                 tasks,
-                true_feats_sum,
                 sample_feats_sum,
                 normal_feats_sum,
             )
@@ -331,9 +328,9 @@ class Designer(object):
         @jax.jit
         def _likelihood(
             true_ws,
+            true_feats_sum,
             sample_ws,
             tasks,
-            true_feats_sum,
             sample_feats_sum,
             normal_feats_sum,
         ):
@@ -344,12 +341,12 @@ class Designer(object):
             Args:
                 true_ws (ndarray): designer's true w in mind
                     shape: (nfeats, nbatch)
+                true_feats_sum (ndarray): features of true ws
+                    shape: (nfeats, ntasks, nbatch)
                 tasks (ndarray): prior tasks
                     shape: (ntasks, nbatch, task_dim)
                 sample_ws (ndarray): current sampled w, batched
                     shape: (nfeats, nbatch)
-                true_feats_sum (ndarray): features of true ws
-                    shape: (nfeats, ntasks, nbatch)
                 sample_feats_sum (ndarray): sample features
                     shape: (nfeats, ntasks, nbatch)
                 normal_feats_sum (ndarray): normalizer features
@@ -399,11 +396,11 @@ class Designer(object):
             #  shape (nfeats, 1, nbatch, 1)
             normal_truth = np.expand_dims(true_ws, axis=3)
             #  shape (nfeats, ntasks, nbatch, nnorms + 1)
-            normal_feats_sum = np.concatenate(
+            normal_feats_sum_1 = np.concatenate(
                 [normal_feats_sum, np.expand_dims(true_feats_sum, axis=3)], axis=3
             )
             #  shape (nfeats, ntasks, nbatch, nnorms + 1)
-            normal_costs = normal_truth * normal_feats_sum
+            normal_costs = normal_truth * normal_feats_sum_1
             #  shape (ntasks, nbatch, nnorms + 1)
             normal_rews = (-beta * normal_costs).mean(axis=0)
             #  shape (nbatch, nnorms + 1)

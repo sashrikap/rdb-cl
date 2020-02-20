@@ -4,51 +4,55 @@ ACTIVE_ARGS:
   - ratiomean
   - ratiomin
   - random
-  num_active_sample: 10
+  num_active_sample: 1000
   num_active_tasks: 72
-CONTROLLER_ARGS:
-  engine: scipy
-  horizon: 10
-  method: lbfgs
 DESIGNER_ARGS:
   beta: 50
-  num_normalizers: 10
+  num_normalizers: 200
   num_prior_tasks: 2
   sample_args:
     num_chains: 1
-    num_samples: 40
-    num_warmup: 10
+    num_samples: 1000
+    num_warmup: 100
   sample_init_args:
     max_val: 15.0
     proposal_var: 0.5
   sample_method: MH
   true_w: null
   use_true_w: true
+DESIGNER_CONTROLLER_ARGS:
+  engine: scipy
+  horizon: 10
+  method: lbfgs
 ENV_NAME: Week6_01-v1
 EVAL_ARGS:
-  max_batch: 10
-  num_active_workers: 2
-  num_eval_workers: 2
+  max_batch: 1000
+  num_active_workers: 4
+  num_eval_workers: 4
   parallel: true
 EXP_ARGS:
-  EXP_NAME: random_ird_exp_natural_one_hybrid_ird_1000_1000
-  exp_iterations: 8
-  num_eval_map: 2
-  num_eval_tasks: 40
-  save_name: test
+  EXP_NAME: active_ird_exp_ird_beta_50_true_w_irdvar_3_lbfgs
+  exp_iterations: 16
+  num_eval_map: 32
+  num_eval_tasks: 2000
+  save_name: '200219'
 FIXED_TASK_SEED: 0
 IRD_ARGS:
-  num_normalizers: 12
+  num_normalizers: 200
   sample_args:
     num_chains: 3
-    num_samples: 30
-    num_warmup: 20
+    num_samples: 4000
+    num_warmup: 200
   sample_init_args:
     max_val: 15.0
-    proposal_var: 2
+    proposal_var: 3
   sample_method: MH
+IRD_CONTROLLER_ARGS:
+  engine: scipy
+  horizon: 10
+  method: lbfgs
 RANDOM_KEYS:
-- 5
+- 3
 TASK:
 - 0.2
 - -0.7

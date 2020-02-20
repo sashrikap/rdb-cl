@@ -46,20 +46,31 @@ def main(random_key, evaluate=False):
         env.reset()
         return env
 
-    def controller_fn(env, name=""):
+    def designer_controller_fn(env, name=""):
         controller, runner = build_mpc(
             env,
             env.main_car.cost_runtime,
             dt=env.dt,
             replan=False,
             name=name,
-            **CONTROLLER_ARGS,
+            **DESIGNER_CONTROLLER_ARGS,
+        )
+        return controller, runner
+
+    def ird_controller_fn(env, name=""):
+        controller, runner = build_mpc(
+            env,
+            env.main_car.cost_runtime,
+            dt=env.dt,
+            replan=False,
+            name=name,
+            **IRD_CONTROLLER_ARGS,
         )
         return controller, runner
 
     eval_server = ParticleServer(
         env_fn,
-        controller_fn,
+        ird_controller_fn,
         parallel=EVAL_ARGS["parallel"],
         normalized_key=WEIGHT_PARAMS["normalized_key"],
         weight_params=WEIGHT_PARAMS,
@@ -78,7 +89,7 @@ def main(random_key, evaluate=False):
 
     designer = Designer(
         env_fn=env_fn,
-        controller_fn=controller_fn,
+        controller_fn=designer_controller_fn,
         prior_fn=prior_fn,
         weight_params=WEIGHT_PARAMS,
         normalized_key=WEIGHT_PARAMS["normalized_key"],
@@ -90,7 +101,7 @@ def main(random_key, evaluate=False):
     ird_model = IRDOptimalControl(
         env_id=ENV_NAME,
         env_fn=env_fn,
-        controller_fn=controller_fn,
+        controller_fn=ird_controller_fn,
         designer=designer,
         prior_fn=prior_fn,
         normalized_key=WEIGHT_PARAMS["normalized_key"],
