@@ -13,11 +13,13 @@ Credits:
 
 import jax.numpy as np
 import numpy as onp
+import jax
 from rdb.infer.utils import random_uniform
 from jax.scipy.special import logsumexp
 from rdb.exps.utils import Profiler
 from numpyro.handlers import seed
 from rdb.optim.utils import *
+from functools import partial
 from tqdm.auto import tqdm
 from rdb.infer import *
 from jax import random
@@ -28,25 +30,60 @@ class ActiveInfoGain(object):
     """Information Gain.
 
     Args:
-        model (object): IRD Model
         weight_params (dict): parameters (e.g. histogram) for calling.
 
     """
 
-    def __init__(self, rng_key, model, beta, weight_params={}, debug=False):
+    def __init__(self, rng_key, beta, weight_params={}, debug=False):
         self._rng_key = rng_key
-        self._model = model
         self._beta = beta
         self._tasks = []
         self._debug = debug
         self._method = "InfoGain"
         self._weight_params = weight_params
         self._time = None
+        self._entropy_fn = self._build_entropy()
 
     def update_key(self, rng_key):
         self._rng_key = rng_key
 
-    def __call__(self, next_task, belief, all_obs, verbose=True):
+    def _build_entropy(self):
+        @jax.jit
+        def _fn(weights_arr, next_feats_sum, which_bins):
+            """
+            Args:
+                weights_arr (ndarray): shape (nfeats, 1)
+                next_feats_sum (ndarray): shape (nfeats, nweights)
+                which_bins (ndarray): shape (nfeats, nweights, nbins)
+
+            """
+            #  shape (nweights,)
+            new_costs = (weights_arr * next_feats_sum).mean(axis=0)
+            #  shape (nweights,)
+            new_rews = -1 * self._beta * new_costs
+            #  shape (nweights, 1)
+            ratio = np.exp(new_rews - logsumexp(new_rews))[:, None]
+            max_weights = self._weight_params["max_weights"]
+            bins = self._weight_params["bins"]
+            delta = 2 * max_weights / bins
+
+            #  shape (nfeats, nbins)
+            next_probs = (which_bins * ratio).sum(axis=1)
+            next_probs = next_probs / next_probs.sum(axis=1, keepdims=True)
+            next_densities = next_probs * (1 / delta)
+            ent = 0.0
+            for density in next_densities:
+                abs_density = np.abs(density)
+                abs_nonzero = abs_density > 0
+                # Trick by setting 0-density to 1, which passes np.log
+                abs_density += 1 - abs_nonzero
+                # (density * onp.ma.log(abs_density) * delta).sum()
+                ent += -(density * np.log(abs_density) * delta).sum()
+            return ent
+
+        return _fn
+
+    def __call__(self, next_task, belief, all_obs, feats_keys, verbose=True):
         """Information gain (negative entropy) criteria. Higher score the better.
 
         Note:
@@ -56,59 +93,40 @@ class ActiveInfoGain(object):
 
         """
         desc = f"Computing {self._method} acquisition features"
-        if self._time is None:
-            t_start = time()
         if not verbose:
             desc = None
 
-        #  shape nfeats * (nweights)
-        next_feats_sum = belief.get_features_sum(next_task, desc=desc).squeeze(0)
         ## Histogram identity
-        #  shape (nfeats - 1) * (nweights, nbins)
+        #  shape (nfeats, nweights, nbins)
         which_bins = belief.digitize(
             log_scale=False, matrix=True, **self._weight_params
+        ).numpy_array()
+        #  shape (nfeats, nweights)
+        next_feats_sum = belief.get_features_sum(next_task, desc=desc).prepare(
+            feats_keys
         )
-        #  shape (nfeats - 1) * (nbins,)
-        # curr_probs = belief.hist_probs(**self._weight_params)
-        curr_probs = which_bins.sum(axis=0).normalize()
-        max_weights = self._weight_params["max_weights"]
-        bins = self._weight_params["bins"]
-        delta = 2 * max_weights / bins
+        next_feats_sum = next_feats_sum.squeeze(0).numpy_array()
+        #  shape (nfeats, nbins,)
+        curr_probs = which_bins.sum(axis=1)
+        curr_probs = curr_probs / curr_probs.sum(axis=1, keepdims=True)
+        #  shape (nfeats, nweights, 1)
+        all_weights_arr = belief.weights.prepare(feats_keys).numpy_array()[:, :, None]
 
-        entropies = []
-        for ws_i in belief.weights:
-            #  shape (nweights,)
-
-            new_costs = DictList(ws_i, expand_dims=True) * next_feats_sum
-            new_costs = new_costs.numpy_array().mean(axis=0)
-
-            #  shape (nweights,)
-            new_rews = -1 * self._beta * new_costs
-            ratio = np.exp(new_rews - logsumexp(new_rews))
-
-            #  shape (nfeats - 1) * (nbins,)
-            next_probs = (which_bins * ratio[:, None]).sum(axis=0).normalize()
-            # next_belief = belief.resample(next_probs)
-            next_densities = next_probs * (1 / delta)
-            ent = 0.0
-            for key, density in next_densities.items():
-                ent += -(density * onp.ma.log(onp.abs(density)) * delta).sum()
-            if onp.isnan(ent):
-                ent = 1000
-                print("WARNING: Entropy has NaN entropy value")
-            entropies.append(ent)
-
-        entropies = onp.array(entropies)
-        infogain = -1 * onp.mean(entropies)
+        entropy_vfn = jax.vmap(
+            partial(
+                self._entropy_fn, next_feats_sum=next_feats_sum, which_bins=which_bins
+            ),
+            in_axes=1,
+        )
+        entropies = entropy_vfn(all_weights_arr)
+        infogain = -1 * np.mean(entropies)
+        assert not np.isnan(infogain)
 
         if self._debug:
             print(f"Active method {self._method}")
             print(
-                f"\tEntropies mean {onp.mean(entropies):.3f} std {onp.std(entropies):.3f}"
+                f"\tEntropies mean {np.mean(entropies):.3f} std {np.std(entropies):.3f}"
             )
-        if self._time is None:
-            self._time = time() - t_start
-            print(f"Active InfoGain time: {self._time:.3f}")
 
         return infogain
 
@@ -120,11 +138,11 @@ class ActiveRatioTest(ActiveInfoGain):
 
     """
 
-    def __init__(self, rng_key, model, method="mean", debug=False):
-        super().__init__(rng_key, model, beta=0.0, debug=debug)
+    def __init__(self, rng_key, method="mean", debug=False):
+        super().__init__(rng_key, beta=0.0, debug=debug)
         self._method = method
 
-    def __call__(self, next_task, belief, all_obs, verbose=True):
+    def __call__(self, next_task, belief, all_obs, feats_keys, verbose=True):
         """Disagreement criteria.  Higher score the better.
 
         Score = -1 * rew(sample_w, traj_user)/rew(sample_w, traj_sample).
@@ -142,8 +160,10 @@ class ActiveRatioTest(ActiveInfoGain):
             t_start = time()
         if not verbose:
             desc = None
-        next_feats_sum = belief.get_features_sum(next_task, desc=desc)
-        user_feats_sum = obs.get_features_sum(next_task)
+        next_feats_sum = belief.get_features_sum(next_task, desc=desc).prepare(
+            feats_keys
+        )
+        user_feats_sum = obs.get_features_sum(next_task).prepare(feats_keys)
         #  shape (nweights,)
         next_costs = (belief.weights * next_feats_sum).numpy_array().mean(axis=0)
         user_costs = (belief.weights * user_feats_sum).numpy_array().mean(axis=0)
@@ -176,14 +196,14 @@ class ActiveRandom(ActiveInfoGain):
 
     """
 
-    def __init__(self, rng_key, model, method="random", debug=False):
-        super().__init__(rng_key, model, beta=0.0, debug=debug)
+    def __init__(self, rng_key, method="random", debug=False):
+        super().__init__(rng_key, beta=0.0, debug=debug)
         self._method = method
 
     def update_key(self, rng_key):
         self._rng_key = rng_key
 
-    def __call__(self, next_task, belief, all_obs, verbose=True):
+    def __call__(self, next_task, belief, all_obs, feats_keys, verbose=True):
         """Random score
 
         """

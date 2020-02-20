@@ -21,9 +21,9 @@ DESIGNER_ARGS:
   true_w: null
   use_true_w: true
 DESIGNER_CONTROLLER_ARGS:
-  engine: scipy
+  engine: jax
   horizon: 10
-  method: lbfgs
+  method: adam
 ENV_NAME: Week6_01-v1
 EVAL_ARGS:
   max_batch: 1000
@@ -31,7 +31,7 @@ EVAL_ARGS:
   num_eval_workers: 4
   parallel: true
 EXP_ARGS:
-  EXP_NAME: active_ird_exp_ird_beta_50_true_w_irdvar_3_lbfgs
+  EXP_NAME: active_ird_exp_ird_beta_50_true_w_map_mean_irdvar_3_adam200
   exp_iterations: 16
   num_eval_map: 32
   num_eval_tasks: 2000
@@ -48,9 +48,9 @@ IRD_ARGS:
     proposal_var: 3
   sample_method: MH
 IRD_CONTROLLER_ARGS:
-  engine: scipy
+  engine: jax
   horizon: 10
-  method: lbfgs
+  method: adam
 RANDOM_KEYS:
 - 3
 TASK:

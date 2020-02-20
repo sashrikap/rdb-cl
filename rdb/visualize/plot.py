@@ -196,7 +196,7 @@ def plot_rankings(
     for val, label in zip(all_vals, all_labels):
         val = onp.array(val, dtype=float)[idxs]
         if normalize:
-            val = (val - onp.min(val)) / (onp.max(val) - onp.min(val)) + eps
+            val = (val - onp.min(val)) / (onp.max(val) - onp.min(val) + eps)
         val += n_delta * delta  # avoid overlapping
         n_delta += 1
         xs = list(range(len(val)))
@@ -209,7 +209,7 @@ def plot_rankings(
     if title is not None:
         ax.set_title(title)
     if yrange is not None:
-        ax.set_ylim(*yrange)
+        ax.set_ylim(yrange[0], yrange[1])
     if path is not None:
         plt.savefig(path)
         plt.close()

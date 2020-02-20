@@ -277,9 +277,12 @@ class ExperimentActiveIRD(object):
 
         scores = []
         desc = "Evaluaitng candidate tasks"
+        feats_keys = self._model._env.features_keys
         for next_task in tqdm(candidates, desc=desc):
             scores.append(
-                active_fn(onp.array([next_task]), belief, all_obs, verbose=False)
+                active_fn(
+                    onp.array([next_task]), belief, all_obs, feats_keys, verbose=False
+                )
             )
         scores = onp.array(scores)
 
@@ -314,7 +317,7 @@ class ExperimentActiveIRD(object):
                 "Evaluation", belief_map, eval_tasks, verbose=True
             )
             self._eval_server.compute_tasks(
-                "Evaluation", belief_map, eval_tasks, verbose=True
+                "Evaluation", target, eval_tasks, verbose=True
             )
 
             num_violate = 0.0

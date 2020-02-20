@@ -644,8 +644,6 @@ class Particles(object):
         out = {}
         ranges = (-max_weights, max_weights)
         for key in self.weights.keys():
-            if key == self._normalized_key:
-                continue
             row = self.weights[key]
             ## Fast histogram
             hist_count = histogram1d(row, bins=bins, range=ranges)
@@ -676,8 +674,6 @@ class Particles(object):
         m_bins = onp.linspace(*ranges, bins)
         nweights = len(self.weights)
         for key in self.weights.keys():
-            if key == self._normalized_key:
-                continue
             vals = self.weights[key]
             if not log_scale:
                 vals = onp.log(vals)

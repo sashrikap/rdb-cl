@@ -327,13 +327,13 @@ class IRDOptimalControl(object):
             #  shape (nnorms_1, nfeats, ntasks)
             normal_ws_1 = np.repeat(normal_ws_1[:, :, None], ntasks, axis=2)
             #  shape (nnorms_1, ntasks)
-            # ird_normal_probs = designer_vll(ird_normal_true_ws)
             ird_normal_probs = designer_vll(normal_ws_1, ird_normal_feats_sum)
             #  shape (nnorms_1, ntasks) -> (ntasks, )
             ird_normal_probs = logsumexp(ird_normal_probs, axis=0) - np.log(nnorms_1)
 
             ## ==================================================
             ## ================= Aggregate tasks ================
+            # log_prob = (ird_true_probs - ird_normal_probs).sum()
             log_prob = (ird_true_probs - ird_normal_probs).mean()
             return log_prob
 

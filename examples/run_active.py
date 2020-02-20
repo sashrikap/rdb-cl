@@ -114,18 +114,13 @@ def main(random_key, evaluate=False):
     active_fns = {
         "infogain": ActiveInfoGain(
             rng_key=None,
-            model=ird_model,
             beta=DESIGNER_ARGS["beta"],
             weight_params=WEIGHT_PARAMS,
             debug=False,
         ),
-        "ratiomean": ActiveRatioTest(
-            rng_key=None, model=ird_model, method="mean", debug=False
-        ),
-        "ratiomin": ActiveRatioTest(
-            rng_key=None, model=ird_model, method="min", debug=False
-        ),
-        "random": ActiveRandom(rng_key=None, model=ird_model),
+        "ratiomean": ActiveRatioTest(rng_key=None, method="mean", debug=False),
+        "ratiomin": ActiveRatioTest(rng_key=None, method="min", debug=False),
+        "random": ActiveRandom(rng_key=None),
     }
     for key in list(active_fns.keys()):
         if key not in ACTIVE_ARGS["active_fns"]:
