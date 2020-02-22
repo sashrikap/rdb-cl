@@ -13,6 +13,7 @@ Credits:
 
 import jax.numpy as np
 import numpy as onp
+import math
 import jax
 from rdb.infer.utils import random_uniform
 from jax.scipy.special import logsumexp
@@ -83,6 +84,25 @@ class ActiveInfoGain(object):
 
         return _fn
 
+    def _batch_compute_entropy(self, entropy_vfn, all_weights_arr, batch_size=100):
+        """If we compute entropy of all weights in one go, JAX would run out of RAM.
+
+        Args:
+            all_weights_arr (ndarray): weight array
+                shape (nfeats, nweights,)
+
+        """
+        if batch_size < 0:
+            return entropy_fvn(all_weights_arr)
+        else:
+            nbatches = math.ceil(len(all_weights_arr) / batch_size)
+            entropies = []
+            for bi in range(nbatches):
+                idx_start, idx_end = bi * batch_size, (bi + 1) * batch_size
+                next_ents = entropy_vfn(all_weights_arr[:, idx_start:idx_end])
+                entropies.append(next_ents)
+            return np.concatenate(entropies, axis=0)
+
     def __call__(self, next_task, belief, all_obs, feats_keys, verbose=True):
         """Information gain (negative entropy) criteria. Higher score the better.
 
@@ -118,7 +138,7 @@ class ActiveInfoGain(object):
             ),
             in_axes=1,
         )
-        entropies = entropy_vfn(all_weights_arr)
+        entropies = self._batch_compute_entropy(entropy_vfn, all_weights_arr)
         infogain = -1 * np.mean(entropies)
         assert not np.isnan(infogain)
 
@@ -138,8 +158,8 @@ class ActiveRatioTest(ActiveInfoGain):
 
     """
 
-    def __init__(self, rng_key, method="mean", debug=False):
-        super().__init__(rng_key, beta=0.0, debug=debug)
+    def __init__(self, rng_key, beta, method="mean", debug=False):
+        super().__init__(rng_key, beta=beta, debug=debug)
         self._method = method
 
     def __call__(self, next_task, belief, all_obs, feats_keys, verbose=True):
@@ -156,18 +176,16 @@ class ActiveRatioTest(ActiveInfoGain):
         ## Last observation
         obs = all_obs[-1]
 
-        if self._time is None:
-            t_start = time()
         if not verbose:
             desc = None
-        next_feats_sum = belief.get_features_sum(next_task, desc=desc).prepare(
-            feats_keys
-        )
+        next_feats_sum = belief.get_features_sum(next_task).prepare(feats_keys)
         user_feats_sum = obs.get_features_sum(next_task).prepare(feats_keys)
         #  shape (nweights,)
         next_costs = (belief.weights * next_feats_sum).numpy_array().mean(axis=0)
         user_costs = (belief.weights * user_feats_sum).numpy_array().mean(axis=0)
-        ratios = next_costs - user_costs
+        next_rews = -1 * next_costs
+        user_rews = -1 * user_costs
+        ratios = self._beta * (user_rews - next_rews)
 
         if self._debug:
             min_idx = np.argmin(ratios)
@@ -177,14 +195,10 @@ class ActiveRatioTest(ActiveInfoGain):
                 print(f"\t-> {key}: {val:.3f}")
             print(f"\tRatios mean {np.mean(ratios):.3f} std {np.std(ratios):.3f}")
 
-        if self._time is None:
-            self._time = time() - t_start
-            print(f"Active Ratio time: {self._time:.3f}")
-
         if self._method == "mean":
-            return np.mean(ratios)
+            return -1 * np.mean(ratios)
         elif self._method == "min":
-            return np.min(ratios)
+            return -1 * np.min(ratios)
         else:
             raise NotImplementedError
 

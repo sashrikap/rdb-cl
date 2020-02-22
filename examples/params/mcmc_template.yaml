@@ -47,6 +47,7 @@ USER_TRUE_W: False
 
 ## Full sampling
 IRD_ARGS:
+  task_method: "sum"
   num_normalizers: 200
   sample_method: "MH"
   sample_init_args:
@@ -62,11 +63,12 @@ IRD_ARGS:
     num_chains: 2
   # exp_name: "ird_convergence_random_w_random_tasks_norm_1000_beta_10_var_5"
   # exp_name: "ird_convergence_true_w_random_tasks_norm_1000_beta_10_var_5"
-  exp_name: "ird_convergence_true_w_prior_tasks_norm_200_beta_50_var_2"
-  # exp_name: "ird_convergence_true_w_prior_tasks_sum_norm_200_beta_10_var_2"
+  # exp_name: "ird_convergence_true_w_prior_tasks_norm_200_beta_50_var_2"
+  exp_name: "ird_convergence_true_w_prior_tasks_sum_norm_200_beta_50_var_2"
   # exp_name: "ird_convergence_true_w_random_tasks_sum_norm_200_beta_50_var_2"
 
 DESIGNER_ARGS:
+  task_method: "mean"
   num_normalizers: 200
   sample_method: "MH"
   sample_init_args:
@@ -81,8 +83,9 @@ DESIGNER_ARGS:
   true_w: NULL
   # exp_name: "designer_convergence_true_w_prior_tasks_norm_200_beta_50_var_2"
   exp_name: "designer_convergence_true_w_prior_tasks_mean_norm_200_beta_50_var_2"
+  # exp_name: "designer_convergence_true_w_prior_tasks_sum_norm_200_beta_50_var_2"
   # exp_name: "designer_convergence_true_w_random_tasks_mean_norm_200_beta_50_var_2"
-SAVE_NAME: "200219"
+SAVE_NAME: "200220"
 
 
 # # Test sampling

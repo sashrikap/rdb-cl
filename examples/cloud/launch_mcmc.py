@@ -74,7 +74,7 @@ if __name__ == "__main__":
     else:
         # params = {"RANDOM_KEYS": list(range(26, 36)), "NUM_EVAL_WORKERS": 8}
         params = {
-            "RANDOM_KEYS": list(range(4)),
+            "RANDOM_KEYS": list(range(2)),
             # "RANDOM_KEYS": list(range(4, 8)),
             # "RANDOM_KEYS": [20, 21, 22, 23, 24],
             "NUM_EVAL_WORKERS": 2,

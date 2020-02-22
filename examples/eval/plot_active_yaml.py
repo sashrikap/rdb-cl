@@ -1,5 +1,6 @@
 from jax import random
 import os
+import yaml
 import jax.numpy as np
 import numpy as onp
 import matplotlib.pyplot as plt
@@ -10,7 +11,8 @@ sns.set()
 
 def read_seed(path):
     # print(path)
-    data = np.load(path, allow_pickle=True)["eval_hist"].item()
+    with open(path, "r") as f:
+        data = yaml.load(f)
     return data
 
 
@@ -18,21 +20,14 @@ def cleanup(arr, max_len):
     if len(arr) == 1:
         return np.array(arr)
     else:
-        # print([len(a) for a in arr])
-        # print(f"{len(arr)} seeds")
         arrs = []
         for a in arr:
-            # if len(a) == max_len:
-            #     arrs.append(a)
             if len(a) >= max_len + PADDING:
                 arrs.append(a[PADDING : PADDING + max_len])
-                # arrs.append(a[:3])
-        # return arrs[:2]
-        # print(np.array(arrs))
-        return np.array(arrs)[:, :]
+        return np.array(arrs)
 
 
-def plot_perform(data_dir, data):
+def plot_perform(data_dir, exp_name, data):
     sns.set_palette("husl")
     colors = "gbkr"
     for i, (method, mdict) in enumerate(data.items()):
@@ -45,18 +40,34 @@ def plot_perform(data_dir, data):
     plt.xlabel("Iteration")
     plt.ylabel("Log ratio")
     plt.title("Log Relative Performance")
-    plt.savefig(os.path.join(data_dir, "performance.png"))
+    plt.savefig(os.path.join(data_dir, exp_name, "performance.png"))
     plt.show()
-    # print(data)
+
+
+def plot_log_prob(data_dir, exp_name, data):
+    sns.set_palette("husl")
+    colors = "gbkr"
+    for i, (method, mdict) in enumerate(data.items()):
+        perf = np.array(mdict["log_prob_true"])
+        sns.tsplot(
+            time=range(len(perf[0])), color=colors[i], data=perf, condition=method
+        )
+    plt.xticks(range(len(perf[0])))
+    plt.legend(loc="lower right")
+    plt.xlabel("Iteration")
+    plt.ylabel("Log P")
+    plt.title("Log Prob Of true reward")
+    plt.savefig(os.path.join(data_dir, exp_name, "logprobtrue.png"))
+    plt.show()
 
 
 def plot_data():
     seedpaths = []
     seeddata = []
     if os.path.isdir(os.path.join(exp_dir, exp_name)):
-        print("normal found")
         for file in sorted(os.listdir(os.path.join(exp_dir, exp_name))):
-            if exp_name in file:
+            if exp_name in file and "yaml" in file:
+                print(file)
                 exp_path = os.path.join(exp_dir, exp_name, file)
                 if os.path.isfile(exp_path):
                     use_bools = [str(s) in exp_path for s in use_seeds]
@@ -64,65 +75,46 @@ def plot_data():
                     if onp.any(use_bools) and not onp.any(not_bools):
                         seedpaths.append(exp_path)
 
-    if os.path.isdir(os.path.join(rand_dir, rand_name)):
-        print("random found")
-        for file in sorted(os.listdir(os.path.join(rand_dir, rand_name))):
-            if rand_name in file:
-                exp_path = os.path.join(rand_dir, rand_name, file)
-                if os.path.isfile(exp_path):
-                    use_bools = [str(s) in exp_path for s in use_seeds]
-                    not_bools = [str(s) in exp_path for s in not_seeds]
-                    if onp.any(use_bools) and not onp.any(not_bools):
-                        seedpaths.append(exp_path)
-
     for exp_path in seedpaths:
-        seeddata.append(read_seed(exp_path))
-        print(exp_path, len(seeddata[-1]))
+        exp_read = read_seed(exp_path)
+        # print(exp_path, len(exp_read))
+        seeddata.append(exp_read)
 
     data = {}
     for idx, (sd, spath) in enumerate(zip(seeddata, seedpaths)):
-        # if not all([len(h) > PADDING + MAX_LEN or len(h) > PADDING + MAX_RANDOM_LEN for h in sd.values()]):
-        #    continue
         for method, hist in sd.items():
             if method not in data.keys():
-                data[method] = {"perform": []}
+                data[method] = {"perform": [], "log_prob_true": []}
             data[method]["perform"].append([])
+            data[method]["log_prob_true"].append([])
             for h in hist:
                 data[method]["perform"][-1].append(h["perform"])
-            print(
-                f"idx {idx} seed {spath} perf {hist[0]['perform']:.3f}, {hist[1]['perform']:.3f}"
-            )
-            # import pdb; pdb.set_trace()
+                data[method]["log_prob_true"][-1].append(h["log_prob_true"])
     for method, mdict in data.items():
         if "random" in method:
             mdict["perform"] = cleanup(mdict["perform"], MAX_RANDOM_LEN)
+            mdict["log_prob_true"] = cleanup(mdict["log_prob_true"], MAX_RANDOM_LEN)
         else:
             mdict["perform"] = cleanup(mdict["perform"], MAX_LEN)
+            mdict["log_prob_true"] = cleanup(mdict["log_prob_true"], MAX_LEN)
         print(method, mdict["perform"].shape)
-        # print(method, mdict["perform"])
 
-    plot_perform(exp_dir, data)
+    plot_perform(exp_dir, exp_name, data)
+    plot_log_prob(exp_dir, exp_name, data)
 
 
 if __name__ == "__main__":
     N = -1
-    use_seeds = [4]
-    # 200128, bad for random: 0 (2, 3), 3 (2), 4 (2, 5, 8), 6 (1, 2, 4), 7 (2, 3, 4)
-    # 200128, bad for infogain: 4 (1)
-    # 200128, bad for ratiomean: 1
-    # 200128, bad for ratiomin: 4 (1)
-    not_seeds = [20, 21, 22, 23, 24]
-    MAX_LEN = 2
-    MAX_RANDOM_LEN = 6
+    use_seeds = list(range(30))
+    not_seeds = []
+    MAX_LEN = 4
+    MAX_RANDOM_LEN = 3
     PADDING = 0
 
     use_seeds = [str(random.PRNGKey(si)) for si in use_seeds]
     not_seeds = [str(random.PRNGKey(si)) for si in not_seeds]
-    # exp_dir = "data/200116"
-    # exp_name = "active_ird_exp_mid"
 
-    exp_dir = "data/200128"
-    exp_name = "active_ird_exp_natural_one_hybrid_ird_1000_1000"
-    rand_dir = "data/200128"
-    rand_name = "random_ird_exp_natural_one_hybrid_ird_1000_1000"
+    exp_dir = "data/200220"
+    exp_name = "active_ird_exp_ird_beta_50_true_w_map_sum_irdvar_3_adam200"
+    # exp_name = "active_ird_exp_ird_beta_50_true_w_map_sum_irdvar_3_week602_adam200"
     plot_data()

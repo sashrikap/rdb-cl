@@ -3,8 +3,8 @@ RANDOM_KEYS: [22]
 # RANDOM_KEYS: [0, 1, 2, 3]
 FIXED_TASK_SEED: 0
 
+# ENV_NAME: "Week6_02-v1"
 ENV_NAME: "Week6_01-v1"
-# ENV_NAME: "Week6_01-v1"
 
 ## MPC Specific
 IRD_CONTROLLER_ARGS:
@@ -23,19 +23,23 @@ DESIGNER_CONTROLLER_ARGS:
 
 
 
-# ## Full sampling
+## Full sampling
 EXP_ARGS:
   num_eval_map: 32
   num_eval_tasks: 2000
   # num_eval_tasks: 40
-  exp_iterations: 16
-  save_name: "200219"
+  exp_iterations: 24
+  save_name: "200220"
   # EXP_NAME: "active_ird_exp_ird_beta_50_true_w_irdvar_3_lbfgs"
-  EXP_NAME: "active_ird_exp_ird_beta_50_true_w_map_mean_irdvar_3_adam200"
-  # EXP_NAME: "active_ird_exp_ird_beta_50_true_w_map_sum_irdvar_3_adam200"
+  # EXP_NAME: "active_ird_exp_ird_beta_50_true_w_map_mean_irdvar_3_adam200"
+  EXP_NAME: "active_ird_exp_ird_beta_50_true_w_map_sum_irdvar_3_adam200"
+  # EXP_NAME: "active_ird_exp_ird_beta_50_true_w_map_sum_irdvar_3_week602_adam200"
+  # EXP_NAME: "test"
   # EXP_NAME: "active_ird_exp_ird_beta_50_prior_2"
 ## Designer Settigns
 DESIGNER_ARGS:
+  task_method: "mean"
+  # task_method: "sum"
   num_normalizers: 200
   sample_method: "MH"
   sample_init_args:
@@ -51,6 +55,7 @@ DESIGNER_ARGS:
   true_w: NULL
 ## IRD Settings
 IRD_ARGS:
+  task_method: "sum"
   num_normalizers: 200
   sample_method: "MH"
   sample_init_args:
@@ -80,7 +85,7 @@ ACTIVE_ARGS:
 
 
 
-## Testing
+# ## Testing
 # EXP_ARGS:
 #   num_eval_map: 2
 #   num_eval_tasks: 40
@@ -120,8 +125,8 @@ ACTIVE_ARGS:
 # ACTIVE_ARGS:
 #   num_active_tasks: 72
 #   num_active_sample: 10
-#   active_fns: ["infogain", "ratiomean", "ratiomin", "random"]
-#   # active_fns: ["infogain"]
+#   # active_fns: ["infogain", "ratiomean", "ratiomin", "random"]
+#   active_fns: ["infogain"]
 #   # active_fns: ["random"]
 #   # active_fns: ["infogain", "ratiomean", "ratiomin"]
 #   # active_fns: ["random"]

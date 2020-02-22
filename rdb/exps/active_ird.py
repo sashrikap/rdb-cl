@@ -594,9 +594,9 @@ class ExperimentActiveIRD(object):
                 other_keys,
                 path=path,
                 title=f"{fn_key}_itr_{itr}",
-                yrange=[-0.4, 2],
+                yrange=[-0.4, 4],
                 loc="upper left",
                 normalize=True,
-                delta=0.2,
+                delta=0.8,
                 annotate_rankings=True,
             )

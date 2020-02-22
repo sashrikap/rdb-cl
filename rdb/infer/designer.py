@@ -44,6 +44,7 @@ class Designer(object):
         normalized_key,
         num_normalizers,
         ## Sampling
+        task_method="sum",
         sample_method="MH",
         sample_init_args={},
         sample_args={},
@@ -85,6 +86,7 @@ class Designer(object):
         self._prior_fn = prior_fn
         self._prior = None
         self._model = None
+        self._task_method = task_method
         self._likelihood = self._build_likelihood(self._beta)
         self._likelihood_ird = self._build_likelihood(self._beta)
         self._sample_args = sample_args
@@ -325,6 +327,15 @@ class Designer(object):
     def _build_likelihood(self, beta):
         """Build likelihood kernel."""
 
+        ## Operation over tasks
+        task_method = None
+        if self._task_method == "sum":
+            task_method = partial(np.sum, axis=0)
+        elif self._task_method == "mean":
+            task_method = partial(np.mean, axis=0)
+        else:
+            raise NotImplementedError
+
         @jax.jit
         def _likelihood(
             true_ws,
@@ -387,8 +398,7 @@ class Designer(object):
             #  shape (nfeats, ntasks, nbatch) -> (ntasks, nbatch, ), average across features
             sample_rews = (-beta * sample_costs).mean(axis=0)
             #  shape (nbatch,)
-            # sample_rews = sample_rews.sum(axis=0)
-            sample_rews = sample_rews.mean(axis=0)
+            sample_rews = task_method(sample_rews)
             assert sample_rews.shape == (nbatch,)
 
             ## =================================================
@@ -404,8 +414,7 @@ class Designer(object):
             #  shape (ntasks, nbatch, nnorms + 1)
             normal_rews = (-beta * normal_costs).mean(axis=0)
             #  shape (nbatch, nnorms + 1)
-            # normal_rews = normal_rews.sum(axis=0)
-            normal_rews = normal_rews.mean(axis=0)
+            normal_rews = task_method(normal_rews)
             #  shape (nbatch,)
             normal_rews = logsumexp(normal_rews, axis=1) - np.log(nnorms + 1)
             assert normal_rews.shape == (nbatch,)

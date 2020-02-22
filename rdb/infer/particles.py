@@ -708,7 +708,8 @@ class Particles(object):
             hist_count, _ = onp.histogram([weights[key]], bins=bins, range=ranges)
             ct = onp.sum(hist_count * all_counts)
             prob_ct = float(ct) / len(row)
-            log_prob += np.log(prob_ct)
+            eps = 1e-8
+            log_prob += np.log(prob_ct + eps)
         return log_prob
 
     def map_estimate(self, num_map, method="histogram", log_scale=False):

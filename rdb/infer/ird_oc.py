@@ -77,6 +77,7 @@ class IRDOptimalControl(object):
         normalized_key,
         num_normalizers=-1,
         ## Sampling
+        task_method="sum",
         sample_method="MH",
         sample_init_args={},
         sample_args={},  # "num_warmups": xx, "num_samples": xx
@@ -111,6 +112,7 @@ class IRDOptimalControl(object):
         self._prior_fn = prior_fn
         self._prior = None
         self._model = None
+        self._task_method = task_method
         self._sampler = None
         self._sample_args = sample_args
         self._sample_method = sample_method
@@ -267,6 +269,15 @@ class IRDOptimalControl(object):
         )
         designer_vll = jax.vmap(designer_ll)
 
+        ## Operation over tasks
+        task_method = None
+        if self._task_method == "sum":
+            task_method = np.sum
+        elif self._task_method == "mean":
+            task_method = np.mean
+        else:
+            raise NotImplementedError
+
         def _model():
             #  shape (nfeats, 1)
             true_ws = self._prior(1).prepare(feats_keys)
@@ -333,8 +344,7 @@ class IRDOptimalControl(object):
 
             ## ==================================================
             ## ================= Aggregate tasks ================
-            # log_prob = (ird_true_probs - ird_normal_probs).sum()
-            log_prob = (ird_true_probs - ird_normal_probs).mean()
+            log_prob = task_method(ird_true_probs - ird_normal_probs)
             return log_prob
 
         return _model

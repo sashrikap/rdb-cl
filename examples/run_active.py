@@ -111,15 +111,15 @@ def main(random_key, evaluate=False):
         **IRD_ARGS,
     )
     ## Active acquisition function for experiment
+    BETA = DESIGNER_ARGS["beta"]
     active_fns = {
         "infogain": ActiveInfoGain(
-            rng_key=None,
-            beta=DESIGNER_ARGS["beta"],
-            weight_params=WEIGHT_PARAMS,
-            debug=False,
+            rng_key=None, beta=BETA, weight_params=WEIGHT_PARAMS, debug=False
         ),
-        "ratiomean": ActiveRatioTest(rng_key=None, method="mean", debug=False),
-        "ratiomin": ActiveRatioTest(rng_key=None, method="min", debug=False),
+        "ratiomean": ActiveRatioTest(
+            rng_key=None, beta=BETA, method="mean", debug=False
+        ),
+        "ratiomin": ActiveRatioTest(rng_key=None, beta=BETA, method="min", debug=False),
         "random": ActiveRandom(rng_key=None),
     }
     for key in list(active_fns.keys()):

@@ -25,12 +25,12 @@ EXP_ITERATIONS: 24
 FIXED_TASK_SEED: 0
 GCP_LABEL: ird_sample_1000_norm_200
 IRD_ARGS:
-  exp_name: ird_convergence_true_w_prior_tasks_norm_200_beta_50_var_2_laplace
+  exp_name: ird_convergence_true_w_prior_tasks_norm_200_beta_50_var_2
   num_normalizers: 200
   sample_args:
     num_chains: 2
-    num_samples: 1000
-    num_warmup: 100
+    num_samples: 4000
+    num_warmup: 300
   sample_init_args:
     max_val: 15.0
     proposal_var: 2
@@ -40,8 +40,8 @@ NUM_EVAL_WORKERS: 2
 NUM_PRIOR_MODE: design
 PARALLEL: true
 RANDOM_KEYS:
-- 3
-SAVE_NAME: '200216'
+- 1
+SAVE_NAME: '200219'
 USER_TRUE_W: false
 WEIGHT_PARAMS:
   bins: 200
