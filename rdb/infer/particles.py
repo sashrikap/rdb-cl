@@ -354,16 +354,21 @@ class Particles(object):
             if us0 is not None:
                 batch_us0 = us0.reshape((-1, T, udim))
             batch_weights_arr = batch_weights.prepare(feats_keys).numpy_array()
-            batch_acs, batch_costs, batch_feats, batch_feats_sum, batch_vios = collect_trajs(
-                batch_weights_arr,
-                batch_states,
-                self._controller,
-                self._runner,
-                desc=desc,
-                us0=batch_us0,
-                jax=jax,
-                max_batch=max_batch,
-            )
+            try:
+                batch_acs, batch_costs, batch_feats, batch_feats_sum, batch_vios = collect_trajs(
+                    batch_weights_arr,
+                    batch_states,
+                    self._controller,
+                    self._runner,
+                    desc=desc,
+                    us0=batch_us0,
+                    jax=jax,
+                    max_batch=max_batch,
+                )
+            except:
+                import pdb
+
+                pdb.set_trace()
             #  shape (ntasks, nweights, T, acs_dim)
             all_actions = batch_acs.reshape((ntasks, nweights, T, udim))
             #  shape (ntasks, nweights)
@@ -535,39 +540,32 @@ class Particles(object):
 
         """
         nbatch = len(self.weights)
+        #  shape (nfeats, nbatch, )
+        this_fsums = self.get_features_sum([task])[0]
+        #  shape (nvios, nbatch)
+        this_vios = self.get_violations([task])[0]
         if target is not None:
-            # shape (nfeats, nbatch, )
+            #  shape (nfeats, nbatch, )
             target_ws = target.weights.tile(nbatch, axis=0)
             target_ws = target_ws.normalize_by_key(self._normalized_key)
             assert len(target.weights) == 1, "Can only compare with 1 target weights."
-            ## Compare reward difference
-            #  shape (nfeats, nbatch, )
-            this_fsums = self.get_features_sum([task])[0]
             that_fsums = target.get_features_sum([task])[0]
-            #  shape (nfeats, nbatch, )
-            diff_costs = target_ws * (this_fsums - that_fsums)
-            #  shape (nbatch, )
-            diff_rews = -1 * diff_costs.onp_array().mean(axis=0)
-            ## Compare violation difference
-            #  shape (nvios, nbatch)
-            this_vios = self.get_violations([task])[0]
             that_vios = target.get_violations([task])[0]
+            diff_costs = target_ws * (this_fsums - that_fsums)
             diff_vios = this_vios - that_vios
-            #  shape (nbatch)
-            diff_vios = diff_vios.onp_array().mean(axis=0)
+            #  shape (nbatch,)
+            diff_rews = -1 * diff_costs.onp_array().mean(axis=0)
+            diff_vios_arr = diff_vios.onp_array().sum(axis=0)
             if verbose:
                 print(
                     f"Diff rew {len(diff_rews)} items: mean {diff_rews.mean():.3f} std {diff_rews.std():.3f} max {diff_rews.max():.3f} min {diff_rews.min():.3f}"
                 )
-            return diff_rews, diff_vios
+            return diff_rews, diff_vios_arr, diff_vios
         else:
-            this_ws = self.weights
-            this_fsums = self.get_features_sum(task)
-            this_costs = this_ws * this_fsums
-            this_rews = -1 * this_costs.onp_array().mean(axis=0)
-            this_vios = self.get_violations(task)
-            this_vios = this_vios.onp_array().mean(axis=0)
-            return this_rews, this_vios
+            this_costs = np.zeros(nbatch)
+            this_rews = np.zeros(nbatch)
+            this_vios_arr = this_vios.onp_array().sum(axis=0)
+            return this_rews, this_vios_arr, this_vios
 
     def resample(self, probs):
         """Resample from particles using list of new probs. Used for particle filter update."""
@@ -626,7 +624,7 @@ class Particles(object):
             entropy = -(1.0 / N) * onp.sum(onp.log(kernel(data)))
         elif method == "histogram":
             if hist_probs is None:
-                hist_probs = self.hist_probs()
+                hist_probs = self.hist_probs(log_scale=log_scale)
             hist_densities = hist_probs * (1 / delta)
             entropy = 0.0
             for key, density in hist_densities.items():
@@ -634,7 +632,7 @@ class Particles(object):
                 entropy += ent
         return entropy
 
-    def hist_probs(self, bins, max_weights, **kwargs):
+    def hist_probs(self, bins, max_weights, log_scale=False, **kwargs):
         """Histogram probability. How likely does each bin contain samples.
 
         Return:
@@ -646,6 +644,8 @@ class Particles(object):
         for key in self.weights.keys():
             row = self.weights[key]
             ## Fast histogram
+            if not log_scale:
+                row = np.log(row)
             hist_count = histogram1d(row, bins=bins, range=ranges)
             hist_prob = hist_count / len(row)
 
@@ -686,7 +686,7 @@ class Particles(object):
                 out[key] = mat
         return DictList(out)
 
-    def log_prob(self, weights, method="histogram"):
+    def log_prob(self, weights, method="histogram", log_scale=False):
         """Log probability of value"""
         assert (
             "bins" in self._weight_params and "max_weights" in self._weight_params
@@ -698,6 +698,10 @@ class Particles(object):
         log_prob = 0.0
         for key in weights.keys():
             row = self.weights[key]
+            val = weights[key]
+            if not log_scale:
+                row = np.log(row)
+                val = np.log(val)
             unique_vals, indices, counts = onp.unique(
                 onp.digitize(row, m_bins, right=True),
                 return_index=True,
@@ -705,7 +709,7 @@ class Particles(object):
             )
             # which_bin = onp.digitize(, m_bins, right=True)[0]
             all_counts, _ = onp.histogram(row, bins=bins, range=ranges)
-            hist_count, _ = onp.histogram([weights[key]], bins=bins, range=ranges)
+            hist_count, _ = onp.histogram([val], bins=bins, range=ranges)
             ct = onp.sum(hist_count * all_counts)
             prob_ct = float(ct) / len(row)
             eps = 1e-8
@@ -811,7 +815,7 @@ class Particles(object):
         diff_rews, diff_vios = [], []
         for task in tasks:
             # (nbatch,)
-            diff_rew, diff_vio = self.compare_with(task, target)
+            diff_rew, diff_vio, _ = self.compare_with(task, target)
             diff_rews.append(diff_rew)
             diff_vios.append(diff_vio)
         # Dims: (n_tasks, nbatch,) -> (n_tasks,)

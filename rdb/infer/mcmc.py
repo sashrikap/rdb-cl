@@ -157,6 +157,7 @@ def mh(model, proposal_var, max_val, jit=True):
 
         curr_flat, unravel_fn = ravel_pytree(curr_state)
         next_log_prob, next_flat = -np.inf, curr_flat
+        # import pdb; pdb.set_trace()
         init_val = (next_flat, next_log_prob, False, 0.0, rng_key)
 
         def _cond_fn(val):
@@ -165,6 +166,7 @@ def mh(model, proposal_var, max_val, jit=True):
             return np.logical_not(accept)
 
         def _step_mh(rng_key):
+            nonlocal curr_flat
             next_flat = mh_draws(curr_flat, mh_proposal_var, rng_key)
             next_state = unravel_fn(next_flat)
             next_log_prob, _ = log_density(model, model_args, model_kwargs, next_state)
@@ -174,9 +176,8 @@ def mh(model, proposal_var, max_val, jit=True):
             (_, _, _, n, rng_key) = val
             rng_key, rng_mh_sample, rng_mh_step = random.split(rng_key, 3)
             next_flat, next_log_prob = _step_mh(rng_mh_step)
-            accept_log_prob = (
-                next_log_prob - curr_log_prob
-            )  # Forward logit minus last logit
+            # Forward logit minus last logit
+            accept_log_prob = next_log_prob - curr_log_prob
             coin_flip_prob = np.log(
                 random.uniform(rng_mh_sample, accept_log_prob.shape)
             )
@@ -184,6 +185,8 @@ def mh(model, proposal_var, max_val, jit=True):
                 np.logical_and(next_flat < max_val, next_flat > -1 * max_val)
             )
             accept = np.logical_and(coin_flip_prob < accept_log_prob, feasible)
+            # print("curr", curr_log_prob, "next", next_log_prob, "accept", accept_log_prob, accept)
+            # import pdb; pdb.set_trace()
             return (next_flat, next_log_prob, accept, n + 1.0, rng_key)
 
         if jit:
@@ -197,6 +200,7 @@ def mh(model, proposal_var, max_val, jit=True):
             terminal_val = curr_val
         (next_flat, next_log_prob, _, n, rng_key) = terminal_val
         next_state = unravel_fn(next_flat)
+        # import pdb; pdb.set_trace()
 
         return next_state, next_log_prob, n, 1.0 / n
 

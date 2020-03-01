@@ -4,6 +4,7 @@ import pytest
 import jax.numpy as np
 import numpy as onp
 import rdb.envs.drive2d
+from time import time
 from jax.config import config
 from rdb.optim.mpc import *
 from rdb.optim.runner import Runner
@@ -22,7 +23,7 @@ weights = {
     "dist_cars": 1.1,
     "dist_lanes": 0.1,
     "dist_fences": 0.35,
-    "dist_objects": 100.25,
+    "dist_objects": 1.25,
     "speed": 0.05,
     "control": 0.1,
 }
@@ -75,26 +76,34 @@ def tune_method(nbatch, engine, method, engine_gt="scipy", method_gt="lbfgs"):
     opt_gt, runner_gt = get_mpc(engine_gt, method_gt)
     states = get_init_states(nbatch)
     ## Single
+    # t_single = time()
     costs_single = run_single(states, opt_gt, runner_gt, weights)
+    # t_single = time() - time()
     ## Batch
+    # t_batch = time()
     costs_batch = run_batch(states, opt_a, runner_a, weights)
+    # t_batch = time() - t_batch
     print(f"Nbatch {nbatch}")
     ## Only check if batch is worse than single
     abs_diff = onp.maximum(costs_batch - costs_single, 0)
     abs_ratio = abs_diff / costs_single
     max_idx = abs_ratio.argmax()
     max_ratio = abs_ratio[max_idx]
+    mean_ratio = abs_ratio.mean()
+    median_ratio = np.median(abs_ratio)
     print(
-        f"Batch {method} vs single {method_gt} diff max ratio: {max_ratio:.3f} median: {np.median(abs_ratio):.3f}"
+        f"Batch {method} x {nbatch} vs single {method_gt} diff max ratio: {max_ratio:.3f} median: {median_ratio:.3f} mean: {mean_ratio:.3f}"
     )
 
 
 if __name__ == "__main__":
     # tune_method(100, "scipy", "lbfgs")
-    # tune_method(1000, "scipy", "lbfgs")
+    # tune_method(100, "scipy", "lbfgs", "jax", "adam")
+    # tune_method(500, "scipy", "lbfgs")
+    tune_method(500, "jax", "adam")
     # tune_method(100, "scipy", "bfgs")
     # tune_method(100, "scipy", "bfgs", engine_gt="scipy", method_gt="bfgs")
     # tune_method(100, "scipy", "basinhopping")
     # tune_method(100, "jax", "adam")
-    tune_method(1000, "jax", "adam")
+    # tune_method(1000, "jax", "adam")
     # tune_method(100, "jax", "momentum")

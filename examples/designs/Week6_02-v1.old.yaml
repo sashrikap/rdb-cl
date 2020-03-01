@@ -83,19 +83,4 @@ DESIGNS:
     dist_lanes: 2.5
     dist_objects: 2.25
     speed: 5
-- TASK:
-  - -0.3
-  - -0.3
-  - -0.16
-  - -0.4
-  - 0.08
-  - 0.7
-  WEIGHTS:
-    control: 0.2
-    dist_cars: 2.0
-    dist_fences: 5.35
-    dist_lanes: 2.5
-    dist_objects: 2.25
-    speed: 5
-    speed_over: 80
 ENV_NAME: Week6_02-v1

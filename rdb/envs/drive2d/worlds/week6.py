@@ -174,10 +174,10 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
         constraints_dict = OrderedDict()
         constraints_dict["offtrack"] = constraints.build_offtrack(env=self)
         constraints_dict["overspeed"] = constraints.build_overspeed(
-            env=self, max_speed=1.0
+            env=self, max_speed=0.9
         )
         constraints_dict["underspeed"] = constraints.build_underspeed(
-            env=self, min_speed=-0.2
+            env=self, min_speed=-0.1
         )
         constraints_dict["uncomfortable"] = constraints.build_uncomfortable(
             env=self, max_actions=self._control_bound
@@ -186,6 +186,7 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
             env=self, lane_idx=2
         )
         constraints_dict["collision"] = constraints.build_collision(env=self)
+        constraints_dict["crash_objects"] = constraints.build_collision(env=self)
         constraints_fn = merge_dict_funcs(constraints_dict)
 
         return constraints_dict, constraints_fn
@@ -415,7 +416,7 @@ class Week6_02_v1(HighwayDriveWorld_Week6):
         goal_lane = 0
         horizon = 10
         dt = 0.25
-        control_bound = 1.2
+        control_bound = 0.5
         lane_width = 0.13
         num_lanes = 3
         # Car states

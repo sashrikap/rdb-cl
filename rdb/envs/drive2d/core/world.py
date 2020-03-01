@@ -89,7 +89,7 @@ class DriveWorld(gym.Env):
         # Dyanmics, features, constraints and metadata functions
         self._xdim = onp.prod(self.state.shape)
         self._dynamics_fn, self._indices = self._get_dynamics_fn()
-        self._raw_features_dict, self._features_dict, self._features_fn = (
+        self._raw_features_dict, self._raw_features_fn, self._features_dict, self._features_fn = (
             self._get_features_fn()
         )
         # Compute violations, metadata and task naturalness
@@ -162,6 +162,11 @@ class DriveWorld(gym.Env):
             obj.state = state[:, last_idx : last_idx + obj.xdim]
             last_idx += obj.xdim
         self.state = state
+
+    @property
+    def raw_features_fn(self):
+        """Nonlinear dictionary features function."""
+        return self._raw_features_fn
 
     @property
     def features_fn(self):
@@ -302,10 +307,10 @@ class DriveWorld(gym.Env):
         feats_dict = OrderedDict()
         # Car feature functions
         car_fns = [None] * len(self._cars)
+        main_idx = self._indices["main_car"]
         for c_i, car in enumerate(self._cars):
             key = f"cars{c_i}"
             car_idx = self._indices[key]
-            main_idx = self._indices["main_car"]
 
             def car_dist_fn(state, actions, car_idx=car_idx):
                 # Very important to keep third argument for variable closure
@@ -318,18 +323,17 @@ class DriveWorld(gym.Env):
         # Lane feature functions
         lane_fns = [None] * len(self._lanes)
         for l_i, lane in enumerate(self._lanes):
-            main_idx = self._indices["main_car"]
 
             def lane_dist_fn(state, actions, lane=lane):
                 main_state = state[..., np.arange(*main_idx)]
-                return feature.dist_to_lane(main_state, lane.center, lane.normal)
+                dist = feature.dist_to_lane(main_state, lane.center, lane.normal)
+                return dist
 
             lane_fns[l_i] = lane_dist_fn
 
         # Object feature functions
         obj_fns = [None] * len(self._objects)
         for o_i, obj in enumerate(self._objects):
-            main_idx = self._indices["main_car"]
             obj_idx = self._indices[f"{obj.name}_{o_i:02d}"]
 
             def obj_dist_fn(state, actions, obj_idx=obj_idx):
@@ -381,8 +385,9 @@ class DriveWorld(gym.Env):
             nlr_feats_dict[key] = jax.jit(fn)
 
         # One-input-multi-output
+        raw_feats_dict_fn = merge_dict_funcs(raw_feats_dict)
         merged_feats_dict_fn = merge_dict_funcs(nlr_feats_dict)
-        return raw_feats_dict, nlr_feats_dict, merged_feats_dict_fn
+        return raw_feats_dict, raw_feats_dict_fn, nlr_feats_dict, merged_feats_dict_fn
 
     def _get_nonlinear_features_dict(self, feats_dict):
         raise NotImplementedError

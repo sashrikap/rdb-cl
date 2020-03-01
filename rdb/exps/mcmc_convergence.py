@@ -259,7 +259,8 @@ class ExperimentMCMC(object):
 
         new_tasks = random_choice(self._get_rng_task(), all_tasks, 1)
         ## Simulate
-        for n_prior in range(len(self._all_designer_prior_tasks)):
+        # for n_prior in range(len(self._all_designer_prior_tasks)):
+        for n_prior in range(2, 6):
 
             self._log_time(f"Designer Prior {n_prior} Begin")
             print(f"Experiment mode ({self._rng_name}) {exp_mode}")
@@ -300,8 +301,10 @@ class ExperimentMCMC(object):
         save_dir = f"{self._save_root}/{exp_mode}"
         all_tasks = self._designer.env.all_tasks
 
-        for num_obs in range(1, len(self._all_ird_obs_ws)):
-            # for num_obs in range(3, 4):
+        # for num_obs in range(6, len(self._all_ird_obs_ws)):
+        # for num_obs in range(5, 6):
+        # for num_obs in range(4, 5):
+        for num_obs in range(3, 6):
 
             self._log_time(f"IRD Obs {num_obs} Begin")
             print(f"Experiment mode ({self._rng_name}): {exp_mode}")

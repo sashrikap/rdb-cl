@@ -1,0 +1,152 @@
+# RANDOM_KEYS: [4]
+# RANDOM_KEYS: [21]
+RANDOM_KEYS: [1]
+# RANDOM_KEYS: [0, 1, 2, 3]
+FIXED_TASK_SEED: 0
+
+ENV_NAME: "Week6_02-v1"
+# ENV_NAME: "Week6_01-v1"
+
+## MPC Specific
+IRD_CONTROLLER_ARGS:
+  horizon: 10
+  # engine: "jax"
+  # method: "adam"
+  engine: "scipy"
+  method: "lbfgs"
+
+DESIGNER_CONTROLLER_ARGS:
+  horizon: 10
+  # engine: "jax"
+  # method: "adam"
+  engine: "scipy"
+  method: "lbfgs"
+
+
+DESIGN: "01"
+
+## Full sampling
+EXP_ARGS:
+  num_eval_map: 32
+  num_eval_tasks: 2000
+  # num_eval_tasks: 40
+  exp_iterations: 16
+  save_name: "200228"
+  EXP_NAME: "compare_sum_beta_10_true_w_irdvar_3_602_scipy"
+  # EXP_NAME: "test"
+  # EXP_NAME: "active_ird_exp_ird_beta_50_prior_2"
+## Designer Settigns
+DESIGNER_ARGS:
+  task_method: "sum"
+  # task_method: "sum"
+  num_normalizers: 400
+  sample_method: "MH"
+  sample_init_args:
+    proposal_var: 0.2
+    max_val: 15.0
+  proposal_decay: 0.7
+  sample_args:
+    num_samples: 500
+    num_warmup: 100
+    num_chains: 1
+  beta: 10
+  use_true_w: True
+  num_prior_tasks: 2
+  true_w: NULL
+## IRD Settings
+IRD_ARGS:
+  task_method: "sum"
+  # task_method: "sum"
+  num_normalizers: 400
+  sample_method: "MH"
+  sample_init_args:
+    proposal_var: 3
+    max_val: 15.0
+  proposal_decay: 0.9
+  sample_args:
+    num_warmup: 200
+    num_samples: 8000
+    num_chains: 3
+    # num_warmup: 100
+    # num_samples: 1000
+    # num_chains: 1
+
+
+
+
+# ## Test sampling
+# EXP_ARGS:
+#   num_eval_map: 32
+#   num_eval_tasks: 100
+#   # num_eval_tasks: 40
+#   exp_iterations: 16
+#   save_name: "200228"
+#   EXP_NAME: "compare_sum_beta_50_true_w_irdvar_3_dvar_02_602_scipy"
+#   # EXP_NAME: "test"
+#   # EXP_NAME: "active_ird_exp_ird_beta_50_prior_2"
+# ## Designer Settigns
+# DESIGNER_ARGS:
+#   task_method: "sum"
+#   # task_method: "sum"
+#   num_normalizers: 200
+#   sample_method: "MH"
+#   sample_init_args:
+#     proposal_var: 0.2
+#     max_val: 15.0
+#   proposal_decay: 0.7
+#   sample_args:
+#     num_samples: 500
+#     num_warmup: 100
+#     num_chains: 1
+#   beta: 50
+#   use_true_w: True
+#   num_prior_tasks: 2
+#   true_w: NULL
+# ## IRD Settings
+# IRD_ARGS:
+#   task_method: "sum"
+#   # task_method: "sum"
+#   num_normalizers: 200
+#   sample_method: "MH"
+#   sample_init_args:
+#     proposal_var: 3
+#     max_val: 15.0
+#   proposal_decay: 0.9
+#   sample_args:
+#     num_warmup: 200
+#     num_samples: 100
+#     num_chains: 3
+#     # num_warmup: 100
+#     # num_samples: 1000
+#     # num_chains: 1
+
+
+EVAL_ARGS:
+  parallel: True
+  num_eval_workers: 4
+  num_active_workers: 0
+  max_batch: 500
+ACTIVE_ARGS:
+  num_active_tasks: 72
+  num_active_sample: 1000
+  active_fns: ["infogain", "ratiomean", "ratiomin", "random"]
+  # active_fns: ["infogain"]
+  # active_fns: ["ratiomean", "ratiomin", "random"]
+  # active_fns: ["infogain", "ratiomean", "ratiomin"]
+  # active_fns: ["random"]
+  # active_fns: ["infogain", "ratiomean", "ratiomin"]
+
+## Plotting & weight scaling
+WEIGHT_PARAMS:
+  normalized_key: "dist_cars"
+  max_weights: 15.0
+  bins: 200
+  feature_keys:
+  - "dist_cars"
+  - "dist_lanes"
+  - "dist_fences"
+  - "dist_objects"
+  - "speed"
+  - "control"
+
+TRUE_W: NULL

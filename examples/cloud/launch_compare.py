@@ -7,7 +7,7 @@ from tqdm import tqdm
 def launch(params_dict):
     locals().update(params_dict)
     print(params_dict)
-    save_params("examples/params/active_params.yaml", params_dict)
+    save_params("examples/params/compare_params.yaml", params_dict)
 
     filter_ext = (".pyc", ".log", ".git", ".mp4", ".npz", ".ipynb")
 
@@ -54,7 +54,7 @@ def launch(params_dict):
 
     # This will run locally
     launch_api.run_command(
-        command="bash /dar_payload/rdb/examples/cloud/run_active.sh",
+        command="bash /dar_payload/rdb/examples/cloud/run_compare.sh",
         # command="echo 'check out' && ls /gcp_input/200110_test_eval_all",
         # command="pwd && touch good.txt",
         # command="bash ./rdb/examples/cloud/run_pyglet.sh",
@@ -67,7 +67,7 @@ if __name__ == "__main__":
     LOCAL_MODE = False
 
     # ========== Parameters =============
-    template = load_params("examples/params/active_template.yaml")
+    template = load_params("examples/params/compare_template.yaml")
 
     if LOCAL_MODE:
         launch(template)
@@ -75,8 +75,6 @@ if __name__ == "__main__":
         # params = {"RANDOM_KEYS": list(range(26, 36)), "NUM_EVAL_WORKERS": 8}
         params = {
             "RANDOM_KEYS": list(range(6)),
-            # "RANDOM_KEYS": list(range(6)),
-            # "RANDOM_KEYS": [20, 21, 22, 23, 24],
             # "NUM_EVAL_WORKERS": 8,
         }
         # params = {"RANDOM_KEYS": [9], "NUM_EVAL_WORKERS": 8}

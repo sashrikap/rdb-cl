@@ -4,9 +4,11 @@ Note:
     * See (rdb.exps.active_ird.py) for more details.
 
 """
+
 import numpyro
 
 numpyro.set_host_device_count(3)
+
 
 from rdb.exps.active_ird import ExperimentActiveIRD
 from rdb.exps.active import ActiveInfoGain, ActiveRatioTest, ActiveRandom
@@ -23,13 +25,13 @@ import copy
 import ray
 
 
-def main(random_key, evaluate=False):
+def main(random_key, debug=False):
     SAVE_ROOT = data_dir() if not GCP_MODE else "/gcp_output"  # Don'tchange this line
     DEBUG_ROOT = data_dir() if not GCP_MODE else "/gcp_input"
 
     # Define random key
     rng_key = random.PRNGKey(random_key)
-    if evaluate:
+    if debug:
         # Load pre-saved parameters and update
         print(
             f"\n======== Evaluating exp {EXP_ARGS['save_name']} from {SAVE_ROOT}/{EXP_ARGS['save_name']}========\n"
@@ -152,30 +154,43 @@ def main(random_key, evaluate=False):
 
     """ Experiment """
     experiment.update_key(rng_key)
-    if evaluate:
-        experiment.run_evaluation(override=True)
+
+    if COMPARE:
+        experiment.run_comparison(num_tasks=7, design=DESIGN)
+    elif DEBUG:
+        experiment.run_evaluation(override=False)
     else:
-        experiment.run()
+        raise NotImplementedError
     ray.shutdown()  # Prepare for next run, which reinitialize ray with different seed
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process some integers.")
-    parser.add_argument("--GCP_MODE", action="store_true")
-    parser.add_argument("--EVALUATE", action="store_true")
+    parser.add_argument("--COMPARE", action="store_true")
+    parser.add_argument("--DEBUG", action="store_true")
+    parser.add_argument("--GCP", action="store_true")
     args = parser.parse_args()
 
-    GCP_MODE = args.GCP_MODE
-    EVALUATE = args.EVALUATE
+    COMPARE = args.COMPARE
+    GCP_MODE = args.GCP
+    DEBUG = args.DEBUG
 
-    # Load parameters
-    if not GCP_MODE:
-        PARAMS = load_params("examples/params/active_template.yaml")
+    if COMPARE:
+        if GCP_MODE:
+            PARAMS = load_params("/dar_payload/rdb/examples/params/compare_params.yaml")
+        else:
+            PARAMS = load_params("examples/params/compare_template.yaml")
+    elif DEBUG:
+        if GCP_MODE:
+            PARAMS = load_params("/dar_payload/rdb/examples/params/debug_params.yaml")
+        else:
+            PARAMS = load_params("examples/params/debug_template.yaml")
     else:
-        PARAMS = load_params("/dar_payload/rdb/examples/params/active_params.yaml")
+        raise NotImplementedError
+
     locals().update(PARAMS)
     if not GCP_MODE:
         # RANDOM_KEYS = [24]
         NUM_EVAL_WORKERS = 4
     for ki in copy.deepcopy(RANDOM_KEYS):
-        main(random_key=ki, evaluate=EVALUATE)
+        main(random_key=ki, debug=DEBUG)

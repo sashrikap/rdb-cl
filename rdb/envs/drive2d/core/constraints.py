@@ -72,7 +72,37 @@ def build_collision(env):
         # feats: (T, nbatch, ncars, 2)
         feats = vfn(states, actions)
         assert len(feats.shape) == 4
-        return np.any(np.abs(feats) < threshold, axis=(2, 3))
+        return np.any(np.all(np.abs(feats) < threshold, axis=3), axis=2)
+
+    return func
+
+
+def build_crash_objects(env):
+    """Detects when main_car crashes into obstacle.
+
+    Args:
+        actions (ndarray): (T, nbatch, udim)
+        states (ndarray): (T, nbatch, xdim)
+
+    Return:
+        * collision (ndarray): (T, nbatch) boolean
+
+    Note:
+        * Needs to know car shape a-priori
+
+    """
+    ncars = len(env.cars)
+    threshold = np.array([env.car_width, env.car_length])
+    vfn = jax.vmap(env.raw_features_dict["dist_objects"])
+
+    @jax.jit
+    def func(states, actions):
+        assert len(states.shape) == 3
+        assert len(actions.shape) == 3
+        # feats: (T, nbatch, ncars, 2)
+        feats = vfn(states, actions)
+        assert len(feats.shape) == 4
+        return np.any(np.all(np.abs(feats) < threshold, axis=3), axis=2)
 
     return func
 

@@ -16,7 +16,7 @@ env = gym.make("Week6_02-v1")
 def build_constraints():
     constraints_dict = OrderedDict()
     constraints_dict["offtrack"] = constraints.build_offtrack(env=env)
-    constraints_dict["overspeed"] = constraints.build_overspeed(env=env, max_speed=1.0)
+    constraints_dict["overspeed"] = constraints.build_overspeed(env=env, max_speed=0.0)
     constraints_dict["underspeed"] = constraints.build_underspeed(
         env=env, min_speed=-0.2
     )
@@ -33,15 +33,19 @@ def build_constraints():
 @pytest.mark.parametrize("batch", [2, 3, 4, 10])
 def test_combined_full(batch):
     cons_fn = build_constraints()
+    raw_fn = env.raw_features_fn
     dyn_fn = env.dynamics_fn
     state = env.state.repeat(batch, axis=0)
     horizon = 20
     all_states, all_acs = [], []
+    raw_out = []
     for i in range(horizon):
         ac = onp.zeros((batch, 2))
-        state = dyn_fn(state, ac)
-        all_states.append(state)
+        d_state = dyn_fn(state, ac)
+        next_state = state + d_state
+        all_states.append(next_state)
         all_acs.append(ac)
+        raw_out.append(raw_fn(next_state, ac))
     all_states = onp.array(all_states)
     all_acs = onp.array(all_acs)
     cons_out = cons_fn(all_states, all_acs)

@@ -4,9 +4,6 @@ Note:
     * See (rdb.exps.active_ird.py) for more details.
 
 """
-import numpyro
-
-numpyro.set_host_device_count(3)
 
 from rdb.exps.active_ird import ExperimentActiveIRD
 from rdb.exps.active import ActiveInfoGain, ActiveRatioTest, ActiveRandom
@@ -79,10 +76,10 @@ def main(random_key, evaluate=False):
     eval_server.register("Evaluation", EVAL_ARGS["num_eval_workers"])
     eval_server.register("Active", EVAL_ARGS["num_active_workers"])
     ## Prior sampling & likelihood functions for PGM
-    def prior_fn(name="", feature_keys=WEIGHT_PARAMS["feature_keys"]):
+    def prior_fn(name=""):
         return LogUniformPrior(
             normalized_key=WEIGHT_PARAMS["normalized_key"],
-            feature_keys=feature_keys,
+            feature_keys=WEIGHT_PARAMS["feature_keys"],
             log_max=WEIGHT_PARAMS["max_weights"],
             name=name,
         )
@@ -152,10 +149,8 @@ def main(random_key, evaluate=False):
 
     """ Experiment """
     experiment.update_key(rng_key)
-    if evaluate:
-        experiment.run_evaluation(override=True)
-    else:
-        experiment.run()
+    # experiment.run_evaluation(override=False)
+    experiment.run_inspection()
     ray.shutdown()  # Prepare for next run, which reinitialize ray with different seed
 
 
@@ -168,11 +163,7 @@ if __name__ == "__main__":
     GCP_MODE = args.GCP_MODE
     EVALUATE = args.EVALUATE
 
-    # Load parameters
-    if not GCP_MODE:
-        PARAMS = load_params("examples/params/active_template.yaml")
-    else:
-        PARAMS = load_params("/dar_payload/rdb/examples/params/active_params.yaml")
+    PARAMS = load_params("examples/params/debug_template.yaml")
     locals().update(PARAMS)
     if not GCP_MODE:
         # RANDOM_KEYS = [24]

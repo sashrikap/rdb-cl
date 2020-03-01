@@ -76,6 +76,7 @@ class IRDOptimalControl(object):
         ## Weight parameters
         normalized_key,
         num_normalizers=-1,
+        proposal_decay=1.0,
         ## Sampling
         task_method="sum",
         sample_method="MH",
@@ -101,6 +102,7 @@ class IRDOptimalControl(object):
         # Rationality
         self._designer = designer
         self._beta = designer.beta
+        self._proposal_decay = proposal_decay
 
         # Normalizer
         self._num_normalizers = num_normalizers
@@ -157,12 +159,12 @@ class IRDOptimalControl(object):
 
     def update_key(self, rng_key):
         """ Update random key """
-        self._rng_key, rng_norm = random.split(rng_key, 2)
         ## Sample normaling factor
-        self._prior = self._prior_fn("ird")
-        self._norm_prior = seed(self._prior_fn("ird_norm"), rng_norm)
+        self._norm_prior = self._prior_fn("ird_norm")
+        self._rng_key, rng_norm = random.split(rng_key, 2)
+        sample_prior = seed(self._norm_prior, rng_norm)
         self._normalizer = self.create_particles(
-            self._norm_prior(self._num_normalizers),
+            sample_prior(self._num_normalizers),
             save_name="ird_normalizer",
             runner=self._normal_runner,
             controller=self._normal_controller,
@@ -227,13 +229,12 @@ class IRDOptimalControl(object):
         # #  shape (ntasks, dnnorms, T, udim)
         # obs_actions_dnorm = np.repeat(obs_actions, dnnorms, axis=0)
 
-        #  shape (nfeats, nnorms)
         normal_ws = self._normalizer.weights
         normal_ws = normal_ws.prepare(feats_keys).numpy_array()
 
         ## =================== Prepare IRD Normalizer ==================
         # self._normalizer.compute_tasks(tasks, us0=obs_actions_norm)
-        self._normalizer.compute_tasks(tasks)
+        self._normalizer.compute_tasks(tasks, max_batch=50)
         #  shape (nfeats, ntasks, nnorms)
         ird_normal_fsum = self._normalizer.get_features_sum(tasks)
         ird_normal_fsum = ird_normal_fsum.prepare(feats_keys).numpy_array()
@@ -244,7 +245,7 @@ class IRDOptimalControl(object):
 
         ## ================= Prepare Designer Normalizer ================
         # self._designer._normalizer.compute_tasks(tasks, us0=obs_actions_dnorm)
-        self._designer._normalizer.compute_tasks(tasks)
+        self._designer._normalizer.compute_tasks(tasks, max_batch=50)
         #  shape (nfeats, ntasks, d_nnorms)
         designer_normal_fsum = self._designer.normalizer.get_features_sum(tasks)
         designer_normal_fsum = designer_normal_fsum.prepare(feats_keys).numpy_array()
@@ -261,7 +262,7 @@ class IRDOptimalControl(object):
         ## Designer kernels
         designer_ll = partial(
             self._designer.likelihood_ird,
-            # true_feats_sum=obs_feats_sum,
+            true_feats_sum=obs_feats_sum,
             sample_ws=obs_ws,
             tasks=obs_tasks,
             sample_feats_sum=obs_feats_sum,
@@ -304,6 +305,11 @@ class IRDOptimalControl(object):
             log_prob = _likelihood(true_ws, true_feats_sum, ird_normal_fsum_1)
             numpyro.factor("ird_log_probs", log_prob)
 
+        #  shape (nnorms, nfeats, ntasks)
+        normal_ws_v = np.repeat(normal_ws.swapaxes(0, 1)[:, :, None], ntasks, axis=2)
+        #  shape (nnorms, ntasks)
+        ird_normal_probs = designer_vll(normal_ws_v)
+
         @jax.jit
         def _likelihood(ird_true_ws, ird_true_feats_sum, ird_normal_feats_sum):
             """
@@ -329,24 +335,80 @@ class IRDOptimalControl(object):
             #  shape (nfeats, ntasks)
             ird_true_ws_n = np.repeat(ird_true_ws, ntasks, axis=1)
             #  shape (ntasks,), designer nbatch = ntasks
-            ird_true_probs = designer_ll(ird_true_ws_n, ird_true_feats_sum)
+            # ird_true_probs = designer_ll(ird_true_ws_n, ird_true_feats_sum)
+            ird_true_probs = designer_ll(ird_true_ws_n)
+            assert ird_true_probs.shape == (ntasks,)
+
+            # ## =================================================
+            # ## ======= Computing Denominator: normal_xxx =======
+            # #  shape (nnorms_1, nfeats)
+            # normal_ws_1 = np.concatenate([ird_true_ws, normal_ws], 1).swapaxes(0, 1)
+            # #  shape (nnorms_1, nfeats, ntasks)
+            # normal_ws_1 = np.repeat(normal_ws_1[:, :, None], ntasks, axis=2)
+            # #  shape (nnorms_1, ntasks)
+            # # ird_normal_probs = designer_vll(normal_ws_1, ird_normal_feats_sum)
+            # ird_normal_probs = designer_vll(normal_ws_1)
 
             ## =================================================
             ## ======= Computing Denominator: normal_xxx =======
-            #  shape (nnorms_1, nfeats)
-            normal_ws_1 = np.concatenate([ird_true_ws, normal_ws], 1).swapaxes(0, 1)
-            #  shape (nnorms_1, nfeats, ntasks)
-            normal_ws_1 = np.repeat(normal_ws_1[:, :, None], ntasks, axis=2)
+            #  shape (1, nfeats, ntasks)
+            ird_true_ws_v = np.repeat(
+                ird_true_ws.swapaxes(0, 1)[:, :, None], ntasks, axis=2
+            )
+            #  shape (1, ntasks)
+            ird_true_probs = designer_vll(ird_true_ws_v)
+            assert ird_true_probs.shape == (1, ntasks)
             #  shape (nnorms_1, ntasks)
-            ird_normal_probs = designer_vll(normal_ws_1, ird_normal_feats_sum)
+            ird_normal_probs_ = np.concatenate(
+                [ird_true_probs, ird_normal_probs], axis=0
+            )
+
             #  shape (nnorms_1, ntasks) -> (ntasks, )
-            ird_normal_probs = logsumexp(ird_normal_probs, axis=0) - np.log(nnorms_1)
+            ird_normal_probs_ = logsumexp(ird_normal_probs_, axis=0) - np.log(nnorms_1)
+            assert ird_normal_probs_.shape == (ntasks,)
 
             ## ==================================================
             ## ================= Aggregate tasks ================
-            log_prob = task_method(ird_true_probs - ird_normal_probs)
+            log_prob = task_method(ird_true_probs - ird_normal_probs_)
             return log_prob
 
+        # import pdb; pdb.set_trace()
+        # # d_true_ps = self.create_particles(
+        # #     self._designer.truth.weights, controller=self._sample_controller, runner=self._sample_runner
+        # # )
+        # # d_true_ps.compute_tasks(tasks, us0=obs_actions, jax=False)
+        # # #  shape (nfeats, ntasks, 1)
+        # # true_feats_sum = d_true_ps.get_features_sum(tasks).prepare(feats_keys)
+        # # true_feats_sum = true_feats_sum.numpy_array()
+        # # #  shape (nfeats, 1, ntasks)
+        # # true_feats_sum = true_feats_sum.swapaxes(1, 2)
+
+        # true_feats_sum = obs_feats_sum
+        # ird_normal_fsum_1 = np.concatenate([true_feats_sum[None, :], ird_normal_fsum], axis=0)
+        # d_joint_ws = DictList(OrderedDict([('control', 2), ('dist_fences', 5.35), ('dist_lanes', 2.5), ('dist_objects', 4.25), ('speed', 5), ('speed_over', 80), ('dist_cars', 2.0)]), expand_dims=True).normalize_by_key("dist_cars")
+        # #d_true_ws = self._designer.truth.weights.prepare(feats_keys).numpy_array()
+        # d_joint_ws = d_joint_ws.prepare(feats_keys).numpy_array()
+        # log_prob_joint = _likelihood(d_joint_ws, true_feats_sum, ird_normal_fsum_1)
+
+        # b_map_ws = DictList(OrderedDict([('control', 2.0773953897444115), ('dist_fences', 161.915494922572), ('dist_lanes', 7.173069941020064), ('dist_objects', 16.272937241410762), ('speed', 0.10904018090865127), ('speed_over', 129.47986491349732), ('dist_cars', 1.0)]), expand_dims=True).normalize_by_key("dist_cars")
+        # b_map_ws = b_map_ws.prepare(feats_keys).numpy_array()
+        # log_prob_map = _likelihood(b_map_ws, true_feats_sum, ird_normal_fsum_1)
+
+        # b_map_ps = self.create_particles(b_map_ws, controller=self._sample_controller, runner=self._sample_runner)
+        # b_map_ps.compute_tasks(tasks, us0=obs_actions, jax=False)
+        # #  shape (nfeats, ntasks, 1)
+        # b_map_feats_sum = b_map_ps.get_features_sum(tasks).prepare(feats_keys)
+        # b_map_feats_sum = b_map_feats_sum.numpy_array()
+        # #  shape (nfeats, 1, ntasks)
+        # b_map_feats_sum = b_map_feats_sum.swapaxes(1, 2)
+
+        # b_map_ws = b_map_ws.prepare(feats_keys).numpy_array()
+        # idx=0
+        # _likelihood(b_map_ws, true_feats_sum, ird_normal_fsum_1)
+        # b_map_ws = DictList({'control': array([0.0965125]), 'dist_cars': array([1.]), 'dist_fences': array([295.96623983]), 'dist_lanes': array([0.10440017]), 'dist_objects': array([0.3627585]), 'speed': array([0.36979608]), 'speed_over': array([11.51023696])})
+        # b_map_ws = b_map_ws.prepare(feats_keys).numpy_array()
+        # idx=0
+        # _likelihood(b_map_ws, true_feats_sum, ird_normal_fsum_1)
         return _model
 
     def sample(self, tasks, obs, save_name, verbose=True):
@@ -363,30 +425,47 @@ class IRDOptimalControl(object):
                 `hybrid`: use random samples mixed with max trajectory
 
         """
+        feats_keys = self._env.features_keys
         tasks = onp.array(tasks)
         ntasks = len(tasks)
         assert len(tasks) > 0, "Need >=1 tasks"
         assert len(tasks) == len(obs), "Tasks and observations mismatch"
         assert self._normalizer is not None
 
-        print(f"Sampling IRD (obs={len(obs)}): {save_name}")
+        ## ==============================================================
+        ## =================== Prepare for Sampling =====================
+        #  shape nfeats * (ntasks,)
+        observe_ws = DictList(
+            [ob.weights.prepare(feats_keys) for ob in obs], jax=True
+        ).squeeze(1)
+        self._update_normalizer(obs)
 
         ## ==============================================================
-        ## ======================= MCMC Sampling ========================
-        #  shape nfeats * (ntasks,)
-        observe_ws = DictList([ob.weights for ob in obs], jax=True).squeeze(1)
-        ird_model = self._build_model(observe_ws, tasks)
-        sampler = get_ird_sampler(
-            self._sample_method, ird_model, self._sample_init_args, self._sample_args
-        )
+        ## ====================== MCMC Sampling =========================
+        init_args = copy.deepcopy(self._sample_init_args)
+        samp_args = copy.deepcopy(self._sample_args)
+        decay = self._proposal_decay ** (ntasks - 1)
+        init_args["proposal_var"] = init_args["proposal_var"] * decay
         num_chains = self._sample_args["num_chains"]
         init_params = obs[-1].weights.log()
         if num_chains > 1:
             #  shape nfeats * (nchains, 1)
             init_params = init_params.expand_dims(0).repeat(num_chains, axis=0)
+        del init_params[self._normalized_key]
 
-        # with jax.disable_jit():
+        ## ================= Build Prior Function with necessary keys ================
+        self._prior = self._prior_fn("ird")
+        for ob in obs:
+            for key in ob.weights.keys():
+                self._prior.add_feature(key)
+
+        ird_model = self._build_model(observe_ws, tasks)
+        sampler = get_ird_sampler(self._sample_method, ird_model, init_args, samp_args)
+        # sampler = get_designer_sampler(self._sample_method, ird_model, init_args, samp_args)
+
         self._rng_key, rng_sampler = random.split(self._rng_key, 2)
+        print(f"Sampling IRD (obs={len(obs)}): {save_name}, chains={num_chains}")
+        t1 = time()
         sampler.run(
             rng_sampler,
             init_params=dict(init_params),
@@ -397,7 +476,12 @@ class IRDOptimalControl(object):
         ## ====================== Analyze Samples =======================
         #  shape nfeats * (nchains, nsample, 1) -> (nchains, nsample)
         sample_ws = sampler.get_samples(group_by_chain=True)
-        sample_ws = DictList(sample_ws).squeeze(axis=2)
+        sample_ws = DictList(sample_ws, jax=True).squeeze(axis=2)
+        print(f"Sample time {time() - t1}")
+        import pdb
+
+        pdb.set_trace()
+        assert self._normalized_key not in sample_ws.keys()
         sample_ws[self._normalized_key] = np.zeros(sample_ws.shape)
         sample_info = sampler.get_extra_fields(group_by_chain=True)
         sample_rates = sample_info["mean_accept_prob"][:, -1]
@@ -418,8 +502,33 @@ class IRDOptimalControl(object):
         samples.visualize(true_w=self.designer.true_w, obs_w=observe_ws[-1])
         return samples
 
+    def _update_normalizer(self, obs):
+        """
+        If user add feature during designing, update normalizer with new feature keys.
+        """
+        rebuild_normalizer = False
+        all_keys = []
+        for ob in obs:
+            for key in ob.weights.keys():
+                all_keys.append(key)
+                if key not in self._norm_prior.feature_keys:
+                    rebuild_normalizer = True
+                    self._norm_prior.add_feature(key)
+        all_keys = set(all_keys)
+        self._norm_prior = self._prior_fn(name="ird_norm", feature_keys=all_keys)
+        if rebuild_normalizer:
+            self._rng_key, rng_norm = random.split(self._rng_key)
+            sample_prior = seed(self._norm_prior, rng_norm)
+            self._normalizer = self.create_particles(
+                sample_prior(self._num_normalizers),
+                save_name="ird_normalizer",
+                runner=self._normal_runner,
+                controller=self._normal_controller,
+            )
+
     def create_particles(self, weights, runner, controller, save_name=""):
-        weights = DictList(weights)
+        if weights is not None:
+            weights = DictList(weights)
         self._rng_key, rng_particle = random.split(self._rng_key, 2)
         return Particles(
             rng_name=self._rng_name,

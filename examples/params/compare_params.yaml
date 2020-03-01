@@ -4,11 +4,12 @@ ACTIVE_ARGS:
   - ratiomean
   - ratiomin
   - random
-  num_active_sample: 500
-  num_active_tasks: 144
+  num_active_sample: 1000
+  num_active_tasks: 72
+DESIGN: '01'
 DESIGNER_ARGS:
-  beta: 1
-  num_normalizers: 200
+  beta: 10
+  num_normalizers: 400
   num_prior_tasks: 2
   proposal_decay: 0.7
   sample_args:
@@ -26,25 +27,25 @@ DESIGNER_CONTROLLER_ARGS:
   engine: scipy
   horizon: 10
   method: lbfgs
-ENV_NAME: Week6_01-v1
+ENV_NAME: Week6_02-v1
 EVAL_ARGS:
   max_batch: 500
-  num_active_workers: 2
-  num_eval_workers: 2
+  num_active_workers: 0
+  num_eval_workers: 4
   parallel: true
 EXP_ARGS:
-  EXP_NAME: active_ird_sum_beta_1_true_w_irdvar_3_601_scipy
-  exp_iterations: 8
+  EXP_NAME: compare_sum_beta_10_true_w_irdvar_3_602_scipy
+  exp_iterations: 16
   num_eval_map: 32
   num_eval_tasks: 2000
   save_name: '200228'
 FIXED_TASK_SEED: 0
 IRD_ARGS:
-  num_normalizers: 200
+  num_normalizers: 400
   proposal_decay: 0.9
   sample_args:
     num_chains: 3
-    num_samples: 4000
+    num_samples: 8000
     num_warmup: 200
   sample_init_args:
     max_val: 15.0
@@ -57,19 +58,7 @@ IRD_CONTROLLER_ARGS:
   method: lbfgs
 RANDOM_KEYS:
 - 5
-TASK:
-- 0.2
-- -0.7
-- 0.0
-- 0.4
-TRUE_W:
-  control: 2
-  dist_cars: 2.0
-  dist_fences: 5.35
-  dist_lanes: 2.5
-  dist_objects: 4.25
-  speed: 5
-  speed_over: 80
+TRUE_W: null
 WEIGHT_PARAMS:
   bins: 200
   feature_keys:

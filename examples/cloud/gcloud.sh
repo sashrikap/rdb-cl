@@ -15,5 +15,5 @@ gsutil ls -lh "gs://active-ird-experiments/rss-logs/" | sort -k 3
 
 
 ## Retrieve files
-filedir="200220"
+filedir="200228"
 gsutil -o 'GSUtil:parallel_process_count=1' -o 'GSUtil:parallel_thread_count=16' -m cp -r "gs://active-ird-experiments/rss-logs/logs/output/$filedir/*" "data/$filedir/"

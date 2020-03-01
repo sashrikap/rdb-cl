@@ -71,7 +71,7 @@ def plot_weights(
         for j, (d, c, label) in enumerate(
             zip(highlight_dicts, highlight_colors, highlight_labels)
         ):
-            if d is None:
+            if d is None or key not in d:
                 continue
             val = d[key]
             # if not log_scale:
@@ -85,7 +85,7 @@ def plot_weights(
         fig.suptitle(title)
     if path is not None:
         plt.savefig(path)
-        plt.close()
+        plt.close("all")
     else:
         plt.show()
 
@@ -150,7 +150,7 @@ def plot_weights_comparison(
         fig.suptitle(title)
     if path is not None:
         plt.savefig(path)
-        plt.close()
+        plt.close("all")
     else:
         plt.show()
 
@@ -212,7 +212,58 @@ def plot_rankings(
         ax.set_ylim(yrange[0], yrange[1])
     if path is not None:
         plt.savefig(path)
-        plt.close()
+        plt.close("all")
+    else:
+        plt.show()
+
+
+def plot_ranking_corrs(
+    values,
+    labels,
+    path=None,
+    title=None,
+    yrange=None,
+    delta=0.01,
+    annotate_identites=True,
+    figsize=(10, 10),
+):
+    """Plot cross correlations between pairs of values.
+
+    Args:
+        values (list): main value to be plotted
+        labels (list):
+        path (str): save path
+        title (str)
+        delta (float): avoid overlapping
+
+    """
+    assert len(values) == 2
+    vals_i, vals_j = values[0], values[1]
+    label_i, label_j = labels[0], labels[1]
+    # normalize:
+    eps = 1e-9
+    diff_i = onp.max(vals_i) - onp.min(vals_i) + eps
+    diff_j = onp.max(vals_j) - onp.min(vals_j) + eps
+    vals_i = (vals_i - onp.min(vals_i)) / diff_i
+    vals_j = (vals_j - onp.min(vals_j)) / diff_j
+
+    _, ax = plt.subplots(figsize=figsize)
+    ax.plot(vals_i, vals_j, "^")
+    if annotate_identites:
+        for idx, (vi, vj) in enumerate(zip(vals_i, vals_j)):
+            ax.text(vi + delta, vj, idx, size=12)
+    ax.plot([0.0, 1.0], [0.0, 1.0], "k--", linewidth=1)
+    ax.set_xlabel(label_i)
+    ax.set_ylabel(label_j)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    if title is not None:
+        ax.set_title(title)
+    if yrange is not None:
+        ax.set_ylim(yrange[0], yrange[1])
+    if path is not None:
+        plt.savefig(path)
+        plt.close("all")
     else:
         plt.show()
 

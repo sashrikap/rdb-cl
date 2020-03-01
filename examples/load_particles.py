@@ -41,7 +41,7 @@ def load_file(rng_name, save_dir, save_name):
 
 
 if __name__ == "__main__":
-    save_dir = "data/200219/active_ird_exp_ird_beta_50_true_w_irdvar_3_adam200/save"
-    save_name = "ird_belief_method_infogain_itr_03"
-    rng_name = "[0 2]"
+    save_dir = "data/200228/compare_sum_beta_1_true_w_irdvar_3_602_scipy/save"
+    save_name = "ird_belief_joint_tasks_07"
+    rng_name = "[0 1]"
     load_file(rng_name, save_dir, save_name)

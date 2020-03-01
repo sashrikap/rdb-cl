@@ -25,12 +25,25 @@ def test_weights():
     )
 
 
-def test_weight_comparisons():
+def ttest_weight_comparisons():
     all_weights = [get_weights(), get_weights(), get_weights()]
     plot_weights_comparison(
         all_weights_dicts=all_weights,
         all_weights_colors=["b", "g", "r"],
+        all_labels=["a", "b", "c"],
         path="data/test/test_plot_compare.png",
         log_scale=False,
         title="Test plot",
+    )
+
+
+def test_weight_correlations():
+    N = 10
+    all_scores = [np.random.random(N), np.random.random(N)]
+    all_labels = ["Abc", "Def"]
+    plot_ranking_corrs(
+        all_scores,
+        all_labels,
+        path="data/test/test_plot_correlation.png",
+        title="Abc vs Def",
     )

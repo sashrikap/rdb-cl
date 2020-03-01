@@ -16,7 +16,7 @@ NUM_PRIOR_MODE: "design"
 
 
 EXP_ITERATIONS: 24
-ENV_NAME: "Week6_01-v1"
+ENV_NAME: "Week6_02-v1"
 ## MPC Specific
 CONTROLLER_ARGS:
   horizon: 10
@@ -51,41 +51,45 @@ IRD_ARGS:
   num_normalizers: 200
   sample_method: "MH"
   sample_init_args:
-    proposal_var: 2
+    proposal_var: 3
     max_val: 15.0
+  proposal_decay: 0.9
   # sample_method: "HMC"
   # sample_method: "NUTS"
   # sample_init_args:
   #   step_size: 0.2
   sample_args:
-    num_warmup: 300
+    num_warmup: 200
     num_samples: 4000
-    num_chains: 2
+    num_chains: 3
   # exp_name: "ird_convergence_random_w_random_tasks_norm_1000_beta_10_var_5"
-  # exp_name: "ird_convergence_true_w_random_tasks_norm_1000_beta_10_var_5"
-  # exp_name: "ird_convergence_true_w_prior_tasks_norm_200_beta_50_var_2"
-  exp_name: "ird_convergence_true_w_prior_tasks_sum_norm_200_beta_50_var_2"
+  exp_name: "ird_convergence_true_w_random_tasks_norm_200_beta_5_var_3_week602"
+  # exp_name: "ird_convergence_true_w_prior_tasks_norm_200_beta_50_var_3"
+  # exp_name: "ird_convergence_true_w_prior_tasks_sum_norm_200_beta_50_var_2"
   # exp_name: "ird_convergence_true_w_random_tasks_sum_norm_200_beta_50_var_2"
 
 DESIGNER_ARGS:
-  task_method: "mean"
+  task_method: "sum"
   num_normalizers: 200
   sample_method: "MH"
   sample_init_args:
-    proposal_var: 0.5
+    proposal_var: 0.2  # week6_02
+    # proposal_var: 0.5  # week6_01
     max_val: 15.0
+  proposal_decay: 0.7
   sample_args:
-    num_samples: 1000
+    num_samples: 500
     num_warmup: 100
-    num_chains: 2
-  beta: 50
+    num_chains: 1
+  beta: 5
+  num_prior_tasks: 2
   use_true_w: False
   true_w: NULL
   # exp_name: "designer_convergence_true_w_prior_tasks_norm_200_beta_50_var_2"
-  exp_name: "designer_convergence_true_w_prior_tasks_mean_norm_200_beta_50_var_2"
+  # exp_name: "designer_convergence_true_w_prior_tasks_mean_norm_200_beta_50_var_2"
   # exp_name: "designer_convergence_true_w_prior_tasks_sum_norm_200_beta_50_var_2"
-  # exp_name: "designer_convergence_true_w_random_tasks_mean_norm_200_beta_50_var_2"
-SAVE_NAME: "200220"
+  exp_name: "designer_convergence_true_w_random_tasks_sum_norm_200_beta_50_var_0.2_week602"
+SAVE_NAME: "200224"
 
 
 # # Test sampling

@@ -64,6 +64,7 @@ state = copy.deepcopy(env.state)
 t1 = time()
 actions = optimizer(state, weights=weights, batch=False)
 traj, cost, info = runner(state, actions, weights=weights, batch=False)
+print(f"Engine {ENGINE}, method {METHOD}")
 if BENCHMARK > 0:
     t_compile = time() - t1
     print(f"Compile time {t_compile:.3f}")

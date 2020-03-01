@@ -43,6 +43,7 @@ class Designer(object):
         ## Weight parameters
         normalized_key,
         num_normalizers,
+        proposal_decay=1.0,
         ## Sampling
         task_method="sum",
         sample_method="MH",
@@ -81,6 +82,7 @@ class Designer(object):
         self._num_normalizers = num_normalizers
         self._normalizer = None
         self._norm_prior = None
+        self._proposal_decay = proposal_decay
 
         # Sampling Prior and kernel
         self._prior_fn = prior_fn
@@ -162,12 +164,15 @@ class Designer(object):
     def true_w(self, w):
         print("Designer truth updated")
         self._true_w = w
-        self._truth = self.create_particles(
-            weights=DictList([w], jax=False),
-            controller=self._true_controller,
-            runner=self._true_runner,
-            save_name="designer_truth",
-        )
+        if w is not None:
+            self._truth = self.create_particles(
+                weights=DictList([w], jax=False),
+                controller=self._true_controller,
+                runner=self._true_runner,
+                save_name="designer_truth",
+            )
+        else:
+            self._truth = None
 
     @property
     def truth(self):
@@ -228,14 +233,22 @@ class Designer(object):
 
             ## ==============================================================
             ## ======================= MCMC Sampling ========================
-            model = self._build_model(tasks)
-            sampler = get_designer_sampler(
-                self._sample_method, model, self._sample_init_args, self._sample_args
-            )
+            init_args = copy.deepcopy(self._sample_init_args)
+            samp_args = copy.deepcopy(self._sample_args)
+            ntasks = len(tasks)
+            decay = self._proposal_decay ** (ntasks - 1)
+            init_args["proposal_var"] = init_args["proposal_var"] * decay
             num_chains = self._sample_args["num_chains"]
             init_params = self._truth.weights.log()
             if num_chains > 1:
+                #  shape nfeats * (nchains, 1)
                 init_params = init_params.expand_dims(0).repeat(num_chains, axis=0)
+            del init_params[self._normalized_key]
+
+            model = self._build_model(tasks)
+            sampler = get_designer_sampler(
+                self._sample_method, model, init_args, samp_args
+            )
 
             self._rng_key, rng_sampler = random.split(self._rng_key, 2)
             sampler.run(
@@ -249,6 +262,7 @@ class Designer(object):
             sample_ws = sampler.get_samples(group_by_chain=True)
             #  shape nfeats * (nchains, nsample, 1) -> nfeats * (nchains, nsample)
             sample_ws = DictList(sample_ws).squeeze(axis=2)
+            assert self._normalized_key not in sample_ws.keys()
             sample_ws[self._normalized_key] = np.zeros(sample_ws.shape)
             sample_info = sampler.get_extra_fields(group_by_chain=True)
             sample_rates = sample_info["mean_accept_prob"][:, -1]
@@ -268,7 +282,8 @@ class Designer(object):
                 save_name=save_name,
             )
             particles.visualize(true_w=self.true_w, obs_w=None)
-            return particles.subsample(1)
+            # return particles.subsample(1)
+            return particles.map_estimate(1)
 
     def _build_model(self, tasks):
         """Build Designer PGM model."""

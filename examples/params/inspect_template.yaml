@@ -1,10 +1,10 @@
 # RANDOM_KEYS: [21]
-RANDOM_KEYS: [22]
+RANDOM_KEYS: [1]
 # RANDOM_KEYS: [0, 1, 2, 3]
 FIXED_TASK_SEED: 0
 
-# ENV_NAME: "Week6_02-v1"
-ENV_NAME: "Week6_01-v1"
+ENV_NAME: "Week6_02-v1"
+# ENV_NAME: "Week6_01-v1"
 
 ## MPC Specific
 IRD_CONTROLLER_ARGS:
@@ -28,16 +28,15 @@ EXP_ARGS:
   num_eval_map: 32
   num_eval_tasks: 2000
   # num_eval_tasks: 40
-  exp_iterations: 8
-  save_name: "200228"
+  exp_iterations: 16
+  save_name: "200224"
   # EXP_NAME: "active_ird_beta_50_true_w_irdvar_3_lbfgs"
   # EXP_NAME: "active_ird_beta_50_true_w_map_mean_irdvar_3_adam200"
   # EXP_NAME: "active_ird_beta_50_true_w_map_sum_irdvar_3_adam200"
   # EXP_NAME: "active_ird_beta_50_true_w_map_sum_irdvar_3_week602_adam200"
   # EXP_NAME: "active_ird_sum_beta_50_dprior_3_irdvar_3_dvar_0.2_week602_scipy"
   # EXP_NAME: "active_ird_sum_beta_50_dprior_2_irdvar_3_dvar_02_602_scipy"
-  # EXP_NAME: "active_ird_sum_beta_1_true_w_irdvar_3_dvar_02_602_scipy"
-  EXP_NAME: "active_ird_sum_beta_1_true_w_irdvar_3_601_scipy"
+  EXP_NAME: "active_ird_sum_beta_1_true_w_irdvar_3_dvar_02_602_scipy"
   # EXP_NAME: "test"
   # EXP_NAME: "active_ird_beta_50_prior_2"
 ## Designer Settigns
@@ -72,7 +71,7 @@ IRD_ARGS:
   sample_args:
     num_warmup: 200
     num_samples: 4000
-    num_chains: 3
+    num_chains: 1
     # num_warmup: 100
     # num_samples: 1000
     # num_chains: 1
@@ -82,8 +81,8 @@ EVAL_ARGS:
   num_active_workers: 2
   max_batch: 500
 ACTIVE_ARGS:
-  num_active_tasks: 144
-  num_active_sample: 500
+  num_active_tasks: 72
+  num_active_sample: 1000
   active_fns: ["infogain", "ratiomean", "ratiomin", "random"]
   # active_fns: ["infogain", "random"]
   # active_fns: ["infogain"]
@@ -99,8 +98,8 @@ ACTIVE_ARGS:
 #   num_eval_map: 2
 #   num_eval_tasks: 40
 #   exp_iterations: 8
-#   save_name: "200228"
-#   EXP_NAME: "test"
+#   save_name: "test"
+#   EXP_NAME: "random_ird_exp_natural_one_hybrid_ird_1000_1000"
 # DESIGNER_ARGS:
 #   num_normalizers: 10
 #   sample_method: "MH"
@@ -111,7 +110,7 @@ ACTIVE_ARGS:
 #     num_samples: 40
 #     num_warmup: 10
 #     num_chains: 1
-#   beta: 1
+#   beta: 50
 #   use_true_w: True
 #   # use_true_w: False
 #   num_prior_tasks: 2
@@ -135,7 +134,7 @@ ACTIVE_ARGS:
 #   num_active_tasks: 72
 #   num_active_sample: 10
 #   # active_fns: ["infogain", "ratiomean", "ratiomin", "random"]
-#   active_fns: ["infogain", "ratiomean"]
+#   active_fns: ["infogain"]
 #   # active_fns: ["random"]
 #   # active_fns: ["infogain", "ratiomean", "ratiomin"]
 #   # active_fns: ["random"]
@@ -167,13 +166,13 @@ WEIGHT_PARAMS:
 
 ## True w2
 TRUE_W:
-  control: 2
-  dist_cars: 2.0
-  dist_fences: 5.35
-  dist_lanes: 2.5
-  dist_objects: 4.25
-  speed: 5
-  speed_over: 80
+  control: 0.1
+  dist_cars: 1.0
+  dist_fences: 2.68
+  dist_lanes: 1.25
+  dist_objects: 1.125
+  speed: 2.5
+  speed_over: 40.
 
 
 TASK: [0.2, -0.7, 0.0, 0.4]
