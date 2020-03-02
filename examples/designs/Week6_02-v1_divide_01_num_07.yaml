@@ -7,12 +7,12 @@ DESIGNS:
   - 0.12
   - 0.5
   WEIGHTS:
-    control: 2
-    dist_cars: 5.0
+    control: 4
+    dist_cars: 1.0
     dist_fences: 5.35
-    dist_lanes: 1
-    dist_objects: 5.25
-    speed: 1
+    dist_lanes: 0.5
+    dist_objects: 2.25
+    speed: 8
 - TASK:
   - -0.4
   - 0.8
@@ -21,7 +21,7 @@ DESIGNS:
   - 0.08
   - 1.0
   WEIGHTS:
-    control: 2
+    control: 0.5
     dist_cars: 2.0
     dist_fences: 5.35
     dist_lanes: 4
@@ -52,9 +52,9 @@ DESIGNS:
     control: 2
     dist_cars: 2.0
     dist_fences: 5.35
-    dist_lanes: 2.5
-    dist_objects: 2.25
-    speed: 5
+    dist_lanes: 1.5
+    dist_objects: 3.25
+    speed: 4
 - TASK:
   - -0.2
   - 0.8
@@ -63,12 +63,13 @@ DESIGNS:
   - 0.12
   - 0.4
   WEIGHTS:
-    control: 2
+    control: 5
     dist_cars: 2.0
     dist_fences: 5.35
     dist_lanes: 2.5
     dist_objects: 2.25
     speed: 5
+    speed_over: 80
 - TASK:
   - -0.3
   - -0.3
@@ -77,13 +78,13 @@ DESIGNS:
   - 0.08
   - 0.7
   WEIGHTS:
-    control: 2
+    control: 4
     dist_cars: 2.0
     dist_fences: 5.35
     dist_lanes: 2.5
     dist_objects: 2.25
     speed: 5
-    speed_over: 10
+    speed_over: 80
 - TASK:
   - -0.4
   - -0.1
@@ -92,9 +93,9 @@ DESIGNS:
   - 0.0
   - 0.8
   WEIGHTS:
-    control: 2
+    control: 4
     dist_cars: 2.0
-    dist_fences: 5.35
+    dist_fences: 20.35
     dist_lanes: 2.5
     dist_objects: 4.25
     speed: 5

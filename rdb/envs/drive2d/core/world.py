@@ -562,17 +562,71 @@ class DriveWorld(gym.Env):
                 font_name="Palatino",
                 font_size=15,
                 x=30,
+                y=self._window.height - 90,
+                width=200,
+                anchor_x="left",
+                anchor_y="top",
+                multiline=True,
+            )
+            self._thrust_label = pyglet.text.Label(
+                "",
+                font_name="Palatino",
+                font_size=15,
+                x=30,
+                y=self._window.height - 70,
+                width=200,
+                anchor_x="left",
+                anchor_y="top",
+                multiline=True,
+            )
+            self._brake_label = pyglet.text.Label(
+                "",
+                font_name="Palatino",
+                font_size=15,
+                x=30,
+                y=self._window.height - 50,
+                width=200,
+                anchor_x="left",
+                anchor_y="top",
+                multiline=True,
+            )
+            self._steer_label = pyglet.text.Label(
+                "",
+                font_name="Palatino",
+                font_size=15,
+                x=30,
                 y=self._window.height - 30,
                 width=200,
                 anchor_x="left",
                 anchor_y="top",
                 multiline=True,
             )
-        speed = self._main_car.state[0, 3] * self._speed_factor
-        self._label.text = f"Speed: {speed:.2f} mph"
+        speed = self._main_car.state[0, 3]
+        brake = self._main_car.brake
+        thrust = self._main_car.thrust
+        steer = self._main_car.steer
+        self._label.text = f"Speed: {speed * self._speed_factor:.2f} mph"
+        self._brake_label.text = f"Brake: {brake:.2f}"
+        self._thrust_label.text = f"Thrust: {thrust:.2f}"
+        self._steer_label.text = f"Steer: {steer:.2f}"
+        self._label.color = (255, 255, 255, 255)
+        self._brake_label.color = (255, 255, 255, 255)
+        self._steer_label.color = (255, 255, 255, 255)
+        self._thrust_label.color = (255, 255, 255, 255)
+        if brake > self._main_car.control_bound:
+            self._brake_label.color = (255, 0, 0, 255)
+        if steer > self._main_car.control_bound:
+            self._steer_label.color = (255, 0, 0, 255)
+        if thrust > self._main_car.control_bound:
+            self._thrust_label.color = (255, 0, 0, 255)
+        if speed > self._main_car.max_speed:
+            self._label.color = (255, 0, 0, 255)
         if text is not None:
             self._label.text += "\n" + text
         self._label.draw()
+        self._thrust_label.draw()
+        self._brake_label.draw()
+        self._steer_label.draw()
 
     def draw_lane(self, lane):
         gl.glColor3f(0.4, 0.4, 0.4)

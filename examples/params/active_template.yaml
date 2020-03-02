@@ -3,16 +3,16 @@ RANDOM_KEYS: [22]
 # RANDOM_KEYS: [0, 1, 2, 3]
 FIXED_TASK_SEED: 0
 
-# ENV_NAME: "Week6_02-v1"
-ENV_NAME: "Week6_01-v1"
+ENV_NAME: "Week6_02-v1"
+# ENV_NAME: "Week6_01-v1"
 
 ## MPC Specific
 IRD_CONTROLLER_ARGS:
   horizon: 10
-  # engine: "jax"
-  # method: "adam"
-  engine: "scipy"
-  method: "lbfgs"
+  engine: "jax"
+  method: "adam"
+  # engine: "scipy"
+  # method: "lbfgs"
 
 DESIGNER_CONTROLLER_ARGS:
   horizon: 10
@@ -29,7 +29,7 @@ EXP_ARGS:
   num_eval_tasks: 2000
   # num_eval_tasks: 40
   exp_iterations: 8
-  save_name: "200228"
+  save_name: "200229"
   # EXP_NAME: "active_ird_beta_50_true_w_irdvar_3_lbfgs"
   # EXP_NAME: "active_ird_beta_50_true_w_map_mean_irdvar_3_adam200"
   # EXP_NAME: "active_ird_beta_50_true_w_map_sum_irdvar_3_adam200"
@@ -37,7 +37,8 @@ EXP_ARGS:
   # EXP_NAME: "active_ird_sum_beta_50_dprior_3_irdvar_3_dvar_0.2_week602_scipy"
   # EXP_NAME: "active_ird_sum_beta_50_dprior_2_irdvar_3_dvar_02_602_scipy"
   # EXP_NAME: "active_ird_sum_beta_1_true_w_irdvar_3_dvar_02_602_scipy"
-  EXP_NAME: "active_ird_sum_beta_1_true_w_irdvar_3_601_scipy"
+  # EXP_NAME: "active_ird_sum_beta_1_true_w_irdvar_3_601_scipy"
+  EXP_NAME: "active_ird_sum_beta_20_dprior_2_irdvar_3_dvar_1_602_adam"
   # EXP_NAME: "test"
   # EXP_NAME: "active_ird_beta_50_prior_2"
 ## Designer Settigns
@@ -47,7 +48,7 @@ DESIGNER_ARGS:
   num_normalizers: 200
   sample_method: "MH"
   sample_init_args:
-    proposal_var: 0.2  # week6_02
+    proposal_var: 1  # week6_02
     # proposal_var: 0.5  # week6_01
     max_val: 15.0
   proposal_decay: 0.7
@@ -55,8 +56,9 @@ DESIGNER_ARGS:
     num_samples: 500
     num_warmup: 100
     num_chains: 1
-  beta: 1
-  use_true_w: True
+  # beta: 1
+  beta: 20
+  use_true_w: False
   num_prior_tasks: 2
   true_w: NULL
 ## IRD Settings

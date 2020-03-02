@@ -298,10 +298,11 @@ class Designer(object):
         ntasks = len(tasks)
         #  shape (nfeats, 1)
         true_ws = self._truth.weights.prepare(feats_keys).numpy_array()
-        ## ============= Pre-empt heavy optimiations =============
+        ## ============= Pre-empt optimiations =============
         #  shape (nfeats, ntasks, 1)
         true_feats_sum = self._truth.get_features_sum(tasks).prepare(feats_keys)
         true_feats_sum = true_feats_sum.numpy_array()
+
         #  shape (nfeats, ntasks, nnorms)
         normal_feats_sum = self._normalizer.get_features_sum(tasks).prepare(feats_keys)
         normal_feats_sum = normal_feats_sum.numpy_array()
@@ -329,6 +330,7 @@ class Designer(object):
             log_probs = self._likelihood(
                 true_ws,
                 true_feats_sum,
+                # sample_feats_sum,
                 sample_ws,
                 tasks,
                 sample_feats_sum,
@@ -420,15 +422,20 @@ class Designer(object):
             ## ======= Computing Denominator: normal_xxx =======
             #  shape (nfeats, 1, nbatch, 1)
             normal_truth = np.expand_dims(true_ws, axis=3)
-            #  shape (nfeats, ntasks, nbatch, nnorms + 1)
-            normal_feats_sum_1 = np.concatenate(
-                [normal_feats_sum, np.expand_dims(true_feats_sum, axis=3)], axis=3
+            #  shape (nfeats, ntasks, nbatch, nnorms + 2)
+            normal_feats_sum_2 = np.concatenate(
+                [
+                    normal_feats_sum,
+                    np.expand_dims(true_feats_sum, axis=3),
+                    np.expand_dims(sample_feats_sum, axis=3),
+                ],
+                axis=3,
             )
-            #  shape (nfeats, ntasks, nbatch, nnorms + 1)
-            normal_costs = normal_truth * normal_feats_sum_1
-            #  shape (ntasks, nbatch, nnorms + 1)
+            #  shape (nfeats, ntasks, nbatch, nnorms + 2)
+            normal_costs = normal_truth * normal_feats_sum_2
+            #  shape (ntasks, nbatch, nnorms + 2)
             normal_rews = (-beta * normal_costs).mean(axis=0)
-            #  shape (nbatch, nnorms + 1)
+            #  shape (nbatch, nnorms + 2)
             normal_rews = task_method(normal_rews)
             #  shape (nbatch,)
             normal_rews = logsumexp(normal_rews, axis=1) - np.log(nnorms + 1)

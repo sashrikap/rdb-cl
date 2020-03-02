@@ -31,6 +31,7 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
         horizon=10,
         num_lanes=3,
         lane_width=0.13,
+        max_speed=0.9,
         car_ranges=[[-0.4, 1.0], [-0.4, 1.0]],
         car_delta=0.1,
         obstacle_states=[],
@@ -46,6 +47,9 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
         self._goal_speed = goal_speed
         self._goal_lane = goal_lane
         self._control_bound = control_bound
+        self._max_speed = max_speed
+        main_car.control_bound = control_bound
+        main_car.max_speed = max_speed
         # Define objects
         objs = []
         for state in obstacle_states:
@@ -174,7 +178,7 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
         constraints_dict = OrderedDict()
         constraints_dict["offtrack"] = constraints.build_offtrack(env=self)
         constraints_dict["overspeed"] = constraints.build_overspeed(
-            env=self, max_speed=0.9
+            env=self, max_speed=self._max_speed
         )
         constraints_dict["underspeed"] = constraints.build_underspeed(
             env=self, min_speed=-0.1
@@ -416,7 +420,7 @@ class Week6_02_v1(HighwayDriveWorld_Week6):
         goal_lane = 0
         horizon = 10
         dt = 0.25
-        control_bound = 0.5
+        control_bound = 0.8
         lane_width = 0.13
         num_lanes = 3
         # Car states

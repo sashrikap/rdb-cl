@@ -156,7 +156,7 @@ def main(random_key, debug=False):
     experiment.update_key(rng_key)
 
     if COMPARE:
-        experiment.run_comparison(num_tasks=7, design=DESIGN)
+        experiment.run_comparison(num_tasks=NUM_DESIGN_TASKS, design=DESIGN)
     elif DEBUG:
         experiment.run_evaluation(override=False)
     else:

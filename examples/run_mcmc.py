@@ -112,8 +112,8 @@ def main(random_key):
     """ Experiment """
     # with jax.disable_jit():
     experiment.update_key(rng_key)
-    # experiment.run_designer(DESIGNER_ARGS["exp_name"])
-    experiment.run_ird(IRD_ARGS["exp_name"])
+    experiment.run_designer(DESIGNER_ARGS["exp_name"])
+    # experiment.run_ird(IRD_ARGS["exp_name"])
 
 
 if __name__ == "__main__":

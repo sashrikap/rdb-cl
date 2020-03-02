@@ -1,25 +1,55 @@
 DESIGNS:
-- TASK:
-  - 0.5
-  - 0.1
-  - -0.16
-  - 0.7
-  - 0.12
-  - 0.5
+- TASK: !!python/object/apply:numpy.core.multiarray._reconstruct
+    args:
+    - &id001 !!python/name:numpy.ndarray ''
+    - !!python/tuple
+      - 0
+    - !!binary |
+      Yg==
+    state: !!python/tuple
+    - 1
+    - !!python/tuple
+      - 6
+    - &id002 !!python/object/apply:numpy.dtype
+      args:
+      - f8
+      - 0
+      - 1
+      state: !!python/tuple
+      - 3
+      - <
+      - null
+      - null
+      - null
+      - -1
+      - -1
+      - 0
+    - false
+    - !!binary |
+      NDMzMzMz07+UmZmZmZnJP3oUrkfherS/lJmZmZmZyT+4HoXrUbi+P5aZmZmZmdk/
   WEIGHTS:
-    control: 0.5
-    dist_cars: 5.0
+    control: 4
+    dist_cars: 1.0
     dist_fences: 5.35
-    dist_lanes: 0.5
+    dist_lanes: 2
     dist_objects: 2.25
-    speed: 4
-- TASK:
-  - -0.4
-  - 0.8
-  - -0.12
-  - 0.3
-  - 0.08
-  - 1.0
+    speed: 8
+    speed_over: 20
+- TASK: !!python/object/apply:numpy.core.multiarray._reconstruct
+    args:
+    - *id001
+    - !!python/tuple
+      - 0
+    - !!binary |
+      Yg==
+    state: !!python/tuple
+    - 1
+    - !!python/tuple
+      - 6
+    - *id002
+    - false
+    - !!binary |
+      y8zMzMzM7D+gmZmZmZm5v7gehetRuL6/MDMzMzMz0z+4HoXrUbi+PzEzMzMzM+M/
   WEIGHTS:
     control: 0.5
     dist_cars: 2.0
@@ -27,77 +57,95 @@ DESIGNS:
     dist_lanes: 4
     dist_objects: 5.25
     speed: 2
-- TASK:
-  - 0.4
-  - -0.3
-  - -0.08
-  - 0.4
-  - 0.08
-  - 0.7
+    speed_over: 20
+- TASK: !!python/object/apply:numpy.core.multiarray._reconstruct
+    args:
+    - *id001
+    - !!python/tuple
+      - 0
+    - !!binary |
+      Yg==
+    state: !!python/tuple
+    - 1
+    - !!python/tuple
+      - 6
+    - *id002
+    - false
+    - !!binary |
+      l5mZmZmZ6T+amZmZmZnZv3sUrkfhesS//P//////3z97FK5H4Xq0P5eZmZmZmek/
   WEIGHTS:
     control: 2
-    dist_cars: 2.0
+    dist_cars: 1
     dist_fences: 5.35
-    dist_lanes: 2.5
+    dist_lanes: 5
     dist_objects: 2.25
     speed: 5
-- TASK:
-  - 0.5
-  - 0.1
-  - -0.16
-  - 0.7
-  - 0.12
-  - 0.5
+- TASK: !!python/object/apply:numpy.core.multiarray._reconstruct
+    args:
+    - *id001
+    - !!python/tuple
+      - 0
+    - !!binary |
+      Yg==
+    state: !!python/tuple
+    - 1
+    - !!python/tuple
+      - 6
+    - *id002
+    - false
+    - !!binary |
+      mpmZmZmZ2b9jZmZmZmbmP3sUrkfhesS//f//////7z97FK5H4Xq0P2NmZmZmZuY/
   WEIGHTS:
     control: 2
     dist_cars: 2.0
     dist_fences: 5.35
     dist_lanes: 1.5
     dist_objects: 3.25
-    speed: 4
-- TASK:
-  - -0.2
-  - 0.8
-  - -0.12
-  - 0.6
-  - 0.12
-  - 0.4
+    speed: 8
+- TASK: !!python/object/apply:numpy.core.multiarray._reconstruct
+    args:
+    - *id001
+    - !!python/tuple
+      - 0
+    - !!binary |
+      Yg==
+    state: !!python/tuple
+    - 1
+    - !!python/tuple
+      - 6
+    - *id002
+    - false
+    - !!binary |
+      NDMzMzMz07/LzMzMzMzsP7gehetRuL6/MDMzMzMz0z97FK5H4Xq0P/z//////98/
   WEIGHTS:
-    control: 0.2
+    control: 5
     dist_cars: 2.0
     dist_fences: 5.35
     dist_lanes: 2.5
     dist_objects: 2.25
     speed: 5
-    speed_over: 80
-- TASK:
-  - -0.3
-  - -0.3
-  - -0.16
-  - -0.4
-  - 0.08
-  - 0.7
+    speed_over: 20
+- TASK: !!python/object/apply:numpy.core.multiarray._reconstruct
+    args:
+    - *id001
+    - !!python/tuple
+      - 0
+    - !!binary |
+      Yg==
+    state: !!python/tuple
+    - 1
+    - !!python/tuple
+      - 6
+    - *id002
+    - false
+    - !!binary |
+      lpmZmZmZ2T+XmZmZmZnpP3oUrkfherS//f//////7z97FK5H4Xq0PzEzMzMzM+M/
   WEIGHTS:
-    control: 1.5
+    control: 20
     dist_cars: 2.0
-    dist_fences: 5.35
+    dist_fences: 2.35
     dist_lanes: 2.5
-    dist_objects: 2.25
-    speed: 5
-    speed_over: 80
-- TASK:
-  - -0.4
-  - -0.1
-  - -0.1
-  - 0.45
-  - 0.0
-  - 0.8
-  WEIGHTS:
-    control: 4
-    dist_cars: 2.0
-    dist_fences: 20.35
-    dist_lanes: 2.5
-    dist_objects: 4.25
-    speed: 5
-    speed_over: 80
+    dist_objects: 1.25
+    speed: 10
+    speed_over: 20
 ENV_NAME: Week6_02-v1

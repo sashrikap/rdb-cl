@@ -478,9 +478,7 @@ class IRDOptimalControl(object):
         sample_ws = sampler.get_samples(group_by_chain=True)
         sample_ws = DictList(sample_ws, jax=True).squeeze(axis=2)
         print(f"Sample time {time() - t1}")
-        import pdb
 
-        pdb.set_trace()
         assert self._normalized_key not in sample_ws.keys()
         sample_ws[self._normalized_key] = np.zeros(sample_ws.shape)
         sample_info = sampler.get_extra_fields(group_by_chain=True)

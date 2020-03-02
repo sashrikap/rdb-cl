@@ -47,6 +47,9 @@ class Car(object):
         self._color = color
         self._xdim = 4
         self._udim = 2
+        self._curr_control = None
+        self._control_bound = np.inf
+        self._max_speed = np.inf
         # Initilialize trajectory data
 
     @property
@@ -82,6 +85,43 @@ class Car(object):
     def color(self):
         return self._color
 
+    @property
+    def brake(self):
+        if self._curr_control is not None:
+            return max(0, float(-1 * self._curr_control[0][1]))
+        else:
+            return 0
+
+    @property
+    def thrust(self):
+        if self._curr_control is not None:
+            return max(0, float(self._curr_control[0][1]))
+        else:
+            return 0
+
+    @property
+    def steer(self):
+        if self._curr_control is not None:
+            return np.abs(float(self._curr_control[0][0]))
+        else:
+            return 0
+
+    @property
+    def control_bound(self):
+        return self._control_bound
+
+    @control_bound.setter
+    def control_bound(self, bound):
+        self._control_bound = bound
+
+    @property
+    def max_speed(self):
+        return self._max_speed
+
+    @max_speed.setter
+    def max_speed(self, max_speed):
+        self._max_speed = max_speed
+
     def control(self, u, dt):
         raise NotImplementedError
 
@@ -114,6 +154,7 @@ class FixSpeedCar(Car):
         self._state += (
             self.dynamics_fn(self._state, np.zeros((len(self._state), self.udim))) * dt
         )
+        self._curr_control = np.zeros((1, 2))
 
     def copy(self):
         return FixSpeedCar(
@@ -169,6 +210,7 @@ class OptimalControlCar(Car):
             self._features_fn is not None and self._cost_runtime is not None
         ), "Need to initialize car by `env.reset()`"
 
+        self._curr_control = u
         diff = self.dynamics_fn(self._state, u)
         self._state += self.dynamics_fn(self._state, u) * dt
 

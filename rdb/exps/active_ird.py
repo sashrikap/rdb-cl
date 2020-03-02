@@ -351,6 +351,13 @@ class ExperimentActiveIRD(object):
             print(f"    Average Violation diff {avg_violate:.2f}")
             print(f"    Average Performance diff {avg_perform:.2f}")
             print(f"    True Weights Log Prob {log_prob_true:.2f}")
+
+            # For comparison debugging
+            # self._divide_violations = belief_map.get_violations(eval_tasks)
+            # self._joint_violations = belief_map.get_violations(eval_tasks)
+            # self._divide_one = self._divide_violations[:, 0]
+            # self._joint_one = self._joint_violations[:, 0]
+            # import pdb; pdb.set_trace()
         info = {
             "violation": avg_violate,
             "feats_violation": dict(feats_violate),
@@ -720,7 +727,7 @@ class ExperimentActiveIRD(object):
                     continue
                 belief = all_beliefs[key][itr]
 
-    def run_comparison(self, num_tasks, design="01"):
+    def run_comparison(self, num_tasks, design):
         """
         2020 Feb 25th: compare batch ird vs divide/conquer ird vs final design.
 
@@ -737,10 +744,16 @@ class ExperimentActiveIRD(object):
         )
         ENV_NAME = self._exp_params["ENV_NAME"]
         joint_data = load_params(
-            join(examples_dir(), f"designs/{ENV_NAME}_joint_{design}.yaml")
+            join(
+                examples_dir(),
+                f"designs/{ENV_NAME}_joint_{design:02d}_num_{num_tasks:02d}.yaml",
+            )
         )
         divid_data = load_params(
-            join(examples_dir(), f"designs/{ENV_NAME}_divide_{design}.yaml")
+            join(
+                examples_dir(),
+                f"designs/{ENV_NAME}_divide_{design:02d}_num_{num_tasks:02d}.yaml",
+            )
         )
         joint_obs, joint_tasks = self._load_design(
             num_tasks, joint_data, cache=False, compute_belief=False

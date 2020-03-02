@@ -1,6 +1,7 @@
 # RANDOM_KEYS: [4]
 # RANDOM_KEYS: [21]
-RANDOM_KEYS: [1]
+RANDOM_KEYS: [22]
+# RANDOM_KEYS: [1]
 # RANDOM_KEYS: [0, 1, 2, 3]
 FIXED_TASK_SEED: 0
 
@@ -10,20 +11,22 @@ ENV_NAME: "Week6_02-v1"
 ## MPC Specific
 IRD_CONTROLLER_ARGS:
   horizon: 10
-  # engine: "jax"
-  # method: "adam"
-  engine: "scipy"
-  method: "lbfgs"
+  engine: "jax"
+  method: "adam"
+  # engine: "scipy"
+  # method: "lbfgs"
 
 DESIGNER_CONTROLLER_ARGS:
   horizon: 10
-  # engine: "jax"
-  # method: "adam"
-  engine: "scipy"
-  method: "lbfgs"
+  engine: "jax"
+  method: "adam"
+  # engine: "scipy"
+  # method: "lbfgs"
 
 
-DESIGN: "01"
+NUM_DESIGN_TASKS: 6
+DESIGN: 2
+
 
 ## Full sampling
 EXP_ARGS:
@@ -31,8 +34,9 @@ EXP_ARGS:
   num_eval_tasks: 2000
   # num_eval_tasks: 40
   exp_iterations: 16
-  save_name: "200228"
-  EXP_NAME: "compare_sum_beta_10_true_w_irdvar_3_602_scipy"
+  save_name: "200229"
+  EXP_NAME: "compare_sum_beta_20_true_w_irdvar_3_602_adam_design_02_num_06"
+  # EXP_NAME: "compare_sum_beta_10_true_w_irdvar_3_602_scipy_design_01"
   # EXP_NAME: "test"
   # EXP_NAME: "active_ird_exp_ird_beta_50_prior_2"
 ## Designer Settigns
@@ -49,7 +53,7 @@ DESIGNER_ARGS:
     num_samples: 500
     num_warmup: 100
     num_chains: 1
-  beta: 10
+  beta: 20
   use_true_w: True
   num_prior_tasks: 2
   true_w: NULL
