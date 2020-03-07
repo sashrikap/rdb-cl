@@ -186,7 +186,6 @@ class ActiveRatioTest(ActiveInfoGain):
         next_rews = -1 * next_costs
         user_rews = -1 * user_costs
         ratios = self._beta * (user_rews - next_rews)
-
         if self._debug:
             min_idx = np.argmin(ratios)
             print(f"Active method {self._method}")

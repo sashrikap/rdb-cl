@@ -24,8 +24,8 @@ DESIGNER_CONTROLLER_ARGS:
   # method: "lbfgs"
 
 
-NUM_DESIGN_TASKS: 6
-DESIGN: 2
+NUM_DESIGN_TASKS: 5
+DESIGN: 4
 
 
 ## Full sampling
@@ -35,7 +35,7 @@ EXP_ARGS:
   # num_eval_tasks: 40
   exp_iterations: 16
   save_name: "200229"
-  EXP_NAME: "compare_sum_beta_20_true_w_irdvar_3_602_adam_design_02_num_06"
+  EXP_NAME: "compare_sum_beta_20_true_w_irdvar_3_602_adam_design_04_num_05"
   # EXP_NAME: "compare_sum_beta_10_true_w_irdvar_3_602_scipy_design_01"
   # EXP_NAME: "test"
   # EXP_NAME: "active_ird_exp_ird_beta_50_prior_2"
@@ -74,6 +74,15 @@ IRD_ARGS:
     # num_warmup: 100
     # num_samples: 1000
     # num_chains: 1
+ACTIVE_ARGS:
+  num_active_tasks: 144
+  num_active_sample: 500
+  active_fns: ["infogain", "ratiomean", "ratiomin", "random"]
+  # active_fns: ["infogain"]
+  # active_fns: ["ratiomean", "ratiomin", "random"]
+  # active_fns: ["infogain", "ratiomean", "ratiomin"]
+  # active_fns: ["random"]
+  # active_fns: ["infogain", "ratiomean", "ratiomin"]
 
 
 
@@ -81,11 +90,11 @@ IRD_ARGS:
 # ## Test sampling
 # EXP_ARGS:
 #   num_eval_map: 32
-#   num_eval_tasks: 100
+#   num_eval_tasks: 10
 #   # num_eval_tasks: 40
 #   exp_iterations: 16
 #   save_name: "200228"
-#   EXP_NAME: "compare_sum_beta_50_true_w_irdvar_3_dvar_02_602_scipy"
+#   EXP_NAME: "tests"
 #   # EXP_NAME: "test"
 #   # EXP_NAME: "active_ird_exp_ird_beta_50_prior_2"
 # ## Designer Settigns
@@ -118,27 +127,29 @@ IRD_ARGS:
 #   proposal_decay: 0.9
 #   sample_args:
 #     num_warmup: 200
-#     num_samples: 100
+#     num_samples: 1000
 #     num_chains: 3
 #     # num_warmup: 100
 #     # num_samples: 1000
 #     # num_chains: 1
+# ACTIVE_ARGS:
+#   num_active_tasks: 24
+#   num_active_sample: 100
+#   active_fns: ["infogain", "ratiomean", "ratiomin", "random"]
+#   # active_fns: ["infogain"]
+#   # active_fns: ["ratiomean", "ratiomin", "random"]
+#   # active_fns: ["infogain", "ratiomean", "ratiomin"]
+#   # active_fns: ["random"]
+#   # active_fns: ["infogain", "ratiomean", "ratiomin"]
+
 
 
 EVAL_ARGS:
   parallel: True
   num_eval_workers: 4
-  num_active_workers: 0
+  num_active_workers: 4
   max_batch: 500
-ACTIVE_ARGS:
-  num_active_tasks: 72
-  num_active_sample: 1000
-  active_fns: ["infogain", "ratiomean", "ratiomin", "random"]
-  # active_fns: ["infogain"]
-  # active_fns: ["ratiomean", "ratiomin", "random"]
-  # active_fns: ["infogain", "ratiomean", "ratiomin"]
-  # active_fns: ["random"]
-  # active_fns: ["infogain", "ratiomean", "ratiomin"]
+
 
 ## Plotting & weight scaling
 WEIGHT_PARAMS:

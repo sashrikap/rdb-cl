@@ -11,8 +11,7 @@ sns.set()
 
 def read_seed(path):
     # print(path)
-    with open(path, "r") as f:
-        data = yaml.load(f)
+    data = np.load(path, allow_pickle=True).item()
     return data
 
 
@@ -83,7 +82,12 @@ def plot_data():
     seeddata = []
     if os.path.isdir(os.path.join(exp_dir, exp_name)):
         for file in sorted(os.listdir(os.path.join(exp_dir, exp_name))):
-            if exp_name in file and "yaml" in file and file.endswith("yaml"):
+            if (
+                exp_name in file
+                and "npy" in file
+                and "map" not in file
+                and file.endswith("npy")
+            ):
                 print(file)
                 exp_path = os.path.join(exp_dir, exp_name, file)
                 if os.path.isfile(exp_path):
@@ -129,14 +133,14 @@ if __name__ == "__main__":
     N = -1
     use_seeds = list(range(30))
     not_seeds = []
-    MAX_LEN = 5
-    MAX_RANDOM_LEN = 5
+    MAX_LEN = 8
+    MAX_RANDOM_LEN = 8
     PADDING = 0
 
     use_seeds = [str(random.PRNGKey(si)) for si in use_seeds]
     not_seeds = [str(random.PRNGKey(si)) for si in not_seeds]
 
-    exp_dir = "data/200224"
+    exp_dir = "data/200229"
     # exp_name = "active_ird_exp_ird_beta_50_true_w_map_sum_irdvar_3_adam200"
-    exp_name = "active_ird_sum_beta_1_true_w_irdvar_3_dvar_02_602_scipy"
+    exp_name = "active_ird_sum_beta_10_dprior_2_irdvar_3_dvar_1_602_adam"
     plot_data()

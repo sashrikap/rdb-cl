@@ -446,18 +446,23 @@ class IRDOptimalControl(object):
         samp_args = copy.deepcopy(self._sample_args)
         decay = self._proposal_decay ** (ntasks - 1)
         init_args["proposal_var"] = init_args["proposal_var"] * decay
-        num_chains = self._sample_args["num_chains"]
-        init_params = obs[-1].weights.log()
-        if num_chains > 1:
-            #  shape nfeats * (nchains, 1)
-            init_params = init_params.expand_dims(0).repeat(num_chains, axis=0)
-        del init_params[self._normalized_key]
 
         ## ================= Build Prior Function with necessary keys ================
         self._prior = self._prior_fn("ird")
         for ob in obs:
             for key in ob.weights.keys():
-                self._prior.add_feature(key)
+                if key != self._normalized_key:
+                    self._prior.add_feature(key)
+
+        num_chains = self._sample_args["num_chains"]
+        num_keys = len(self._prior.feature_keys)
+        init_params = DictList(
+            dict(zip(self._prior.feature_keys, np.zeros((num_keys, 1))))
+        )
+        if num_chains > 1:
+            #  shape nfeats * (nchains, 1)
+            init_params = init_params.expand_dims(0).repeat(num_chains, axis=0)
+        del init_params[self._normalized_key]
 
         ird_model = self._build_model(observe_ws, tasks)
         sampler = get_ird_sampler(self._sample_method, ird_model, init_args, samp_args)
@@ -509,7 +514,10 @@ class IRDOptimalControl(object):
         for ob in obs:
             for key in ob.weights.keys():
                 all_keys.append(key)
-                if key not in self._norm_prior.feature_keys:
+                if (
+                    key not in self._norm_prior.feature_keys
+                    and key != self._normalized_key
+                ):
                     rebuild_normalizer = True
                     self._norm_prior.add_feature(key)
         all_keys = set(all_keys)

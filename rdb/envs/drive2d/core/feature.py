@@ -146,7 +146,7 @@ def dist_outside_fence(x, center, normal):
     assert len(x.shape) == 2 and x.shape[1] == XDIM
     assert len(center.shape) == 1 and center.shape[-1] == POSDIM
     assert len(normal.shape) == 1 and normal.shape[-1] == POSDIM
-    return -1 * dist_inside_fence(x, center, normal)
+    return np.maximum(-1 * dist_inside_fence(x, center, normal), 0)
 
 
 @jax.jit

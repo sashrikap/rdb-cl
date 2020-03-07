@@ -55,5 +55,5 @@ def plot_comparisons(save_dir, exp_name):
 
 if __name__ == "__main__":
     save_dir = "data/200229"
-    exp_name = "compare_sum_beta_10_true_w_irdvar_3_602_adam_design_02_num_06"
+    exp_name = "compare_sum_beta_20_true_w_irdvar_3_602_adam_design_04_num_05"
     plot_comparisons(save_dir, exp_name)

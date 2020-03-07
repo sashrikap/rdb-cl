@@ -354,21 +354,16 @@ class Particles(object):
             if us0 is not None:
                 batch_us0 = us0.reshape((-1, T, udim))
             batch_weights_arr = batch_weights.prepare(feats_keys).numpy_array()
-            try:
-                batch_acs, batch_costs, batch_feats, batch_feats_sum, batch_vios = collect_trajs(
-                    batch_weights_arr,
-                    batch_states,
-                    self._controller,
-                    self._runner,
-                    desc=desc,
-                    us0=batch_us0,
-                    jax=jax,
-                    max_batch=max_batch,
-                )
-            except:
-                import pdb
-
-                pdb.set_trace()
+            batch_acs, batch_costs, batch_feats, batch_feats_sum, batch_vios = collect_trajs(
+                batch_weights_arr,
+                batch_states,
+                self._controller,
+                self._runner,
+                desc=desc,
+                us0=batch_us0,
+                jax=jax,
+                max_batch=max_batch,
+            )
             #  shape (ntasks, nweights, T, acs_dim)
             all_actions = batch_acs.reshape((ntasks, nweights, T, udim))
             #  shape (ntasks, nweights)

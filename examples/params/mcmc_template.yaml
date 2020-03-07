@@ -48,7 +48,7 @@ USER_TRUE_W: False
 ## Full sampling
 IRD_ARGS:
   task_method: "sum"
-  num_normalizers: 200
+  num_normalizers: 1000
   sample_method: "MH"
   sample_init_args:
     proposal_var: 3
@@ -59,21 +59,21 @@ IRD_ARGS:
   # sample_init_args:
   #   step_size: 0.2
   sample_args:
-    num_warmup: 200
+    num_warmup: 1000
     num_samples: 8000
     num_chains: 3
   # exp_name: "ird_convergence_random_w_random_tasks_norm_1000_beta_10_var_5"
-  exp_name: "ird_convergence_true_w_random_tasks_norm_200_beta_10_var_3_week602"
+  exp_name: "ird_convergence_true_w_random_tasks_norm_1000_beta_10_var_3_week602"
   # exp_name: "ird_convergence_true_w_prior_tasks_norm_200_beta_50_var_3"
   # exp_name: "ird_convergence_true_w_prior_tasks_sum_norm_200_beta_50_var_2"
   # exp_name: "ird_convergence_true_w_random_tasks_sum_norm_200_beta_50_var_2"
 
 DESIGNER_ARGS:
   task_method: "sum"
-  num_normalizers: 200
+  num_normalizers: 1000
   sample_method: "MH"
   sample_init_args:
-    proposal_var: 0.5  # week6_02
+    proposal_var: 1  # week6_02
     # proposal_var: 0.5  # week6_01
     max_val: 15.0
   proposal_decay: 0.7
@@ -81,14 +81,14 @@ DESIGNER_ARGS:
     num_samples: 500
     num_warmup: 100
     num_chains: 1
-  beta: 10
+  beta: 20
   num_prior_tasks: 2
   use_true_w: False
   true_w: NULL
   # exp_name: "designer_convergence_true_w_prior_tasks_norm_200_beta_50_var_2"
   # exp_name: "designer_convergence_true_w_prior_tasks_mean_norm_200_beta_50_var_2"
   # exp_name: "designer_convergence_true_w_prior_tasks_sum_norm_200_beta_50_var_2"
-  exp_name: "designer_convergence_true_w_random_tasks_sum_norm_200_beta_10_var_0.2_week602"
+  exp_name: "designer_convergence_true_w_random_tasks_sum_norm_1000_beta_20_var_1_week602"
 SAVE_NAME: "200229"
 
 

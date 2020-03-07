@@ -196,8 +196,9 @@ class ExperimentActiveIRD(object):
                 if len(all_obs) == 0:
                     task, scores = self._propose_random_task()
                 else:
+                    belief = all_beliefs[-1].subsample(self._num_active_sample)
                     task, scores = self._propose_task(
-                        candidates, all_beliefs, all_obs, all_tasks, key
+                        candidates, belief, all_obs, all_tasks, key
                     )
 
                 self._all_tasks[key].append(task)
@@ -244,7 +245,7 @@ class ExperimentActiveIRD(object):
         scores = onp.zeros(self._num_active_tasks)
         return task, scores
 
-    def _propose_task(self, candidates, all_beliefs, all_obs, all_tasks, fn_key):
+    def _propose_task(self, candidates, belief, all_obs, all_tasks, fn_key):
         """Find best next task for this active function.
 
         Computation: n_particles(~1k) * n_active(~100) tasks
@@ -262,13 +263,9 @@ class ExperimentActiveIRD(object):
 
         """
 
-        assert (
-            len(all_beliefs) == len(all_obs) == len(all_tasks)
-        ), "Observation and tasks mismatch"
+        assert len(all_obs) == len(all_tasks), "Observation and tasks mismatch"
         assert len(all_obs) > 0, "Need at least 1 observation"
         # Compute belief features
-        belief = all_beliefs[-1]
-        belief = belief.subsample(self._num_active_sample)
         active_fn = self._active_fns[fn_key]
         print(f"Active proposal method {fn_key}: Begin")
         if fn_key != "random":
@@ -380,23 +377,23 @@ class ExperimentActiveIRD(object):
         diff_perf, diff_vios_arr, diff_vios = belief_map.compare_with(
             next_task, target=target
         )
-        map_perform = list(diff_perf)
-        map_violate = list(diff_vios_arr)  # (nweights,)
+        map_perform = diff_perf
+        map_violate = diff_vios_arr  # (nweights,)
         diff_perf, diff_vios_arr, diff_vios = joint_obs.compare_with(
             next_task, target=target
         )
-        obs_perform = diff_perf.mean()
-        obs_violate = diff_vios_arr.mean()
+        obs_perform = diff_perf
+        obs_violate = diff_vios_arr
 
-        print(f"    MAP Violation diff {map_violate:.2f}")
-        print(f"    MAP Performance diff {map_perform:.2f}")
-        print(f"    Obs Violation diff {obs_violate:.2f}")
-        print(f"    Obs Performance diff {obs_perform:.2f}")
+        print(f"    MAP Violation diff {map_violate.mean():.2f}")
+        print(f"    MAP Performance diff {map_perform.mean():.2f}")
+        print(f"    Obs Violation diff {obs_violate.mean():.2f}")
+        print(f"    Obs Performance diff {obs_perform.mean():.2f}")
         info = {
-            "map_violation": map_violate,
-            "obs_violation": obs_violate,
-            "map_perform": map_perform,
-            "obs_perform": obs_perform,
+            "map_violation": map_violate.tolist(),
+            "obs_violation": obs_violate.tolist(),
+            "map_perform": map_perform.tolist(),
+            "obs_perform": obs_perform.tolist(),
         }
         if cache:
             self._active_map_vs_obs_hist[fn_key].append(info)
@@ -585,9 +582,8 @@ class ExperimentActiveIRD(object):
         with open(npz_path, "wb+") as f:
             np.savez(f, **data)
         ## Save evaluation history to yaml
-        yaml_path = f"{self._save_dir}/{self._exp_name}_seed_{self._rng_name}.yaml"
-        with open(yaml_path, "w+") as stream:
-            yaml.dump(self._active_eval_hist, stream, default_flow_style=False)
+        npy_path = f"{self._save_dir}/{self._exp_name}_seed_{self._rng_name}.npy"
+        np.save(npy_path, self._active_eval_hist)
         ## Save active comparison to yaml
         npy_path = f"{self._save_dir}/{self._exp_name}_map_seed_{self._rng_name}.npy"
         np.save(npy_path, self._active_map_vs_obs_hist)
@@ -773,6 +769,40 @@ class ExperimentActiveIRD(object):
         )
         divid_vio = divid_info["violation"]
 
+        ### Run Active IRD on Candidates ###
+        print("Proposing new tasks")
+        candidates = random_choice(
+            self._get_rng_task(), self._model.env.all_tasks, self._num_active_tasks
+        )
+        divid_proposal = {}
+        belief = divid_belief.subsample(self._num_active_sample)
+        for key in self._active_fns.keys():
+            task, scores = self._propose_task(
+                candidates, belief, divid_obs, divid_tasks, key
+            )
+            divid_proposal[key] = {
+                "task": task,
+                "candidates": candidates,
+                "scores": scores,
+            }
+
+        ranking_dir = os.path.join(self._save_dir, "candidates")
+        os.makedirs(ranking_dir, exist_ok=True)
+        for fn_key in divid_proposal.keys():
+            cand_scores = onp.array(divid_proposal[fn_key]["scores"])
+            other_scores = []
+            other_keys = []
+            # Check other active function
+            other_scores_all = copy.deepcopy(divid_proposal)
+            del other_scores_all[fn_key]
+            for key in other_scores_all.keys():
+                other_scores.append(other_scores_all[key]["scores"])
+                other_keys.append(key)
+            for other_s, other_k in zip(other_scores, other_keys):
+                file = f"key_{self._rng_name}_divide_cand_num_{len(divid_obs)}_comare_{fn_key}_vs_{other_k}.png"
+                path = os.path.join(ranking_dir, file)
+                plot_ranking_corrs([cand_scores, other_s], [fn_key, other_k], path=path)
+
         ## Do inference on all design environments with IRD & joint design
         joint_belief = self._model.sample(
             tasks=onp.array(joint_tasks),
@@ -785,6 +815,35 @@ class ExperimentActiveIRD(object):
         )
         joint_vio = joint_info["violation"]
 
+        joint_proposal = {}
+        belief = joint_belief.subsample(self._num_active_sample)
+        for key in self._active_fns.keys():
+            task, scores = self._propose_task(
+                candidates, belief, joint_obs, joint_tasks, key
+            )
+            joint_proposal[key] = {
+                "task": task,
+                "candidates": candidates,
+                "scores": scores,
+            }
+
+        ranking_dir = os.path.join(self._save_dir, "candidates")
+        os.makedirs(ranking_dir, exist_ok=True)
+        for fn_key in joint_proposal.keys():
+            cand_scores = onp.array(joint_proposal[fn_key]["scores"])
+            other_scores = []
+            other_keys = []
+            # Check other active function
+            other_scores_all = copy.deepcopy(joint_proposal)
+            del other_scores_all[fn_key]
+            for key in other_scores_all.keys():
+                other_scores.append(other_scores_all[key]["scores"])
+                other_keys.append(key)
+            for other_s, other_k in zip(other_scores, other_keys):
+                file = f"key_{self._rng_name}_joint_cand_num_{len(joint_obs)}_comare_{fn_key}_vs_{other_k}.png"
+                path = os.path.join(ranking_dir, file)
+                plot_ranking_corrs([cand_scores, other_s], [fn_key, other_k], path=path)
+
         ## Evaluate joint IRD, d/c IRD, joint design
         designer_info = self._evaluate(
             "Designer", joint_obs[-1], self._eval_tasks, map_eval=1, cache=False
@@ -793,8 +852,10 @@ class ExperimentActiveIRD(object):
         comparison_data = {
             "joint": joint_vio,
             "joint_feats": joint_info["feats_violation"],
+            "joint_proposal": joint_proposal,
             "divide": divid_vio,
             "divide_feats": divid_info["feats_violation"],
+            "divide_proposal": divid_proposal,
             "designer": designer_vio,
             "designer_feats": designer_info["feats_violation"],
         }

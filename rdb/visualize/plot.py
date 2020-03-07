@@ -56,33 +56,32 @@ def plot_weights(
     fig, axs = plt.subplots(n_values, 1, figsize=(20, 2 * n_values), dpi=80)
     weights_dicts = weights_dicts.log() if not log_scale else weights_dicts
     for i, key in enumerate(sorted(list(weights_dicts[0].keys()))):
-        with Profiler("Plot weights"):
-            values = weights_dicts[key]
-            n, bins, patches = axs[i].hist(
-                values,
-                bins,
-                histtype="stepfilled",
-                range=(-max_weights, max_weights),
-                density=True,
-                facecolor="b",
-                ec="k",
-                alpha=0.3,
-            )
-            ybottom, ytop = axs[i].get_ylim()
-            gap = (ytop - ybottom) / (len(highlight_dicts) - 1 + 1e-8)
-            ## Highlight value
-            for j, (d, c, label) in enumerate(
-                zip(highlight_dicts, highlight_colors, highlight_labels)
-            ):
-                if d is None or key not in d:
-                    continue
-                val = d[key]
-                # if not log_scale:
-                val = onp.log(val)
-                axs[i].axvline(x=val, c=c)
-                # add 0.05 gap so that labels don't overlap
-                axs[i].text(val, ybottom + gap * j, label, size=10)
-            axs[i].set_xlabel(key)
+        values = weights_dicts[key]
+        n, bins, patches = axs[i].hist(
+            values,
+            bins,
+            histtype="stepfilled",
+            range=(-max_weights, max_weights),
+            density=True,
+            facecolor="b",
+            ec="k",
+            alpha=0.3,
+        )
+        ybottom, ytop = axs[i].get_ylim()
+        gap = (ytop - ybottom) / (len(highlight_dicts) - 1 + 1e-8)
+        ## Highlight value
+        for j, (d, c, label) in enumerate(
+            zip(highlight_dicts, highlight_colors, highlight_labels)
+        ):
+            if d is None or key not in d:
+                continue
+            val = d[key]
+            # if not log_scale:
+            val = onp.log(val)
+            axs[i].axvline(x=val, c=c)
+            # add 0.05 gap so that labels don't overlap
+            axs[i].text(val, ybottom + gap * j, label, size=10)
+        axs[i].set_xlabel(key)
     plt.tight_layout()
     if title is not None:
         fig.suptitle(title)

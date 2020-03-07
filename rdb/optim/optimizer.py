@@ -60,7 +60,8 @@ class OptimizerMPC(object):
             >>> actions = optimizer(x0, u0=u0, weights=weights)
 
         Note:
-            * If `weights` is provided, it is user's reponsibility to ensure that cost_u & grad_u can accept `weights` as argument
+            * If `weights` is provided, it is user's reponsibility to ensure
+            that cost_u & grad_u can accept `weights` as argument
 
         """
         self._xdim = xdim
@@ -314,7 +315,8 @@ class OptimizerScipy(OptimizerMPC):
             >>> actions = optimizer(x0, u0=u0, weights=weights)
 
         Note:
-            * If `weights` is provided, it is user's reponsibility to ensure that cost_u & grad_u can accept `weights` as argument
+            * If `weights` is provided, it is user's reponsibility to
+            ensure that cost_u & grad_u can accept `weights` as argument
 
         """
         super().__init__(
@@ -337,7 +339,8 @@ class OptimizerScipy(OptimizerMPC):
         self.h_grad_u = self._scipy_wrapper(h_grad_u, flatten_out=True)
 
     def _scipy_wrapper(self, jit_fn, flatten_out=False):
-        """Function to interface with scipy.optimizer, which implicitly flattens input.
+        """Function to interface with scipy.optimizer, which implicitly
+        flattens input.
 
         This method does two things:
             * Undo scipy.minimize's flattening
@@ -518,7 +521,8 @@ class OptimizerJax(OptimizerMPC):
 class OptimizerNumPyro(OptimizerMPC):
     """NumPyro Optimizer for optimal control.
 
-    Includes Numpyro-powered vectorized optimizers. The advantage over JAX optimizers is that it works better with Numpyro inference.
+    Includes Numpyro-powered vectorized optimizers. The advantage over
+    JAX optimizers is that it works better with Numpyro inference.
 
     """
 

@@ -4,9 +4,9 @@ ACTIVE_ARGS:
   - ratiomean
   - ratiomin
   - random
-  num_active_sample: 1000
-  num_active_tasks: 72
-DESIGN: 2
+  num_active_sample: 500
+  num_active_tasks: 144
+DESIGN: 4
 DESIGNER_ARGS:
   beta: 20
   num_normalizers: 400
@@ -30,11 +30,11 @@ DESIGNER_CONTROLLER_ARGS:
 ENV_NAME: Week6_02-v1
 EVAL_ARGS:
   max_batch: 500
-  num_active_workers: 0
+  num_active_workers: 4
   num_eval_workers: 4
   parallel: true
 EXP_ARGS:
-  EXP_NAME: compare_sum_beta_20_true_w_irdvar_3_602_adam_design_02_num_06
+  EXP_NAME: compare_sum_beta_20_true_w_irdvar_3_602_adam_design_04_num_05
   exp_iterations: 16
   num_eval_map: 32
   num_eval_tasks: 2000
@@ -56,7 +56,7 @@ IRD_CONTROLLER_ARGS:
   engine: jax
   horizon: 10
   method: adam
-NUM_DESIGN_TASKS: 6
+NUM_DESIGN_TASKS: 5
 RANDOM_KEYS:
 - 5
 TRUE_W: null

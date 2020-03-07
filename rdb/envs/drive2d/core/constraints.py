@@ -32,7 +32,8 @@ def build_offtrack(env):
 
     """
     num_cars = len(env.cars)
-    threshold = 0.5 * env.car_width + 0.5 * env.lane_width
+    # threshold = 0.5 * env.car_width + 0.5 * env.lane_width
+    threshold = -0.5 * env.car_width + 0.5 * env.lane_width
     vfn = jax.vmap(env.raw_features_dict["dist_fences"])
 
     @jax.jit
@@ -42,7 +43,7 @@ def build_offtrack(env):
         # feats (T, nbatch, nfence, 1)
         feats = vfn(states, actions)
         assert len(feats.shape) == 4
-        return np.any(np.abs(feats) < threshold, axis=(2, 3))
+        return np.any(np.abs(feats) > threshold, axis=(2, 3))
 
     return func
 
