@@ -50,6 +50,10 @@ def load_params(filepath):
 
 def save_params(filepath, params):
     """Save experiment parameters to yaml"""
+    file_dir = dirname(filepath)
+    if not isdir(dirname(filepath)):
+        print(f"Creating new directory {file_dir}")
+        os.makedirs(file_dir, exist_ok=True)
     with open(filepath, "w+") as stream:
         try:
             yaml.dump(params, stream, default_flow_style=False)

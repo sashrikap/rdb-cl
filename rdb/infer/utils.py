@@ -7,7 +7,7 @@ import math
 import copy, os
 import numpyro
 import numpyro.distributions as dist
-from jax import random
+from jax import random, lax
 from functools import partial
 from rdb.infer.mcmc import MH
 from rdb.optim.utils import *
@@ -210,9 +210,9 @@ def collect_trajs(
         for it in range(num_iterations):
             it_begin = it * max_batch
             it_end = min((it + 1) * max_batch, nbatch)
-            valid_i = onp.ones(max_batch, dtype=bool)
             idxs = onp.zeros(nbatch, dtype=bool)
             idxs[it_begin:it_end] = True
+            valid_i = onp.ones(max_batch, dtype=bool)
             states_i = states[list(idxs)]
             us0_i = None if not us0 else us0[list(idxs)]
             weights_arr_i = weights_arr[:, list(idxs)]

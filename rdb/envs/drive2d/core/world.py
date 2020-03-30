@@ -84,7 +84,8 @@ class DriveWorld(gym.Env):
         self._grass = None
         self._magnify = 1.0
         self._cm = matplotlib.cm.coolwarm
-        self._heat_fn = None
+        self._viz_heat_fn = None
+        self._viz_constraint_fn = None
 
         # Dyanmics, features, constraints and metadata functions
         self._xdim = onp.prod(self.state.shape)
@@ -442,8 +443,15 @@ class DriveWorld(gym.Env):
         main_car=None,
         text=None,
         draw_heat=False,
+        draw_boundary=False,
+        draw_constraint_key=None,
         weights=None,
     ):
+        """
+        Args:
+            draw_heat (bool): draw heatmap, where redness ~ | cost |
+            draw_boundary (bool): draw boundary map, where redness ~ cost > 0
+        """
         assert mode in ["human", "state_pixels", "rgb_array"]
         if self.state.shape[0] > 1:
             print("WARNING: rendering with batch mode")
@@ -489,7 +497,16 @@ class DriveWorld(gym.Env):
             if draw_heat:
                 assert weights is not None
                 self.set_heat(weights)
-                self.draw_heatmap()
+                self._draw_heatmap(heat_fn=self._viz_heat_fn)
+            elif draw_boundary:
+                assert weights is not None
+                self.set_heat(weights)
+                self._draw_heatmap(
+                    heat_fn=lambda *args: self._viz_heat_fn(*args) > 0.01
+                )
+            elif draw_constraint_key is not None:
+                self.set_constraints(draw_constraint_key)
+                self._draw_heatmap(heat_fn=self._viz_constraint_fn)
 
             gl.glPopMatrix()
             self.draw_text(text)
@@ -669,9 +686,20 @@ class DriveWorld(gym.Env):
             act = onp.zeros((1, self.udim))
             return cost_fn(state, act)
 
-        self._heat_fn = val
+        self._viz_heat_fn = val
 
-    def draw_heatmap(self):
+    def set_constraints(self, constraints_key):
+        def val(x, y):
+            constraint_fn = self._constraints_dict[constraints_key]
+            state = deepcopy(self.state)
+            main_idx = self._indices["main_car"]
+            state[:, main_idx[0] : main_idx[0] + 3] = [x, y, onp.pi / 3]
+            act = onp.zeros((1, self.udim))
+            return 0.5 * constraint_fn(np.array([state]), np.array([act]))
+
+        self._viz_constraint_fn = val
+
+    def _draw_heatmap(self, heat_fn):
         center = self.main_car.state[0, :2]
         c0 = center - onp.array([1.0, 1.0]) / self._magnify
         c1 = center + onp.array([1.0, 1.0]) / self._magnify
@@ -682,7 +710,7 @@ class DriveWorld(gym.Env):
         # Sweep for cost values
         for i, x in enumerate(tqdm(onp.linspace(c0[0], c1[0], SIZE[0]))):
             for j, y in enumerate(onp.linspace(c0[1], c1[1], SIZE[1])):
-                vals[j, i] = self._heat_fn(x, y)
+                vals[j, i] = heat_fn(x, y)
         vals = (vals - onp.min(vals)) / (onp.max(vals) - onp.min(vals) + 1e-6)
         # Convert to color map and draw
         vals = self._cm(vals)

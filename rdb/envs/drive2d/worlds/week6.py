@@ -134,10 +134,10 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
         )
         nlr_feats_dict["dist_fences"] = compose(
             sum_items,
-            # feature.quadratic_feat,
+            feature.quadratic_feat,
             # feature.neg_relu_feat,
-            feature.relu_feat,
-            lambda dist: dist + (self._lane_width + self._car_length) / 2,
+            # feature.relu_feat,
+            lambda dist: dist,
         )
         nobjs = len(self._objects)
         nlr_feats_dict["dist_objects"] = compose(
@@ -190,7 +190,7 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
             env=self, lane_idx=2
         )
         constraints_dict["collision"] = constraints.build_collision(env=self)
-        constraints_dict["crash_objects"] = constraints.build_collision(env=self)
+        constraints_dict["crash_objects"] = constraints.build_crash_objects(env=self)
         constraints_fn = merge_dict_funcs(constraints_dict)
 
         return constraints_dict, constraints_fn

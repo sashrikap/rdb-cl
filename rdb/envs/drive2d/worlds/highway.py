@@ -63,7 +63,12 @@ class HighwayDriveWorld(DriveWorld):
 
             def fence_dist_fn(state, actions, fence=fence, normal=normal):
                 main_pos = state[..., np.arange(*main_idx)]
-                return feature.dist_outside_fence(main_pos, fence.center, normal)
+                fence_center = fence.center
+                safe_margin = self._lane_width / 8
+                crash_center = fence_center + normal * np.array(
+                    [(self._lane_width + self._car_width) / 2 + safe_margin, 0]
+                )
+                return feature.dist_outside_fence(main_pos, crash_center, normal)
                 # return feature.diff_to_fence(fence.center, normal, main_pos)
 
             fence_fns[f_i] = fence_dist_fn

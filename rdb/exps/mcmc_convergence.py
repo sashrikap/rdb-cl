@@ -14,7 +14,7 @@ Includes:
 """
 
 from rdb.infer.particles import Particles
-from rdb.exps.utils import Profiler
+from rdb.exps.utils import Profiler, save_params
 from numpyro.handlers import seed
 from functools import partial
 from tqdm.auto import tqdm
@@ -166,11 +166,14 @@ class ExperimentMCMC(object):
         """
         all_tasks = self._model.env.all_tasks
         num_obs = self._max_ird_obs_num
+        num_tasks = 100
         for design in self._design_data["DESIGNS"]:
             design["WEIGHTS"] = normalize_weights(
                 design["WEIGHTS"], self._normalized_key
             )
-        rand_tasks = onp.array(random_choice(self._get_rng_task(), all_tasks, num_obs))
+        rand_tasks = onp.array(
+            random_choice(self._get_rng_task(), all_tasks, num_tasks)
+        )
 
         if exp_mode.startswith("designer"):
             ## Designer experiment
@@ -184,16 +187,14 @@ class ExperimentMCMC(object):
                 # Treat final design as true_w
                 true_w = self._design_data["DESIGNS"][-1]["WEIGHTS"]
                 self._all_ird_obs_tasks.append(design_task)
-                self._all_ird_obs_ws.append(true_w)
+            self._all_ird_obs_ws = [true_w] * num_tasks
 
         elif "ird_convergence_true_w_random_tasks" in exp_mode:
             ## Use one of Jerry's prior designed w as true w
             ## Test # random tasks vs convergence
             self._all_ird_obs_tasks = rand_tasks
-            for d_data in self._design_data["DESIGNS"]:
-                # Treat final design as true_w
-                true_w = self._design_data["DESIGNS"][-1]["WEIGHTS"]
-                self._all_ird_obs_ws.append(true_w)
+            true_w = self._design_data["DESIGNS"][-1]["WEIGHTS"]
+            self._all_ird_obs_ws = [true_w] * num_tasks
 
         elif "ird_convergence_random_w_random_tasks" in exp_mode:
             ## Use a random w as true w
@@ -222,7 +223,7 @@ class ExperimentMCMC(object):
                         true_w[key] = val
                     if len((true_w.keys())) == n_feats:
                         break
-                self._all_ird_obs_ws.append(true_w)
+            self._all_ird_obs_ws = [true_w] * num_tasks
 
         else:
             raise NotImplementedError
@@ -251,6 +252,7 @@ class ExperimentMCMC(object):
 
         self._load_design(exp_mode)
         save_dir = f"{self._save_root}/{exp_mode}"
+        save_params(f"{save_dir}/params_{self._rng_name}.yaml", self._exp_params)
 
         all_tasks = self._designer.env.all_tasks
         viz_tasks = random_choice(
@@ -273,6 +275,7 @@ class ExperimentMCMC(object):
             prior_w = self._all_designer_prior_ws[n_prior]
 
             ## Set designer data
+            # import pdb; pdb.set_trace()
             self._designer.prior_tasks = prior_tasks
             self._designer.true_w = prior_w
 
@@ -281,7 +284,9 @@ class ExperimentMCMC(object):
                 "num_samples"
             ]
             save_name = f"designer_sample_{num_samples:04d}_prior_{n_prior:02d}"
-            obs = self._designer.simulate(new_tasks, save_name=save_name)
+            samples = self._designer.simulate(new_tasks, save_name=save_name)
+            samples.save()
+            obs = samples.subsample(1)
 
             ## Visualize performance
             # obs.visualize_comparisons(
@@ -299,12 +304,14 @@ class ExperimentMCMC(object):
 
         self._load_observations(exp_mode)
         save_dir = f"{self._save_root}/{exp_mode}"
+        save_params(f"{save_dir}/params_{self._rng_name}.yaml", self._exp_params)
         all_tasks = self._designer.env.all_tasks
 
         # for num_obs in range(6, len(self._all_ird_obs_ws)):
-        # for num_obs in range(5, 6):
-        # for num_obs in range(4, 5):
-        for num_obs in range(3, 6):
+        # for num_obs in range(1, 6):
+        for num_obs in range(1, 15):
+            # for num_obs in range(4, 5):
+            # for num_obs in range(3, 6):
 
             self._log_time(f"IRD Obs {num_obs} Begin")
             print(f"Experiment mode ({self._rng_name}): {exp_mode}")
@@ -320,6 +327,8 @@ class ExperimentMCMC(object):
             num_samples = self._exp_params["IRD_ARGS"]["sample_args"]["num_samples"]
             belief_name = f"ird_sample_{num_samples:04d}_obs_{num_obs:02d}"
             belief = self._model.sample(tasks=obs_tasks, obs=obs, save_name=belief_name)
+            belief.save()
+            # import pdb; pdb.set_trace()
 
             ## Reset designer prior tasks
             self._designer.prior_tasks = all_tasks

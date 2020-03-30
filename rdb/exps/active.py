@@ -59,6 +59,7 @@ class ActiveInfoGain(object):
 
             """
             #  shape (nweights,)
+            # import pdb; pdb.set_trace()
             new_costs = (weights_arr * next_feats_sum).mean(axis=0)
             #  shape (nweights,)
             new_rews = -1 * self._beta * new_costs
@@ -74,12 +75,12 @@ class ActiveInfoGain(object):
             next_densities = next_probs * (1 / delta)
             ent = 0.0
             for density in next_densities:
-                abs_density = np.abs(density)
-                abs_nonzero = abs_density > 0
+                # assert np.all(density >= 0)
+                abs_nonzero = density > 0
                 # Trick by setting 0-density to 1, which passes np.log
-                abs_density += 1 - abs_nonzero
+                density += 1 - abs_nonzero
                 # (density * onp.ma.log(abs_density) * delta).sum()
-                ent += -(density * np.log(abs_density) * delta).sum()
+                ent += -(density * np.log(density) * delta).sum()
             return ent
 
         return _fn
@@ -130,13 +131,17 @@ class ActiveInfoGain(object):
         curr_probs = which_bins.sum(axis=1)
         curr_probs = curr_probs / curr_probs.sum(axis=1, keepdims=True)
         #  shape (nfeats, nweights, 1)
-        all_weights_arr = belief.weights.prepare(feats_keys).numpy_array()[:, :, None]
+        all_weights_arr = belief.weights.prepare(feats_keys).normalize_across_keys()
+        all_weights_arr = all_weights_arr.numpy_array()[:, :, None]
 
         entropy_vfn = jax.vmap(
             partial(
                 self._entropy_fn, next_feats_sum=next_feats_sum, which_bins=which_bins
             ),
             in_axes=1,
+        )
+        self._entropy_fn(
+            all_weights_arr[:, 0], next_feats_sum=next_feats_sum, which_bins=which_bins
         )
         entropies = self._batch_compute_entropy(entropy_vfn, all_weights_arr)
         infogain = -1 * np.mean(entropies)

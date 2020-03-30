@@ -503,14 +503,15 @@ class Particles(object):
                 self._cache_violations[task_name] = data[task_name]["violations"]
 
     def merge_bulk_tasks(self, tasks, bulk_data):
-        """Merge dumped data from bulk data.
+        """Merge dumped data from distributed bulk data.
 
         Args:
             tasks (ndarray): (ntasks, task_dim)
             data (dict): {"actions": (ntasks, nweights, T, task_dim), ...}
 
         """
-        assert len(tasks) == len(bulk_data["actions"])
+        assert len(tasks) == bulk_data["actions"].shape[0]
+        assert len(self.weights) == bulk_data["actions"].shape[1]
         for ti, task in enumerate(tasks):
             task_name = self.get_task_name(task)
             if task_name not in self.cached_names:
@@ -528,6 +529,7 @@ class Particles(object):
 
         Output:
             diff_rews (ndarray): (nbatch,)
+            diff_vios_arr (ndarray): (nbatch, )
             diff_vios (ndarray): (nbatch,)
 
         Requires:
@@ -619,7 +621,9 @@ class Particles(object):
             entropy = -(1.0 / N) * onp.sum(onp.log(kernel(data)))
         elif method == "histogram":
             if hist_probs is None:
-                hist_probs = self.hist_probs(log_scale=log_scale)
+                hist_probs = self.hist_probs(
+                    bins=bins, max_weights=max_weights, log_scale=log_scale
+                )
             hist_densities = hist_probs * (1 / delta)
             entropy = 0.0
             for key, density in hist_densities.items():
@@ -659,6 +663,9 @@ class Particles(object):
         """Based on numpy.digitize. Find histogram bin membership of each sample.
 
         Args:
+            bins: number of bins
+            max_weights: weights range [-max_weights, max_weights]
+            log_scale: current values are in log_scale
             matrix (bool):
                 if true, return (nfeats -1) * nbins
                 if false, return (nfeats -1) * (nweights, nbins)
@@ -686,6 +693,10 @@ class Particles(object):
         assert (
             "bins" in self._weight_params and "max_weights" in self._weight_params
         ), "Particle weight parameters not properly setup."
+        # Normalize by key
+        weights = DictList(weights, expand_dims=True).normalize_by_key(
+            self._normalized_key
+        )[0]
         max_weights = self._weight_params["max_weights"]
         bins = self._weight_params["bins"]
         ranges = (-max_weights, max_weights)
@@ -766,7 +777,7 @@ class Particles(object):
         load_data = np.load(path, allow_pickle=True)
         self._weights = DictList(load_data["weights"].item())
 
-    def visualize(self, true_w=None, obs_w=None, **kwargs):
+    def visualize(self, true_w=None, obs_w=None, log_scale=False, **kwargs):
         """Visualize weight belief distribution in histogram.
 
         Shows all weight particles, true weight, observed weight and MAP weights.
@@ -781,7 +792,7 @@ class Particles(object):
         max_weights = self._weight_params["max_weights"]
 
         num_map = 4  # Magic number for now
-        map_ws = self.map_estimate(num_map, log_scale=False).weights
+        map_ws = self.map_estimate(num_map, log_scale=log_scale).weights
         map_ls = [str(i) for i in range(1, 1 + num_map)]
         # Visualize multiple map weights in magenta with ranking labels
         plot_weights(
@@ -792,7 +803,7 @@ class Particles(object):
             path=f"{self._fig_dir}/{self._expanded_name}.png",
             title="Proxy Reward; true (red), obs (black) map (magenta)",
             max_weights=max_weights,
-            log_scale=False,
+            log_scale=log_scale,
         )
 
     def visualize_comparisons(self, tasks, target, fig_name):

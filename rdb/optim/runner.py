@@ -146,18 +146,48 @@ class Runner(object):
             self._env.close_window()
         imsave(path, frame)
 
-    def collect_heatmap(self, state, weights, width=450, path=None, text=None):
+    def collect_cost_heatmap(self, state, weights, width=450, path=None, text=None):
         assert len(state.shape) == 2
 
         weights = DictList(weights)
         if path is None:
-            path = join(dirname(rdb.__file__), "..", "data", "thumbnail.png")
+            path = join(dirname(rdb.__file__), "..", "data", "heatmap.png")
         os.makedirs(dirname(path), exist_ok=True)
         self._env.reset()
         self._env.state = state
         frame = self._env.render(
             "rgb_array", draw_heat=True, weights=weights, text=text
         )
+        frame = imresize(frame, (width, width))
+        if self.run_from_ipython():
+            self._env.close_window()
+        imsave(path, frame)
+
+    def collect_bound_heatmap(self, state, weights, width=450, path=None, text=None):
+        assert len(state.shape) == 2
+
+        weights = DictList(weights)
+        if path is None:
+            path = join(dirname(rdb.__file__), "..", "data", "boundarymap.png")
+        os.makedirs(dirname(path), exist_ok=True)
+        self._env.reset()
+        self._env.state = state
+        frame = self._env.render(
+            "rgb_array", draw_boundary=True, weights=weights, text=text
+        )
+        frame = imresize(frame, (width, width))
+        if self.run_from_ipython():
+            self._env.close_window()
+        imsave(path, frame)
+
+    def collect_constraint_heatmap(self, state, key, width=450, path=None, text=None):
+        assert len(state.shape) == 2
+        if path is None:
+            path = join(dirname(rdb.__file__), "..", "data", "constraint.png")
+        os.makedirs(dirname(path), exist_ok=True)
+        self._env.reset()
+        self._env.state = state
+        frame = self._env.render("rgb_array", draw_constraint_key=key, text=text)
         frame = imresize(frame, (width, width))
         if self.run_from_ipython():
             self._env.close_window()

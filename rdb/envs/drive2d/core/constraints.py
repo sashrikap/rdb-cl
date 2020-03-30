@@ -32,8 +32,7 @@ def build_offtrack(env):
 
     """
     num_cars = len(env.cars)
-    # threshold = 0.5 * env.car_width + 0.5 * env.lane_width
-    threshold = -0.5 * env.car_width + 0.5 * env.lane_width
+    threshold = env.lane_width / 8
     vfn = jax.vmap(env.raw_features_dict["dist_fences"])
 
     @jax.jit
@@ -93,7 +92,7 @@ def build_crash_objects(env):
 
     """
     ncars = len(env.cars)
-    threshold = np.array([env.car_width, env.car_length])
+    threshold = np.array([env.car_width * 0.5, env.car_length])
     vfn = jax.vmap(env.raw_features_dict["dist_objects"])
 
     @jax.jit

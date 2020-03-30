@@ -43,7 +43,6 @@ from numpyro.util import (
     while_loop,
     cond,
     copy_docs_from,
-    fori_collect,
     fori_loop,
     identity,
     not_jax_tracer,
@@ -170,6 +169,10 @@ def mh(model, proposal_var, max_val, jit=True):
             next_flat = mh_draws(curr_flat, mh_proposal_var, rng_key)
             next_state = unravel_fn(next_flat)
             next_log_prob, _ = log_density(model, model_args, model_kwargs, next_state)
+            # curr_log_prob, _ = log_density(model, model_args, model_kwargs, curr_state)
+            # print(next_log_prob, curr_log_prob)
+            # print("mcmc diff", next_log_prob - curr_log_prob)
+            # import pdb; pdb.set_trace()
             return next_flat, next_log_prob
 
         def _body_fn(val):
@@ -201,7 +204,7 @@ def mh(model, proposal_var, max_val, jit=True):
         (next_flat, next_log_prob, _, n, rng_key) = terminal_val
         next_state = unravel_fn(next_flat)
         # import pdb; pdb.set_trace()
-
+        # print(next_state)
         return next_state, next_log_prob, n, 1.0 / n
 
     def sample_kernel(mh_state, model_args=(), model_kwargs=None):

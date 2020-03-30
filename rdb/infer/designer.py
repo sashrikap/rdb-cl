@@ -28,9 +28,6 @@ class Designer(object):
         * Currently assumes same beta, proposal as IRD module, although
           doesn't have to be.
 
-    Args:
-        true_w (dict): true weight
-
     """
 
     def __init__(
@@ -38,7 +35,6 @@ class Designer(object):
         env_fn,
         controller_fn,
         beta,
-        true_w,
         prior_fn,
         ## Weight parameters
         normalized_key,
@@ -63,16 +59,8 @@ class Designer(object):
         self._env_fn = env_fn
         self._env = env_fn()
         self._build_controllers(controller_fn)
-        self._true_w = true_w
-        if self._true_w is not None:
-            self._truth = self.create_particles(
-                weights=DictList([true_w], jax=False),
-                controller=self._true_controller,
-                runner=self._true_runner,
-                save_name="designer_truth",
-            )
-        else:
-            self._truth = None
+        self._true_w = None
+        self._truth = None
         self._beta = beta
         self._use_true_w = use_true_w
         self._normalized_key = normalized_key
@@ -89,8 +77,7 @@ class Designer(object):
         self._prior = None
         self._model = None
         self._task_method = task_method
-        self._likelihood = self._build_likelihood(self._beta)
-        self._likelihood_ird = self._build_likelihood(self._beta)
+        self._likelihood, self._likelihood_ird = self._build_likelihood()
         self._sample_args = sample_args
         self._sample_method = sample_method
         self._sample_init_args = sample_init_args
@@ -163,16 +150,14 @@ class Designer(object):
     @true_w.setter
     def true_w(self, w):
         print("Designer truth updated")
-        self._true_w = w
-        if w is not None:
-            self._truth = self.create_particles(
-                weights=DictList([w], jax=False),
-                controller=self._true_controller,
-                runner=self._true_runner,
-                save_name="designer_truth",
-            )
-        else:
-            self._truth = None
+        w_dict = DictList([w], jax=False).normalize_by_key(self._normalized_key)
+        self._true_w = w_dict[0]
+        self._truth = self.create_particles(
+            weights=w_dict,
+            controller=self._true_controller,
+            runner=self._true_runner,
+            save_name="designer_truth",
+        )
 
     @property
     def truth(self):
@@ -188,8 +173,6 @@ class Designer(object):
 
     def update_key(self, rng_key):
         self._rng_key, rng_truth, rng_norm = random.split(rng_key, 3)
-        if self._truth is not None:
-            self._truth.update_key(rng_truth)
         self.reset_prior_tasks()
         ## Sample normaling factor
         self._norm_prior = seed(self._prior_fn("designer_norm"), rng_norm)
@@ -201,8 +184,27 @@ class Designer(object):
         )
         # Build likelihood and model
         self._prior = self._prior_fn("designer")
+        if self._truth is not None:
+            self._truth.update_key(rng_truth)
 
-    def simulate(self, new_tasks, save_name):
+    def update_prior(self, keys):
+        update_normalizer = False
+        for key in keys:
+            if key != self._normalized_key:
+                self._prior.add_feature(key)
+                update_normalizer = True
+        if update_normalizer:
+            keys = self._prior.feature_keys
+            self._rng_key, rng_norm = random.split(self._rng_key, 2)
+            self._norm_prior = seed(self._prior_fn("designer_norm", keys), rng_norm)
+            self._normalizer = self.create_particles(
+                self._norm_prior(self._num_normalizers),
+                save_name="designer_normalizer",
+                runner=self._norm_runner,
+                controller=self._norm_controller,
+            )
+
+    def simulate(self, new_tasks, save_name, tqdm_position=0):
         """Sample 1 set of weights from b(design_w) given true_w and prior tasks.
 
         Example:
@@ -228,10 +230,6 @@ class Designer(object):
                 tasks = onp.concatenate([self._prior_tasks, new_tasks])
 
             ## ==============================================================
-            ## =================== Pre-empt Computations ====================
-            self._normalizer.compute_tasks(tasks, vectorize=True)
-
-            ## ==============================================================
             ## ======================= MCMC Sampling ========================
             init_args = copy.deepcopy(self._sample_init_args)
             samp_args = copy.deepcopy(self._sample_args)
@@ -255,6 +253,7 @@ class Designer(object):
                 rng_sampler,
                 init_params=dict(init_params),
                 extra_fields=["mean_accept_prob"],
+                tqdm_position=tqdm_position,
             )
 
             ## ==============================================================
@@ -272,7 +271,7 @@ class Designer(object):
                 chains=sample_ws,
                 rates=sample_rates,
                 fig_dir=f"{self._save_dir}/mcmc",
-                title=f"seed_{self._rng_name}_{save_name}_samples_{num_samples}",
+                title=f"seed_{self._rng_name}_{save_name}_samples_{num_samples:04d}",
                 **self._weight_params,
             )
             particles = self.create_particles(
@@ -282,8 +281,8 @@ class Designer(object):
                 save_name=save_name,
             )
             particles.visualize(true_w=self.true_w, obs_w=None)
-            # return particles.subsample(1)
-            return particles.map_estimate(1)
+            return particles
+            # return particles.map_estimate(1)
 
     def _build_model(self, tasks):
         """Build Designer PGM model."""
@@ -296,6 +295,7 @@ class Designer(object):
         nfeats = len(feats_keys)
         nnorms = len(self._normalizer.weights)
         ntasks = len(tasks)
+        self.update_prior(self._truth.weights.keys())
         #  shape (nfeats, 1)
         true_ws = self._truth.weights.prepare(feats_keys).numpy_array()
         ## ============= Pre-empt optimiations =============
@@ -303,45 +303,43 @@ class Designer(object):
         true_feats_sum = self._truth.get_features_sum(tasks).prepare(feats_keys)
         true_feats_sum = true_feats_sum.numpy_array()
 
-        #  shape (nfeats, ntasks, nnorms)
-        normal_feats_sum = self._normalizer.get_features_sum(tasks).prepare(feats_keys)
-        normal_feats_sum = normal_feats_sum.numpy_array()
-        #  shape (nfeats, ntasks, 1, nnorms)
-        normal_feats_sum = np.expand_dims(normal_feats_sum, axis=2)
         assert true_ws.shape == (nfeats, 1)
-        assert normal_feats_sum.shape == (nfeats, ntasks, 1, nnorms)
+        ## Operation over tasks
+        task_method = None
+        if self._task_method == "sum":
+            task_method = partial(np.sum, axis=0)
+        elif self._task_method == "mean":
+            task_method = partial(np.mean, axis=0)
+        else:
+            raise NotImplementedError
 
         def _model():
             #  shape nfeats * (1,)
-            new_ws = self._prior(1).prepare(feats_keys)
+            new_ws = self._prior(1).prepare(feats_keys).normalize_across_keys()
             sample_ws = new_ws.numpy_array()
             ## ======= Not jit-able optimization: requires scipy/jax optimizer ======
             sample_ps = self.create_particles(
                 new_ws,
                 controller=self._sample_controller,
                 runner=self._sample_runner,
-                jax=False,
+                jax=True,
             )
-            sample_ps.compute_tasks(tasks, jax=False)
+            sample_ps.compute_tasks(tasks, jax=True)
             #  shape (nfeats, ntasks, 1)
             sample_feats_sum = sample_ps.get_features_sum(tasks).prepare(feats_keys)
             sample_feats_sum = sample_feats_sum.numpy_array()
             assert sample_feats_sum.shape == (nfeats, ntasks, 1)
+            #  shape (ntasks, nbatch,)
             log_probs = self._likelihood(
-                true_ws,
-                true_feats_sum,
-                # sample_feats_sum,
-                sample_ws,
-                tasks,
-                sample_feats_sum,
-                normal_feats_sum,
+                true_ws, sample_ws, sample_feats_sum, tasks, self.beta
             )
-            assert len(log_probs) == 1
-            numpyro.factor("designer_log_prob", log_probs[0])
+            #  shape (nbatch,)
+            log_prob = task_method(log_probs)
+            numpyro.factor("designer_log_prob", log_prob)
 
         return _model
 
-    def _build_likelihood(self, beta):
+    def _build_likelihood(self):
         """Build likelihood kernel."""
 
         ## Operation over tasks
@@ -354,31 +352,73 @@ class Designer(object):
             raise NotImplementedError
 
         @jax.jit
-        def _likelihood(
-            true_ws,
-            true_feats_sum,
-            sample_ws,
-            tasks,
-            sample_feats_sum,
-            normal_feats_sum,
-        ):
+        def _likelihood(true_ws, sample_ws, sample_feats_sum, tasks, beta):
             """
-            Main likelihood function. Used in Designer and Designer Inversion (IRD Kernel).
-            Designer forward likelihood p(design_w | true_w).
+            Forward likelihood function (Unnormalized). Used in Designer sampling.
+            Computes something proportional to p(design_w | true_w).
 
             Args:
                 true_ws (ndarray): designer's true w in mind
                     shape: (nfeats, nbatch)
-                true_feats_sum (ndarray): features of true ws
-                    shape: (nfeats, ntasks, nbatch)
                 tasks (ndarray): prior tasks
                     shape: (ntasks, nbatch, task_dim)
                 sample_ws (ndarray): current sampled w, batched
                     shape: (nfeats, nbatch)
                 sample_feats_sum (ndarray): sample features
                     shape: (nfeats, ntasks, nbatch)
+
+            Note:
+                * nbatch dimension has two uses
+                  (1) nbatch=1 in designer.sample
+                  (1) nbatch=nnorms in ird.sample
+                * To stabilize MH sampling
+                  (1) sum across tasks
+                  (2) average across features
+
+            Return:
+                log_probs (ndarray): (ntasks, nbatch, )
+
+            """
+            nfeats = sample_ws.shape[0]
+            nbatch = sample_ws.shape[1]
+            ntasks = len(tasks)
+            assert true_ws.shape == (nfeats, nbatch)
+            assert sample_ws.shape == (nfeats, nbatch)
+            assert sample_feats_sum.shape == (nfeats, ntasks, nbatch)
+
+            #  shape (nfeats, 1, nbatch)
+            true_ws = np.expand_dims(true_ws, axis=1)
+
+            ## ===============================================
+            ## ======= Computing Numerator: sample_xxx =======
+            #  shape (nfeats, ntasks, nbatch)
+            sample_costs = true_ws * sample_feats_sum
+            #  shape (nfeats, ntasks, nbatch) -> (ntasks, nbatch, ), average across features
+            sample_rews = -beta * sample_costs.mean(axis=0)
+
+            assert sample_rews.shape == (ntasks, nbatch)
+            #  shape (ntasks, nbatch,)
+            log_probs = sample_rews
+            return log_probs
+
+        def _normalized_likelihood(
+            true_ws,
+            # true_feats_sum,
+            sample_ws,
+            sample_feats_sum,
+            normal_feats_sum,
+            tasks,
+            beta,
+        ):
+            """
+            Main likelihood function (Normalized). Used in Designer Inversion (IRD Kernel).
+            Approximates p(design_w | true_w).
+
+            Args:
                 normal_feats_sum (ndarray): normalizer features
                     shape: (nfeats, ntasks, nbatch, nnorms)
+                true_feats_sum (ndarray): true ws features
+                    shape: (nfeats, ntasks, nbatch)
 
             Note:
                 * In IRD kernel, `sample_feats_sum` is used as proxy for `true_feats_sum`
@@ -386,7 +426,7 @@ class Designer(object):
                   nbatch * nnorms ~ 2000 * 200 in IRD kernel
                 * nbatch dimension has two uses
                   (1) nbatch=1 in designer.sample
-                  (1) nbatch=nnorms in ird.sample
+                  (1) nbatch=nobs, ntasks=1 in ird.sample
                 * To stabilize MH sampling
                   (1) sum across tasks
                   (2) average across features
@@ -401,32 +441,21 @@ class Designer(object):
             nnorms = normal_feats_sum.shape[3]
             assert true_ws.shape == (nfeats, nbatch)
             assert sample_ws.shape == (nfeats, nbatch)
-            assert true_feats_sum.shape == (nfeats, ntasks, nbatch)
             assert sample_feats_sum.shape == (nfeats, ntasks, nbatch)
             assert normal_feats_sum.shape == (nfeats, ntasks, nbatch, nnorms)
 
-            #  shape (nfeats, 1, nbatch)
-            true_ws = np.expand_dims(true_ws, axis=1)
-
-            ## ===============================================
-            ## ======= Computing Numerator: sample_xxx =======
-            #  shape (nfeats, ntasks, nbatch)
-            sample_costs = true_ws * sample_feats_sum
-            #  shape (nfeats, ntasks, nbatch) -> (ntasks, nbatch, ), average across features
-            sample_rews = (-beta * sample_costs).mean(axis=0)
-            #  shape (nbatch,)
-            sample_rews = task_method(sample_rews)
-            assert sample_rews.shape == (nbatch,)
+            #  shape (ntasks, nbatch)
+            sample_rews = _likelihood(true_ws, sample_ws, sample_feats_sum, tasks, beta)
 
             ## =================================================
             ## ======= Computing Denominator: normal_xxx =======
             #  shape (nfeats, 1, nbatch, 1)
-            normal_truth = np.expand_dims(true_ws, axis=3)
+            normal_truth = np.expand_dims(np.expand_dims(true_ws, axis=1), 3)
             #  shape (nfeats, ntasks, nbatch, nnorms + 2)
             normal_feats_sum_2 = np.concatenate(
                 [
                     normal_feats_sum,
-                    np.expand_dims(true_feats_sum, axis=3),
+                    # np.expand_dims(true_feats_sum, axis=3),
                     np.expand_dims(sample_feats_sum, axis=3),
                 ],
                 axis=3,
@@ -434,9 +463,16 @@ class Designer(object):
             #  shape (nfeats, ntasks, nbatch, nnorms + 2)
             normal_costs = normal_truth * normal_feats_sum_2
             #  shape (ntasks, nbatch, nnorms + 2)
-            normal_rews = (-beta * normal_costs).mean(axis=0)
+            normal_rews = -beta * normal_costs.mean(axis=0)
+
+            # Normalize by tasks
+            # normal_rews -= np.expand_dims(sample_rews, axis=2)
+            # sample_rews = np.zeros_like(sample_rews)
+
             #  shape (nbatch, nnorms + 2)
             normal_rews = task_method(normal_rews)
+            #  shape (nbatch,)
+            sample_rews = task_method(sample_rews)
             #  shape (nbatch,)
             normal_rews = logsumexp(normal_rews, axis=1) - np.log(nnorms + 1)
             assert normal_rews.shape == (nbatch,)
@@ -447,7 +483,7 @@ class Designer(object):
             log_probs = sample_rews - normal_rews
             return log_probs
 
-        return _likelihood
+        return _likelihood, _normalized_likelihood
 
     def create_particles(
         self, weights, controller=None, runner=None, save_name="", jax=False

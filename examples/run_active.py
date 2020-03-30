@@ -87,17 +87,20 @@ def main(random_key, evaluate=False):
             name=name,
         )
 
-    designer = Designer(
-        env_fn=env_fn,
-        controller_fn=designer_controller_fn,
-        prior_fn=prior_fn,
-        weight_params=WEIGHT_PARAMS,
-        normalized_key=WEIGHT_PARAMS["normalized_key"],
-        save_root=f"{SAVE_ROOT}/{EXP_ARGS['save_name']}",
-        exp_name=f"{EXP_ARGS['EXP_NAME']}",
-        **DESIGNER_ARGS,
-    )
+    def designer_fn():
+        designer = Designer(
+            env_fn=env_fn,
+            controller_fn=designer_controller_fn,
+            prior_fn=prior_fn,
+            weight_params=WEIGHT_PARAMS,
+            normalized_key=WEIGHT_PARAMS["normalized_key"],
+            save_root=f"{SAVE_ROOT}/{PARAMS['save_name']}",
+            exp_name=f"{PARAMS['EXP_NAME']}",
+            **DESIGNER_ARGS,
+        )
+        return designer
 
+    designer = designer_fn()
     ird_model = IRDOptimalControl(
         env_id=ENV_NAME,
         env_fn=env_fn,
@@ -106,20 +109,22 @@ def main(random_key, evaluate=False):
         prior_fn=prior_fn,
         normalized_key=WEIGHT_PARAMS["normalized_key"],
         weight_params=WEIGHT_PARAMS,
-        save_root=f"{SAVE_ROOT}/{EXP_ARGS['save_name']}",
-        exp_name=f"{EXP_ARGS['EXP_NAME']}",
+        save_root=f"{SAVE_ROOT}/{PARAMS['save_name']}",
+        exp_name=f"{PARAMS['EXP_NAME']}",
         **IRD_ARGS,
     )
     ## Active acquisition function for experiment
-    BETA = DESIGNER_ARGS["beta"]
+    ACTIVE_BETA = IRD_ARGS["beta"]
     active_fns = {
         "infogain": ActiveInfoGain(
-            rng_key=None, beta=BETA, weight_params=WEIGHT_PARAMS, debug=False
+            rng_key=None, beta=ACTIVE_BETA, weight_params=WEIGHT_PARAMS, debug=False
         ),
         "ratiomean": ActiveRatioTest(
-            rng_key=None, beta=BETA, method="mean", debug=False
+            rng_key=None, beta=ACTIVE_BETA, method="mean", debug=False
         ),
-        "ratiomin": ActiveRatioTest(rng_key=None, beta=BETA, method="min", debug=False),
+        "ratiomin": ActiveRatioTest(
+            rng_key=None, beta=ACTIVE_BETA, method="min", debug=False
+        ),
         "random": ActiveRandom(rng_key=None),
     }
     for key in list(active_fns.keys()):
@@ -134,20 +139,16 @@ def main(random_key, evaluate=False):
 
     experiment = ExperimentActiveIRD(
         ird_model,
-        designer,
-        active_fns,
+        designer_fn=designer_fn,
+        active_fns=active_fns,
         true_w=TRUE_W,
         eval_server=eval_server,
-        iterations=EXP_ARGS["exp_iterations"],
-        num_eval_tasks=EXP_ARGS["num_eval_tasks"],
-        num_eval_map=EXP_ARGS["num_eval_map"],
-        num_active_tasks=ACTIVE_ARGS["num_active_tasks"],
-        num_active_sample=ACTIVE_ARGS["num_active_sample"],
         fixed_task_seed=fixed_task_seed,
-        save_root=f"{SAVE_ROOT}/{EXP_ARGS['save_name']}",
-        exp_name=f"{EXP_ARGS['EXP_NAME']}",
+        save_root=f"{SAVE_ROOT}/{PARAMS['save_name']}",
+        exp_name=f"{PARAMS['EXP_NAME']}",
         exp_params=PARAMS,
         normalized_key=WEIGHT_PARAMS["normalized_key"],
+        **EXP_ARGS,
     )
 
     """ Experiment """

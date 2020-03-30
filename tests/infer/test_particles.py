@@ -23,7 +23,10 @@ def build_weights(num_weights):
     for _ in range(num_weights):
         w = {}
         for key in env.features_keys:
-            w[key] = onp.random.random()
+            if key == normalized_key:
+                w[key] = 1.0
+            else:
+                w[key] = onp.random.random()
         weights.append(w)
     return DictList(weights)
 
@@ -45,6 +48,7 @@ def build_particles(num_weights):
     )
     weights = build_weights(num_weights)
     ps = Particles(
+        rng_name="",
         rng_key=None,
         env_fn=None,
         env=env,
@@ -64,6 +68,12 @@ def build_particles(num_weights):
 all_particles = {}
 for num_weights in [1, 5, 10, 20]:
     all_particles[num_weights] = build_particles(num_weights)
+
+
+@pytest.mark.parametrize("num_weights", [10, 20])
+def test_digitize(num_weights):
+    ps = build_particles(num_weights)
+    which_bins = ps.digitize(bins=5, max_weights=1, log_scale=True, matrix=True)
 
 
 @pytest.mark.parametrize("num_weights", [2, 5])
@@ -200,7 +210,10 @@ def test_compare_with(num_weights):
     ps = all_particles[num_weights]
     target = build_particles(1)
     task = env.all_tasks[0]
-    diff_rews, diff_vios = ps.compare_with(task, target)
+    diff_rews, diff_vios_arr, diff_vios = ps.compare_with(task, target)
+    import pdb
+
+    pdb.set_trace()
     assert diff_rews.shape == (num_weights,)
     assert diff_vios.shape == (num_weights,)
 
@@ -215,7 +228,7 @@ def test_resample(num_weights):
 @pytest.mark.parametrize("num_weights", [1, 5])
 def test_entropy(num_weights):
     ps = all_particles[num_weights]
-    ent = ps.entropy(bins=5, max_weights=10)
+    ent = ps.entropy(bins=5, max_weights=10, log_scale=True)
 
 
 @pytest.mark.parametrize("num_weights", [10, 20])

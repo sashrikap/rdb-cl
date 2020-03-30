@@ -7,7 +7,7 @@ import numpyro.distributions as dist
 import yaml, argparse, os
 import numpy as onp
 import itertools
-import ptyest
+import pytest
 import copy
 import ray
 

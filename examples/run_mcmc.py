@@ -57,10 +57,10 @@ def main(random_key):
     assert design_data["ENV_NAME"] == ENV_NAME, "Environment name mismatch"
 
     ## Prior sampling & likelihood functions for PGM
-    def prior_fn(name=""):
+    def prior_fn(name="", feature_keys=WEIGHT_PARAMS["feature_keys"]):
         return LogUniformPrior(
             normalized_key=WEIGHT_PARAMS["normalized_key"],
-            feature_keys=WEIGHT_PARAMS["feature_keys"],
+            feature_keys=feature_keys,
             log_max=WEIGHT_PARAMS["max_weights"],
             name=name,
         )
@@ -112,16 +112,22 @@ def main(random_key):
     """ Experiment """
     # with jax.disable_jit():
     experiment.update_key(rng_key)
-    experiment.run_designer(DESIGNER_ARGS["exp_name"])
-    # experiment.run_ird(IRD_ARGS["exp_name"])
+    if DESIGNER:
+        experiment.run_designer(DESIGNER_ARGS["exp_name"])
+    elif IRD:
+        experiment.run_ird(IRD_ARGS["exp_name"])
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process some integers.")
     parser.add_argument("--GCP_MODE", action="store_true")
+    parser.add_argument("--DESIGNER", action="store_true")
+    parser.add_argument("--IRD", action="store_true")
     args = parser.parse_args()
 
     GCP_MODE = args.GCP_MODE
+    IRD = args.IRD
+    DESIGNER = args.DESIGNER
 
     # Load parameters
     if not GCP_MODE:

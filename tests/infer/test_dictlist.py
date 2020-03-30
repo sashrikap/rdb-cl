@@ -1,11 +1,12 @@
 from rdb.infer.dictlist import *
 from collections import OrderedDict
 import numpy as onp
+import jax.numpy as np
 
 
 def assert_equal(dicta, dictb):
     for key in dicta.keys():
-        assert onp.allclose(dicta[key], dictb[key])
+        assert np.allclose(dicta[key], dictb[key])
 
 
 def test_dict_init():
@@ -337,7 +338,7 @@ def test_normalize_by_key():
 
 
 def test_normalize_across_keys():
-    dict_ = DictList({"a": [1, 2], "b": [1, 3]}).normalize_across_keys()
+    dict_ = DictList({"a": [1, 2], "b": [1, 3]}, jax=False).normalize_across_keys()
     results = {
         "a": [onp.sqrt(1 / 2.0), 2.0 / onp.sqrt(13)],
         "b": [onp.sqrt(1 / 2.0), 3.0 / onp.sqrt(13)],
@@ -345,7 +346,7 @@ def test_normalize_across_keys():
     assert_equal(dict_, results)
 
     dict_ = DictList(
-        {"a": [[1, 1], [2, 2]], "b": [[1, 2], [3, 3]]}
+        {"a": [[1, 1], [2, 2]], "b": [[1, 2], [3, 3]]}, jax=False
     ).normalize_across_keys()
     results = {
         "a": [

@@ -111,9 +111,10 @@ if __name__ == "__main__":
     # 200128, bad for infogain: 4 (1)
     # 200128, bad for ratiomean: 1
     # 200128, bad for ratiomin: 4 (1)
-    not_seeds = [20, 21, 22, 23, 24]
+    # not_seeds = [20, 21, 22, 23, 24]
+    not_seeds = []
     MAX_LEN = 2
-    MAX_RANDOM_LEN = 6
+    MAX_RANDOM_LEN = 3
     PADDING = 0
 
     use_seeds = [str(random.PRNGKey(si)) for si in use_seeds]
@@ -121,8 +122,8 @@ if __name__ == "__main__":
     # exp_dir = "data/200116"
     # exp_name = "active_ird_exp_mid"
 
-    exp_dir = "data/200128"
-    exp_name = "active_ird_exp_natural_one_hybrid_ird_1000_1000"
-    rand_dir = "data/200128"
-    rand_name = "random_ird_exp_natural_one_hybrid_ird_1000_1000"
+    exp_dir = "data/200319"
+    exp_name = "active_ird_sum_ibeta_5_irdvar_3_true_w_w1_602_adam"
+    rand_dir = "data/200319"
+    rand_name = "active_ird_sum_ibeta_5_irdvar_3_true_w_w1_602_adam"
     plot_data()

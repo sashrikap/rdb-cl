@@ -1,14 +1,10 @@
 ACTIVE_ARGS:
   active_fns:
   - infogain
-  - ratiomean
-  - ratiomin
   - random
-  num_active_sample: 500
-  num_active_tasks: 144
 DESIGNER_ARGS:
-  beta: 10
-  num_normalizers: 200
+  beta: 20
+  num_normalizers: 1000
   num_prior_tasks: 2
   proposal_decay: 0.7
   sample_args:
@@ -17,15 +13,14 @@ DESIGNER_ARGS:
     num_warmup: 100
   sample_init_args:
     max_val: 15.0
-    proposal_var: 1
+    proposal_var: 0.3
   sample_method: MH
   task_method: sum
-  true_w: null
-  use_true_w: true
+  use_true_w: false
 DESIGNER_CONTROLLER_ARGS:
-  engine: scipy
+  engine: jax
   horizon: 10
-  method: lbfgs
+  method: adam
 ENV_NAME: Week6_02-v1
 EVAL_ARGS:
   max_batch: 500
@@ -33,18 +28,21 @@ EVAL_ARGS:
   num_eval_workers: 2
   parallel: true
 EXP_ARGS:
-  EXP_NAME: active_ird_sum_beta_10_true_w_irdvar_3_602_adam
-  exp_iterations: 8
-  num_eval_map: 32
-  num_eval_tasks: 2000
-  save_name: '200229'
+  eval_method: uniform
+  iterations: 16
+  num_active_sample: 500
+  num_active_tasks: 144
+  num_eval: 128
+  num_eval_tasks: 500
+  obs_method: uniform
+EXP_NAME: active_ird_sum_ibeta_50_dprior_2_dbeta_20_obs_uniform_w1_unif_128_602_adam
 FIXED_TASK_SEED: 0
 IRD_ARGS:
-  num_normalizers: 200
+  beta: 50
   proposal_decay: 0.9
   sample_args:
     num_chains: 3
-    num_samples: 4000
+    num_samples: 8000
     num_warmup: 200
   sample_init_args:
     max_val: 15.0
@@ -56,12 +54,7 @@ IRD_CONTROLLER_ARGS:
   horizon: 10
   method: adam
 RANDOM_KEYS:
-- 5
-TASK:
-- 0.2
-- -0.7
-- 0.0
-- 0.4
+- 3
 TRUE_W:
   control: 2
   dist_cars: 2.0
@@ -81,3 +74,4 @@ WEIGHT_PARAMS:
   - control
   max_weights: 15.0
   normalized_key: dist_cars
+save_name: '200322'

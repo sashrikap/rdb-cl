@@ -33,6 +33,7 @@ Credits:
 """
 
 from rdb.infer.utils import random_choice
+from rdb.distrib.designer import DesignerServer
 from rdb.infer.particles import Particles
 from numpyro.handlers import seed
 from rdb.visualize.plot import *
@@ -54,7 +55,8 @@ class ExperimentActiveIRD(object):
         active_fns (dict): map name -> active function
         model (object): IRD model
         iteration (int): algorithm iterations
-        num_eval_map (int): if > 0, use MAP estimate
+        num_eval (int): if > 0, use MAP estimate
+        eval_method (str): "map" or "uniform"
         num_active_tasks (int): # task candidates for active selection
         num_active_sample (int): running acquisition function on belief
             samples is costly, so subsample belief particles
@@ -64,13 +66,15 @@ class ExperimentActiveIRD(object):
     def __init__(
         self,
         model,
-        designer,
+        designer_fn,
         active_fns,
         true_w,
         eval_server,
         iterations=10,
         num_eval_tasks=4,
-        num_eval_map=-1,
+        num_eval=-1,
+        eval_method="map",
+        obs_method="map",
         num_active_tasks=4,
         num_active_sample=-1,
         fixed_task_seed=None,
@@ -85,10 +89,12 @@ class ExperimentActiveIRD(object):
     ):
         # Inverse Reward Design Model
         self._model = model
-        self._designer = designer
         self._true_w = true_w
         self._active_fns = active_fns
         self._eval_server = eval_server
+        self._designer_server = DesignerServer(designer_fn)
+        self._designer_server.register(len(active_fns))
+        self._obs_method = obs_method
         # Random key & function
         self._rng_key = None
         self._rng_name = None
@@ -96,7 +102,9 @@ class ExperimentActiveIRD(object):
         self._iterations = iterations
         self._normalized_key = normalized_key
         # Evaluation
-        self._num_eval_map = num_eval_map
+        self._num_eval = num_eval
+        self._eval_method = eval_method
+        assert eval_method in {"map", "uniform"}
         self._num_eval_tasks = num_eval_tasks
         # Active Task proposal
         self._num_active_tasks = num_active_tasks
@@ -116,6 +124,7 @@ class ExperimentActiveIRD(object):
     def _build_cache(self):
         """ Build cache data """
         self._initial_task = None
+        self._initial_obs = None
         self._active_eval_hist = {}
         self._active_map_vs_obs_hist = {}
         self._all_tasks = {}
@@ -135,21 +144,21 @@ class ExperimentActiveIRD(object):
         # Set name
         self._rng_name = str(rng_key)
         self._model.rng_name = str(rng_key)
-        self._designer.rng_name = str(rng_key)
+        self._designer_server.set_rng_name(str(rng_key))
         # Model and designer
         self._rng_key, rng_model, rng_designer, rng_choice, rng_active = random.split(
             rng_key, 5
         )
         self._model.update_key(rng_model)
-        self._designer.update_key(rng_designer)
-        self._designer.true_w = self._true_w
+        self._designer_server.update_key(rng_designer)
+        self._designer_server.set_true_w(self._true_w)
         # Active functions
         rng_active_keys = random.split(rng_active, len(list(self._active_fns.keys())))
         for fn, rng_key_fn in zip(list(self._active_fns.values()), rng_active_keys):
             fn.update_key(rng_key_fn)
 
-    def _get_rng_task(self):
-        if self._fixed_task_seed is not None:
+    def _get_rng_task(self, use_fix_seed=False):
+        if self._fixed_task_seed is not None and use_fix_seed:
             self._fixed_task_seed, rng_task = random.split(self._fixed_task_seed)
         else:
             self._rng_key, rng_task = random.split(self._rng_key)
@@ -173,7 +182,7 @@ class ExperimentActiveIRD(object):
         if self._num_eval_tasks > len(self._model.env.all_tasks):
             num_eval = -1
         self._eval_tasks = random_choice(
-            self._get_rng_task(), self._model.env.all_tasks, num_eval
+            self._get_rng_task(use_fix_seed=True), self._model.env.all_tasks, num_eval
         )
 
         ### Main Experiment Loop ###
@@ -186,7 +195,8 @@ class ExperimentActiveIRD(object):
 
             ### Run Active IRD on Candidates ###
             print(f"\nActive IRD ({self._rng_name}) iteration {itr}")
-            for key in self._active_fns.keys():
+            active_keys = list(self._active_fns.keys())
+            for key in active_keys:
                 all_beliefs = self._all_beliefs[key]
                 all_obs = self._all_obs[key]
                 all_tasks = self._all_tasks[key]
@@ -208,14 +218,26 @@ class ExperimentActiveIRD(object):
                 if len(all_beliefs) > 0:
                     self._compare_on_next(key, all_beliefs[-1], all_obs[-1], task)
 
-                ## Simulate Designer
-                obs = self._designer.simulate(
-                    onp.array([task]), save_name=f"designer_method_{key}_itr_{itr:02d}"
-                )
+            ### Simulate Designer ###
+            latest_tasks = [ts[-1] for ts in self._all_tasks.values()]
+            samples = self._designer_server.simulate(
+                onp.array(latest_tasks), methods=active_keys, itr=itr
+            )
+            for sp, key in zip(samples, active_keys):
+                if self._obs_method == "map":
+                    obs = sp[0].map_estimate(1)
+                elif self._obs_method == "uniform":
+                    obs = sp[0].subsample(1)
+                if len(self._all_obs[key]) == 0:
+                    if self._initial_obs is None:
+                        self._initial_obs = obs
+                    else:
+                        obs = self._initial_obs
                 self._all_obs[key].append(obs)
-                self._log_time(f"Itr {itr} {key} Designer")
+            self._log_time(f"Itr {itr} Designer Simulated")
 
-                ## IRD Sampling w/ Divide And Conquer
+            ### IRD Sampling w/ Divide And Conquer ###
+            for key in active_keys:
                 belief = self._model.sample(
                     tasks=onp.array(self._all_tasks[key]),
                     obs=self._all_obs[key],
@@ -226,8 +248,14 @@ class ExperimentActiveIRD(object):
                 self._log_time(f"Itr {itr} {key} IRD Divide & Conquer")
 
                 ## Evaluate, plot and Save
-                self._evaluate(key, belief, self._eval_tasks)
-                self._save(itr=itr)
+                self._evaluate(
+                    key,
+                    belief,
+                    self._eval_tasks,
+                    method=self._eval_method,
+                    num_samples=self._num_eval,
+                )
+                self._save(itr=itr, fn_key=key)
                 self._log_time(f"Itr {itr} {key} Eval & Save")
 
     def _propose_random_task(self):
@@ -290,74 +318,69 @@ class ExperimentActiveIRD(object):
         next_task = candidates[onp.argmax(scores)]
         return next_task, scores
 
-    def _evaluate(self, fn_key, belief, eval_tasks, map_eval=None, cache=True):
+    def _evaluate(self, fn_key, belief, eval_tasks, method, num_samples, cache=True):
         """Evaluate current sampled belief on eval task.
 
         Computation: n_map(~4) * n_eval(5~10k) tasks
 
         Note:
-            self._num_eval_map: use MAP estimate particle, intead of whole population, to estimate.
+            self._num_eval: number of sub samples for evaluation
+            self._eval_method: use MAP/uniform sample
 
         Criteria:
             * Relative Reward.
             * Violations.
 
         """
-        if map_eval is None:
-            map_eval = self._num_eval_map
-        if self._model.interactive_mode and self._designer.run_from_ipython():
-            # Interactive mode, skip evaluation to speed up
-            avg_violate = 0.0
-            avg_perform = 0.0
-            log_prob_true = 0.0
-            feats_violate = {}
-        else:
-            # Compute belief features
-            belief_map = belief.map_estimate(map_eval, log_scale=False)
-            target = self._designer.truth
-            print(f"Evaluating method {fn_key}: Begin")
-            self._eval_server.compute_tasks(
-                "Evaluation", belief_map, eval_tasks, verbose=True
-            )
-            self._eval_server.compute_tasks(
-                "Evaluation", target, eval_tasks, verbose=True
-            )
+        # if self._model.interactive_mode and self._designer.run_from_ipython():
+        #     # Interactive mode, skip evaluation to speed up
+        #     avg_violate = 0.0
+        #     avg_perform = 0.0
+        #     log_prob_true = 0.0
+        #     avg_feats_violate = {}
+        # else:
 
-            num_violate = 0.0
-            performance = 0.0
-            feats_violate = None
-            desc = f"Evaluating method {fn_key}"
-            for task in tqdm(eval_tasks, desc=desc):
-                diff_perf, diff_vios_arr, diff_vios = belief_map.compare_with(
-                    task, target=target
-                )
-                performance += diff_perf.mean()
-                num_violate += diff_vios_arr.mean()  # (nweights,) -> (1,)
-                if feats_violate is None:
-                    feats_violate = diff_vios
-                else:
-                    feats_violate += diff_vios
-                # import pdb; pdb.set_trace()
-            avg_violate = num_violate * (1 / float(len(eval_tasks)))
-            avg_perform = performance * (1 / float(len(eval_tasks)))
-            feats_violate = feats_violate * (1 / float(len(eval_tasks)))
-            if self._designer.truth is not None:
-                log_prob_true = float(belief.log_prob(self._designer.truth.weights[0]))
-            else:
-                log_prob_true = 0.0
-            print(f"    Average Violation diff {avg_violate:.2f}")
-            print(f"    Average Performance diff {avg_perform:.2f}")
-            print(f"    True Weights Log Prob {log_prob_true:.2f}")
+        # Compute belief features
+        if method == "uniform":
+            belief_sample = belief.subsample(num_samples)
+        elif method == "map":
+            belief_sample = belief.map_estimate(num_samples, log_scale=False)
 
-            # For comparison debugging
-            # self._divide_violations = belief_map.get_violations(eval_tasks)
-            # self._joint_violations = belief_map.get_violations(eval_tasks)
-            # self._divide_one = self._divide_violations[:, 0]
-            # self._joint_one = self._joint_violations[:, 0]
+        target = self._designer_server.designer.truth
+        print(f"Evaluating method {fn_key}: Begin")
+        self._eval_server.compute_tasks(
+            "Evaluation", belief_sample, eval_tasks, verbose=True
+        )
+        self._eval_server.compute_tasks("Evaluation", target, eval_tasks, verbose=True)
+
+        num_violates = []
+        performances = []
+        feats_violates = []
+        desc = f"Evaluating method {fn_key}"
+        for task in tqdm(eval_tasks, desc=desc):
+            diff_perf, diff_vios_arr, diff_vios = belief_sample.compare_with(
+                task, target=target
+            )
+            performances.append(diff_perf.mean())
+            num_violates.append(diff_vios_arr.mean())  # (nweights,) -> (1,)
+            feats_violates.append(diff_vios)
             # import pdb; pdb.set_trace()
+        avg_violate = np.mean(np.array(num_violates, dtype=float))
+        avg_perform = np.mean(np.array(performances, dtype=float))
+        avg_feats_violate = feats_violates[0] * (1 / float(len(eval_tasks)))
+        for fv in feats_violates[1:]:
+            avg_feats_violate += fv * (1 / float(len(eval_tasks)))
+        if target is not None:
+            log_prob_true = float(belief.log_prob(target.weights[0]))
+        else:
+            log_prob_true = 0.0
+        print(f"    Average Violation diff {avg_violate:.2f}")
+        print(f"    Average Performance diff {avg_perform:.2f}")
+        print(f"    True Weights Log Prob {log_prob_true:.2f}")
+
         info = {
             "violation": avg_violate,
-            "feats_violation": dict(feats_violate),
+            "feats_violation": dict(avg_feats_violate),
             "perform": avg_perform,
             "log_prob_true": log_prob_true,
         }
@@ -367,12 +390,12 @@ class ExperimentActiveIRD(object):
 
     def _compare_on_next(self, fn_key, belief, joint_obs, next_task, cache=True):
         """Compare observation and MAP estimate on next proposed task"""
-        belief_map = belief.map_estimate(self._num_eval_map, log_scale=False)
-        print(f"Evaluating method {fn_key}: Begin")
+        belief_map = belief.map_estimate(self._num_eval, log_scale=False)
+        print(f"Evaluating method {fn_key} on next task")
         belief_map.compute_tasks([next_task])
         joint_obs.compute_tasks([next_task])
 
-        target = self._designer.truth
+        target = self._designer_server.designer.truth
         desc = f"Evaluating method {fn_key}"
         diff_perf, diff_vios_arr, diff_vios = belief_map.compare_with(
             next_task, target=target
@@ -436,8 +459,8 @@ class ExperimentActiveIRD(object):
             obs = self._model.create_particles(
                 [weights],
                 save_name=f"ird_prior_design_{i:02d}",
-                controller=self._designer._sample_controller,
-                runner=self._designer._sample_runner,
+                controller=self._designer_server.designer._sample_controller,
+                runner=self._designer_server.designer._sample_runner,
             )
             load_obs.append(obs)
             load_tasks.append(task)
@@ -497,8 +520,8 @@ class ExperimentActiveIRD(object):
             self._all_obs[key] = [
                 self._model.create_particles(
                     [ws],
-                    controller=self._designer._sample_controller,
-                    runner=self._designer._sample_runner,
+                    controller=self._designer_server.designer._sample_controller,
+                    runner=self._designer_server.designer._sample_runner,
                     save_name="observation",
                 )
                 for ws in np_obs[key]
@@ -508,7 +531,7 @@ class ExperimentActiveIRD(object):
         # Load truth
         if "true_w" in eval_data:
             true_ws = [eval_data["true_w"].item()]
-            self._designer.truth.weights = true_ws
+            self._designer_server.designer.truth.weights = true_ws
         # Load parameters and check
         if "exp_params" in eval_data:
             exp_params = eval_data["exp_params"].item()
@@ -567,7 +590,7 @@ class ExperimentActiveIRD(object):
             seed=self._rng_name,
             exp_params=self._exp_params,
             env_id=str(self._model.env_id),
-            true_w=self._designer.true_w,
+            true_w=self._designer_server.designer.true_w,
             curr_obs=np_obs,
             curr_tasks=self._all_tasks,
             eval_hist=self._active_eval_hist,
@@ -590,7 +613,7 @@ class ExperimentActiveIRD(object):
 
         if fn_key is not None:
             ## Save belief sample information
-            true_w = self._designer.true_w
+            true_w = self._designer_server.designer.true_w
             # Ony save last belief, to save time
             itr = len(self._all_beliefs[fn_key]) - 1
             belief = self._all_beliefs[fn_key][-1]
@@ -610,82 +633,6 @@ class ExperimentActiveIRD(object):
             s = secs - (h * 60 * 60) - (m * 60)
             print(f">>> Active IRD {caption} Time: {int(h)}h {int(m)}m {s:.2f}s")
         self._last_time = time()
-
-    def run_inspection(self, override=False):
-        """For interactive mode. Since it's costly to run evaluation during interactive
-        mode, we save the beliefs and evaluate post-hoc.
-
-        Args:
-            override (bool): if false, do not re-calculate evaluations.
-
-        """
-        print(
-            f"\n============= Evaluate Candidates ({self._rng_name}): {self._save_root} {self._exp_name} ============="
-        )
-        if not self._load_cache(self._save_root):
-            return
-
-        ## IRD Sampling w/ Divide And Conquer
-        # key = "infogain"
-        # itr = 2
-        # map_weights = self._all_beliefs[key][itr].map_estimate(4).weights
-        # belief = self._model.sample(tasks=onp.array(self._all_tasks[key])[:itr+1],obs=self._all_obs[key][:itr+1],save_name=f"ird_belief_method_{key}_itr_{itr:02d}",)
-
-        all_cands = self._all_candidates
-        all_scores = self._all_cand_scores
-        all_beliefs = self._all_beliefs
-        eval_tasks = self._eval_tasks
-        num_iter = all_cands.shape[0]
-        print(f"Methods {list(all_beliefs.keys())}, iterations {num_iter}")
-        for itr in range(num_iter):
-            for key in all_beliefs:
-                if len(self._all_tasks[key]) <= itr:
-                    continue
-                import pdb
-
-                pdb.set_trace()
-                #  shape (1, task_dim)
-                curr_task = self._all_tasks[key][itr][None, :]
-                curr_obs = self._all_obs[key][itr]
-                #  shape (1, task_dim)
-                next_task = self._all_tasks[key][itr + 1][None, :]
-
-                self._eval_server.compute_tasks(
-                    "Evaluation", curr_obs, eval_tasks, verbose=True
-                )
-                self._eval_server.compute_tasks(
-                    "Evaluation", curr_obs, next_task, verbose=True
-                )
-                target = self._designer.truth
-                self._eval_server.compute_tasks(
-                    "Evaluation", target, eval_tasks, verbose=True
-                )
-                self._eval_server.compute_tasks(
-                    "Evaluation", target, next_task, verbose=True
-                )
-
-                eval_violate = 0.0
-                eval_perform = 0.0
-                desc = f"Evaluating method {fn_key}"
-                for task in tqdm(eval_tasks, desc=desc):
-                    diff_perf, diff_vios_arr, _ = curr_obs.compare_with(
-                        task, target=target
-                    )
-                    eval_perform += diff_perf.mean() / len(eval_tasks)
-                    eval_violate += diff_vios_arr.mean() / len(eval_tasks)
-
-                cand_violate = 0.0
-                cand_perform = 0.0
-                desc = f"Evaluating method {fn_key}"
-                for task in tqdm(eval_tasks, desc=desc):
-                    diff_perf, diff_vios_arr, _ = curr_obs.compare_with(
-                        task, target=target
-                    )
-                    cand_perform += diff_perf.mean()
-                    cand_violate += diff_vios_arr.mean()
-
-                self._save(itr=itr)
-                self._log_time(f"Itr {itr} Method {key} Eval & Save")
 
     def run_evaluation(self):
         """For interactive mode. Since it's costly to run evaluation during interactive
@@ -722,145 +669,6 @@ class ExperimentActiveIRD(object):
                 if len(all_beliefs[key]) <= itr:
                     continue
                 belief = all_beliefs[key][itr]
-
-    def run_comparison(self, num_tasks, design):
-        """
-        2020 Feb 25th: compare batch ird vs divide/conquer ird vs final design.
-
-        """
-        print(
-            f"\n============= Evaluate Candidates ({self._rng_name}): {self._save_root} {self._exp_name} ============="
-        )
-        # assert self._load_cache(self._save_root), "Saved data not successfully loaded"
-        num_eval = self._num_eval_tasks
-        if self._num_eval_tasks > len(self._model.env.all_tasks):
-            num_eval = -1
-        self._eval_tasks = random_choice(
-            self._get_rng_task(), self._model.env.all_tasks, num_eval
-        )
-        ENV_NAME = self._exp_params["ENV_NAME"]
-        joint_data = load_params(
-            join(
-                examples_dir(),
-                f"designs/{ENV_NAME}_joint_{design:02d}_num_{num_tasks:02d}.yaml",
-            )
-        )
-        divid_data = load_params(
-            join(
-                examples_dir(),
-                f"designs/{ENV_NAME}_divide_{design:02d}_num_{num_tasks:02d}.yaml",
-            )
-        )
-        joint_obs, joint_tasks = self._load_design(
-            num_tasks, joint_data, cache=False, compute_belief=False
-        )
-        divid_obs, divid_tasks = self._load_design(
-            num_tasks, divid_data, cache=False, compute_belief=False
-        )
-        ## Do inference on all design environments with IRD & divide/conquer
-        divid_belief = self._model.sample(
-            tasks=onp.array(divid_tasks),
-            obs=divid_obs,
-            save_name=f"ird_belief_divid_tasks_{num_tasks:02d}",
-        )
-        divid_belief.save()
-        divid_info = self._evaluate(
-            "Divide", divid_belief, self._eval_tasks, cache=False
-        )
-        divid_vio = divid_info["violation"]
-
-        ### Run Active IRD on Candidates ###
-        print("Proposing new tasks")
-        candidates = random_choice(
-            self._get_rng_task(), self._model.env.all_tasks, self._num_active_tasks
-        )
-        divid_proposal = {}
-        belief = divid_belief.subsample(self._num_active_sample)
-        for key in self._active_fns.keys():
-            task, scores = self._propose_task(
-                candidates, belief, divid_obs, divid_tasks, key
-            )
-            divid_proposal[key] = {
-                "task": task,
-                "candidates": candidates,
-                "scores": scores,
-            }
-
-        ranking_dir = os.path.join(self._save_dir, "candidates")
-        os.makedirs(ranking_dir, exist_ok=True)
-        for fn_key in divid_proposal.keys():
-            cand_scores = onp.array(divid_proposal[fn_key]["scores"])
-            other_scores = []
-            other_keys = []
-            # Check other active function
-            other_scores_all = copy.deepcopy(divid_proposal)
-            del other_scores_all[fn_key]
-            for key in other_scores_all.keys():
-                other_scores.append(other_scores_all[key]["scores"])
-                other_keys.append(key)
-            for other_s, other_k in zip(other_scores, other_keys):
-                file = f"key_{self._rng_name}_divide_cand_num_{len(divid_obs)}_comare_{fn_key}_vs_{other_k}.png"
-                path = os.path.join(ranking_dir, file)
-                plot_ranking_corrs([cand_scores, other_s], [fn_key, other_k], path=path)
-
-        ## Do inference on all design environments with IRD & joint design
-        joint_belief = self._model.sample(
-            tasks=onp.array(joint_tasks),
-            obs=[joint_obs[-1]] * len(joint_tasks),
-            save_name=f"ird_belief_joint_tasks_{num_tasks:02d}",
-        )
-        joint_belief.save()
-        joint_info = self._evaluate(
-            "Joint", joint_belief, self._eval_tasks, cache=False
-        )
-        joint_vio = joint_info["violation"]
-
-        joint_proposal = {}
-        belief = joint_belief.subsample(self._num_active_sample)
-        for key in self._active_fns.keys():
-            task, scores = self._propose_task(
-                candidates, belief, joint_obs, joint_tasks, key
-            )
-            joint_proposal[key] = {
-                "task": task,
-                "candidates": candidates,
-                "scores": scores,
-            }
-
-        ranking_dir = os.path.join(self._save_dir, "candidates")
-        os.makedirs(ranking_dir, exist_ok=True)
-        for fn_key in joint_proposal.keys():
-            cand_scores = onp.array(joint_proposal[fn_key]["scores"])
-            other_scores = []
-            other_keys = []
-            # Check other active function
-            other_scores_all = copy.deepcopy(joint_proposal)
-            del other_scores_all[fn_key]
-            for key in other_scores_all.keys():
-                other_scores.append(other_scores_all[key]["scores"])
-                other_keys.append(key)
-            for other_s, other_k in zip(other_scores, other_keys):
-                file = f"key_{self._rng_name}_joint_cand_num_{len(joint_obs)}_comare_{fn_key}_vs_{other_k}.png"
-                path = os.path.join(ranking_dir, file)
-                plot_ranking_corrs([cand_scores, other_s], [fn_key, other_k], path=path)
-
-        ## Evaluate joint IRD, d/c IRD, joint design
-        designer_info = self._evaluate(
-            "Designer", joint_obs[-1], self._eval_tasks, map_eval=1, cache=False
-        )
-        designer_vio = designer_info["violation"]
-        comparison_data = {
-            "joint": joint_vio,
-            "joint_feats": joint_info["feats_violation"],
-            "joint_proposal": joint_proposal,
-            "divide": divid_vio,
-            "divide_feats": divid_info["feats_violation"],
-            "divide_proposal": divid_proposal,
-            "designer": designer_vio,
-            "designer_feats": designer_info["feats_violation"],
-        }
-        npy_path = f"{self._save_dir}/{self._exp_name}_seed_{self._rng_name}.npy"
-        onp.save(npy_path, comparison_data)
 
     def _plot_candidate_scores(self, itr, debug_dir=None):
         if debug_dir is None:
@@ -905,3 +713,218 @@ class ExperimentActiveIRD(object):
                 file = f"key_{self._rng_name}_cand_itr_{itr}_comare_{fn_key}_vs_{other_k}.png"
                 path = os.path.join(ranking_dir, file)
                 plot_ranking_corrs([cand_scores, other_s], [fn_key, other_k], path=path)
+
+    # def run_inspection(self, override=False):
+    #     """For interactive mode. Since it's costly to run evaluation during interactive
+    #     mode, we save the beliefs and evaluate post-hoc.
+
+    #     Args:
+    #         override (bool): if false, do not re-calculate evaluations.
+
+    #     """
+    #     print(
+    #         f"\n============= Evaluate Candidates ({self._rng_name}): {self._save_root} {self._exp_name} ============="
+    #     )
+    #     if not self._load_cache(self._save_root):
+    #         return
+
+    #     ## IRD Sampling w/ Divide And Conquer
+    #     # key = "infogain"
+    #     # itr = 2
+    #     # map_weights = self._all_beliefs[key][itr].map_estimate(4).weights
+    #     # belief = self._model.sample(tasks=onp.array(self._all_tasks[key])[:itr+1],obs=self._all_obs[key][:itr+1],save_name=f"ird_belief_method_{key}_itr_{itr:02d}",)
+
+    #     all_cands = self._all_candidates
+    #     all_scores = self._all_cand_scores
+    #     all_beliefs = self._all_beliefs
+    #     eval_tasks = self._eval_tasks
+    #     num_iter = all_cands.shape[0]
+    #     print(f"Methods {list(all_beliefs.keys())}, iterations {num_iter}")
+    #     for itr in range(num_iter):
+    #         for key in all_beliefs:
+    #             if len(self._all_tasks[key]) <= itr:
+    #                 continue
+    #             import pdb
+
+    #             pdb.set_trace()
+    #             #  shape (1, task_dim)
+    #             curr_task = self._all_tasks[key][itr][None, :]
+    #             curr_obs = self._all_obs[key][itr]
+    #             #  shape (1, task_dim)
+    #             next_task = self._all_tasks[key][itr + 1][None, :]
+
+    #             self._eval_server.compute_tasks(
+    #                 "Evaluation", curr_obs, eval_tasks, verbose=True
+    #             )
+    #             self._eval_server.compute_tasks(
+    #                 "Evaluation", curr_obs, next_task, verbose=True
+    #             )
+    #             target = self._designer_server.designer.truth
+    #             self._eval_server.compute_tasks(
+    #                 "Evaluation", target, eval_tasks, verbose=True
+    #             )
+    #             self._eval_server.compute_tasks(
+    #                 "Evaluation", target, next_task, verbose=True
+    #             )
+
+    #             eval_violate = 0.0
+    #             eval_perform = 0.0
+    #             desc = f"Evaluating method {fn_key}"
+    #             for task in tqdm(eval_tasks, desc=desc):
+    #                 diff_perf, diff_vios_arr, _ = curr_obs.compare_with(
+    #                     task, target=target
+    #                 )
+    #                 eval_perform += diff_perf.mean() / len(eval_tasks)
+    #                 eval_violate += diff_vios_arr.mean() / len(eval_tasks)
+
+    #             cand_violate = 0.0
+    #             cand_perform = 0.0
+    #             desc = f"Evaluating method {fn_key}"
+    #             for task in tqdm(eval_tasks, desc=desc):
+    #                 diff_perf, diff_vios_arr, _ = curr_obs.compare_with(
+    #                     task, target=target
+    #                 )
+    #                 cand_perform += diff_perf.mean()
+    #                 cand_violate += diff_vios_arr.mean()
+
+    #             self._save(itr=itr, fn_key=key)
+    #             self._log_time(f"Itr {itr} Method {key} Eval & Save")
+
+    # def run_comparison(self, num_tasks, design):
+    #     """
+    #     2020 Feb 25th: compare batch ird vs divide/conquer ird vs final design.
+
+    #     """
+    #     print(
+    #         f"\n============= Evaluate Candidates ({self._rng_name}): {self._save_root} {self._exp_name} ============="
+    #     )
+    #     # assert self._load_cache(self._save_root), "Saved data not successfully loaded"
+    #     num_eval = self._num_eval_tasks
+    #     if self._num_eval_tasks > len(self._model.env.all_tasks):
+    #         num_eval = -1
+    #     self._eval_tasks = random_choice(
+    #         self._get_rng_task(), self._model.env.all_tasks, num_eval
+    #     )
+    #     ENV_NAME = self._exp_params["ENV_NAME"]
+    #     joint_data = load_params(
+    #         join(
+    #             examples_dir(),
+    #             f"designs/{ENV_NAME}_joint_{design:02d}_num_{num_tasks:02d}.yaml",
+    #         )
+    #     )
+    #     divid_data = load_params(
+    #         join(
+    #             examples_dir(),
+    #             f"designs/{ENV_NAME}_divide_{design:02d}_num_{num_tasks:02d}.yaml",
+    #         )
+    #     )
+    #     joint_obs, joint_tasks = self._load_design(
+    #         num_tasks, joint_data, cache=False, compute_belief=False
+    #     )
+    #     divid_obs, divid_tasks = self._load_design(
+    #         num_tasks, divid_data, cache=False, compute_belief=False
+    #     )
+    #     ## Do inference on all design environments with IRD & divide/conquer
+    #     divid_belief = self._model.sample(
+    #         tasks=onp.array(divid_tasks),
+    #         obs=divid_obs,
+    #         save_name=f"ird_belief_divid_tasks_{num_tasks:02d}",
+    #     )
+    #     divid_belief.save()
+    #     divid_info = self._evaluate(
+    #         "Divide", divid_belief, self._eval_tasks, cache=False
+    #     )
+    #     divid_vio = divid_info["violation"]
+
+    #     ### Run Active IRD on Candidates ###
+    #     print("Proposing new tasks")
+    #     candidates = random_choice(
+    #         self._get_rng_task(), self._model.env.all_tasks, self._num_active_tasks
+    #     )
+    #     divid_proposal = {}
+    #     belief = divid_belief.subsample(self._num_active_sample)
+    #     for key in self._active_fns.keys():
+    #         task, scores = self._propose_task(
+    #             candidates, belief, divid_obs, divid_tasks, key
+    #         )
+    #         divid_proposal[key] = {
+    #             "task": task,
+    #             "candidates": candidates,
+    #             "scores": scores,
+    #         }
+
+    #     ranking_dir = os.path.join(self._save_dir, "candidates")
+    #     os.makedirs(ranking_dir, exist_ok=True)
+    #     for fn_key in divid_proposal.keys():
+    #         cand_scores = onp.array(divid_proposal[fn_key]["scores"])
+    #         other_scores = []
+    #         other_keys = []
+    #         # Check other active function
+    #         other_scores_all = copy.deepcopy(divid_proposal)
+    #         del other_scores_all[fn_key]
+    #         for key in other_scores_all.keys():
+    #             other_scores.append(other_scores_all[key]["scores"])
+    #             other_keys.append(key)
+    #         for other_s, other_k in zip(other_scores, other_keys):
+    #             file = f"key_{self._rng_name}_divide_cand_num_{len(divid_obs)}_comare_{fn_key}_vs_{other_k}.png"
+    #             path = os.path.join(ranking_dir, file)
+    #             plot_ranking_corrs([cand_scores, other_s], [fn_key, other_k], path=path)
+
+    #     ## Do inference on all design environments with IRD & joint design
+    #     joint_belief = self._model.sample(
+    #         tasks=onp.array(joint_tasks),
+    #         obs=[joint_obs[-1]] * len(joint_tasks),
+    #         save_name=f"ird_belief_joint_tasks_{num_tasks:02d}",
+    #     )
+    #     joint_belief.save()
+    #     joint_info = self._evaluate(
+    #         "Joint", joint_belief, self._eval_tasks, cache=False
+    #     )
+    #     joint_vio = joint_info["violation"]
+
+    #     joint_proposal = {}
+    #     belief = joint_belief.subsample(self._num_active_sample)
+    #     for key in self._active_fns.keys():
+    #         task, scores = self._propose_task(
+    #             candidates, belief, joint_obs, joint_tasks, key
+    #         )
+    #         joint_proposal[key] = {
+    #             "task": task,
+    #             "candidates": candidates,
+    #             "scores": scores,
+    #         }
+
+    #     ranking_dir = os.path.join(self._save_dir, "candidates")
+    #     os.makedirs(ranking_dir, exist_ok=True)
+    #     for fn_key in joint_proposal.keys():
+    #         cand_scores = onp.array(joint_proposal[fn_key]["scores"])
+    #         other_scores = []
+    #         other_keys = []
+    #         # Check other active function
+    #         other_scores_all = copy.deepcopy(joint_proposal)
+    #         del other_scores_all[fn_key]
+    #         for key in other_scores_all.keys():
+    #             other_scores.append(other_scores_all[key]["scores"])
+    #             other_keys.append(key)
+    #         for other_s, other_k in zip(other_scores, other_keys):
+    #             file = f"key_{self._rng_name}_joint_cand_num_{len(joint_obs)}_comare_{fn_key}_vs_{other_k}.png"
+    #             path = os.path.join(ranking_dir, file)
+    #             plot_ranking_corrs([cand_scores, other_s], [fn_key, other_k], path=path)
+
+    #     ## Evaluate joint IRD, d/c IRD, joint design
+    #     designer_info = self._evaluate(
+    #         "Designer", joint_obs[-1], self._eval_tasks, map_eval=1, cache=False
+    #     )
+    #     designer_vio = designer_info["violation"]
+    #     comparison_data = {
+    #         "joint": joint_vio,
+    #         "joint_feats": joint_info["feats_violation"],
+    #         "joint_proposal": joint_proposal,
+    #         "divide": divid_vio,
+    #         "divide_feats": divid_info["feats_violation"],
+    #         "divide_proposal": divid_proposal,
+    #         "designer": designer_vio,
+    #         "designer_feats": designer_info["feats_violation"],
+    #     }
+    #     npy_path = f"{self._save_dir}/{self._exp_name}_seed_{self._rng_name}.npy"
+    #     onp.save(npy_path, comparison_data)

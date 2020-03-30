@@ -37,14 +37,15 @@ def plot_data():
                 and "map" in file
                 and file.endswith("npy")
             ):
-                print(file)
                 exp_path = os.path.join(exp_dir, exp_name, file)
                 if os.path.isfile(exp_path):
                     use_bools = [str(s) in exp_path for s in use_seeds]
                     not_bools = [str(s) in exp_path for s in not_seeds]
+                    print(exp_path, use_seeds, not_bools)
                     if onp.any(use_bools) and not onp.any(not_bools):
                         seedpaths.append(exp_path)
-
+    if len(seedpaths) == 0:
+        return
     exp_path = seedpaths[0]
     exp_read = read_seed(exp_path)
 
@@ -58,7 +59,10 @@ def plot_data():
             "violation": np.array(hist[idx]["map_violation"])
             - np.array(hist[idx]["obs_violation"]),
         }
-        # Only look at first proposed task
+    import pdb
+
+    pdb.set_trace()
+    # Only look at first proposed task
 
     x = np.arange(len(list(data.keys())))
     dim = 2
@@ -90,16 +94,16 @@ def plot_data():
 
 if __name__ == "__main__":
     N = -1
-    all_seeds = [0, 1, 2, 3, 4, 5]
-    exp_dir = "data/200229"
+    all_seeds = [1]
+    exp_dir = "data/200322"
     # exp_name = "active_ird_exp_ird_beta_50_true_w_map_sum_irdvar_3_adam200"
-    exp_name = "active_ird_sum_beta_10_dprior_2_irdvar_3_dvar_1_602_adam"
+    exp_name = "active_ird_sum_ibeta_1_true_w_w1_eval_unif_128_602_adam"
 
     for seed in all_seeds:
         use_seeds = [seed]
         not_seeds = []
-        MAX_LEN = 8
-        MAX_RANDOM_LEN = 8
+        MAX_LEN = 4
+        MAX_RANDOM_LEN = 4
         PADDING = 0
 
         use_seeds = [str(random.PRNGKey(si)) for si in use_seeds]

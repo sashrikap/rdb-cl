@@ -271,12 +271,12 @@ class DictList(dict):
     def normalize_across_keys(self):
         """Normalize all values such that ||w_i||_2 = 1.
         """
-        this_array = self.onp_array()
-        norm = onp.linalg.norm(this_array, axis=0, keepdims=True)
-        this_array = this_array / norm
-        new_data = self.copy()
-        new_data.from_array(this_array)
-        return new_data
+        data = OrderedDict()
+        this_array = self.numpy_array()
+        norm = np.sqrt(np.sum(this_array ** 2, axis=0))
+        for key, val in self.items():
+            data[key] = val / norm
+        return DictList(data, jax=self._jax)
 
     def copy(self):
         data = OrderedDict()
@@ -383,7 +383,7 @@ class DictList(dict):
 
         """
         # return np.array(list(self.values()))
-        return np.array(list(self.values()))
+        return self._np.array(list(self.values()))
 
     def clone(self, jax=False):
         """Return jax.numpy.

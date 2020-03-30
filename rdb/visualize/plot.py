@@ -76,8 +76,8 @@ def plot_weights(
             if d is None or key not in d:
                 continue
             val = d[key]
-            # if not log_scale:
-            val = onp.log(val)
+            if not log_scale:
+                val = onp.log(val)
             axs[i].axvline(x=val, c=c)
             # add 0.05 gap so that labels don't overlap
             axs[i].text(val, ybottom + gap * j, label, size=10)

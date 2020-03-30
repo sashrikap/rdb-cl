@@ -51,6 +51,15 @@ def test_random_speed():
     print(f"Compute 10x 500 random took {time() - t1:.3f}")
 
 
+def test_cross_product():
+    arr_a = np.array([1, 2, 3])
+    arr_b = np.array([4, 5, 6, 7])
+    cross_a, cross_b = cross_product(arr_a, arr_b, np.array, np.array)
+    na, nb = len(arr_a), len(arr_b)
+    assert np.allclose(cross_a, np.repeat(arr_a, nb))
+    assert np.allclose(cross_b, np.tile(arr_b, na))
+
+
 env = gym.make("Week6_02-v1")  # Two Blockway
 env.reset()
 main_car = env.main_car
@@ -112,7 +121,6 @@ def test_collect_trajs(num_weights):
             assert_equal(feats, last_feats)
             assert_equal(feats_sum, last_feats_sum)
             assert_equal(vios, last_vios)
-
         last_actions = actions
         last_costs = costs
         last_feats = feats

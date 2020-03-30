@@ -99,8 +99,8 @@ def tune_method(nbatch, engine, method, engine_gt="scipy", method_gt="lbfgs"):
 if __name__ == "__main__":
     # tune_method(100, "scipy", "lbfgs")
     # tune_method(100, "scipy", "lbfgs", "jax", "adam")
-    # tune_method(500, "scipy", "lbfgs")
-    tune_method(500, "jax", "adam")
+    tune_method(500, "scipy", "lbfgs")
+    # tune_method(500, "jax", "adam")
     # tune_method(100, "scipy", "bfgs")
     # tune_method(100, "scipy", "bfgs", engine_gt="scipy", method_gt="bfgs")
     # tune_method(100, "scipy", "basinhopping")

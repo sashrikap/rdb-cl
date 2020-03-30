@@ -26,32 +26,44 @@ def cleanup(arr, max_len):
         return np.array(arrs)
 
 
+colors = {
+    "random": "gray",
+    "infogain": "darkorange",
+    "ratiomean": "b",
+    "rationmin": "r",
+}
+
+
 def plot_perform(data_dir, exp_name, data):
     sns.set_palette("husl")
-    colors = "gbkr"
     for i, (method, mdict) in enumerate(data.items()):
         perf = np.array(mdict["perform"])
         sns.tsplot(
-            time=range(len(perf[0])), color=colors[i], data=perf, condition=method
+            time=range(1, 1 + len(perf[0])),
+            color=colors[method],
+            data=perf,
+            condition=method,
         )
-    plt.xticks(range(len(perf[0])))
+    plt.xticks(range(1, 1 + len(perf[0])))
     plt.legend(loc="lower right")
     plt.xlabel("Iteration")
     plt.ylabel("Log ratio")
-    plt.title("Log Relative Performance")
+    plt.title("Performance Difference (-Regret)")
     plt.savefig(os.path.join(data_dir, exp_name, "performance.png"))
     plt.show()
 
 
 def plot_violate(data_dir, exp_name, data):
     sns.set_palette("husl")
-    colors = "gbkr"
     for i, (method, mdict) in enumerate(data.items()):
         perf = np.array(mdict["violation"])
         sns.tsplot(
-            time=range(len(perf[0])), color=colors[i], data=perf, condition=method
+            time=range(1, 1 + len(perf[0])),
+            color=colors[method],
+            data=perf,
+            condition=method,
         )
-    plt.xticks(range(len(perf[0])))
+    plt.xticks(range(1, 1 + len(perf[0])))
     plt.legend(loc="lower right")
     plt.xlabel("Iteration")
     plt.ylabel("Log ratio")
@@ -62,13 +74,15 @@ def plot_violate(data_dir, exp_name, data):
 
 def plot_log_prob(data_dir, exp_name, data):
     sns.set_palette("husl")
-    colors = "gbkr"
     for i, (method, mdict) in enumerate(data.items()):
         perf = np.array(mdict["log_prob_true"])
         sns.tsplot(
-            time=range(len(perf[0])), color=colors[i], data=perf, condition=method
+            time=range(1, 1 + len(perf[0])),
+            color=colors[method],
+            data=perf,
+            condition=method,
         )
-    plt.xticks(range(len(perf[0])))
+    plt.xticks(range(1, 1 + len(perf[0])))
     plt.legend(loc="lower right")
     plt.xlabel("Iteration")
     plt.ylabel("Log P")
@@ -85,20 +99,22 @@ def plot_data():
             if (
                 exp_name in file
                 and "npy" in file
-                and "map" not in file
+                and "map_seed" not in file
                 and file.endswith("npy")
             ):
-                print(file)
                 exp_path = os.path.join(exp_dir, exp_name, file)
+                # print(exp_path)
                 if os.path.isfile(exp_path):
                     use_bools = [str(s) in exp_path for s in use_seeds]
                     not_bools = [str(s) in exp_path for s in not_seeds]
+                    print(file, use_bools, not_bools)
                     if onp.any(use_bools) and not onp.any(not_bools):
                         seedpaths.append(exp_path)
 
     for exp_path in seedpaths:
         exp_read = read_seed(exp_path)
-        # print(exp_path, len(exp_read))
+        # print(exp_path)
+        print(exp_path, len(exp_read["infogain"]))
         seeddata.append(exp_read)
 
     data = {}
@@ -131,16 +147,18 @@ def plot_data():
 
 if __name__ == "__main__":
     N = -1
-    use_seeds = list(range(30))
+    use_seeds = [0, 1, 2, 3]  # list(range(30))
     not_seeds = []
-    MAX_LEN = 8
-    MAX_RANDOM_LEN = 8
+    MAX_LEN = 13
+    MAX_RANDOM_LEN = 13
     PADDING = 0
 
     use_seeds = [str(random.PRNGKey(si)) for si in use_seeds]
     not_seeds = [str(random.PRNGKey(si)) for si in not_seeds]
 
-    exp_dir = "data/200229"
+    exp_dir = "data/200321"
     # exp_name = "active_ird_exp_ird_beta_50_true_w_map_sum_irdvar_3_adam200"
-    exp_name = "active_ird_sum_beta_10_dprior_2_irdvar_3_dvar_1_602_adam"
+    exp_name = (
+        "active_ird_sum_ibeta_10_irdvar_3_true_w_w1_eval_unif_nofixtask_128_602_adam"
+    )
     plot_data()

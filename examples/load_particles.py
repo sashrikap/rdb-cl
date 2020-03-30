@@ -13,6 +13,7 @@ def load_file(rng_name, save_dir, save_name):
             "dist_objects",
             "speed",
             "control",
+            "speed_over",
         ],
     }
     ps = Particles(
@@ -34,14 +35,16 @@ def load_file(rng_name, save_dir, save_name):
     unique_vals, indices, counts = onp.unique(
         digits, return_index=True, return_counts=True
     )
-    ps.log_prob(weights[0])
+    # ps.log_prob(weights[0])
     import pdb
 
     pdb.set_trace()
 
 
 if __name__ == "__main__":
-    save_dir = "data/200228/compare_sum_beta_1_true_w_irdvar_3_602_scipy/save"
-    save_name = "ird_belief_joint_tasks_07"
-    rng_name = "[0 1]"
+    save_dir = (
+        "data/200309/active_ird_sum_ibeta_20_true_w_irdvar_3_dbeta_1_602_adam/save"
+    )
+    save_name = "ird_belief_method_random_itr_00"
+    rng_name = "[0 0]"
     load_file(rng_name, save_dir, save_name)
