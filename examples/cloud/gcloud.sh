@@ -22,5 +22,5 @@ gsutil -o 'GSUtil:parallel_process_count=1' -o 'GSUtil:parallel_thread_count=16'
 
 
 
-filedir="200322"
+filedir="200331"
 gsutil -o 'GSUtil:parallel_process_count=1' -o 'GSUtil:parallel_thread_count=16' -m cp -r "gs://active-ird-experiments/rss-logs/logs/output/$filedir/*" "data/$filedir/"

@@ -196,6 +196,13 @@ class ExperimentMCMC(object):
             true_w = self._design_data["DESIGNS"][-1]["WEIGHTS"]
             self._all_ird_obs_ws = [true_w] * num_tasks
 
+        elif "ird_convergence_true_w_same_tasks" in exp_mode:
+            ## Use one of Jerry's prior designed w as true w
+            ## Test # same tasks vs convergence
+            self._all_ird_obs_tasks = onp.array([rand_tasks[0]] * num_tasks)
+            true_w = self._design_data["DESIGNS"][-1]["WEIGHTS"]
+            self._all_ird_obs_ws = [true_w] * num_tasks
+
         elif "ird_convergence_random_w_random_tasks" in exp_mode:
             ## Use a random w as true w
             ## Test # random tasks vs convergence

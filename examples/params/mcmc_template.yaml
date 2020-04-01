@@ -1,7 +1,7 @@
 # ENV_NAME: "Week6_01-v0"
 
 #RANDOM_KEYS: [0, 1, 2, 3]
-RANDOM_KEYS: [0]
+RANDOM_KEYS: [1]
 # RANDOM_KEYS: [22]
 # RANDOM_KEYS: [23]
 NUM_EVAL_WORKERS: 4
@@ -59,7 +59,7 @@ IRD_ARGS:
   # sample_method: "NUTS"
   # sample_init_args:
   #   step_size: 0.2
-  beta: 500
+  beta: 50
   sample_args:
     num_warmup: 1000
     num_samples: 8000
@@ -73,7 +73,8 @@ IRD_ARGS:
   # exp_name: "ird_convergence_true_w_random_tasks_w3_beta_20_var_3_week602"
   # exp_name: "ird_convergence_true_w_random_tasks_w1_beta_5_var_3_week602"
   #exp_name: "ird_convergence_true_w_random_tasks_w1_beta_50_nodenom_var_3_week602"
-  exp_name: "ird_convergence_true_w_random_tasks_w1_500_var_3_week602"
+  # exp_name: "ird_convergence_true_w_random_tasks_w1_beta_1000_var_0.3_week602"
+  exp_name: "ird_convergence_true_w_same_tasks_w1_beta_50_var_3_week602"
   # exp_name: "ird_convergence_true_w_prior_tasks_norm_200_beta_50_var_3"
   # exp_name: "ird_convergence_true_w_prior_tasks_sum_norm_200_beta_50_var_2"
   # exp_name: "ird_convergence_true_w_random_tasks_sum_norm_200_beta_50_var_2"
@@ -98,7 +99,7 @@ DESIGNER_ARGS:
   # exp_name: "designer_convergence_true_w_prior_tasks_sum_norm_200_beta_50_var_2"
   #exp_name: "designer_convergence_true_w_random_tasks_sum_no_norm_beta_20_var_1_week602"
   exp_name: "designer_convergence_true_w_random_tasks_w1_beta_20_dprior_2_var_1_week602"
-SAVE_NAME: "200324"
+SAVE_NAME: "200331"
 
 
 # # Test sampling

@@ -131,19 +131,13 @@ def main(random_key, evaluate=False):
         if key not in ACTIVE_ARGS["active_fns"]:
             del active_fns[key]
 
-    ## Task sampling seed
-    if FIXED_TASK_SEED is not None:
-        fixed_task_seed = random.PRNGKey(FIXED_TASK_SEED)
-    else:
-        fixed_task_seed = None
-
+    EXP_ARGS["eval_seed"] = random.PRNGKey(EXP_ARGS["eval_seed"])
     experiment = ExperimentActiveIRD(
         ird_model,
         designer_fn=designer_fn,
         active_fns=active_fns,
         true_w=TRUE_W,
         eval_server=eval_server,
-        fixed_task_seed=fixed_task_seed,
         save_root=f"{SAVE_ROOT}/{PARAMS['save_name']}",
         exp_name=f"{PARAMS['EXP_NAME']}",
         exp_params=PARAMS,

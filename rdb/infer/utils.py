@@ -84,7 +84,7 @@ def get_designer_sampler(
 # ========================================================
 
 
-def random_choice(rng_key, items, num, probs=None, replacement=True):
+def random_choice(rng_key, items, num, probs=None, replacement=True, complement=False):
     """Randomly sample from items.
 
     Usage:
@@ -94,17 +94,25 @@ def random_choice(rng_key, items, num, probs=None, replacement=True):
 
     """
     if num < 0:
-        return items
+        if complement:
+            return items, []
+        else:
+            return items
 
     if not replacement:
         # no replacement
         assert probs is None, "Cannot use probs without replacement"
         assert num < len(items), f"Only has {len(items)} items"
-        probs = onp.array(probs)
         arr = random.uniform(rng_key, shape=(len(items),))
         arr = onp.array(arr)
         idxs = onp.argsort(arr)[:num]
-        return [items[idx] for idx in idxs]
+        items_selected = [items[idx] for idx in idxs]
+        if complement:
+            idxs_complement = onp.argsort(arr)[num:]
+            items_complement = [items[idx] for idx in idxs_complement]
+            return onp.array(items_selected), onp.array(items_complement)
+        else:
+            return onp.array(items_selected)
     else:
         # with replacement
         if probs is None:
@@ -113,14 +121,23 @@ def random_choice(rng_key, items, num, probs=None, replacement=True):
             assert len(probs) == len(items)
             probs = probs / onp.sum(probs)
         probs = onp.cumsum(probs)
-        arr = random.uniform(rng_key, shape=(num,))
-        arr = onp.array(arr)
-        output = []
+        arr = onp.array(random.uniform(rng_key, shape=(num,)))
+        items_selected = []
+        idxs_selected = []
         for i in range(num):
             diff = onp.minimum(arr[i] - probs, 0)
             first_neg = onp.argmax(diff < 0)
-            output.append(items[int(first_neg)])
-        return onp.array(output)
+            idx = int(first_neg)
+            items_selected.append(items[idx])
+            idxs_selected.append(idx)
+        if complement:
+            ones_complement = onp.ones(len(items), dtype=bool)
+            ones_complement[idxs_selected] = False
+            idxs_complement = onp.where(ones_complement)[0]
+            items_complement = [items[idx] for idx in idxs_complement]
+            return onp.array(items_selected), onp.array(items_complement)
+        else:
+            return onp.array(items_selected)
 
 
 def random_uniform(rng_key, low=0.0, high=1.0):

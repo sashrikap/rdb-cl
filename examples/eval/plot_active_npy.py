@@ -147,18 +147,16 @@ def plot_data():
 
 if __name__ == "__main__":
     N = -1
-    use_seeds = [0, 1, 2, 3]  # list(range(30))
+    use_seeds = list(range(30))
     not_seeds = []
-    MAX_LEN = 13
-    MAX_RANDOM_LEN = 13
+    MAX_LEN = 15
+    MAX_RANDOM_LEN = 15
     PADDING = 0
 
     use_seeds = [str(random.PRNGKey(si)) for si in use_seeds]
     not_seeds = [str(random.PRNGKey(si)) for si in not_seeds]
 
-    exp_dir = "data/200321"
+    exp_dir = "data/200331"
     # exp_name = "active_ird_exp_ird_beta_50_true_w_map_sum_irdvar_3_adam200"
-    exp_name = (
-        "active_ird_sum_ibeta_10_irdvar_3_true_w_w1_eval_unif_nofixtask_128_602_adam"
-    )
+    exp_name = "active_ird_ibeta_50_true_w1_eval_unif_128_seed_0_602_adam"
     plot_data()

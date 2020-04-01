@@ -16,7 +16,7 @@ DESIGNER_ARGS:
     proposal_var: 0.3
   sample_method: MH
   task_method: sum
-  use_true_w: false
+  use_true_w: true
 DESIGNER_CONTROLLER_ARGS:
   engine: jax
   horizon: 10
@@ -29,14 +29,14 @@ EVAL_ARGS:
   parallel: true
 EXP_ARGS:
   eval_method: uniform
+  eval_seed: 0
   iterations: 16
   num_active_sample: 500
   num_active_tasks: 144
   num_eval: 128
   num_eval_tasks: 500
   obs_method: uniform
-EXP_NAME: active_ird_sum_ibeta_50_dprior_2_dbeta_20_obs_uniform_w1_unif_128_602_adam
-FIXED_TASK_SEED: 0
+EXP_NAME: active_ird_ibeta_50_true_w1_eval_unif_128_seed_0_602_adam
 IRD_ARGS:
   beta: 50
   proposal_decay: 0.9
@@ -56,11 +56,11 @@ IRD_CONTROLLER_ARGS:
 RANDOM_KEYS:
 - 3
 TRUE_W:
-  control: 2
+  control: 0.2
   dist_cars: 2.0
   dist_fences: 5.35
   dist_lanes: 2.5
-  dist_objects: 4.25
+  dist_objects: 2.25
   speed: 5
   speed_over: 80
 WEIGHT_PARAMS:
@@ -74,4 +74,4 @@ WEIGHT_PARAMS:
   - control
   max_weights: 15.0
   normalized_key: dist_cars
-save_name: '200322'
+save_name: '200331'

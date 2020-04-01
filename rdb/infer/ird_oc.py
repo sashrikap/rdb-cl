@@ -324,27 +324,6 @@ class IRDOptimalControl(object):
             log_prob = task_method(ird_true_probs)
             return log_prob
 
-        # import pdb; pdb.set_trace()
-        # # obs
-        # true_ws = DictList(OrderedDict([('control', 0.0024866362431691736), ('dist_cars', 0.024866362431691734), ('dist_fences', 0.06651751950477539), ('dist_lanes', 0.03108295303961467), ('dist_objects', 0.0279746577356532), ('speed', 0.06216590607922934), ('speed_over', 0.9946544972676694)]), expand_dims=True)
-        # true_ps = self.create_particles(true_ws, controller=self._sample_controller, runner=self._sample_runner)
-        # true_ps.compute_tasks(tasks, jax=True)
-        # true_feats_sum = true_ps.get_features_sum(tasks).prepare(feats_keys)
-        # true_feats_sum = true_feats_sum.numpy_array().swapaxes(1, 2)
-        # true_ws = true_ws.prepare(feats_keys).normalize_across_keys().numpy_array()
-        # _likelihood(true_ws, true_feats_sum)
-
-        # DeviceArray = np.array
-        # float64 = float
-        # #true_ws = DictList(OrderedDict([('control', DeviceArray(-0.7980361, dtype=float64)), ('dist_fences', DeviceArray(10.31402998, dtype=float64)), ('dist_lanes', DeviceArray(-9.22143681, dtype=float64)), ('dist_objects', DeviceArray(9.80284159, dtype=float64)), ('speed', DeviceArray(12.81107139, dtype=float64)), ('speed_over', DeviceArray(3.76604005, dtype=float64)), ('dist_cars', DeviceArray(0., dtype=float64))]), expand_dims=True)
-        # true_ws = DictList({'dist_cars': DeviceArray([1.], dtype=float64), 'dist_lanes': DeviceArray([0.48531774], dtype=float64), 'dist_objects': DeviceArray([14.32940056], dtype=float64), 'speed': DeviceArray([0.64673457], dtype=float64), 'speed_over': DeviceArray([88.57175116], dtype=float64), 'speed_under': DeviceArray([0.], dtype=float64), 'control': DeviceArray([0.09202977], dtype=float64), 'control_thrust': DeviceArray([0.], dtype=float64), 'control_brake': DeviceArray([0.], dtype=float64), 'control_turn': DeviceArray([0.], dtype=float64), 'dist_fences': DeviceArray([3.67584862], dtype=float64)})
-        # true_ps = self.create_particles(true_ws, controller=self._sample_controller, runner=self._sample_runner)
-        # true_ps.compute_tasks(tasks, jax=True)
-        # true_feats_sum = true_ps.get_features_sum(tasks).prepare(feats_keys)
-        # true_feats_sum = true_feats_sum.numpy_array().swapaxes(1, 2)
-        # true_ws = true_ws.prepare(feats_keys).normalize_across_keys().numpy_array()
-        # _likelihood(true_ws, true_feats_sum)
-
         return _model
 
     def sample(self, tasks, obs, save_name, verbose=True):

@@ -92,6 +92,61 @@ def plot_weights(
         plt.show()
 
 
+# def plot_weights_2d(
+#     weights_dicts,
+#     highlight_dicts=[],
+#     highlight_colors=[],
+#     highlight_labels=[],
+#     fname=None,
+#     title=None,
+#     max_weights=8.0,
+#     log_scale=True,
+#     **kwargs,
+# ):
+#     """Plot weights for visualizing.
+
+#     Args:
+#         highlight_dicts (list): list of weight dictionaries
+#         highlight_colors (list): list of colors for highlighting these weights
+#         highlight_labels (list): list of labels for denoting these weights
+#         max_weights (float): log range of weights ~ (-max_weights, max_weights)
+
+#     """
+#     assert len(highlight_dicts) == len(highlight_colors) == len(highlight_labels)
+
+#     n_values = len(weights_dicts[0].values())
+#     fig, axs = plt.subplots(n_values, 1, figsize=(20, 2 * n_values), dpi=80)
+#     weights_dicts = weights_dicts.log() if not log_scale else weights_dicts
+#     for i, key_i in enumerate(sorted(list(weights_dicts[0].keys()))):
+#         for j, key_i in enumerate(sorted(list(weights_dicts[0].keys()))):
+
+#         values = weights_dicts[key]
+
+#         ybottom, ytop = axs[i].get_ylim()
+#         gap = (ytop - ybottom) / (len(highlight_dicts) - 1 + 1e-8)
+#         ## Highlight value
+#         for j, (d, c, label) in enumerate(
+#             zip(highlight_dicts, highlight_colors, highlight_labels)
+#         ):
+#             if d is None or key not in d:
+#                 continue
+#             val = d[key]
+#             if not log_scale:
+#                 val = onp.log(val)
+#             axs[i].axvline(x=val, c=c)
+#             # add 0.05 gap so that labels don't overlap
+#             axs[i].text(val, ybottom + gap * j, label, size=10)
+#         axs[i].set_xlabel(key)
+#     plt.tight_layout()
+#     if title is not None:
+#         fig.suptitle(title)
+#     if fname is not None:
+#         plt.savefig(f"{fname}.png")
+#         plt.close("all")
+#     else:
+#         plt.show()
+
+
 def plot_weights_comparison(
     all_weights_dicts,
     all_weights_colors,

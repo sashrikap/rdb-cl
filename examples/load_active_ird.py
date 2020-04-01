@@ -12,5 +12,5 @@ def load_file(save_path):
 
 
 if __name__ == "__main__":
-    save_path = "data/200320/active_ird_sum_ibeta_10_irdvar_3_true_w_w1_eval_unif_602_adam/active_ird_sum_ibeta_10_irdvar_3_true_w_w1_eval_unif_602_adam_seed_[0 1].npz"
+    save_path = "data/200330/active_ird_ibeta_50_true_w1_eval_unif_128_seed_0_602_adam/active_ird_ibeta_50_true_w1_eval_unif_128_seed_0_602_adam_seed_[0 2].npz"
     load_file(save_path)

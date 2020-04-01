@@ -803,6 +803,7 @@ class Particles(object):
             path=f"{self._fig_dir}/{self._expanded_name}.png",
             title="Proxy Reward; true (red), obs (black) map (magenta)",
             max_weights=max_weights,
+            bins=bins,
             log_scale=log_scale,
         )
 

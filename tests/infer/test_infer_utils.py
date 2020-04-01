@@ -51,6 +51,59 @@ def test_random_speed():
     print(f"Compute 10x 500 random took {time() - t1:.3f}")
 
 
+def test_random_choice_complement():
+    key = random.PRNGKey(0)
+    arr = [1, 2, 3, 4, 5, 6]
+    probs = onp.random.random(len(arr))
+    num = 3
+    rand_noreplacement = random_choice(key, arr, num, replacement=False)
+    for r in rand_noreplacement:
+        assert r in arr
+    rand_noreplacement, rand_complement = random_choice(
+        key, arr, num, replacement=False, complement=True
+    )
+    for r in rand_noreplacement:
+        assert r in arr
+        assert r not in rand_complement
+    for r in rand_complement:
+        assert r in arr
+        assert r not in rand_noreplacement
+    for r in arr:
+        if r not in rand_noreplacement:
+            assert r in rand_complement
+        else:
+            assert r in rand_noreplacement
+    assert len(rand_noreplacement) + len(rand_complement) == len(arr)
+
+    rand_replacement = random_choice(key, arr, num, probs, replacement=True)
+    for r in rand_replacement:
+        assert r in arr
+    rand_replacement, rand_complement = random_choice(
+        key, arr, num, probs, replacement=True, complement=True
+    )
+    for r in rand_replacement:
+        assert r in arr
+        assert r not in rand_complement
+    for r in rand_complement:
+        assert r in arr
+        assert r not in rand_replacement
+    for r in arr:
+        if r not in rand_replacement:
+            assert r in rand_complement
+        else:
+            assert r in rand_replacement
+    assert len(set(rand_replacement)) + len(rand_complement) == len(arr)
+
+    N = 1000
+    num = 100
+    arr = onp.random.random(N)
+    rand_replacement = random_choice(key, arr, num, replacement=True)
+    assert (
+        onp.mean(rand_replacement) <= onp.mean(arr) + 0.2
+        and onp.mean(rand_replacement) >= onp.mean(arr) - 0.2
+    )
+
+
 def test_cross_product():
     arr_a = np.array([1, 2, 3])
     arr_b = np.array([4, 5, 6, 7])
@@ -77,7 +130,7 @@ optimizer, runner = build_mpc(
 
 
 @pytest.mark.parametrize("num_weights", [1, 5, 10, 20])
-def test_collect_trajs(num_weights):
+def ttest_collect_trajs(num_weights):
     key = random.PRNGKey(0)
     tasks = random_choice(key, env.all_tasks, num_weights)
     states = env.get_init_states(tasks)
