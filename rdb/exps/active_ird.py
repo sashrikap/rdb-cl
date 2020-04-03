@@ -66,20 +66,29 @@ class ExperimentActiveIRD(object):
     def __init__(
         self,
         model,
+        env_fn,
         designer_fn,
         active_fns,
         true_w,
         eval_server,
         iterations=10,
+        # Evaluation parameters
         num_eval_tasks=4,
         num_eval=-1,
+        eval_env_name=None,
         eval_method="map",
         eval_seed=None,
+        # Observation model
         obs_method="map",
+        use_true_w=False,
+        num_prior_tasks=0,
+        # Active sampling
         num_active_tasks=4,
         num_active_sample=-1,
+        # Debugging
         fixed_candidates=None,
         fixed_belief_tasks=None,
+        # Metadata
         normalized_key=None,
         design_data=None,
         num_load_design=-1,
@@ -89,6 +98,7 @@ class ExperimentActiveIRD(object):
     ):
         # Inverse Reward Design Model
         self._model = model
+        self._env_fn = env_fn
         self._true_w = true_w
         self._active_fns = active_fns
         self._eval_server = eval_server
@@ -101,11 +111,15 @@ class ExperimentActiveIRD(object):
         self._eval_seed = eval_seed
         self._iterations = iterations
         self._normalized_key = normalized_key
+        # Designer simulation
+        self._num_prior_tasks = num_prior_tasks
+        self._use_true_w = use_true_w
         # Evaluation
         self._num_eval = num_eval
         self._eval_method = eval_method
         assert eval_method in {"map", "uniform"}
         self._num_eval_tasks = num_eval_tasks
+        self._eval_env_name = eval_env_name
         # Active Task proposal
         self._num_active_tasks = num_active_tasks
         self._fixed_candidates = fixed_candidates
@@ -131,7 +145,8 @@ class ExperimentActiveIRD(object):
         self._hist_obs, self._hist_beliefs = {}, {}
         self._hist_candidates = []
         self._hist_cand_scores = {}
-        self._eval_tasks, self._train_tasks = [], []
+        self._eval_tasks = []
+        self._train_tasks, self._train_difficulties = [], None
         self._curr_belief = {}
         for key in self._active_fns.keys():
             self._active_eval_hist[key] = []
@@ -182,16 +197,21 @@ class ExperimentActiveIRD(object):
         self._log_time("Begin")
         self._build_cache()
         self._load_design(self._num_load_design, self._design_data)
+        eval_env = self._env_fn(self._eval_env_name)
         num_eval = self._num_eval_tasks
-        if self._num_eval_tasks > len(self._model.env.all_tasks):
+        if self._num_eval_tasks > len(eval_env.all_tasks):
             num_eval = -1
-        self._eval_tasks, self._train_tasks = random_choice(
-            self._get_rng_eval(),
-            self._model.env.all_tasks,
-            num_eval,
-            replacement=False,
-            complement=True,
+        self._eval_tasks = random_choice(
+            self._get_rng_eval(), eval_env.all_tasks, num_eval, replacement=False
         )
+        self._train_tasks = self._model.env.all_tasks
+        prior_tasks = random_choice(
+            self._get_rng_eval(),
+            self._train_tasks,
+            self._num_prior_tasks,
+            replacement=False,
+        )
+        self._designer_server.set_prior_tasks(prior_tasks)
 
         ### Main Experiment Loop ###
         for itr in range(0, self._iterations):
@@ -219,6 +239,13 @@ class ExperimentActiveIRD(object):
                         task = self._initial_task
                 elif key == "random":
                     task, scores = self._propose_random_task()
+                elif key == "difficult":
+                    if self._train_difficulties is None:
+                        self._train_difficulties = self._model.env.all_task_difficulties
+                    task, scores = self._propose_random_task()
+                    task_ids = onp.argsort(self._train_difficulties)[-1000:]
+                    difficult_tasks = self._train_tasks[task_ids]
+                    task = random_choice(self._get_rng_task(), difficult_tasks, 1)[0]
                 else:
                     belief = hist_beliefs[-1].subsample(self._num_active_sample)
                     next_candidates = candidates
@@ -237,19 +264,22 @@ class ExperimentActiveIRD(object):
 
             ### Simulate Designer ###
             latest_tasks = [ts[-1] for ts in self._hist_tasks.values()]
-            samples = self._designer_server.simulate(
-                onp.array(latest_tasks), methods=active_keys, itr=itr
-            )
+            if self._use_true_w:
+                samples = [self._designer_server.designer.truth] * len(active_keys)
+            else:
+                samples = self._designer_server.simulate(
+                    onp.array(latest_tasks), methods=active_keys, itr=itr
+                )
             for sp, key in zip(samples, active_keys):
                 if self._obs_method == "map":
                     obs = sp[0].map_estimate(1)
                 elif self._obs_method == "uniform":
                     obs = sp[0].subsample(1)
-                if len(self._hist_obs[key]) == 0:
-                    if self._initial_obs is None:
-                        self._initial_obs = obs
-                    else:
-                        obs = self._initial_obs
+                # if len(self._hist_obs[key]) == 0:
+                #     if self._initial_obs is None:
+                #         self._initial_obs = obs
+                #     else:
+                #         obs = self._initial_obs
                 self._hist_obs[key].append(obs)
             self._log_time(f"Itr {itr} Designer Simulated")
 

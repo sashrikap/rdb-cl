@@ -10,14 +10,15 @@ from rdb.infer import *
 NUM_THUMBNAILS = 200
 # ENV_NAME = "Week6_01-v0"  # Blockway
 # ENV_NAME = "Week6_01-v1"
-ENV_NAME = "Week6_02-v1"  # Two Blockway
+# ENV_NAME = "Week6_02-v1"  # Two Blockway
+ENV_NAME = "Week6_03-v1"  # Two Blockway
 ROOT_DIR = "data/thumbnails"
 
 
-THUMBNAIL = False
+THUMBNAIL = True
 HEATMAP = False
-BOUNDMAP = True
-CONSTRAINTSMAP = True
+BOUNDMAP = False
+CONSTRAINTSMAP = False
 
 env = gym.make(ENV_NAME)
 env.reset()

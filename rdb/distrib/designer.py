@@ -17,6 +17,7 @@ class DesignerWorkerSingle(object):
         self._key = None
         self._true_w = None
         self._rng_name = None
+        self._prior_tasks = None
 
     def simulate(self, task, save_name, itr, tqdm_position=0):
         samples = self._designer.simulate(
@@ -40,6 +41,13 @@ class DesignerWorkerSingle(object):
 
     def get_true_w(self):
         return self._true_w
+
+    def set_prior_tasks(self, tasks):
+        self._designer.prior_tasks = tasks
+        self._prior_tasks = tasks
+
+    def get_prior_tasks(self):
+        return self._prior_tasks
 
     def set_rng_name(self, rng_name):
         self._designer.rng_name = rng_name
@@ -153,6 +161,18 @@ class DesignerServer(object):
 
         else:
             self.workers[0].set_true_w(true_w)
+
+    def set_prior_tasks(self, tasks):
+        self._local_designer.prior_tasks = tasks
+        if self._parallel:
+            for wi in range(len(self._workers)):
+                self._workers[wi].set_prior_tasks.remote(tasks)
+
+            for wi in range(len(self._workers)):
+                ray.get(self._workers[wi].get_prior_tasks.remote())
+
+        else:
+            self.workers[0].set_prior_tasks(tasks)
 
     def set_rng_name(self, rng_name):
         if self._parallel:

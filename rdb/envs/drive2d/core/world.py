@@ -101,6 +101,7 @@ class DriveWorld(gym.Env):
         # For sampling tasks
         self._rng_key = None
         self._all_tasks = None
+        self._all_task_difficulties = None
         self._grid_tasks = []
 
     @property
@@ -413,6 +414,10 @@ class DriveWorld(gym.Env):
         if self._all_tasks is None:
             self._setup_tasks()
         return self._all_tasks
+
+    @property
+    def all_task_difficulties(self):
+        return self._all_task_difficulties
 
     @property
     def grid_tasks(self):

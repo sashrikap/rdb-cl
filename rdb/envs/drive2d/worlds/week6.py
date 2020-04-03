@@ -220,6 +220,7 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
             self._grid_tasks.append(obs_range_y)
         all_tasks = list(itertools.product(*self._grid_tasks))
         self._all_tasks = self._get_natural_tasks(all_tasks)
+        self._all_task_difficulties = self._get_task_difficulties(self._all_tasks)
 
     def _get_natural_tasks(self, tasks):
         """Filter out tasks that are not natural (keep tasks where initial positions
@@ -269,8 +270,33 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
             # all_tasks = onp.array(tasks)[onp.array(too_close)]
         else:
             raise NotImplementedError
-
         return all_tasks
+
+    def _get_task_difficulties(self, tasks, method="mean_inv"):
+        """ Compute task difficulties.
+        """
+        if method == "mean_inv":
+            ## Mean of inverse of object distances
+            ## Difference to cars and objects
+            all_states = self.get_init_states(tasks)
+            all_acs = np.zeros((len(tasks), 2))
+
+            diff_cars = self._raw_features_dict["dist_cars"](all_states, all_acs)
+            diff_objs = self._raw_features_dict["dist_objects"](all_states, all_acs)
+
+            diff_cars = diff_cars.reshape(-1, len(self._cars), 2)
+            diff_objs = diff_objs.reshape(-1, len(self._objects), 2)
+
+            dist_cars = np.linalg.norm(diff_cars, axis=2)
+            dist_objs = np.linalg.norm(diff_objs, axis=2)
+
+            sum_invs = np.sum((1 / dist_cars), axis=1) + np.sum((1 / dist_objs), axis=1)
+            mean_invs = sum_invs / float(len(self._cars) + len(self._objects))
+            # all_tasks = onp.array(tasks)[onp.array(too_close)]
+            difficulties = mean_invs
+        else:
+            raise NotImplementedError
+        return difficulties
 
 
 class Week6_01(HighwayDriveWorld_Week6):
@@ -455,8 +481,10 @@ class Week6_02_v1(HighwayDriveWorld_Week6):
         )
 
 
-class Week6_03(HighwayDriveWorld_Week6):
-    """Highway merging scenario, now with two obstacles
+class Week6_03_v1(HighwayDriveWorld_Week6):
+    """Highway merging scenario with two obstacles, but include much more sparse (common-case) events.
+        (1) Each task has difficulty rating
+        (2) Dense interactions are rare events.
     """
 
     def __init__(self):
@@ -468,7 +496,7 @@ class Week6_03(HighwayDriveWorld_Week6):
         goal_lane = 0
         horizon = 10
         dt = 0.25
-        control_bound = 1.2
+        control_bound = 0.8
         lane_width = 0.13
         num_lanes = 3
         # Car states
@@ -476,16 +504,13 @@ class Week6_03(HighwayDriveWorld_Week6):
         car2 = np.array([-lane_width, 0.9, np.pi / 2, 0])
         car_states = np.array([car1, car2])
         car_speeds = np.array([car_speed, car_speed])
+        car_ranges = [[-2.0, 2.0], [-2.0, 2.0]]
         # Obstacle states
-        obstacle_states = np.array([[0.0, 0.3], [-lane_width, 0.3], [lane_width, 0.3]])
-        obs_ranges = [
-            [-0.13, -0.129, -0.4, 1.2],
-            [0.0, 0.01, -0.4, 1.2],
-            [0.13, 0.131, -0.4, 1.2],
-        ]
-        obs_delta = [0.04, 0.2]
+        obstacle_states = np.array([[0.0, 0.3], [-lane_width, 0.3]])
+        # [x_min, x_max, y_min, y_max]
+        obs_ranges = [[-0.16, 0.0, -2.0, 2.0], [0.0, 0.16, -2.0, 2.0]]
         # Don't filter any task
-        task_naturalness = "all"
+        task_naturalness = "distance"
 
         super().__init__(
             main_state,
@@ -498,8 +523,10 @@ class Week6_03(HighwayDriveWorld_Week6):
             horizon=horizon,
             num_lanes=num_lanes,
             lane_width=lane_width,
+            car_delta=0.25,
+            car_ranges=car_ranges,
             obs_ranges=obs_ranges,
-            obs_delta=obs_delta,
+            obs_delta=[0.1, 0.1],
             obstacle_states=obstacle_states,
             task_naturalness=task_naturalness,
         )

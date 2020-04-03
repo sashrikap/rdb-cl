@@ -39,10 +39,12 @@ def main(random_key, evaluate=False):
         eval_params = load_params(params_path)
         locals().update(eval_params)
 
-    def env_fn():
+    def env_fn(env_name=None):
         import gym, rdb.envs.drive2d
 
-        env = gym.make(ENV_NAME)
+        if env_name is None:
+            env_name = ENV_NAME
+        env = gym.make(env_name)
         env.reset()
         return env
 
@@ -126,6 +128,7 @@ def main(random_key, evaluate=False):
             rng_key=None, beta=ACTIVE_BETA, method="min", debug=False
         ),
         "random": ActiveRandom(rng_key=None),
+        "difficult": ActiveRandom(rng_key=None),
     }
     for key in list(active_fns.keys()):
         if key not in ACTIVE_ARGS["active_fns"]:
@@ -134,6 +137,7 @@ def main(random_key, evaluate=False):
     EXP_ARGS["eval_seed"] = random.PRNGKey(EXP_ARGS["eval_seed"])
     experiment = ExperimentActiveIRD(
         ird_model,
+        env_fn=env_fn,
         designer_fn=designer_fn,
         active_fns=active_fns,
         true_w=TRUE_W,

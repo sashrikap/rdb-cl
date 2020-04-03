@@ -3,8 +3,9 @@ RANDOM_KEYS: [21]
 # RANDOM_KEYS: [0, 1, 2, 3]
 # FIXED_TASK_SEED: null
 
-ENV_NAME: "Week6_02-v1"
+# ENV_NAME: "Week6_02-v1"
 # ENV_NAME: "Week6_01-v1"
+ENV_NAME: "Week6_03-v1"
 
 ## MPC Specific
 IRD_CONTROLLER_ARGS:
@@ -23,7 +24,7 @@ DESIGNER_CONTROLLER_ARGS:
 
 
 ## Saving
-save_name: "200331"
+save_name: "200402"
 # EXP_NAME: "active_ird_beta_50_true_w_irdvar_3_lbfgs"
 # EXP_NAME: "active_ird_beta_50_true_w_map_mean_irdvar_3_adam200"
 # EXP_NAME: "active_ird_beta_50_true_w_map_sum_irdvar_3_adam200"
@@ -37,121 +38,122 @@ save_name: "200331"
 # EXP_NAME: "active_ird_sum_ibeta_20_true_w_irdvar_3_dbeta_1_602_adam"
 # EXP_NAME: "active_ird_sum_ibeta_5_test_true_w_irdvar_3_dbeta_1_602_adam"
 # EXP_NAME: "active_ird_sum_ibeta_80_irdvar_3_true_w_w1_eval_unif_128_602_adam"
-EXP_NAME: "active_ird_ibeta_50_true_w1_eval_unif_128_seed_0_602_adam"
+EXP_NAME: "active_ird_ibeta_50_true_w1_eval_unif_128_difficult_seed_0_603_adam"
 # EXP_NAME: "active_ird_sum_ibeta_50_dprior_2_dbeta_20_obs_uniform_w1_unif_128_602_adam"
 # EXP_NAME: "test"
 # EXP_NAME: "active_ird_beta_50_prior_2"
 
 
-# ## Full sampling
-# EXP_ARGS:
-#   num_eval: 128
-#   eval_method: "uniform"
-#   obs_method: "uniform"
-#   # eval_method: "map"
-#   num_eval_tasks: 500
-#   # num_eval_tasks: 40
-#   iterations: 16
-#   num_active_tasks: 144
-#   num_active_sample: 500
-#   eval_seed: 0
-# ## Designer Settigns
-# DESIGNER_ARGS:
-#   task_method: "sum"
-#   num_normalizers: 1000
-#   sample_method: "MH"
-#   sample_init_args:
-#     proposal_var: 0.3
-#     max_val: 15.0
-#   proposal_decay: 0.7
-#   sample_args:
-#     num_samples: 500
-#     num_warmup: 100
-#     num_chains: 1
-#   beta: 20
-#   use_true_w: True
-#   num_prior_tasks: 2
-# ## IRD Settings
-# IRD_ARGS:
-#   task_method: "sum"
-#   sample_method: "MH"
-#   sample_init_args:
-#     proposal_var: 3
-#     max_val: 15.0
-#   proposal_decay: 0.9
-#   beta: 50
-#   sample_args:
-#     num_warmup: 200
-#     num_samples: 8000
-#     num_chains: 3
-#     # num_warmup: 100
-#     # num_samples: 1000
-#     # num_chains: 1
-# EVAL_ARGS:
-#   parallel: True
-#   num_eval_workers: 2
-#   num_active_workers: 2
-#   max_batch: 500
-# ACTIVE_ARGS:
-#   # active_fns: ["infogain", "ratiomean", "ratiomin", "random"]
-#   active_fns: ["infogain", "random"]
-#   # active_fns: ["infogain"]
-#   # active_fns: ["ratiomean", "ratiomin", "random"]
-#   # active_fns: ["infogain", "ratiomean", "ratiomin"]
-#   # active_fns: ["random"]
-#   # active_fns: ["infogain", "ratiomean", "ratiomin"]
-
-
-## Testing
-## Saving
-save_name: "200330"
-EXP_NAME: "test"
+# Full sampling
 EXP_ARGS:
-  num_eval: 2
-  num_eval_tasks: 40
+  num_eval: 128
+  eval_method: "uniform"
   obs_method: "uniform"
-  iterations: 8
+  # eval_method: "map"
+  num_eval_tasks: 500
+  eval_env_name: "Week6_02-v1"
+  # num_eval_tasks: 40
+  iterations: 16
+  num_active_tasks: 144
+  num_active_sample: 500
   eval_seed: 0
+  use_true_w: True
+  num_prior_tasks: 2
+## Designer Settigns
 DESIGNER_ARGS:
   task_method: "sum"
-  num_normalizers: 10
+  num_normalizers: 1000
   sample_method: "MH"
   sample_init_args:
-    proposal_var: 0.5
+    proposal_var: 0.3
     max_val: 15.0
+  proposal_decay: 0.7
   sample_args:
-    num_samples: 40
-    num_warmup: 10
+    num_samples: 500
+    num_warmup: 100
     num_chains: 1
   beta: 20
-  use_true_w: True
-  # use_true_w: False
-  num_prior_tasks: 2
+## IRD Settings
 IRD_ARGS:
-  sample_method: "MH"
   task_method: "sum"
+  sample_method: "MH"
   sample_init_args:
-    proposal_var: 2
+    proposal_var: 3
     max_val: 15.0
+  proposal_decay: 0.9
+  beta: 50
   sample_args:
-    num_warmup: 20
-    num_samples: 30
+    num_warmup: 200
+    num_samples: 8000
     num_chains: 3
-  beta: 1
+    # num_warmup: 100
+    # num_samples: 1000
+    # num_chains: 1
 EVAL_ARGS:
   parallel: True
   num_eval_workers: 2
   num_active_workers: 2
-  max_batch: 10
+  max_batch: 500
 ACTIVE_ARGS:
-  num_active_tasks: 72
-  num_active_sample: 10
   # active_fns: ["infogain", "ratiomean", "ratiomin", "random"]
-  active_fns: ["infogain", "random"]
-  # active_fns: ["random"]
+  active_fns: ["difficult"]
+  # active_fns: ["infogain"]
+  # active_fns: ["ratiomean", "ratiomin", "random"]
   # active_fns: ["infogain", "ratiomean", "ratiomin"]
   # active_fns: ["random"]
   # active_fns: ["infogain", "ratiomean", "ratiomin"]
+
+
+# ## Testing
+# ## Saving
+# save_name: "200330"
+# EXP_NAME: "test"
+# EXP_ARGS:
+#   num_eval: 2
+#   num_eval_tasks: 40
+#   obs_method: "uniform"
+#   iterations: 8
+#   eval_seed: 0
+#   use_true_w: True
+#   num_prior_tasks: 2
+#   eval_env_name: "Week6_02-v1"
+# DESIGNER_ARGS:
+#   task_method: "sum"
+#   num_normalizers: 10
+#   sample_method: "MH"
+#   sample_init_args:
+#     proposal_var: 0.5
+#     max_val: 15.0
+#   sample_args:
+#     num_samples: 40
+#     num_warmup: 10
+#     num_chains: 1
+#   beta: 20
+# IRD_ARGS:
+#   sample_method: "MH"
+#   task_method: "sum"
+#   sample_init_args:
+#     proposal_var: 2
+#     max_val: 15.0
+#   sample_args:
+#     num_warmup: 20
+#     num_samples: 30
+#     num_chains: 3
+#   beta: 1
+# EVAL_ARGS:
+#   parallel: True
+#   num_eval_workers: 2
+#   num_active_workers: 2
+#   max_batch: 10
+# ACTIVE_ARGS:
+#   num_active_tasks: 72
+#   num_active_sample: 10
+#   # active_fns: ["infogain", "ratiomean", "ratiomin", "random"]
+#   active_fns: ["infogain", "random"]
+#   # active_fns: ["random"]
+#   # active_fns: ["infogain", "ratiomean", "ratiomin"]
+#   # active_fns: ["random"]
+#   # active_fns: ["infogain", "ratiomean", "ratiomin"]
 
 
 

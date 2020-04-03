@@ -50,8 +50,7 @@ class Designer(object):
         ## Saving options
         save_root="",
         exp_name="",
-        use_true_w=False,
-        num_prior_tasks=0,
+        prior_tasks=[],
     ):
         self._rng_key = None
         self._rng_name = None
@@ -62,7 +61,6 @@ class Designer(object):
         self._true_w = None
         self._truth = None
         self._beta = beta
-        self._use_true_w = use_true_w
         self._normalized_key = normalized_key
         self._weight_params = weight_params
 
@@ -89,7 +87,6 @@ class Designer(object):
 
         ## Designer Prior tasks
         self._prior_tasks = []
-        self._num_prior_tasks = num_prior_tasks
 
     @property
     def likelihood(self):
@@ -126,22 +123,14 @@ class Designer(object):
             self._env, "Designer Sample"
         )
 
-    def reset_prior_tasks(self):
-        assert self._num_prior_tasks < len(self._env.all_tasks)
-        self._rng_key, rng_choice = random.split(self._rng_key)
-        tasks = random_choice(rng_choice, self._env.all_tasks, self._num_prior_tasks)
-        self._prior_tasks = tasks
-
     @property
     def prior_tasks(self):
-        assert self._num_prior_tasks == len(self._prior_tasks)
         return self._prior_tasks
 
     @prior_tasks.setter
     def prior_tasks(self, tasks):
         """ Modifies Underlying Designer Prior. Use very carefully."""
         self._prior_tasks = tasks
-        self._num_prior_tasks = len(tasks)
 
     @property
     def true_w(self):
@@ -173,7 +162,6 @@ class Designer(object):
 
     def update_key(self, rng_key):
         self._rng_key, rng_truth, rng_norm = random.split(rng_key, 3)
-        self.reset_prior_tasks()
         ## Sample normaling factor
         self._norm_prior = seed(self._prior_fn("designer_norm"), rng_norm)
         self._normalizer = self.create_particles(
@@ -217,72 +205,67 @@ class Designer(object):
 
         """
         print(f"Sampling Designer (prior={len(self._prior_tasks)}): {save_name}")
-        if self._use_true_w:
-            return self._truth
+        ## Sample based on prior tasks + new_tasks
+        assert self._truth is not None, "Need assumed designer truth."
+        assert self._prior_tasks is not None, "Need >=0 prior tasks."
+        if len(self._prior_tasks) == 0:
+            assert len(new_tasks.shape) == 2 and len(new_tasks) == 1
+            tasks = new_tasks
         else:
-            ## Sample based on prior tasks + new_tasks
-            assert self._truth is not None, "Need assumed designer truth."
-            assert self._prior_tasks is not None, "Need >=0 prior tasks."
-            if len(self._prior_tasks) == 0:
-                assert len(new_tasks.shape) == 2 and len(new_tasks) == 1
-                tasks = new_tasks
-            else:
-                tasks = onp.concatenate([self._prior_tasks, new_tasks])
+            tasks = onp.concatenate([self._prior_tasks, new_tasks])
 
-            ## ==============================================================
-            ## ======================= MCMC Sampling ========================
-            init_args = copy.deepcopy(self._sample_init_args)
-            samp_args = copy.deepcopy(self._sample_args)
-            ntasks = len(tasks)
-            decay = self._proposal_decay ** (ntasks - 1)
-            init_args["proposal_var"] = init_args["proposal_var"] * decay
-            num_chains = self._sample_args["num_chains"]
-            init_params = self._truth.weights.log()
-            if num_chains > 1:
-                #  shape nfeats * (nchains, 1)
-                init_params = init_params.expand_dims(0).repeat(num_chains, axis=0)
-            del init_params[self._normalized_key]
+        ## ==============================================================
+        ## ======================= MCMC Sampling ========================
+        init_args = copy.deepcopy(self._sample_init_args)
+        samp_args = copy.deepcopy(self._sample_args)
+        ntasks = len(tasks)
+        decay = self._proposal_decay ** (ntasks - 1)
+        init_args["proposal_var"] = init_args["proposal_var"] * decay
+        num_chains = self._sample_args["num_chains"]
+        init_params = self._truth.weights.log()
+        if num_chains > 1:
+            #  shape nfeats * (nchains, 1)
+            init_params = init_params.expand_dims(0).repeat(num_chains, axis=0)
+        del init_params[self._normalized_key]
 
-            model = self._build_model(tasks)
-            sampler = get_designer_sampler(
-                self._sample_method, model, init_args, samp_args
-            )
+        model = self._build_model(tasks)
+        sampler = get_designer_sampler(self._sample_method, model, init_args, samp_args)
 
-            self._rng_key, rng_sampler = random.split(self._rng_key, 2)
-            sampler.run(
-                rng_sampler,
-                init_params=dict(init_params),
-                extra_fields=["mean_accept_prob"],
-                tqdm_position=tqdm_position,
-            )
+        self._rng_key, rng_sampler = random.split(self._rng_key, 2)
+        sampler.run(
+            rng_sampler,
+            init_params=dict(init_params),
+            extra_fields=["mean_accept_prob"],
+            tqdm_position=tqdm_position,
+        )
 
-            ## ==============================================================
-            ## ====================== Analyze Samples =======================
-            sample_ws = sampler.get_samples(group_by_chain=True)
-            #  shape nfeats * (nchains, nsample, 1) -> nfeats * (nchains, nsample)
-            sample_ws = DictList(sample_ws).squeeze(axis=2)
-            assert self._normalized_key not in sample_ws.keys()
-            sample_ws[self._normalized_key] = np.zeros(sample_ws.shape)
-            sample_info = sampler.get_extra_fields(group_by_chain=True)
-            sample_rates = sample_info["mean_accept_prob"][:, -1]
-            num_samples = sample_ws.shape[1]
+        ## ==============================================================
+        ## ====================== Analyze Samples =======================
+        sample_ws = sampler.get_samples(group_by_chain=True)
+        #  shape nfeats * (nchains, nsample, 1) -> nfeats * (nchains, nsample)
+        sample_ws = DictList(sample_ws).squeeze(axis=2)
+        assert self._normalized_key not in sample_ws.keys()
+        sample_ws[self._normalized_key] = np.zeros(sample_ws.shape)
+        sample_info = sampler.get_extra_fields(group_by_chain=True)
+        sample_rates = sample_info["mean_accept_prob"][:, -1]
+        num_samples = sample_ws.shape[1]
 
-            visualize_chains(
-                chains=sample_ws,
-                rates=sample_rates,
-                fig_dir=f"{self._save_dir}/mcmc",
-                title=f"seed_{self._rng_name}_{save_name}_samples_{num_samples:04d}",
-                **self._weight_params,
-            )
-            particles = self.create_particles(
-                sample_ws[0].exp(),
-                controller=self._one_controller,
-                runner=self._one_runner,
-                save_name=save_name,
-            )
-            particles.visualize(true_w=self.true_w, obs_w=None)
-            return particles
-            # return particles.map_estimate(1)
+        visualize_chains(
+            chains=sample_ws,
+            rates=sample_rates,
+            fig_dir=f"{self._save_dir}/mcmc",
+            title=f"seed_{self._rng_name}_{save_name}_samples_{num_samples:04d}",
+            **self._weight_params,
+        )
+        particles = self.create_particles(
+            sample_ws[0].exp(),
+            controller=self._one_controller,
+            runner=self._one_runner,
+            save_name=save_name,
+        )
+        particles.visualize(true_w=self.true_w, obs_w=None)
+        return particles
+        # return particles.map_estimate(1)
 
     def _build_model(self, tasks):
         """Build Designer PGM model."""
