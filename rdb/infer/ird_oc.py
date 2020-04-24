@@ -356,10 +356,10 @@ class IRDOptimalControl(object):
 
         num_chains = self._sample_args["num_chains"]
         num_keys = len(self._prior.feature_keys)
-        # init_params = DictList(
-        #     dict(zip(self._prior.feature_keys, np.zeros((num_keys, 1))))
-        # )
-        init_params = obs[-1].weights.log()
+        init_params = DictList(
+            dict(zip(self._prior.feature_keys, np.zeros((num_keys, 1))))
+        )
+        # init_params = obs[-1].weights.log()
         if num_chains > 1:
             #  shape nfeats * (nchains, 1)
             init_params = init_params.expand_dims(0).repeat(num_chains, axis=0)

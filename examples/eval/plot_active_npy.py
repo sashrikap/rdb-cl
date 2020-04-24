@@ -33,8 +33,8 @@ colors = {
     "random": "gray",
     "infogain": "darkorange",
     "difficult": "purple",
-    "ratiomean": "b",
-    "rationmin": "r",
+    "ratiomean": "peru",
+    "ratiomin": "darkred",
 }
 
 
@@ -161,6 +161,8 @@ def plot_data():
     data = {}
     for idx, (sd, spath) in enumerate(zip(seeddata, seedpaths)):
         for method, hist in sd.items():
+            if method in not_methods:
+                continue
             if method not in data.keys():
                 data[method] = {
                     "perform": [],
@@ -200,14 +202,15 @@ if __name__ == "__main__":
     N = -1
     use_seeds = list(range(30))
     not_seeds = []
-    MAX_LEN = 14
-    MAX_RANDOM_LEN = 14
+    MAX_LEN = 15
+    MAX_RANDOM_LEN = 15
     PADDING = 0
 
     use_seeds = [str(random.PRNGKey(si)) for si in use_seeds]
     not_seeds = [str(random.PRNGKey(si)) for si in not_seeds]
+    not_methods = []
 
-    exp_dir = "data/200402"
+    exp_dir = "data/200406"
     # exp_name = "active_ird_exp_ird_beta_50_true_w_map_sum_irdvar_3_adam200"
-    exp_name = "active_ird_ibeta_50_true_w1_eval_unif_128_difficult_seed_0_603_adam"
+    exp_name = "active_ird_ibeta_50_true_w1_eval_unif_128_ratio_seed_0_603_adam"
     plot_data()

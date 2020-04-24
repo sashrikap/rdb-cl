@@ -1,11 +1,6 @@
 """Active-IRD Main Experiment.
 
-Prerequisite:
-    * Acquisition criteria
-    * Environment (rdb.envs.drive2d)
-    * Belief sampler (rdb.infer.ird_oc.py)
-
-Full Active-IRD Evaluation:
+Full Experiment:
     1) Choose True weight, environment
     2) Simulate Designer on env
     3) Infer b(w) over true weight, sample environment
@@ -32,11 +27,9 @@ Credits:
 
 """
 
-from rdb.infer.utils import random_choice
 from rdb.distrib.designer import DesignerServer
-from rdb.infer.particles import Particles
-from numpyro.handlers import seed
 from rdb.visualize.plot import *
+from rdb.infer.utils import *
 from rdb.exps.utils import *
 from tqdm.auto import tqdm
 from jax import random
@@ -55,7 +48,7 @@ class ExperimentActiveIRD(object):
         active_fns (dict): map name -> active function
         model (object): IRD model
         iteration (int): algorithm iterations
-        num_eval (int): if > 0, use MAP estimate
+        num_eval (int): how many particles to sample from posterior belief
         eval_method (str): "map" or "uniform"
         num_active_tasks (int): # task candidates for active selection
         num_active_sample (int): running acquisition function on belief
@@ -89,7 +82,6 @@ class ExperimentActiveIRD(object):
         fixed_candidates=None,
         fixed_belief_tasks=None,
         # Metadata
-        normalized_key=None,
         design_data=None,
         num_load_design=-1,
         save_root="data/active_ird_exp1",
@@ -110,7 +102,6 @@ class ExperimentActiveIRD(object):
         self._rng_name = None
         self._eval_seed = eval_seed
         self._iterations = iterations
-        self._normalized_key = normalized_key
         # Designer simulation
         self._num_prior_tasks = num_prior_tasks
         self._use_true_w = use_true_w
@@ -248,11 +239,8 @@ class ExperimentActiveIRD(object):
                     task = random_choice(self._get_rng_task(), difficult_tasks, 1)[0]
                 else:
                     belief = hist_beliefs[-1].subsample(self._num_active_sample)
-                    next_candidates = candidates
-                    # next_candidates = onp.concatenate(candidates, onp.array([hist_tasks[-1]]))
-                    # import pdb; pdb.set_trace()
                     task, scores = self._propose_task(
-                        next_candidates, belief, hist_obs, hist_tasks, key
+                        candidates, belief, hist_obs, hist_tasks, key
                     )
 
                 self._hist_tasks[key].append(task)
@@ -375,13 +363,6 @@ class ExperimentActiveIRD(object):
             * Violations.
 
         """
-        # if self._model.interactive_mode and self._designer.run_from_ipython():
-        #     # Interactive mode, skip evaluation to speed up
-        #     avg_violate = 0.0
-        #     avg_perform = 0.0
-        #     log_prob_true = 0.0
-        #     avg_feats_violate = {}
-        # else:
 
         # Compute belief features
         if method == "uniform":
@@ -498,7 +479,7 @@ class ExperimentActiveIRD(object):
         for i, design_i in enumerate(load_designs):
             # Load previous design
             task = design_i["TASK"]
-            weights = normalize_weights(design_i["WEIGHTS"], self._normalized_key)
+            weights = design_i["WEIGHTS"]
             obs = self._model.create_particles(
                 [weights],
                 save_name=f"ird_prior_design_{i:02d}",
@@ -530,80 +511,6 @@ class ExperimentActiveIRD(object):
                 assert len(self._hist_beliefs[key]) == i
                 self._hist_beliefs[key].append(belief)
         return load_obs, load_tasks
-
-    def _load_cache(self, load_dir, load_eval=True):
-        """Load previous experiment checkpoint.
-
-        The opposite ove self._save().
-
-        """
-        # Load eval data
-        self._build_cache()
-        eval_path = (
-            f"{load_dir}/{self._exp_name}/{self._exp_name}_seed_{self._rng_name}.npz"
-        )
-        if not os.path.isfile(eval_path):
-            print(f"Failed to load {eval_path}")
-            return False
-
-        eval_data = np.load(eval_path, allow_pickle=True)
-        if load_eval:
-            self._active_eval_hist = eval_data["eval_hist"].item()
-            self._active_map_vs_obs_hist = eval_data["active_map_vs_obs_hist"].item()
-        self._hist_candidates = eval_data["candidate_tasks"]
-        self._hist_cand_scores = eval_data["candidate_scores"].item()
-        self._eval_tasks = eval_data["eval_tasks"]
-        if len(self._eval_tasks) == 0:
-            self._eval_tasks = self._model.env.all_tasks
-        self._hist_tasks = eval_data["curr_tasks"].item()
-
-        # Load observations
-        np_obs = eval_data["curr_obs"].item()
-        for key in np_obs.keys():
-            self._hist_obs[key] = [
-                self._model.create_particles(
-                    [ws],
-                    controller=self._designer_server.designer._sample_controller,
-                    runner=self._designer_server.designer._sample_runner,
-                    save_name="observation",
-                )
-                for ws in np_obs[key]
-            ]
-        if "env_id" in eval_data:
-            assert self._model.env_id == eval_data["env_id"].item()
-        # Load truth
-        if "true_w" in eval_data:
-            true_ws = [eval_data["true_w"].item()]
-            self._designer_server.designer.truth.weights = true_ws
-        # Load parameters and check
-        if "exp_params" in eval_data:
-            exp_params = eval_data["exp_params"].item()
-            for key, val in exp_params.items():
-                assert (
-                    key in self._exp_params and self._exp_params[key] == val
-                ), f"Parameter changed {key}: {val}"
-
-        # Load beliefs
-        weight_dir = f"{load_dir}/{self._exp_name}/save"
-        for key in self._active_fns.keys():
-            weight_files = sorted(
-                [f for f in os.listdir(weight_dir) if key in f and self._rng_name in f]
-            )
-            for file in weight_files:
-                # file: weights_seed_[ 0 10]_ird_belief_method_infogain_itr_00.npz
-                save_name = file[file.index("ird") :].replace(".npz", "")
-                belief = self._model.create_particles(
-                    weights=None,
-                    controller=self._model._sample_controller,
-                    runner=self._model._sample_runner,
-                    save_name=save_name,
-                )
-                belief.load()
-                self._hist_beliefs[key].append(belief)
-        # Load random seed
-        rng_key = str_to_key(eval_data["seed"].item())
-        self.update_key(rng_key)
-        return True
 
     def _save(self, itr, fn_key=None, skip_weights=False):
         """Save checkpoint.
@@ -676,42 +583,6 @@ class ExperimentActiveIRD(object):
             s = secs - (h * 60 * 60) - (m * 60)
             print(f">>> Active IRD {caption} Time: {int(h)}h {int(m)}m {s:.2f}s")
         self._last_time = time()
-
-    def run_evaluation(self):
-        """For interactive mode. Since it's costly to run evaluation during interactive
-        mode, we save the beliefs and evaluate post-hoc.
-
-        Args:
-            override (bool): if false, do not re-calculate evaluations.
-
-        """
-        print(
-            f"\n============= Evaluate Candidates ({self._rng_name}): {self._save_root} {self._exp_name} ============="
-        )
-        if not self._load_cache(self._save_root):
-            return
-
-        ## IRD Sampling w/ Divide And Conquer
-        key = "infogain"
-        itr = 2
-        map_weights = self._hist_beliefs[key][itr].map_estimate(4).weights
-        belief = self._model.sample(
-            tasks=onp.array(self._hist_tasks[key])[: itr + 1],
-            obs=self._hist_obs[key][: itr + 1],
-            save_name=f"ird_belief_method_{key}_itr_{itr:02d}",
-        )
-
-        hist_candidates = self._hist_candidates
-        hist_scores = self._hist_cand_scores
-        hist_beliefs = self._hist_beliefs
-        eval_tasks = self._eval_tasks
-        num_iter = hist_candidates.shape[0]
-        print(f"Methods {list(hist_beliefs.keys())}, iterations {num_iter}")
-        for itr in range(num_iter):
-            for key in hist_beliefs:
-                if len(hist_beliefs[key]) <= itr:
-                    continue
-                belief = hist_beliefs[key][itr]
 
     def _plot_candidate_scores(self, itr, debug_dir=None):
         if debug_dir is None:

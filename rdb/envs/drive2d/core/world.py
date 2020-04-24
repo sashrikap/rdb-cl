@@ -22,7 +22,6 @@ import pyglet
 import matplotlib.cm
 from pyglet import gl, graphics
 
-# from gym.envs.classic_control import rendering ## causes problem with headless server
 from rdb.envs.drive2d.core import lane, feature, car
 from rdb.infer.dictlist import *
 from rdb.optim.utils import *
@@ -457,16 +456,20 @@ class DriveWorld(gym.Env):
             draw_heat (bool): draw heatmap, where redness ~ | cost |
             draw_boundary (bool): draw boundary map, where redness ~ cost > 0
         """
-        assert mode in ["human", "state_pixels", "rgb_array"]
+        assert mode in ["human", "rgb_array"]
         if self.state.shape[0] > 1:
             print("WARNING: rendering with batch mode")
 
+        visible = mode == "human"
         if self._window is None:
-            caption = f"{self.__class__}"
+            # from gym.envs.classic_control import rendering
             try:
                 self._window = pyglet.window.Window(
-                    width=int(WINDOW_W / 2), height=int(WINDOW_H / 2)
+                    width=int(WINDOW_W / 2), height=int(WINDOW_H / 2), visible=visible
                 )
+                self._window.set_visible(True)
+                self.draw_text(text)
+                self._window.set_visible(visible)
             except:
                 ## On headless server
                 print("Display not supported on headless server")
@@ -527,9 +530,89 @@ class DriveWorld(gym.Env):
             arr = arr[::-1, :, 0:3]
             # if mode == "human":
             self._window.flip()
+            # self._window.set_visible(False)
             return arr
         else:
             return None
+        # """
+        # Args:
+        #     draw_heat (bool): draw heatmap, where redness ~ | cost |
+        #     draw_boundary (bool): draw boundary map, where redness ~ cost > 0
+        # """
+        # assert mode in ["human", "rgb_array"]
+        # if self.state.shape[0] > 1:
+        #     print("WARNING: rendering with batch mode")
+
+        # if self._window is None:
+        #     from gym.envs.classic_control import rendering
+
+        #     try:
+        #         self._window = pyglet.window.Window(
+        #             width=int(WINDOW_W / 2), height=int(WINDOW_H / 2)
+        #         )
+        #     except:
+        #         ## On headless server
+        #         print("Display not supported on headless server")
+        #         self._headless = True
+        # if not self._headless:
+        #     self._window.switch_to()
+        #     # Bring up window
+        #     self._window.dispatch_events()
+        #     self._window.clear()
+        #     if SYSTEM == "Darwin":
+        #         # JH Note: strange pyglet rendering requires /2
+        #         gl.glViewport(0, 0, int(WINDOW_W), int(WINDOW_H))
+        #     else:  # Linux, etc
+        #         gl.glViewport(0, 0, int(WINDOW_W / 2), int(WINDOW_H / 2))
+        #     gl.glMatrixMode(gl.GL_PROJECTION)
+        #     gl.glPushMatrix()
+        #     gl.glLoadIdentity()
+
+        #     if cars is None:
+        #         cars = self._cars
+        #     if main_car is None:
+        #         main_car = self.main_car
+
+        #     self.center_camera(main_car)
+        #     self.draw_background()
+        #     for lane in self._lanes:
+        #         lane.render()
+        #     for oi, obj in enumerate(self._objects):
+        #         obj.render()
+        #     for car in cars:
+        #         car.render()
+        #     main_car.render()
+        #     if draw_heat:
+        #         assert weights is not None
+        #         self.set_heat(weights)
+        #         self._draw_heatmap(heat_fn=self._viz_heat_fn)
+        #     elif draw_boundary:
+        #         assert weights is not None
+        #         self.set_heat(weights)
+        #         self._draw_heatmap(
+        #             heat_fn=lambda *args: self._viz_heat_fn(*args) > 0.01
+        #         )
+        #     elif draw_constraint_key is not None:
+        #         self.set_constraints(draw_constraint_key)
+        #         self._draw_heatmap(heat_fn=self._viz_constraint_fn)
+
+        #     gl.glPopMatrix()
+        #     self.draw_text(text)
+
+        #     img_data = (
+        #         pyglet.image.get_buffer_manager().get_color_buffer().get_image_data()
+        #     )
+        #     arr = onp.fromstring(img_data.data, dtype=onp.uint8, sep="")
+        #     if SYSTEM == "Darwin":
+        #         arr = arr.reshape(int(WINDOW_W), int(WINDOW_H), 4)
+        #     else:
+        #         arr = arr.reshape(int(WINDOW_W / 2), int(WINDOW_H / 2), 4)
+        #     arr = arr[::-1, :, 0:3]
+        #     # if mode == "human":
+        #     self._window.flip()
+        #     return arr
+        # else:
+        #     return None
 
     def close_window(self):
         if self._window is not None:
@@ -583,6 +666,7 @@ class DriveWorld(gym.Env):
                 "Speed: ",
                 font_name="Palatino",
                 font_size=15,
+                # y=300,
                 x=30,
                 y=self._window.height - 90,
                 width=200,

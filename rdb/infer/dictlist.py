@@ -336,13 +336,16 @@ class DictList(dict):
     def mean(self, axis=1, keepdims=False):
         """Average each value by axis."""
         shape = self.shape
-        assert axis >= 0 and axis < len(
-            shape
+        assert isinstance(axis, tuple) or (
+            axis >= 0 and axis < len(shape)
         ), f"Cannot average axis {axis}, current DictList: nkeys={shape[0]} value {shape[1:]}"
         data = OrderedDict()
+        is_list = False
         for key, val in self.items():
             data[key] = self._np.mean(val, axis=axis, keepdims=keepdims)
-        if len(shape) > 1:
+            if len(data[key].shape) > 0:
+                is_list = True
+        if is_list:
             # value >= 2D, resulting mean >= 1D
             return DictList(data, jax=self._jax)
         else:

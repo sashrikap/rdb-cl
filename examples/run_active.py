@@ -8,8 +8,8 @@ import numpyro
 
 numpyro.set_host_device_count(3)
 
-from rdb.exps.active_ird import ExperimentActiveIRD
 from rdb.exps.active import ActiveInfoGain, ActiveRatioTest, ActiveRandom
+from rdb.exps.active_ird import ExperimentActiveIRD
 from rdb.distrib.particles import ParticleServer
 from rdb.infer.ird_oc import IRDOptimalControl
 from rdb.optim.mpc import build_mpc
@@ -23,21 +23,12 @@ import copy
 import ray
 
 
-def main(random_key, evaluate=False):
+def main(random_key):
     SAVE_ROOT = data_dir() if not GCP_MODE else "/gcp_output"  # Don'tchange this line
     DEBUG_ROOT = data_dir() if not GCP_MODE else "/gcp_input"
 
     # Define random key
     rng_key = random.PRNGKey(random_key)
-    if evaluate:
-        # Load pre-saved parameters and update
-        print(
-            f"\n======== Evaluating exp {EXP_ARGS['save_name']} from {SAVE_ROOT}/{EXP_ARGS['save_name']}========\n"
-        )
-        params_path = f"{SAVE_ROOT}/{EXP_ARGS['save_name']}/{EXP_ARGS['save_name']}/params_{str(rng_key)}.yaml"
-        assert os.path.isfile(params_path)
-        eval_params = load_params(params_path)
-        locals().update(eval_params)
 
     def env_fn(env_name=None):
         import gym, rdb.envs.drive2d
@@ -96,8 +87,8 @@ def main(random_key, evaluate=False):
             prior_fn=prior_fn,
             weight_params=WEIGHT_PARAMS,
             normalized_key=WEIGHT_PARAMS["normalized_key"],
-            save_root=f"{SAVE_ROOT}/{PARAMS['save_name']}",
-            exp_name=f"{PARAMS['EXP_NAME']}",
+            save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
+            exp_name=EXP_NAME,
             **DESIGNER_ARGS,
         )
         return designer
@@ -111,8 +102,8 @@ def main(random_key, evaluate=False):
         prior_fn=prior_fn,
         normalized_key=WEIGHT_PARAMS["normalized_key"],
         weight_params=WEIGHT_PARAMS,
-        save_root=f"{SAVE_ROOT}/{PARAMS['save_name']}",
-        exp_name=f"{PARAMS['EXP_NAME']}",
+        save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
+        exp_name=EXP_NAME,
         **IRD_ARGS,
     )
     ## Active acquisition function for experiment
@@ -142,30 +133,24 @@ def main(random_key, evaluate=False):
         active_fns=active_fns,
         true_w=TRUE_W,
         eval_server=eval_server,
-        save_root=f"{SAVE_ROOT}/{PARAMS['save_name']}",
-        exp_name=f"{PARAMS['EXP_NAME']}",
+        save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
+        exp_name=EXP_NAME,
         exp_params=PARAMS,
-        normalized_key=WEIGHT_PARAMS["normalized_key"],
         **EXP_ARGS,
     )
 
     """ Experiment """
     experiment.update_key(rng_key)
-    if evaluate:
-        experiment.run_evaluation(override=True)
-    else:
-        experiment.run()
+    experiment.run()
     ray.shutdown()  # Prepare for next run, which reinitialize ray with different seed
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process some integers.")
     parser.add_argument("--GCP_MODE", action="store_true")
-    parser.add_argument("--EVALUATE", action="store_true")
     args = parser.parse_args()
 
     GCP_MODE = args.GCP_MODE
-    EVALUATE = args.EVALUATE
 
     # Load parameters
     if not GCP_MODE:
@@ -174,7 +159,5 @@ if __name__ == "__main__":
         PARAMS = load_params("/dar_payload/rdb/examples/params/active_params.yaml")
     locals().update(PARAMS)
     if not GCP_MODE:
-        # RANDOM_KEYS = [24]
         NUM_EVAL_WORKERS = 4
-    for ki in copy.deepcopy(RANDOM_KEYS):
-        main(random_key=ki, evaluate=EVALUATE)
+    main(random_key=RANDOM_KEYS[0])

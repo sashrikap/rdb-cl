@@ -27,7 +27,7 @@ setup(
         "ray",
         "ipython",
         "tqdm",
-        "imageio",
+        "imageio==2.1.2",
         "ipywidgets",
     ],
 )

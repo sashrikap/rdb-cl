@@ -1,7 +1,8 @@
 ACTIVE_ARGS:
   active_fns:
-  - ratiomean
-  - ratiomin
+  - random
+  - infogain
+  - difficult
 DESIGNER_ARGS:
   beta: 20
   num_normalizers: 1000
@@ -29,15 +30,12 @@ EXP_ARGS:
   eval_env_name: Week6_02-v1
   eval_method: uniform
   eval_seed: 0
-  iterations: 16
   num_active_sample: 500
-  num_active_tasks: 144
-  num_eval: 128
+  num_active_tasks: 512
+  num_eval: 512
   num_eval_tasks: 500
-  num_prior_tasks: 2
-  obs_method: uniform
-  use_true_w: true
-EXP_NAME: active_ird_ibeta_50_true_w1_eval_unif_128_ratio_seed_0_603_adam
+  num_propose: 4
+EXP_NAME: interactive_proposal_divide_training_03_propose_04
 IRD_ARGS:
   beta: 50
   proposal_decay: 0.9
@@ -55,15 +53,8 @@ IRD_CONTROLLER_ARGS:
   horizon: 10
   method: adam
 RANDOM_KEYS:
-- 3
-TRUE_W:
-  control: 0.2
-  dist_cars: 2.0
-  dist_fences: 5.35
-  dist_lanes: 2.5
-  dist_objects: 2.25
-  speed: 5
-  speed_over: 80
+- 10
+SAVE_NAME: '200413'
 WEIGHT_PARAMS:
   bins: 200
   feature_keys:
@@ -75,4 +66,3 @@ WEIGHT_PARAMS:
   - control
   max_weights: 15.0
   normalized_key: dist_cars
-save_name: '200406'

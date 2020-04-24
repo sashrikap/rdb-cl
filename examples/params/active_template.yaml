@@ -24,7 +24,7 @@ DESIGNER_CONTROLLER_ARGS:
 
 
 ## Saving
-save_name: "200402"
+SAVE_NAME: "200406"
 # EXP_NAME: "active_ird_beta_50_true_w_irdvar_3_lbfgs"
 # EXP_NAME: "active_ird_beta_50_true_w_map_mean_irdvar_3_adam200"
 # EXP_NAME: "active_ird_beta_50_true_w_map_sum_irdvar_3_adam200"
@@ -38,7 +38,7 @@ save_name: "200402"
 # EXP_NAME: "active_ird_sum_ibeta_20_true_w_irdvar_3_dbeta_1_602_adam"
 # EXP_NAME: "active_ird_sum_ibeta_5_test_true_w_irdvar_3_dbeta_1_602_adam"
 # EXP_NAME: "active_ird_sum_ibeta_80_irdvar_3_true_w_w1_eval_unif_128_602_adam"
-EXP_NAME: "active_ird_ibeta_50_true_w1_eval_unif_128_difficult_seed_0_603_adam"
+EXP_NAME: "active_ird_ibeta_50_true_w1_eval_unif_128_ratio_seed_0_603_adam"
 # EXP_NAME: "active_ird_sum_ibeta_50_dprior_2_dbeta_20_obs_uniform_w1_unif_128_602_adam"
 # EXP_NAME: "test"
 # EXP_NAME: "active_ird_beta_50_prior_2"
@@ -96,17 +96,17 @@ EVAL_ARGS:
   max_batch: 500
 ACTIVE_ARGS:
   # active_fns: ["infogain", "ratiomean", "ratiomin", "random"]
-  active_fns: ["difficult"]
+  # active_fns: ["difficult"]
   # active_fns: ["infogain"]
   # active_fns: ["ratiomean", "ratiomin", "random"]
   # active_fns: ["infogain", "ratiomean", "ratiomin"]
   # active_fns: ["random"]
-  # active_fns: ["infogain", "ratiomean", "ratiomin"]
+  active_fns: ["ratiomean", "ratiomin"]
 
 
 # ## Testing
 # ## Saving
-# save_name: "200330"
+# SAVE_NAME: "200330"
 # EXP_NAME: "test"
 # EXP_ARGS:
 #   num_eval: 2

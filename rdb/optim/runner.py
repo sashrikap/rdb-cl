@@ -64,7 +64,7 @@ class Runner(object):
         except NameError:
             return False
 
-    def collect_frames(self, actions, width=450, mode="rgb_array", text=""):
+    def collect_frames(self, actions, width=450, mode="rgb_array", text="", close=True):
         self._env.reset()
         frames = []
         if mode == "rgb_array":
@@ -73,7 +73,7 @@ class Runner(object):
         for act in actions:
             self._env.step(act)
             if mode == "human":
-                self._env.render("human")
+                self._env.render("human", text=text)
                 time.sleep(0.1)
             elif mode == "rgb_array":
                 frame = self._env.render("rgb_array", text=text)
@@ -81,11 +81,11 @@ class Runner(object):
                 frames.append(frame)
             else:
                 raise NotImplementedError
-        if self.run_from_ipython():
+        if close:
             self._env.close_window()
         return frames
 
-    def collect_mp4(self, state, actions, width=450, path=None, text=None):
+    def collect_mp4(self, state, actions, width=450, path=None, text="", close=True):
         """Save mp4 data.
 
         Args:
@@ -101,7 +101,8 @@ class Runner(object):
         self._env.reset()
         self._env.state = state
         render_env(self._env, state, actions, fps=3, path=path, text=text)
-        self._env.close_window()
+        if close:
+            self._env.close_window()
         return path
 
     def nb_show_mp4(self, state, actions, path, clear=True):
@@ -127,7 +128,7 @@ class Runner(object):
         print(f"video path {mp4_path}")
         display(Video(mp4_path, width=FRAME_WIDTH))
 
-    def collect_thumbnail(self, state, width=450, path=None, text=None):
+    def collect_thumbnail(self, state, width=450, path=None, text=None, close=True):
         """Save thumbnail data.
 
         Args:
@@ -142,11 +143,13 @@ class Runner(object):
         self._env.state = state
         frame = self._env.render("rgb_array", text=text)
         frame = imresize(frame, (width, width))
-        if self.run_from_ipython():
+        if close:
             self._env.close_window()
         imsave(path, frame)
 
-    def collect_cost_heatmap(self, state, weights, width=450, path=None, text=None):
+    def collect_cost_heatmap(
+        self, state, weights, width=450, path=None, text=None, close=True
+    ):
         assert len(state.shape) == 2
 
         weights = DictList(weights)
@@ -159,11 +162,13 @@ class Runner(object):
             "rgb_array", draw_heat=True, weights=weights, text=text
         )
         frame = imresize(frame, (width, width))
-        if self.run_from_ipython():
+        if close:
             self._env.close_window()
         imsave(path, frame)
 
-    def collect_bound_heatmap(self, state, weights, width=450, path=None, text=None):
+    def collect_bound_heatmap(
+        self, state, weights, width=450, path=None, text=None, close=True
+    ):
         assert len(state.shape) == 2
 
         weights = DictList(weights)
@@ -176,11 +181,13 @@ class Runner(object):
             "rgb_array", draw_boundary=True, weights=weights, text=text
         )
         frame = imresize(frame, (width, width))
-        if self.run_from_ipython():
+        if close:
             self._env.close_window()
         imsave(path, frame)
 
-    def collect_constraint_heatmap(self, state, key, width=450, path=None, text=None):
+    def collect_constraint_heatmap(
+        self, state, key, width=450, path=None, text=None, close=True
+    ):
         assert len(state.shape) == 2
         if path is None:
             path = join(dirname(rdb.__file__), "..", "data", "constraint.png")
@@ -189,7 +196,7 @@ class Runner(object):
         self._env.state = state
         frame = self._env.render("rgb_array", draw_constraint_key=key, text=text)
         frame = imresize(frame, (width, width))
-        if self.run_from_ipython():
+        if close:
             self._env.close_window()
         imsave(path, frame)
 

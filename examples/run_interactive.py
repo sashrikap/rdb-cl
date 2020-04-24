@@ -1,13 +1,16 @@
-"""Run Active-IRD Interactive Loop.
+"""Run Interactive IRD experiment.
 
 Note:
-    * See (rdb.exps.active_ird.py) for more details.
+    * See (rdb.exps.interactive_ird.py) for more details.
 
 """
+import numpyro
+
+numpyro.set_host_device_count(3)
 
 from rdb.exps.active import ActiveInfoGain, ActiveRatioTest, ActiveRandom
 from rdb.exps.utils import load_params, examples_dir, data_dir
-from rdb.exps.active_ird import ExperimentActiveIRD
+from rdb.exps.interactive_ird import ExperimentInteractiveIRD
 from rdb.distrib.particles import ParticleServer
 from rdb.infer.ird_oc import IRDOptimalControl
 from os.path import join, expanduser
@@ -17,146 +20,167 @@ from rdb.infer import *
 from jax import random
 import numpyro.distributions as dist
 import yaml, argparse
+import shutil
+import ray
 
 
-class objectview(object):
-    """Load dict params into object, because notebook doesn't support
-    `local().update(params)`
-    """
+def main():
+    SAVE_ROOT = data_dir() if not GCP_MODE else "/gcp_output"  # Don'tchange this line
+    DESIGN_ROOT = f"examples/designs" if not GCP_MODE else f"./rdb/examples/designs"
+    DEBUG_ROOT = data_dir() if not GCP_MODE else "/gcp_input"
 
-    def __init__(self, d):
-        self.__dict__ = d
-
-
-def run_interactive(active_fn_name, random_keys=None, load_design=-1, evaluate=False):
-    ## Load parameters
-    PARAMS = load_params(join(examples_dir(), "params/interactive_template.yaml"))
-    PARAMS["EXP_NAME"] = f"{PARAMS['EXP_NAME']}_{active_fn_name}_design_{load_design}"
-    PARAMS["INTERACTIVE_NAME"] = f"{PARAMS['INTERACTIVE_NAME']}_{active_fn_name}"
-
-    ## Override Parameters
-    if random_keys is not None:
-        PARAMS["RANDOM_KEYS"] = random_keys
-
-    p = objectview(PARAMS)
-    print(f"Interactive Experiment Random Key {p.RANDOM_KEYS}")
-
-    ## Previous design_data
-    if load_design > 0:
-        design_data = load_params(join(examples_dir(), f"designs/{p.ENV_NAME}.yaml"))
-        assert design_data["ENV_NAME"] == p.ENV_NAME, "Environment name mismatch"
-    else:
-        design_data = {}
-
-    def env_fn():
+    def env_fn(env_name=None):
         import gym, rdb.envs.drive2d
 
-        env = gym.make(p.ENV_NAME)
+        if env_name is None:
+            env_name = ENV_NAME
+        env = gym.make(env_name)
         env.reset()
         return env
 
-    def controller_fn(env):
+    def ird_controller_fn(env, name=""):
         controller, runner = build_mpc(
-            env, env.main_car.cost_runtime, p.HORIZON, env.dt, replan=False
+            env,
+            env.main_car.cost_runtime,
+            dt=env.dt,
+            replan=False,
+            name=name,
+            **IRD_CONTROLLER_ARGS,
         )
         return controller, runner
 
-    ## Prior sampling & likelihood functions for PGM
-    prior = LogUniformPrior(
-        rng_key=None,
-        normalized_key=p.NORMALIZED_KEY,
-        feature_keys=p.FEATURE_KEYS,
-        log_max=p.MAX_WEIGHT,
-    )
+    def designer_controller_fn(env, name=""):
+        controller, runner = build_mpc(
+            env,
+            env.main_car.cost_runtime,
+            dt=env.dt,
+            replan=False,
+            name=name,
+            **DESIGNER_CONTROLLER_ARGS,
+        )
+        return controller, runner
 
-    ## Evaluation Server
     eval_server = ParticleServer(
-        env_fn, controller_fn, num_workers=p.NUM_EVAL_WORKERS, parallel=p.PARALLEL
+        env_fn,
+        ird_controller_fn,
+        parallel=EVAL_ARGS["parallel"],
+        normalized_key=WEIGHT_PARAMS["normalized_key"],
+        weight_params=WEIGHT_PARAMS,
+        max_batch=EVAL_ARGS["max_batch"],
     )
+    if not ONLY_VISUALIZE:
+        eval_server.register("Evaluation", EVAL_ARGS["num_eval_workers"])
+    if not ONLY_EVALUATE and not ONLY_VISUALIZE:
+        eval_server.register("Active", EVAL_ARGS["num_active_workers"])
+    ## Prior sampling & likelihood functions for PGM
+    def prior_fn(name="", feature_keys=WEIGHT_PARAMS["feature_keys"]):
+        return LogUniformPrior(
+            normalized_key=WEIGHT_PARAMS["normalized_key"],
+            feature_keys=feature_keys,
+            log_max=WEIGHT_PARAMS["max_weights"],
+            name=name,
+        )
 
+    def designer_fn():
+        designer = Designer(
+            env_fn=env_fn,
+            controller_fn=designer_controller_fn,
+            prior_fn=prior_fn,
+            weight_params=WEIGHT_PARAMS,
+            normalized_key=WEIGHT_PARAMS["normalized_key"],
+            save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
+            exp_name=EXP_NAME,
+            **DESIGNER_ARGS,
+        )
+        return designer
+
+    designer = designer_fn()
     ird_model = IRDOptimalControl(
-        rng_key=None,
-        env_id=p.ENV_NAME,
+        env_id=ENV_NAME,
         env_fn=env_fn,
-        controller_fn=controller_fn,
-        eval_server=eval_server,
-        beta=p.BETA,
-        true_w=None,
-        prior=prior,
-        num_normalizers=p.NUM_NORMALIZERS,
-        normalized_key=p.NORMALIZED_KEY,
-        sample_args={
-            "num_warmups": p.NUM_WARMUPS,
-            "num_samples": p.NUM_SAMPLES,
-            "use_dictlist": True,
-        },
-        interactive_mode=True,
-        interactive_name=p.INTERACTIVE_NAME,
+        controller_fn=ird_controller_fn,
+        designer=designer,
+        prior_fn=prior_fn,
+        normalized_key=WEIGHT_PARAMS["normalized_key"],
+        weight_params=WEIGHT_PARAMS,
         save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
-        exp_name=f"{EXP_NAME}",
+        exp_name=f"{PARAMS['EXP_NAME']}",
+        **IRD_ARGS,
     )
 
-    """ Active acquisition function for experiment """
+    ## Active acquisition function for experiment
+    ACTIVE_BETA = IRD_ARGS["beta"]
     active_fns = {
         "infogain": ActiveInfoGain(
-            rng_key=None, model=ird_model, beta=p.BETA, debug=False
+            rng_key=None, beta=ACTIVE_BETA, weight_params=WEIGHT_PARAMS, debug=False
         ),
         "ratiomean": ActiveRatioTest(
-            rng_key=None, model=ird_model, method="mean", debug=False
+            rng_key=None, beta=ACTIVE_BETA, method="mean", debug=False
         ),
         "ratiomin": ActiveRatioTest(
-            rng_key=None, model=ird_model, method="min", debug=False
+            rng_key=None, beta=ACTIVE_BETA, method="min", debug=False
         ),
-        "random": ActiveRandom(rng_key=None, model=ird_model),
+        "random": ActiveRandom(rng_key=None),
+        "difficult": ActiveRandom(rng_key=None),
     }
-    keys = list(active_fns.keys())
-    for key in keys:
-        if key != active_fn_name:
+    for key in list(active_fns.keys()):
+        if key not in ACTIVE_ARGS["active_fns"]:
             del active_fns[key]
-    assert len(list(active_fns)) == 1
 
-    # Task Sampling seed
-    if p.FIXED_TASK_SEED is not None:
-        fixed_task_seed = random.PRNGKey(p.FIXED_TASK_SEED)
+    EXP_ARGS["eval_seed"] = random.PRNGKey(EXP_ARGS["eval_seed"])
+    if ONLY_EVALUATE:
+        exp_mode = "evaluate"
+    elif ONLY_VISUALIZE:
+        exp_mode = "visualize"
     else:
-        fixed_task_seed = None
-
-    SAVE_ROOT = data_dir()
-    experiment = ExperimentActiveIRD(
+        exp_mode = "propose"
+    experiment = ExperimentInteractiveIRD(
         ird_model,
-        active_fns,
+        env_fn=env_fn,
+        active_fns=active_fns,
         eval_server=eval_server,
-        iterations=p.EXP_ITERATIONS,
-        num_eval_tasks=p.NUM_EVAL_TASKS,
-        num_eval_map=p.NUM_EVAL_MAP,
-        num_active_tasks=p.NUM_ACTIVE_TASKS,
-        num_active_sample=p.NUM_ACTIVE_SAMPLES,
-        normalized_key=p.NORMALIZED_KEY,
-        fixed_task_seed=fixed_task_seed,
-        design_data=design_data,
-        num_load_design=load_design,
-        save_root=f"{SAVE_ROOT}/{p.SAVE_NAME}",
-        exp_name=f"{p.EXP_NAME}",
+        exp_mode=exp_mode,
+        # Saving
+        save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
+        design_root=f"{DESIGN_ROOT}/{SAVE_NAME}",
+        exp_name=EXP_NAME,
         exp_params=PARAMS,
+        **EXP_ARGS,
     )
 
-    for ki in p.RANDOM_KEYS:
-        key = random.PRNGKey(ki)
-        experiment.update_key(key)
-        if evaluate:
-            # Post notebook evaluation
-            # experiment.run_evaluation(override=False)
-            experiment.run_evaluation(override=True)
-        else:
-            # Interactive notebook Experiment
-            experiment.run(plot_candidates=True)
+    """ Experiment """
+    for random_key in RANDOM_KEYS:
+        rng_key = random.PRNGKey(random_key)
+        experiment.update_key(rng_key)
+        experiment.run()
+    ray.shutdown()  # Prepare for next run, which reinitialize ray with different seed
 
 
 if __name__ == "__main__":
-    # for exp_key in ["infogain", "ratiomean", "ratiomin", "random"]:
-    for exp_key in ["infogain", "ratiomean", "ratiomin", "random"]:
-        # for exp_key in ["random"]:
-        # for exp_key in ["infogain"]:
-        # for exp_key in ["ratiomin"]:
-        # for exp_key in ["ratiomean"]:
-        run_interactive(exp_key, evaluate=True)
+    parser = argparse.ArgumentParser(description="Process arguments.")
+    parser.add_argument("--GCP_MODE", action="store_true")
+    parser.add_argument("--ONLY_EVALUATE", action="store_true")
+    parser.add_argument("--ONLY_VISUALIZE", action="store_true")
+    args = parser.parse_args()
+
+    GCP_MODE = args.GCP_MODE
+    ONLY_EVALUATE = args.ONLY_EVALUATE
+    ONLY_VISUALIZE = args.ONLY_VISUALIZE
+
+    # Load parameters
+    if not GCP_MODE:
+        PARAMS = load_params("examples/params/interactive_template.yaml")
+        # Copy design yaml data
+        locals().update(PARAMS)
+        yaml_dir = f"examples/designs/{SAVE_NAME}/{EXP_NAME}/yaml"
+        os.makedirs(yaml_dir, exist_ok=True)
+        if os.path.exists(yaml_dir):
+            shutil.rmtree(yaml_dir)
+        shutil.copytree(f"data/{SAVE_NAME}/{EXP_NAME}/yaml", yaml_dir)
+    else:
+        PARAMS = load_params("/dar_payload/rdb/examples/params/interactive_params.yaml")
+        locals().update(PARAMS)
+    if not GCP_MODE:
+        NUM_EVAL_WORKERS = 4
+
+    main()
