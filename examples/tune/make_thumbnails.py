@@ -10,15 +10,15 @@ from rdb.infer import *
 NUM_THUMBNAILS = 200
 # ENV_NAME = "Week6_01-v0"  # Blockway
 # ENV_NAME = "Week6_01-v1"
-# ENV_NAME = "Week6_02-v1"  # Two Blockway
-ENV_NAME = "Week6_03-v1"  # Two Blockway
+ENV_NAME = "Week6_02-v1"  # Two Blockway
+# ENV_NAME = "Week6_03-v1"  # Two Blockway
 ROOT_DIR = "data/thumbnails"
 
 
 THUMBNAIL = True
-HEATMAP = False
-BOUNDMAP = False
-CONSTRAINTSMAP = False
+HEATMAP = True
+BOUNDMAP = True
+CONSTRAINTSMAP = True
 
 env = gym.make(ENV_NAME)
 env.reset()
@@ -43,12 +43,12 @@ optimizer, runner = build_mpc(
 
 # Run thumbnail
 if THUMBNAIL:
-    for ni in trange(NUM_THUMBNAILS):
+    for ni in trange(NUM_THUMBNAILS, desc="Thumbnails"):
         task = env.all_tasks[onp.random.randint(0, num_tasks)]
         env.set_task(task)
         env.reset()
         path = f"{ROOT_DIR}/env_{ENV_NAME}/thumbnail_{ni:03d}.png"
-        runner.collect_thumbnail(env.state, path=path)
+        runner.collect_thumbnail(env.state, path=path, close=False)
 
 
 # Run costs
@@ -66,12 +66,13 @@ if HEATMAP:
         env.set_task(task)
         env.reset()
         path = f"{ROOT_DIR}/env_{ENV_NAME}/heatmap_{key}.png"
-        runner.collect_cost_heatmap(env.state, weight_k, path=path)
+        runner.collect_cost_heatmap(env.state, weight_k, path=path, close=False)
 
 
 if BOUNDMAP:
     task = env.all_tasks[onp.random.randint(0, num_tasks)]
     for key in ["dist_cars", "dist_lanes", "dist_fences", "dist_objects"]:
+        # for key in ["dist_lanes"]:
         weight_k = copy.deepcopy(weights)
         for keyi in weight_k.keys():
             if keyi == key:
@@ -83,7 +84,7 @@ if BOUNDMAP:
         env.set_task(task)
         env.reset()
         path = f"{ROOT_DIR}/env_{ENV_NAME}/boundmap_{key}.png"
-        runner.collect_bound_heatmap(env.state, weight_k, path=path)
+        runner.collect_bound_heatmap(env.state, weight_k, path=path, close=False)
 
 if CONSTRAINTSMAP:
     task = env.all_tasks[onp.random.randint(0, num_tasks)]
@@ -91,4 +92,4 @@ if CONSTRAINTSMAP:
         env.set_task(task)
         env.reset()
         path = f"{ROOT_DIR}/env_{ENV_NAME}/constraintsmap_{key}.png"
-        runner.collect_constraint_heatmap(env.state, key, path=path)
+        runner.collect_constraint_heatmap(env.state, key, path=path, close=False)

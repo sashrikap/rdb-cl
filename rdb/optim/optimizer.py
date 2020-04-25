@@ -31,7 +31,7 @@ class OptimizerMPC(object):
         xdim,
         udim,
         horizon,
-        replan=True,
+        replan=-1,
         T=None,
         features_keys=[],
         method="lbfgs",
@@ -50,7 +50,7 @@ class OptimizerMPC(object):
             h_csum (fn): horizon cost
                 func(x0, us, weights) -> (T, nbatch, 1)
                 input us flatten by scipy
-            replan (bool): True if replan at every step
+            replan (int): replan interval, < 0 if no replan
             T (int): only in replan mode, plan for longer length than horizon
 
         Example:
@@ -76,8 +76,10 @@ class OptimizerMPC(object):
         self._u_shape = None
         if self._T is None:
             self._T = horizon
-        if not self._replan:
+        if self._replan < 0:
             assert self._T == self._horizon, "No replanning, only plan for horizon"
+        else:
+            assert self._horizon >= self._replan
         ## Rollout functions
         self.h_traj = h_traj
         self.h_csum = h_csum
@@ -212,58 +214,38 @@ class OptimizerMPC(object):
             return us0
 
         # Reshape to T-first
-        #  shape (nbatch, T, u_dim) -> (T, nbatch, u_dim)
-        us0 = us0.swapaxes(0, 1)
+        us0 = us0.swapaxes(0, 1)  # (nbatch, T, u_dim) -> (T, nbatch, u_dim)
 
         # Optimal Control
-        if self._replan:
-            ## Replan.
-            ## Reoptimize control sequence at every timestep.
-            opt_u, xs, du = [], [], []
-            cmin = 0.0
-            x_t = x0
-            for t in range(self._T):
-                csum_u_x0 = lambda u: self.h_csum(x_t, u, weights_arr)
-                grad_u_x0 = lambda u: self.h_grad_u(x_t, u, weights_arr)
-                res = self._minimize(csum_u_x0, grad_u_x0, us0)
-                opt_u_t = res["us"]
-                cmin_t = res["cost"]
-                grad_u_t = res["grad"]
+        opt_us, xs, grad_us = [], [], []
+        x_t = x0  # initial state (nbatch, xdim)
+        for t in range(self._T):
+            if t == 0 or (self._replan > 0 and t % self._replan == 0):
+                csum_us_xt = lambda us: self.h_csum(x_t, us, weights_arr)
+                grad_us_xt = lambda us: self.h_grad_u(x_t, us, weights_arr)
+                res = self._minimize(csum_us_xt, grad_us_xt, us0)
+                # opt_us_t (T, nbatch, u_dim)
+                opt_us_t, cmin_t, grad_us_t = res["us"], res["cost"], res["grad"]
+                # xs_t (T, nbatch, x_dim)
+                xs_t = self.h_traj(x_t, opt_us_t)
 
-                if t_compile is not None:
-                    print(
-                        f"JIT - Controller finish compile in {time() - t_compile:.3f}s: u0 {self._u_shape}"
-                    )
-                opt_u.append(opt_u_t[0])
-                xs_t = self.h_traj(x_t, opt_u_t)
-                du.append(grad_u_t[0])
-                ## Forward 1 timestep, record 1st action
-                xs.append(x_t)
-                x_t = xs_t[1]
-                us0 = opt_u_t
-
-        else:
-            ## No Replan.
-            ## Only optimize control sequence at the beginning
-            csum_u_x0 = lambda u: self.h_csum(x0, u, weights_arr)
-            grad_u_x0 = lambda u: self.h_grad_u(x0, u, weights_arr)
-            res = self._minimize(csum_u_x0, grad_u_x0, us0)
-            opt_u = res["us"]
-            cmin = res["cost"]
-            grad_u = res["grad"]
-
-            xs = self.h_traj(x0, opt_u)
-            costs = self.h_csum(x0, opt_u, weights_arr)
-            u_info = {"du": grad_u, "xs": xs, "cost_fn": csum_u_x0, "costs": costs}
-            if t_compile is not None:
+            if t == 0 and t_compile is not None:
                 print(
                     f"JIT - Controller finish compile in {time() - t_compile:.3f}s: u0 {self._u_shape}"
                 )
+            ## Forward 1 timestep, record 1st action
+            opt_us.append(opt_us_t[0])
+            x_t = xs_t[0]
+            xs.append(x_t)
+            # grad_us.append(grad_us_t[:, 0])
 
-        #  shape (T, nbatch, udim)
-        opt_us = np.array(opt_u)
-        #  shape (nbatch, T, udim)
-        opt_us = opt_us.swapaxes(0, 1)
+            ## Pop first timestep
+            opt_us_t = opt_us_t[1:]
+            xs_t = xs_t[1:]
+            # grad_us_t = np.delete(grad_us_t, 1, 1)
+
+        opt_us = np.stack(opt_us, axis=1)
+        # u_info = {"du": grad_us, "xs": xs, "costs": costs}
         return opt_us
 
 
@@ -286,7 +268,7 @@ class OptimizerScipy(OptimizerMPC):
         xdim,
         udim,
         horizon,
-        replan=True,
+        replan=-1,
         T=None,
         features_keys=[],
         method="lbfgs",
@@ -305,8 +287,9 @@ class OptimizerScipy(OptimizerMPC):
             h_csum (fn): horizon cost
                 func(x0, us, weights) -> (T, nbatch, 1)
                 input us flatten by scipy
-            replan (bool): True if replan at every step
-            T (int): only in replan mode, plan for longer length than horizon
+            horizon (int): look-ahead horizon length
+            replan (int): replan interval, < 0 if no replan
+            T (int): trajectory length
 
         Example:
             >>> # No initialization
@@ -454,7 +437,7 @@ class OptimizerJax(OptimizerMPC):
         xdim,
         udim,
         horizon,
-        replan=True,
+        replan=-1,
         T=None,
         features_keys=[],
         method="adam",
@@ -534,7 +517,7 @@ class OptimizerNumPyro(OptimizerMPC):
         xdim,
         udim,
         horizon,
-        replan=True,
+        replan=-1,
         T=None,
         features_keys=[],
         method="adam",

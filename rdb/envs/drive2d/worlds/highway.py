@@ -58,6 +58,7 @@ class HighwayDriveWorld(DriveWorld):
         ## Distance to fences
         fence_fns = [None] * len(self._fences)
         normals = np.array([[1.0, 0.0], [-1.0, 0.0]])
+        # print("car width", self._car_width, "lane width", self._lane_width)
         for f_i, (fence, normal) in enumerate(zip(self._fences, normals)):
             main_idx = self._indices["main_car"]
 

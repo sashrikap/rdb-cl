@@ -11,7 +11,8 @@ Includes:
 import jax.numpy as np
 import numpy as onp
 import pyglet
-from rdb.envs.drive2d.core.car import centered_image
+
+# from rdb.envs.drive2d.core.car import centered_image
 from rdb.envs.drive2d.core.lane import StraightLane
 from rdb.envs.drive2d.core.dynamics import build_identity_dynamics
 from pyglet import gl, graphics
@@ -20,9 +21,18 @@ from pyglet import gl, graphics
 DEFAULT_SCALE = 0.15 / 600.0
 
 
+def centered_image(filename):
+    img = pyglet.resource.image(filename)
+    # import pdb; pdb.set_trace()
+    img.anchor_x = img.width / 2
+    img.anchor_y = img.height / 2
+    return img
+
+
 def object_sprite(name, scale=1.0):
     sprite = pyglet.sprite.Sprite(centered_image("{}.png".format(name)), subpixel=True)
     sprite.scale = scale * DEFAULT_SCALE
+    # import pdb; pdb.set_trace()
     return sprite
 
 
@@ -85,7 +95,7 @@ class Object(object):
 class Obstacle(Object):
     NAME = "cone"
 
-    def __init__(self, state, scale=1.0):
+    def __init__(self, state, scale=0.7):
         super().__init__(state, self.NAME, scale)
 
 

@@ -24,7 +24,11 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
         main_state,
         goal_speed,
         goal_lane,
-        control_bound,
+        # Control bound
+        max_throttle=0.5,
+        max_brake=0.4,
+        max_steer=0.3,
+        # States
         car_states=[],
         car_speeds=[],
         dt=0.1,
@@ -46,10 +50,14 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
         main_car = car.OptimalControlCar(self, main_state, horizon)
         self._goal_speed = goal_speed
         self._goal_lane = goal_lane
-        self._control_bound = control_bound
         self._max_speed = max_speed
-        main_car.control_bound = control_bound
-        main_car.max_speed = max_speed
+        # Control bound
+        self._max_throttle = max_throttle
+        self._max_steer = max_steer
+        self._max_brake = max_brake
+        main_car.max_throttle = max_throttle
+        main_car.max_steer = max_steer
+        main_car.max_brake = max_brake
         # Define objects
         objs = []
         for state in obstacle_states:
@@ -134,9 +142,9 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
         )
         nlr_feats_dict["dist_fences"] = compose(
             sum_items,
-            feature.quadratic_feat,
+            # feature.quadratic_feat,
             # feature.neg_relu_feat,
-            # feature.relu_feat,
+            feature.relu_feat,
             lambda dist: dist,
         )
         nobjs = len(self._objects)
@@ -147,9 +155,8 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
                 sigma=np.array([self._car_width / 2, self._car_length * 2]),
             ),
         )
-        bound = self._control_bound
         nlr_feats_dict["control"] = compose(sum_state, feature.quadratic_feat)
-        nlr_feats_dict["control_thrust"] = compose(sum_state, feature.quadratic_feat)
+        nlr_feats_dict["control_throttle"] = compose(sum_state, feature.quadratic_feat)
         nlr_feats_dict["control_brake"] = compose(sum_state, feature.quadratic_feat)
         nlr_feats_dict["control_turn"] = compose(sum_state, feature.quadratic_feat)
 
@@ -184,7 +191,10 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
             env=self, min_speed=-0.1
         )
         constraints_dict["uncomfortable"] = constraints.build_uncomfortable(
-            env=self, max_actions=self._control_bound
+            env=self,
+            max_throttle=self._max_throttle,
+            max_brake=self._max_brake,
+            max_steer=self._max_steer,
         )
         constraints_dict["wronglane"] = constraints.build_wronglane(
             env=self, lane_idx=2
@@ -312,7 +322,7 @@ class Week6_01(HighwayDriveWorld_Week6):
         goal_lane = 0
         horizon = 10
         dt = 0.25
-        control_bound = 1.2
+        # Lane size
         lane_width = 0.13
         num_lanes = 3
         # Car states
@@ -330,7 +340,6 @@ class Week6_01(HighwayDriveWorld_Week6):
             main_state,
             goal_speed=goal_speed,
             goal_lane=goal_lane,
-            control_bound=control_bound,
             car_states=car_states,
             car_speeds=car_speeds,
             dt=dt,
@@ -355,7 +364,7 @@ class Week6_01_v1(HighwayDriveWorld_Week6):
         goal_lane = 0
         horizon = 10
         dt = 0.25
-        control_bound = 1.2
+        # Lane size
         lane_width = 0.13
         num_lanes = 3
         # Car states
@@ -373,7 +382,6 @@ class Week6_01_v1(HighwayDriveWorld_Week6):
             main_state,
             goal_speed=goal_speed,
             goal_lane=goal_lane,
-            control_bound=control_bound,
             car_states=car_states,
             car_speeds=car_speeds,
             dt=dt,
@@ -398,7 +406,7 @@ class Week6_02(HighwayDriveWorld_Week6):
         goal_lane = 0
         horizon = 10
         dt = 0.25
-        control_bound = 1.2
+        # Lane size
         lane_width = 0.13
         num_lanes = 3
         # Car states
@@ -418,7 +426,6 @@ class Week6_02(HighwayDriveWorld_Week6):
             main_state,
             goal_speed=goal_speed,
             goal_lane=goal_lane,
-            control_bound=control_bound,
             car_states=car_states,
             car_speeds=car_speeds,
             dt=dt,
@@ -446,7 +453,7 @@ class Week6_02_v1(HighwayDriveWorld_Week6):
         goal_lane = 0
         horizon = 10
         dt = 0.25
-        control_bound = 0.8
+        # Lane size
         lane_width = 0.13
         num_lanes = 3
         # Car states
@@ -466,7 +473,6 @@ class Week6_02_v1(HighwayDriveWorld_Week6):
             main_state,
             goal_speed=goal_speed,
             goal_lane=goal_lane,
-            control_bound=control_bound,
             car_states=car_states,
             car_speeds=car_speeds,
             dt=dt,
@@ -496,7 +502,7 @@ class Week6_03_v1(HighwayDriveWorld_Week6):
         goal_lane = 0
         horizon = 10
         dt = 0.25
-        control_bound = 0.8
+        # Lane size
         lane_width = 0.13
         num_lanes = 3
         # Car states
@@ -516,7 +522,6 @@ class Week6_03_v1(HighwayDriveWorld_Week6):
             main_state,
             goal_speed=goal_speed,
             goal_lane=goal_lane,
-            control_bound=control_bound,
             car_states=car_states,
             car_speeds=car_speeds,
             dt=dt,

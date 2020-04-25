@@ -192,7 +192,7 @@ def control_magnitude(u):
 
 
 @jax.jit
-def control_thrust(u):
+def control_throttle(u):
     """Acceleration force.
 
     Args:
@@ -203,8 +203,8 @@ def control_thrust(u):
 
     """
     assert len(u.shape) == 2 and u.shape[1] == UDIM
-    thrust = np.maximum(u * np.array([0, 1]), 0)
-    return np.sum(thrust, axis=1, keepdims=True)
+    throttle = np.maximum(u * np.array([0, 1]), 0)
+    return np.sum(throttle, axis=1, keepdims=True)
 
 
 @jax.jit

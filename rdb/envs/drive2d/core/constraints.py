@@ -92,8 +92,10 @@ def build_crash_objects(env):
 
     """
     ncars = len(env.cars)
-    threshold = np.array([env.car_width * 0.5, env.car_length])
-    vfn = jax.vmap(env.raw_features_dict["dist_objects"])
+    threshold = np.array([env.car_width * 0.5, env.car_length * 0.5])
+    vfn = jax.vmap(
+        env.raw_features_dict["dist_objects"]
+    )  # (T, nbatch, nobjs, obj_xdim)
 
     @jax.jit
     def func(states, actions):
@@ -107,7 +109,7 @@ def build_crash_objects(env):
     return func
 
 
-def build_uncomfortable(env, max_actions):
+def build_uncomfortable(env, max_throttle, max_brake, max_steer):
     """Detects if actions exceed max actions.
 
     Args:
@@ -123,7 +125,16 @@ def build_uncomfortable(env, max_actions):
     def func(states, actions):
         assert len(states.shape) == 3
         assert len(actions.shape) == 3
-        return np.any(np.abs(actions) > max_actions, axis=2)
+        uncomfortable = np.stack(
+            [
+                actions[:, :, 1] > max_throttle,
+                actions[:, :, 1] < -1 * max_brake,
+                actions[:, :, 0] > max_steer,
+                actions[:, :, 0] < -1 * max_steer,
+            ],
+            axis=2,
+        )
+        return np.any(uncomfortable, axis=2)
 
     return func
 

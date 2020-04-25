@@ -9,6 +9,7 @@ from copy import deepcopy
 
 def centered_image(filename):
     img = pyglet.resource.image(filename)
+    # import pdb; pdb.set_trace()
     img.anchor_x = img.width / 2.0
     img.anchor_y = img.height / 2.0
     return img
@@ -48,7 +49,11 @@ class Car(object):
         self._xdim = 4
         self._udim = 2
         self._curr_control = None
-        self._control_bound = np.inf
+        # Control bound
+        self._max_throttle = np.inf
+        self._max_brake = np.inf
+        self._max_steer = np.inf
+        # Speed bound
         self._max_speed = np.inf
         # Initilialize trajectory data
 
@@ -88,14 +93,20 @@ class Car(object):
     @property
     def brake(self):
         if self._curr_control is not None:
-            return max(0, float(-1 * self._curr_control[0][1]))
+            if self._state[0, 3] > 0:  # Forward
+                return max(0, float(-1 * self._curr_control[0][1]))
+            else:  # Backward
+                return max(0, float(self._curr_control[0][1]))
         else:
             return 0
 
     @property
-    def thrust(self):
+    def throttle(self):
         if self._curr_control is not None:
-            return max(0, float(self._curr_control[0][1]))
+            if self._state[0, 3] > 0:  # Forward
+                return max(0, float(self._curr_control[0][1]))
+            else:  # Backward
+                return max(0, float(-1 * self._curr_control[0][1]))
         else:
             return 0
 
@@ -107,12 +118,28 @@ class Car(object):
             return 0
 
     @property
-    def control_bound(self):
-        return self._control_bound
+    def max_throttle(self):
+        return self._max_throttle
 
-    @control_bound.setter
-    def control_bound(self, bound):
-        self._control_bound = bound
+    @max_throttle.setter
+    def max_throttle(self, throttle):
+        self._max_throttle = throttle
+
+    @property
+    def max_steer(self):
+        return self._max_steer
+
+    @max_steer.setter
+    def max_steer(self, steer):
+        self._max_steer = steer
+
+    @property
+    def max_brake(self):
+        return self._max_brake
+
+    @max_brake.setter
+    def max_brake(self, brake):
+        self._max_brake = brake
 
     @property
     def max_speed(self):
