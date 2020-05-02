@@ -22,9 +22,11 @@ import pyglet
 import matplotlib.cm
 from pyglet import gl, graphics
 
-from rdb.envs.drive2d.core import lane, feature, car
+from rdb.envs.drive2d.core import lane, feature, car, utils
+from rdb.visualize.render import RenderEnv
 from rdb.infer.dictlist import *
 from rdb.optim.utils import *
+from rdb.exps.utils import Profiler
 
 import platform
 
@@ -35,7 +37,7 @@ WINDOW_H = 1200
 pyglet.resource.path.append(str(Path(__file__).parent.parent.joinpath("assets")))
 
 
-class DriveWorld(gym.Env):
+class DriveWorld(RenderEnv, gym.Env):
     """General driving world.
 
     Attributes:
@@ -58,6 +60,7 @@ class DriveWorld(gym.Env):
         car_width=0.075,
         speed_factor=100,
     ):
+        RenderEnv.__init__(self, subframes=subframes)
         self._main_car = main_car
         self._cars = cars
         self._lanes = lanes
@@ -69,22 +72,16 @@ class DriveWorld(gym.Env):
         self._indices = None
         self._speed_factor = speed_factor  # real world speed (mph) per simulation speed
 
-        # Subframe rendering
-        self._subframes = subframes
-        self._sub_cars = [car.copy() for car in self._cars]
-        self._sub_main_car = self.main_car.copy()
-        self._prev_cars = [car.copy() for car in self._cars]
-        self._prev_main_car = self.main_car.copy()
-
         # Render specifics
         self._window = None
         self._headless = False
-        self._label = None
         self._grass = None
         self._magnify = 1.0
         self._cm = matplotlib.cm.coolwarm
         self._viz_heat_fn = None
         self._viz_constraint_fn = None
+        self._layers = utils.EnvGroups()
+        self._texts = utils.TextGroups()
 
         # Dyanmics, features, constraints and metadata functions
         self._xdim = onp.prod(self.state.shape)
@@ -103,9 +100,8 @@ class DriveWorld(gym.Env):
         self._all_task_difficulties = None
         self._grid_tasks = []
 
-    @property
-    def subframes(self):
-        return self._subframes
+        ## Set up rendering
+        self._labels = {}
 
     @property
     def dt(self):
@@ -119,8 +115,7 @@ class DriveWorld(gym.Env):
     def xdim(self):
         return self._xdim
 
-    @property
-    def state(self):
+    def _get_state(self):
         """Current state
 
         Output:
@@ -136,25 +131,7 @@ class DriveWorld(gym.Env):
         state = np.concatenate(state, axis=1)
         return state
 
-    @property
-    def sub_state(self):
-        """For subrendering.
-
-        Output:
-            out (ndarray): (1, xdim)
-
-        """
-        cars = self._sub_cars + [self._sub_main_car]
-        state = []
-        for car in cars:
-            state.append(car.state)
-        for obj in self._objects:
-            state.append(obj.state)
-        state = np.concatenate(state, axis=1)
-        return state
-
-    @state.setter
-    def state(self, state):
+    def _set_state(self, state):
         cars = self._cars + [self.main_car]
         last_idx = 0
         for car in cars:
@@ -171,7 +148,7 @@ class DriveWorld(gym.Env):
         """Set initial state."""
         if len(state.shape) == 1:
             state = state[None, :]
-        cars = self._cars + [self.main_car]
+        cars = self._cars + [self._main_car]
         last_idx = 0
         for car in cars:
             car.init_state = state[:, last_idx : last_idx + car.xdim]
@@ -179,7 +156,13 @@ class DriveWorld(gym.Env):
         for obj in self._objects:
             obj.state = state[:, last_idx : last_idx + obj.xdim]
             last_idx += obj.xdim
-        self.state = state
+        # self.state = state
+
+    def get_init_state(self, task):
+        raise NotImplementedError
+
+    def get_init_states(self, tasks):
+        raise NotImplementedError
 
     @property
     def raw_features_fn(self):
@@ -440,25 +423,23 @@ class DriveWorld(gym.Env):
         """ For plotting purpose, meshgrid version of all_tasks"""
         return self._grid_tasks
 
-    def reset(self):
+    def _do_reset(self):
+        # super().reset()
         for car in self._cars:
             car.reset()
         self.main_car.reset()
-        for car, prev_car in zip(self._cars, self._prev_cars):
-            prev_car.state = deepcopy(car.state)
-        self._prev_main_car.state = deepcopy(self.main_car.state)
 
-    def step(self, action):
-        for car, prev_car in zip(self._cars, self._prev_cars):
-            prev_car.state = deepcopy(car.state)
-        self._prev_main_car.state = deepcopy(self.main_car.state)
-
+    def _do_step(self, action):
         for car in self._cars:
             car.control(self.dt)
         self.main_car.control(action, self.dt)
         rew = 0
         done = False
         return self.state, rew, done, {}
+
+    #####################################################################
+    ##################### Rendering Functionalities #####################
+    #####################################################################
 
     def render(
         self,
@@ -468,7 +449,6 @@ class DriveWorld(gym.Env):
         draw_boundary=False,
         draw_constraint_key=None,
         weights=None,
-        sub_render=False,
     ):
         """
         Args:
@@ -476,34 +456,24 @@ class DriveWorld(gym.Env):
             draw_boundary (bool): draw boundary map, where redness ~ cost > 0
         """
         assert mode in ["human", "rgb_array"]
-        if sub_render:
-            state = self.sub_state
-        else:
-            state = self.state
-
-        if state.shape[0] > 1:
+        if self.state.shape[0] > 1:
             print("WARNING: rendering with batch mode")
 
         visible = mode == "human"
-        const = self.constraints_fn(state[None, :], np.zeros((1, 1, 2)))
-        crash = (
-            np.sum(const["offtrack"])
-            + np.sum(const["collision"])
-            + np.sum(const["crash_objects"])
-        ) > 0
+        ## Initialize rendering
         if self._window is None:
-            try:
-                self._window = pyglet.window.Window(
-                    width=int(WINDOW_W / 2), height=int(WINDOW_H / 2), visible=visible
-                )
-                self._window.set_visible(True)
-                self._window.set_visible(visible)
-            except:
-                ## On headless server
-                print("Display not supported on headless server")
-                self._headless = True
+            # try:
+            self._window = pyglet.window.Window(
+                width=int(WINDOW_W / 2), height=int(WINDOW_H / 2), visible=visible
+            )
+            self._window.set_visible(True)
+            self._setup_render()
+            self._window.set_visible(visible)
+            # except:
+            #     ## On headless server
+            #     print("Display not supported on headless server")
+            #     self._headless = True
         if not self._headless:
-            # self._window.flip()
             self._window.switch_to()
             # Bring up window
             self._window.dispatch_events()
@@ -517,40 +487,28 @@ class DriveWorld(gym.Env):
             gl.glPushMatrix()
             gl.glLoadIdentity()
 
-            if sub_render:
-                cars = self._sub_cars
-                main_car = self._sub_main_car
-            else:
-                cars = self._cars
-                main_car = self.main_car
+            self._center_camera(self._main_car)
+            self._layers.batch.draw()
 
-            self.center_camera(main_car)
-            self.draw_background()
-            for lane in self._lanes:
-                lane.render()
-            for oi, obj in enumerate(self._objects):
-                obj.render()
-            for car in cars:
-                car.render()
-            main_car.render()
             if draw_heat:
                 assert weights is not None
-                self.set_heat(weights)
+                self._set_viz_heat(weights)
                 self._draw_heatmap(heat_fn=self._viz_heat_fn)
             elif draw_boundary:
                 assert weights is not None
-                self.set_heat(weights)
+                self._set_viz_heat(weights)
                 self._draw_heatmap(
                     heat_fn=lambda *args: (self._viz_heat_fn(*args) > 0.01).astype(
                         float
                     )
                 )
             elif draw_constraint_key is not None:
-                self.set_constraints(draw_constraint_key)
+                self._set_viz_constraints(draw_constraint_key)
                 self._draw_heatmap(heat_fn=self._viz_constraint_fn)
 
             gl.glPopMatrix()
-            self.draw_text(text, crash=crash)
+            self._update_text(text=text)
+            # self._texts.batch.draw()
 
             img_data = (
                 pyglet.image.get_buffer_manager().get_color_buffer().get_image_data()
@@ -573,18 +531,7 @@ class DriveWorld(gym.Env):
             self._window.close()
         self._window = None
 
-    def sub_render(self, mode="rgb_array", subframe=0, text=None):
-        """ Alpha-interpolate adjacent frames to make animation look smoother """
-        ratio = (subframe + 1.0) / float(self._subframes)
-        for c_i in range(len(self._cars)):
-            diff_state = self._cars[c_i].state - self._prev_cars[c_i].state
-            self._sub_cars[c_i].state = ratio * diff_state + self._prev_cars[c_i].state
-
-        diff_state = self._main_car.state - self._prev_main_car.state
-        self._sub_main_car.state = ratio * diff_state + self._prev_main_car.state
-        return self.render(mode=mode, text=text, sub_render=True)
-
-    def center_camera(self, main_car):
+    def _center_camera(self, main_car):
         center_x = main_car.state[0, 0]
         center_y = main_car.state[0, 1]
         gl.glOrtho(
@@ -596,139 +543,143 @@ class DriveWorld(gym.Env):
             1.0,
         )
 
-    def draw_background(self):
-        if self._grass is None:
-            self._grass = pyglet.resource.texture("grass.png")
-        gl.glEnable(self._grass.target)
-        gl.glEnable(gl.GL_BLEND)
-        gl.glBindTexture(self._grass.target, self._grass.id)
-        W = 10000.0
-        graphics.draw(
-            4,
-            gl.GL_QUADS,
-            ("v2f", (-W, -W, W, -W, W, W, -W, W)),
-            ("t2f", (0.0, 0.0, W * 5.0, 0.0, W * 5.0, W * 5.0, 0.0, W * 5.0)),
+    def _setup_render(self):
+        ## Setup background
+        self._grass = pyglet.resource.texture("grass.png")
+        W = 10
+        texture_grid = pyglet.image.ImageGrid(self._grass, W, W).get_texture_sequence()
+        texture_group = pyglet.graphics.TextureGroup(
+            texture_grid, self._layers.background
         )
-        gl.glDisable(self._grass.target)
+        tex_map = texture_grid.texture.tex_coords
+        tex_verts = ("v2f", (-W, -W, W, -W, W, W, -W, W))
+        tex_coords = ("t2f", (0.0, 0.0, W * 5.0, 0.0, W * 5.0, W * 5.0, 0.0, W * 5.0))
 
-    def draw_text(self, text=None, crash=False):
-        if self._label is None:
-            assert self._window is not None
-            self._label = pyglet.text.Label(
-                "Speed: ",
-                font_name="Palatino",
-                font_size=15,
-                # y=300,
-                x=30,
-                y=self._window.height - 90,
-                width=200,
-                anchor_x="left",
-                anchor_y="top",
-                multiline=True,
-            )
-            self._throttle_label = pyglet.text.Label(
-                "",
-                font_name="Palatino",
-                font_size=15,
-                x=30,
-                y=self._window.height - 70,
-                width=200,
-                anchor_x="left",
-                anchor_y="top",
-                multiline=True,
-            )
-            self._brake_label = pyglet.text.Label(
-                "",
-                font_name="Palatino",
-                font_size=15,
-                x=30,
-                y=self._window.height - 50,
-                width=200,
-                anchor_x="left",
-                anchor_y="top",
-                multiline=True,
-            )
-            self._steer_label = pyglet.text.Label(
-                "",
-                font_name="Palatino",
-                font_size=15,
-                x=30,
-                y=self._window.height - 30,
-                width=200,
-                anchor_x="left",
-                anchor_y="top",
-                multiline=True,
-            )
-            self._crash_label = pyglet.text.Label(
-                "",
-                font_name="Palatino",
-                font_size=15,
-                x=30,
-                y=self._window.height - 110,
-                width=200,
-                anchor_x="left",
-                anchor_y="top",
-                multiline=True,
-            )
+        ## Setup lanes
+        self._layers.batch.add(4, gl.GL_QUADS, texture_group, tex_verts, tex_coords)
+        for lane in self._lanes:
+            lane.register(group=self._layers.road, batch=self._layers.batch)
+        # setup objects
+        for obj in self._objects:
+            obj.register(group=self._layers.object, batch=self._layers.batch)
+        # Setup text
+        self._setup_text(self._labels, group=self._texts.text, batch=self._texts.batch)
+        # Setup Cars
+        for car in self._cars:
+            car.register(group=self._layers.car, batch=self._layers.batch)
+        self._main_car.register(group=self._layers.main_car, batch=self._layers.batch)
+
+    def _setup_text(self, labels, group, batch):
+        assert self._window is not None
+        labels["main"] = pyglet.text.Label(
+            "Speed: ",
+            font_name="Palatino",
+            font_size=15,
+            # y=300,
+            x=30,
+            y=self._window.height - 90,
+            width=200,
+            anchor_x="left",
+            anchor_y="top",
+            multiline=True,
+            group=group,
+            batch=batch,
+        )
+        labels["throttle"] = pyglet.text.Label(
+            "Throttle: ",
+            font_name="Palatino",
+            font_size=15,
+            x=30,
+            y=self._window.height - 70,
+            # y=300,
+            width=200,
+            anchor_x="left",
+            anchor_y="top",
+            multiline=True,
+            group=group,
+            batch=batch,
+        )
+        labels["brake"] = pyglet.text.Label(
+            "Brake: ",
+            font_name="Palatino",
+            font_size=15,
+            x=30,
+            # y=300,
+            y=self._window.height - 50,
+            width=200,
+            anchor_x="left",
+            anchor_y="top",
+            multiline=True,
+            group=group,
+            batch=batch,
+        )
+        labels["steer"] = pyglet.text.Label(
+            "Steer: ",
+            font_name="Palatino",
+            font_size=15,
+            x=30,
+            y=self._window.height - 30,
+            width=200,
+            anchor_x="left",
+            anchor_y="top",
+            multiline=True,
+            group=group,
+            batch=batch,
+        )
+        labels["crash"] = pyglet.text.Label(
+            "",
+            font_name="Palatino",
+            font_size=15,
+            x=30,
+            y=self._window.height - 110,
+            width=200,
+            anchor_x="left",
+            anchor_y="top",
+            multiline=True,
+            group=group,
+            batch=batch,
+        )
+
+    def _update_text(self, text=None):
         speed = self._main_car.state[0, 3]
         brake = self._main_car.brake
         throttle = self._main_car.throttle
         steer = self._main_car.steer
-        self._label.text = f"Speed: {speed * self._speed_factor:.2f} mph"
-        self._brake_label.text = f"Brake: {brake:.2f}"
-        self._throttle_label.text = f"Throttle: {throttle:.2f}"
-        self._steer_label.text = f"Steer: {steer:.2f}"
-        self._crash_label.text = f""
-        self._label.color = (255, 255, 255, 255)
-        self._brake_label.color = (255, 255, 255, 255)
-        self._throttle_label.color = (255, 255, 255, 255)
-        self._steer_label.color = (255, 255, 255, 255)
-        self._crash_label.color = (255, 0, 0, 255)
+
+        state = self.state
+        labels = self._labels
+        const = self.constraints_fn(state[None, :], np.zeros((1, 1, 2)))
+        crash = (
+            onp.sum(const["offtrack"])
+            + onp.sum(const["collision"])
+            + onp.sum(const["crash_objects"])
+        ) > 0
+        labels["main"].text = f"Speed: {speed * self._speed_factor:.2f} mph"
+        labels["brake"].text = f"Brake: {brake:.2f}"
+        labels["throttle"].text = f"Throttle: {throttle:.2f}"
+        labels["steer"].text = f"Steer: {steer:.2f}"
+        labels["crash"].text = f""
+        labels["main"].color = (255, 255, 255, 255)
+        labels["brake"].color = (255, 255, 255, 255)
+        labels["throttle"].color = (255, 255, 255, 255)
+        labels["steer"].color = (255, 255, 255, 255)
+        labels["crash"].color = (255, 0, 0, 255)
         if brake > self._main_car.max_brake:
-            self._brake_label.color = (255, 0, 0, 255)
+            labels["brake"].color = (255, 0, 0, 255)
         if steer > self._main_car.max_steer:
-            self._steer_label.color = (255, 0, 0, 255)
+            labels["steer"].color = (255, 0, 0, 255)
         if throttle > self._main_car.max_throttle:
-            self._throttle_label.color = (255, 0, 0, 255)
+            labels["throttle"].color = (255, 0, 0, 255)
         if speed > self._main_car.max_speed:
-            self._label.color = (255, 0, 0, 255)
+            labels["main"].color = (255, 0, 0, 255)
         if text is not None:
-            self._label.text += "\n" + text
+            labels["main"].text += "\n" + text
         if crash:
-            self._crash_label.text = "Crash!!"
-        self._label.draw()
-        self._throttle_label.draw()
-        self._brake_label.draw()
-        self._steer_label.draw()
-        self._crash_label.draw()
+            labels["crash"].text = "Crash!!"
+        for key, val in labels.items():
+            val.draw()
 
-    def draw_lane(self, lane):
-        gl.glColor3f(0.4, 0.4, 0.4)
-        W = 1000
-        normal, forward = lane.normal, lane.forward
-        pt1, pt2, width = lane.pt1, lane.pt2, lane.width
-        quad_strip = onp.hstack(
-            [
-                pt1 - forward * W - 0.5 * width * normal,
-                pt1 - forward * W + 0.5 * width * normal,
-                pt2 + forward * W - 0.5 * width * normal,
-                pt2 + forward * W + 0.5 * width * normal,
-            ]
-        )
-        graphics.draw(4, gl.GL_QUAD_STRIP, ("v2f", quad_strip))
-        gl.glColor3f(1.0, 1.0, 1.0)
-        W = 1000
-        line_strip = onp.hstack(
-            [
-                pt1 - forward * W - 0.5 * width * normal,
-                pt1 + forward * W - 0.5 * width * normal,
-                pt1 - forward * W + 0.5 * width * normal,
-                pt1 + forward * W + 0.5 * width * normal,
-            ]
-        )
-        graphics.draw(4, gl.GL_LINES, ("v2f", line_strip))
-
-    def set_heat(self, weights):
+    def _set_viz_heat(self, weights):
         assert isinstance(weights, DictList)
         # Clean up weights input
         weights = weights.prepare(self.features_keys)
@@ -740,7 +691,7 @@ class DriveWorld(gym.Env):
                 self._main_car.cost_runtime,
                 weights=weights.repeat(n_states).numpy_array(),
             )
-            states = onp.repeat(state, n_states, axis=0)  # (n_states, xdim)
+            states = np.repeat(state, n_states, axis=0)  # (n_states, xdim)
             phis = np.array([np.pi / 3] * n_states)
             main_idx = self._indices["main_car"]
             states[:, main_idx[0] : main_idx[0] + 3] = np.stack([xs, ys, phis], axis=1)
@@ -749,17 +700,17 @@ class DriveWorld(gym.Env):
 
         self._viz_heat_fn = val
 
-    def set_constraints(self, constraints_key):
+    def _set_viz_constraints(self, constraints_key):
         def val(xs, ys):
             constraint_fn = self._constraints_dict[constraints_key]
             n_states = len(xs)
             state = deepcopy(self.state)
-            states = onp.repeat(state, n_states, axis=0)  # (n_states, xdim)
+            states = np.repeat(state, n_states, axis=0)  # (n_states, xdim)
             phis = np.array([np.pi / 3] * n_states)
             main_idx = self._indices["main_car"]
             states[:, main_idx[0] : main_idx[0] + 3] = np.stack([xs, ys, phis], axis=1)
             states = states[None, :, :]  # (1, n_states, xdim)
-            acts = onp.zeros((1, n_states, self.udim))  # (1, n_states, udim)
+            acts = np.zeros((1, n_states, self.udim))  # (1, n_states, udim)
             return 0.5 * constraint_fn(states, acts)
 
         self._viz_constraint_fn = val
@@ -777,7 +728,7 @@ class DriveWorld(gym.Env):
         xvs, yvs = np.meshgrid(xs, ys)
         vals = heat_fn(xvs.flatten(), yvs.flatten())
         vals = vals.reshape(SIZE)
-        vals = (vals - np.min(vals)) / (np.max(vals) - np.min(vals) + 1e-6)
+        vals = (vals - onp.min(vals)) / (onp.max(vals) - onp.min(vals) + 1e-6)
         # Convert to color map and draw
         vals = self._cm(vals)  # (SIZE[0], SIZE[1], 4)
         vals[:, :, 3] = 0.5
@@ -797,10 +748,3 @@ class DriveWorld(gym.Env):
             ("t2f", (0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0)),
         )
         gl.glDisable(heatmap.target)
-
-
-def centered_image(filename):
-    img = pyglet.resource.image(filename)
-    img.anchor_x = img.width / 2.0
-    img.anchor_y = img.height / 2.0
-    return img

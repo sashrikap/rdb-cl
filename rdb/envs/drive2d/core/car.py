@@ -2,22 +2,19 @@ import jax.numpy as np
 import jax
 import pyglet
 import numpy as onp
+import traceback, sys
+from rdb.envs.drive2d.core.utils import centered_image
 from rdb.envs.drive2d.core.dynamics import *
 from rdb.optim.utils import *
 from copy import deepcopy
 
 
-def centered_image(filename):
-    img = pyglet.resource.image(filename)
-    # import pdb; pdb.set_trace()
-    img.anchor_x = img.width / 2.0
-    img.anchor_y = img.height / 2.0
-    return img
-
-
-def car_sprite(color, scale=0.15 / 600.0):
+def car_sprite(color, scale=0.15 / 600.0, batch=None, group=None):
     sprite = pyglet.sprite.Sprite(
-        centered_image("car-{}.png".format(color)), subpixel=True
+        centered_image("car-{}.png".format(color)),
+        subpixel=True,
+        group=group,
+        batch=batch,
     )
     sprite.scale = scale
     return sprite
@@ -50,11 +47,11 @@ class Car(object):
         self._udim = 2
         self._curr_control = None
         # Control bound
-        self._max_throttle = np.inf
-        self._max_brake = np.inf
-        self._max_steer = np.inf
+        self._max_throttle = onp.inf
+        self._max_brake = onp.inf
+        self._max_steer = onp.inf
         # Speed bound
-        self._max_speed = np.inf
+        self._max_speed = onp.inf
         # Initilialize trajectory data
 
     @property
@@ -66,7 +63,7 @@ class Car(object):
         return self._udim
 
     def reset(self):
-        self._state = self._init_state
+        self.state = self._init_state
 
     @property
     def state(self):
@@ -76,6 +73,9 @@ class Car(object):
     def state(self, state):
         assert len(state.shape) == 2
         self._state = state
+        if self._sprite is not None:
+            self._sprite.x, self._sprite.y = state[0, 0], state[0, 1]
+            self._sprite.rotation = -state[0, 2] * 180 / onp.pi
 
     @property
     def init_state(self):
@@ -113,7 +113,7 @@ class Car(object):
     @property
     def steer(self):
         if self._curr_control is not None:
-            return np.abs(float(self._curr_control[0][0]))
+            return onp.abs(float(self._curr_control[0][0]))
         else:
             return 0
 
@@ -155,23 +155,17 @@ class Car(object):
     def copy(self):
         raise NotImplementedError
 
-    def render(self, opacity=255):
-        """Render function.
-
-        Use ordinary numpy to save time.
-
-        """
-        if self._sprite is None:
-            self._sprite = car_sprite(self.color)
-        self._sprite.x, self._sprite.y = self.state[0, 0], self.state[0, 1]
-        # sprite.x, sprite.y = 0, 0
-        self._sprite.rotation = -self.state[0, 2] * 180 / onp.pi
+    def register(self, batch, group, opacity=255):
+        """Register render layer"""
+        self._sprite = car_sprite(self.color, batch=batch, group=group)
         self._sprite.opacity = opacity
-        self._sprite.draw()
+        self._sprite.rotation = -self._state[0, 2] * 180 / onp.pi
+        state = self._state
+        self._sprite.x, self._sprite.y = state[0, 0], state[0, 1]
 
 
 class FixSpeedCar(Car):
-    def __init__(self, env, init_state, fix_speed, horizon=1, color="red"):
+    def __init__(self, env, init_state, fix_speed, horizon=1, color="orange"):
         self.env = env
         super().__init__(env, init_state, horizon, color)
         self.fix_speed = fix_speed
@@ -181,7 +175,7 @@ class FixSpeedCar(Car):
         self._state += (
             self.dynamics_fn(self._state, np.zeros((len(self._state), self.udim))) * dt
         )
-        self._curr_control = np.zeros((1, 2))
+        self._curr_control = onp.zeros((1, 2))
 
     def copy(self):
         return FixSpeedCar(
@@ -237,7 +231,7 @@ class OptimalControlCar(Car):
             self._features_fn is not None and self._cost_runtime is not None
         ), "Need to initialize car by `env.reset()`"
 
-        self._curr_control = u
+        self._curr_control = onp.array(u)
         diff = self.dynamics_fn(self._state, u)
         self._state += self.dynamics_fn(self._state, u) * dt
 
@@ -248,7 +242,7 @@ class OptimalControlCar(Car):
 
 
 class UserControlCar(Car):
-    def __init__(self, init_state, color="yellow", force=1.0):
+    def __init__(self, init_state, color="orange", force=1.0):
         self._force = force
         super().__init__(init_state, horizon=1, color=color)
         pass

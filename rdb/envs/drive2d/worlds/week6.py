@@ -89,12 +89,13 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
         """
         tasks = onp.array(tasks)
         assert tasks.shape[-1] == 2 + 2 * len(self._objects), "Task format incorrect"
-        car_y0_idx, car_y1_idx = 1, 5
         obj_idx = 12
-        self.reset()
         state = copy.deepcopy(self.state)
+        for ci, car in enumerate(self.cars + [self._main_car]):
+            state[:, ci * 4 : (ci + 1) * 4] = car.init_state
         all_states = onp.tile(state, (len(tasks), 1))
         # Car state
+        car_y0_idx, car_y1_idx = 1, 5
         all_states[:, car_y0_idx] = tasks[:, 0]
         all_states[:, car_y1_idx] = tasks[:, 1]
         # Object state

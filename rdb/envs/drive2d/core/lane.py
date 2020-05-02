@@ -43,16 +43,10 @@ class StraightLane(object):
         pt2 = self.pt2 + shift
         return StraightLane(pt1, pt2, self.width)
 
-    def render(self):
-        """Render function.
-
-        Use ordinary numpy to save time.
-
-        """
-        gl.glColor3f(0.4, 0.4, 0.4)
-        W = 1000
+    def register(self, batch, group):
         normal, forward = self.normal, self.forward
         pt1, pt2, width = self.pt1, self.pt2, self.width
+        W = 10
         quad_strip = onp.hstack(
             [
                 pt1 - forward * W - 0.5 * width * normal,
@@ -61,9 +55,8 @@ class StraightLane(object):
                 pt2 + forward * W + 0.5 * width * normal,
             ]
         )
-        graphics.draw(4, gl.GL_QUAD_STRIP, ("v2f", quad_strip))
-        gl.glColor3f(1.0, 1.0, 1.0)
-        W = 1000
+        colors = [int(0.4 * 255)] * 12
+        batch.add(4, gl.GL_QUAD_STRIP, group, ("v2f", quad_strip), ("c3B", colors))
         line_strip = onp.hstack(
             [
                 pt1 - forward * W - 0.5 * width * normal,
@@ -72,4 +65,5 @@ class StraightLane(object):
                 pt1 + forward * W + 0.5 * width * normal,
             ]
         )
-        graphics.draw(4, gl.GL_LINES, ("v2f", line_strip))
+        colors = [255] * 12
+        batch.add(4, gl.GL_LINES, group, ("v2f", line_strip), ("c3B", colors))

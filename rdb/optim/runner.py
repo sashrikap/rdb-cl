@@ -68,15 +68,15 @@ class Runner(object):
         self._env.reset()
         frames = []
         if mode == "rgb_array":
-            frames = [self._env.render("rgb_array", text=text)]
+            frames = [self._env.render(mode="rgb_array", text=text)]
         # Rollout
         for act in actions:
             self._env.step(act)
             if mode == "human":
-                self._env.render("human", text=text)
+                self._env.render(mode="human", text=text)
                 time.sleep(0.1)
             elif mode == "rgb_array":
-                frame = self._env.render("rgb_array", text=text)
+                frame = self._env.render(mode="rgb_array", text=text)
                 frame = imresize(frame, (width, width))
                 frames.append(frame)
             else:
@@ -98,7 +98,7 @@ class Runner(object):
         if path is None:
             path = join(dirname(rdb.__file__), "..", "data", "recording.mp4")
         os.makedirs(dirname(path), exist_ok=True)
-        self._env.reset()
+        # self._env.reset()
         self._env.state = state
         render_env(self._env, state, actions, fps=3, path=path, text=text)
         if close:
@@ -139,9 +139,12 @@ class Runner(object):
         if path is None:
             path = join(dirname(rdb.__file__), "..", "data", "thumbnail.png")
         os.makedirs(dirname(path), exist_ok=True)
-        self._env.reset()
+        # self._env.reset()
+        for car in self._env.cars:
+            print(car.state)
+        print(self._env._main_car.state)
         self._env.state = state
-        frame = self._env.render("rgb_array", text=text)
+        frame = self._env.render(mode="rgb_array", text=text)
         frame = imresize(frame, (width, width))
         if close:
             self._env.close_window()
@@ -156,10 +159,10 @@ class Runner(object):
         if path is None:
             path = join(dirname(rdb.__file__), "..", "data", "heatmap.png")
         os.makedirs(dirname(path), exist_ok=True)
-        self._env.reset()
+        # self._env.reset()
         self._env.state = state
         frame = self._env.render(
-            "rgb_array", draw_heat=True, weights=weights, text=text
+            mode="rgb_array", draw_heat=True, weights=weights, text=text
         )
         frame = imresize(frame, (width, width))
         if close:
@@ -175,7 +178,7 @@ class Runner(object):
         if path is None:
             path = join(dirname(rdb.__file__), "..", "data", "boundarymap.png")
         os.makedirs(dirname(path), exist_ok=True)
-        self._env.reset()
+        # self._env.reset()
         self._env.state = state
         frame = self._env.render(
             "rgb_array", draw_boundary=True, weights=weights, text=text
@@ -192,9 +195,9 @@ class Runner(object):
         if path is None:
             path = join(dirname(rdb.__file__), "..", "data", "constraint.png")
         os.makedirs(dirname(path), exist_ok=True)
-        self._env.reset()
+        # self._env.reset()
         self._env.state = state
-        frame = self._env.render("rgb_array", draw_constraint_key=key, text=text)
+        frame = self._env.render(mode="rgb_array", draw_constraint_key=key, text=text)
         frame = imresize(frame, (width, width))
         if close:
             self._env.close_window()

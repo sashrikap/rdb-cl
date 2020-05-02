@@ -5,6 +5,7 @@ import rdb.envs.drive2d
 from time import time, sleep
 from tqdm import tqdm, trange
 from rdb.optim.mpc import build_mpc
+from rdb.exps.utils import Profiler
 from rdb.infer import *
 
 NUM_THUMBNAILS = 200

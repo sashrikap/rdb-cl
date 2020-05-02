@@ -1,10 +1,85 @@
+import gym
+import copy
 import numpy as onp
 from functools import partial
 from matplotlib import pyplot as plt
 from os import makedirs
 from os.path import join
 from scipy.misc import imsave, imresize
+from rdb.exps.utils import Profiler
 import multiprocessing
+
+
+class RenderEnv(object):
+    """Environment with interpolation-based subrender.
+
+    Requirement: subclass implement
+        env._get_state()
+        env._set_state(state)
+        env._do_step(...)
+        env._do_reset(...)
+
+    Workflow:
+        env.step()
+        for i in range(subframes):
+            env.subrender()
+
+    """
+
+    def __init__(self, subframes):
+        # super().__init__()
+        self._subframes = subframes
+        self._subcount = 0
+        self._state, self._prev_state, self._curr_state = None, None, None
+
+    # def _seed(self):
+    #     raise NotImplementedError
+
+    def reset(self):
+        self._prev_state = None
+        self._do_reset()
+
+    @property
+    def subframes(self):
+        return self._subframes
+
+    @property
+    def state(self):
+        return self._get_state()
+
+    @state.setter
+    def state(self, state):
+        self._prev_state = None
+        self._subcount = 0
+        self._set_state(state)
+
+    def step(self, *args):
+        self._prev_state = copy.deepcopy(self.state)
+        self._subcount = 0
+        self._do_step(*args)
+        self._curr_state = copy.deepcopy(self.state)
+
+    def _do_step(self, *args):
+        raise NotImplementedError
+
+    def _get_state(self):
+        raise NotImplementedError
+
+    def _set_state(self, state):
+        raise NotImplementedError
+
+    def _do_reset(self):
+        raise NotImplementedError
+
+    def subrender(self, *args, **kwargs):
+        ratio = float(self._subcount / self._subframes)
+        sub_state = self._prev_state * ratio + self._curr_state * (1 - ratio)
+        self._subcount += 1
+        self.state = sub_state
+        self.render(*args, **kwargs)
+
+    def render(self, mode, text="", *args, **kwargs):
+        pass
 
 
 def save_video(frames, fps, width, path):
@@ -17,8 +92,8 @@ def save_video(frames, fps, width, path):
 
 def forward_env(env, actions, init_state=None, text=None):
     # Render and save environment given pre-specified actions
-    env.set_init_state(init_state)
-    env.reset()
+    env.state = init_state
+    actions = onp.array(actions)
     frames = []
     subframe_op = getattr(env, "sub_render", None)
     has_subframe = callable(subframe_op)
@@ -34,9 +109,8 @@ def forward_env(env, actions, init_state=None, text=None):
     for ai in range(nacs):
         env.step(actions[:, ai])
         render_frames()
-    # render_frames()
-    # TODO: a render bug, need to get rid of the first frame
-    frames = frames[1:]
+
+    # frames = frames[1:]
     return frames
 
 
