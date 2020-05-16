@@ -10,7 +10,7 @@ General workflow:
 """
 import ray
 import math
-from time import time
+import time
 from rdb.infer import *
 from tqdm.auto import tqdm
 
@@ -45,19 +45,26 @@ class ParticleWorkerSingle(object):
             * In general good to avoid re-compiling.
 
         """
-        actions, costs, feats, feats_sum, violations = collect_trajs(
+        batch_trajs = collect_trajs(
             weights_arr,
             states,
             self._controller,
             self._runner,
             max_batch=self._max_batch,
         )
+        lower_trajs = collect_lowerbound_trajs(
+            weights_arr, states, self._runner, max_batch=self._max_batch
+        )
         self._compute_result = dict(
-            actions=actions,
-            costs=costs,
-            feats=feats,
-            feats_sum=feats_sum,
-            violations=violations,
+            cache_actions=batch_trajs["actions"],
+            cache_costs=batch_trajs["costs"],
+            cache_feats=batch_trajs["feats"],
+            cache_feats_sum=batch_trajs["feats_sum"],
+            cache_violations=batch_trajs["violations"],
+            cache_costs_lb=lower_trajs["costs"],
+            cache_feats_lb=lower_trajs["feats"],
+            cache_feats_sum_lb=lower_trajs["feats_sum"],
+            cache_violations_lb=lower_trajs["violations"],
         )
 
     def get_result(self):
@@ -167,14 +174,14 @@ class ParticleServer(object):
         nfeats = len(self._env.features_keys)
         task_dim = tasks.shape[1]
         state_dim = states.shape[1]
-        #  batch_states (ntasks * nweights, state_dim)
-        #  batch_weights nfeats * (ntasks * nweights)
+        #  batch_states: (ntasks * nweights, state_dim)
+        #  batch_weights: nfeats * (ntasks * nweights)
         batch_states, batch_weights = cross_product(
             states, particles.weights, onp.array, DictList
         )
         batch_weights = batch_weights.prepare(self._env.features_keys)
 
-        t_start = time()
+        t_start = time.time()
         print(f"Computing {len(states)}x{len(particles.weights)} tasks")
 
         result = None
@@ -182,6 +189,7 @@ class ParticleServer(object):
         if self._parallel:
             # Schedule
             num_batch_tasks = len(batch_states)
+            assert num_batch_tasks > num_workers
             tasks_per_worker = math.ceil(num_batch_tasks / num_workers)
 
             # Loop through workers
@@ -214,7 +222,7 @@ class ParticleServer(object):
         particles.merge_bulk_tasks(tasks, result)
 
         print(
-            f"Computing {len(states)}x{len(particles.weights)} tasks finished: {(time() - t_start):.3f}s"
+            f"Computing {len(states)}x{len(particles.weights)} tasks finished: {(time.time() - t_start):.3f}s"
         )
 
         return particles

@@ -92,62 +92,76 @@ def plot_weights(
         plt.show()
 
 
-# def plot_weights_2d(
-#     weights_dicts,
-#     highlight_dicts=[],
-#     highlight_colors=[],
-#     highlight_labels=[],
-#     fname=None,
-#     title=None,
-#     max_weights=8.0,
-#     log_scale=True,
-#     **kwargs,
-# ):
-#     """Plot weights for visualizing.
+def plot_weights_2d(
+    weights_dicts,
+    weights_color,
+    key_i,
+    key_j,
+    highlight_dicts=[],
+    highlight_colors=[],
+    highlight_labels=[],
+    path=None,
+    title=None,
+    max_weights=8.0,
+    log_scale=True,
+    loc="upper right",
+    **kwargs,
+):
+    """Plot weights for visualizing.
 
-#     Args:
-#         highlight_dicts (list): list of weight dictionaries
-#         highlight_colors (list): list of colors for highlighting these weights
-#         highlight_labels (list): list of labels for denoting these weights
-#         max_weights (float): log range of weights ~ (-max_weights, max_weights)
+    Args:
+        key_i (str): first feature key
+        key_j (str): second feature key
+        highlight_dicts (list): list of weight dictionaries
+        highlight_colors (list): list of colors for highlighting these weights
+        highlight_labels (list): list of labels for denoting these weights
+        max_weights (float): log range of weights ~ (-max_weights, max_weights)
 
-#     """
-#     assert len(highlight_dicts) == len(highlight_colors) == len(highlight_labels)
+    """
+    assert len(highlight_dicts) == len(highlight_colors) == len(highlight_labels)
+    fig, axs = plt.subplots(1, figsize=(8, 8), dpi=80)
 
-#     n_values = len(weights_dicts[0].values())
-#     fig, axs = plt.subplots(n_values, 1, figsize=(20, 2 * n_values), dpi=80)
-#     weights_dicts = weights_dicts.log() if not log_scale else weights_dicts
-#     for i, key_i in enumerate(sorted(list(weights_dicts[0].keys()))):
-#         for j, key_i in enumerate(sorted(list(weights_dicts[0].keys()))):
+    weights_dicts = weights_dicts.log() if not log_scale else weights_dicts
+    values_i = weights_dicts[key_i]
+    values_j = weights_dicts[key_j]
+    axs.plot(
+        values_i,
+        values_j,
+        "^",
+        color=weights_color,
+        # facecolor=color,
+        alpha=0.5,
+    )
+    axs.set_xlim(-max_weights, max_weights)
+    axs.set_ylim(-max_weights, max_weights)
+    ## Highlight value
+    for j, (d, c, label) in enumerate(
+        zip(highlight_dicts, highlight_colors, highlight_labels)
+    ):
+        if d is None or key not in d:
+            continue
+        val_i = d[key_i]
+        val_j = d[key_j]
+        if not log_scale:
+            val_i = onp.log(val_i)
+            val_j = onp.log(val_j)
+        axs.plot(val_i, val_j, c=c)
+        # add 0.05 gap so that labels don't overlap
+        axs.text(val_i, val_j, label, size=10)
+    # axs.legend(loc=loc)
+    axs.set_xlabel(key_i)
+    axs.set_ylabel(key_j)
+    plt.tight_layout()
+    if title is not None:
+        fig.suptitle(title)
+    if path is not None:
+        plt.savefig(f"{path}.png")
+        plt.close("all")
+    else:
+        plt.show()
 
-#         values = weights_dicts[key]
 
-#         ybottom, ytop = axs[i].get_ylim()
-#         gap = (ytop - ybottom) / (len(highlight_dicts) - 1 + 1e-8)
-#         ## Highlight value
-#         for j, (d, c, label) in enumerate(
-#             zip(highlight_dicts, highlight_colors, highlight_labels)
-#         ):
-#             if d is None or key not in d:
-#                 continue
-#             val = d[key]
-#             if not log_scale:
-#                 val = onp.log(val)
-#             axs[i].axvline(x=val, c=c)
-#             # add 0.05 gap so that labels don't overlap
-#             axs[i].text(val, ybottom + gap * j, label, size=10)
-#         axs[i].set_xlabel(key)
-#     plt.tight_layout()
-#     if title is not None:
-#         fig.suptitle(title)
-#     if fname is not None:
-#         plt.savefig(f"{fname}.png")
-#         plt.close("all")
-#     else:
-#         plt.show()
-
-
-def plot_weights_comparison(
+def plot_weights_hist(
     all_weights_dicts,
     all_weights_colors,
     all_labels,

@@ -10,6 +10,7 @@ from scipy.optimize import minimize, basinhopping
 from rdb.optim.utils import *
 from rdb.infer import *
 import jax.numpy as np
+import time
 import jax
 
 
@@ -193,14 +194,14 @@ class OptimizerMPC(object):
             print(f"JIT - Controller <{self._name}>")
             print(f"JIT - Controller first compile: u0 {u_shape}")
             self._u_shape = u_shape
-            t_compile = time()
+            t_compile = time.time()
         elif u_shape != self._u_shape:
             print(f"JIT - Controller <{self._name}>")
             print(
                 f"JIT - Controller recompile: u0 {u_shape}, previously {self._u_shape}"
             )
             self._u_shape = u_shape
-            t_compile = time()
+            t_compile = time.time()
 
         # Initial guess
         if us0 is None:
@@ -231,7 +232,7 @@ class OptimizerMPC(object):
 
             if t == 0 and t_compile is not None:
                 print(
-                    f"JIT - Controller finish compile in {time() - t_compile:.3f}s: u0 {self._u_shape}"
+                    f"JIT - Controller finish compile in {time.time() - t_compile:.3f}s: u0 {self._u_shape}"
                 )
             ## Forward 1 timestep, record 1st action
             opt_us.append(opt_us_t[0])

@@ -8,6 +8,14 @@ import seaborn as sns
 
 sns.set()
 
+colors = {
+    "random": "gray",
+    "infogain": "darkorange",
+    "difficult": "purple",
+    "ratiomean": "peru",
+    "ratiomin": "darkred",
+}
+
 
 def read_seed(path):
     # print(path)
@@ -26,87 +34,101 @@ def cleanup(arr, max_len):
         return np.array(arrs)
 
 
-def plot_data():
-    seedpaths = []
-    seeddata = []
+def load_data(eval_plot_data, map_plot_data, exp_name, save_name=None):
+    if save_name is None:
+        save_name = exp_name
+
+    map_seedpaths, map_data = [], []
+    eval_seedpaths, eval_data = [], []
+    # Load map_seed data
     if os.path.isdir(os.path.join(exp_dir, exp_name)):
         for file in sorted(os.listdir(os.path.join(exp_dir, exp_name))):
-            if (
-                exp_name in file
-                and "npy" in file
-                and "map" in file
-                and file.endswith("npy")
-            ):
+            if save_name in file and "npy" in file and file.endswith("npy"):
                 exp_path = os.path.join(exp_dir, exp_name, file)
-                if os.path.isfile(exp_path):
-                    use_bools = [str(s) in exp_path for s in use_seeds]
-                    not_bools = [str(s) in exp_path for s in not_seeds]
+                use_bools = [str(s) in exp_path for s in use_seeds]
+                not_bools = [str(s) in exp_path for s in not_seeds]
+                if os.path.isfile(exp_path) and "map" in file:
                     print(exp_path, use_seeds, not_bools)
                     if onp.any(use_bools) and not onp.any(not_bools):
-                        seedpaths.append(exp_path)
-    if len(seedpaths) == 0:
+                        map_seedpaths.append(exp_path)
+                elif os.path.isfile(exp_path) and "map" not in file:
+                    print(exp_path, use_seeds, not_bools)
+                    if onp.any(use_bools) and not onp.any(not_bools):
+                        eval_seedpaths.append(exp_path)
+
+    if len(map_seedpaths) == 0:
         return
-    exp_path = seedpaths[0]
-    exp_read = read_seed(exp_path)
 
-    data = {}
-    fig, ax = plt.subplots()
-    idx = 0
-    for method, hist in exp_read.items():
-        data[method] = {
-            "perform": np.array(hist[idx]["map_perform"])
-            - np.array(hist[idx]["obs_perform"]),
-            "violation": np.array(hist[idx]["map_violation"])
-            - np.array(hist[idx]["obs_violation"]),
-        }
-    import pdb
+    map_data = [read_seed(path) for path in map_seedpaths]
+    eval_data = [read_seed(path) for path in eval_seedpaths]
 
-    pdb.set_trace()
+    for map_d, eval_d in zip(map_data, eval_data):
+        for method in map_d.keys():
+            map_hist = map_d[method]
+            eval_hist = eval_d[method]
+            if method not in eval_plot_data:
+                eval_plot_data[method] = []
+            if method not in map_plot_data:
+                map_plot_data[method] = []
+            for _idx in range(len(map_hist)):
+                # for _idx in range(len(map_hist)):
+                map_plot_data[method].append(
+                    np.array(map_hist[_idx]["map_perform"]).mean()
+                )
+                eval_plot_data[method].append(eval_hist[_idx]["perform"])
+
+
+def plot_data(eval_plot_data, map_plot_data):
     # Only look at first proposed task
+    _, ax = plt.subplots(figsize=(10, 10))
+    for method in eval_plot_data:
+        ax.plot(
+            -1 * np.array(eval_plot_data[method]),
+            -1 * np.array(map_plot_data[method]),
+            "o",
+            color=colors[method],
+            label=method,
+            markersize=5,
+        )
 
-    x = np.arange(len(list(data.keys())))
-    dim = 2
-    w = 0.75
-    dimw = w / dim
-    ax.bar(
-        x,
-        [data[m]["perform"].mean() for m in data.keys()],
-        dimw,
-        yerr=[data[m]["perform"].std() for m in data.keys()],
-        label="Performance",
-    )
-    ax.bar(
-        x + dimw,
-        [data[m]["violation"].mean() for m in data.keys()],
-        dimw,
-        yerr=[data[m]["violation"].std() for m in data.keys()],
-        label="Violations",
-    )
+    # plt.xticks(x, list(data.keys()))
+    plt.legend(loc="upper left")
+    xy_range = (-0.5, 5)
+    ax.plot(xy_range, xy_range, "k--", linewidth=1, color="gray")
 
-    colors = "gbkr"
-    plt.xticks(x, list(data.keys()))
-    plt.legend(loc="upper right")
-    plt.xlabel("Method")
-    plt.ylabel("MAP - Joint")
-    plt.title(f"MAP performance on next proposed task (seed {use_seeds[0]})")
-    plt.savefig(os.path.join(exp_dir, exp_name, f"map_vs_obs_seed_{use_seeds[0]}.png"))
+    ax.set_xlim(*xy_range)
+    ax.set_ylim(*xy_range)
+
+    # ax.set_xlim(1e-1, 10)
+    # ax.set_ylim(1e-1, 10)
+    # ax.set_xscale('log')
+    # ax.set_yscale('log')
+
+    ax.set_ylabel("MAP Regret on Proposed task")
+    ax.set_xlabel("MAP Regret")
+    # plt.axis('scaled')
+    # plt.show()
+    ax.set_title(f"MAP regret on proposed task vs MAP regret")
+    plt.savefig(os.path.join(exp_dir, exp_name, f"map_vs_eval.png"))
 
 
 if __name__ == "__main__":
     N = -1
-    all_seeds = [1]
-    exp_dir = "data/200322"
-    # exp_name = "active_ird_exp_ird_beta_50_true_w_map_sum_irdvar_3_adam200"
-    exp_name = "active_ird_sum_ibeta_1_true_w_w1_eval_unif_128_602_adam"
+    all_seeds = [0, 1, 2, 3, 21, 22]
+    not_seeds = []
+    exp_dir = "data/200402"
+    exp_name = "active_ird_ibeta_50_true_w1_eval_unif_128_difficult_seed_0_603_adam"
+    alt_name = "active_ird_ibeta_50_true_w1_eval_unif_128_seed_0_603_adam"
 
-    for seed in all_seeds:
-        use_seeds = [seed]
-        not_seeds = []
-        MAX_LEN = 4
-        MAX_RANDOM_LEN = 4
-        PADDING = 0
+    MAX_LEN = 4
+    MAX_RANDOM_LEN = 4
+    PADDING = 0
 
-        use_seeds = [str(random.PRNGKey(si)) for si in use_seeds]
-        not_seeds = [str(random.PRNGKey(si)) for si in not_seeds]
+    use_seeds = [str(random.PRNGKey(si)) for si in all_seeds]
+    not_seeds = [str(random.PRNGKey(si)) for si in not_seeds]
 
-        plot_data()
+    eval_plot_data = {}
+    map_plot_data = {}
+    load_data(eval_plot_data, map_plot_data, exp_name)
+    load_data(eval_plot_data, map_plot_data, exp_name, alt_name)
+    plot_data(eval_plot_data, map_plot_data)

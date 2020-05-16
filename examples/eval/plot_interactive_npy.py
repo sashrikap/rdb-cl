@@ -36,9 +36,6 @@ def plot_proposal_eval():
             )
     fig, ax = plt.subplots()
     xs = np.arange(len(methods))
-    import pdb
-
-    pdb.set_trace()
     ys = [np.mean(np.array(all_eval[fn_key])) for fn_key in methods]
     yerr = [np.std(np.array(all_eval[fn_key])) for fn_key in methods]
     plt.bar(xs, ys, yerr=yerr)

@@ -4,7 +4,6 @@ Includes:
     [1] Gaussian Prior.
 
 """
-from time import time
 from rdb.infer import *
 from numpyro.handlers import seed
 from rdb.optim.utils import *

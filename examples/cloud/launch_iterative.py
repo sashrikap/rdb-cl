@@ -9,7 +9,7 @@ import argparse
 def launch(params_dict):
     locals().update(params_dict)
     print(params_dict)
-    save_params("examples/params/interactive_params.yaml", params_dict)
+    save_params("examples/params/iterative_params.yaml", params_dict)
 
     filter_ext = (".pyc", ".log", ".git", ".mp4", ".npz", ".ipynb")
 
@@ -55,17 +55,8 @@ def launch(params_dict):
         mounts = [gcp_mnt, output_mnt]
 
     # This will run locally
-    cmd = "bash /dar_payload/rdb/examples/cloud/run_interactive.sh"
-    if ONLY_EVALUATE:
-        cmd = "bash /dar_payload/rdb/examples/cloud/run_interactive_eval.sh"
-    launch_api.run_command(
-        command=cmd,
-        # command="echo 'check out' && ls /gcp_input/200110_test_eval_all",
-        # command="pwd && touch good.txt",
-        # command="bash ./rdb/examples/cloud/run_pyglet.sh",
-        mounts=mounts,
-        mode=launch_mode,
-    )
+    cmd = "bash /dar_payload/rdb/examples/cloud/run_iterative.sh"
+    launch_api.run_command(command=cmd, mounts=mounts, mode=launch_mode)
 
 
 if __name__ == "__main__":
@@ -77,7 +68,7 @@ if __name__ == "__main__":
     LOCAL_MODE = False
 
     # ========== Parameters =============
-    template = load_params("examples/params/interactive_template.yaml")
+    template = load_params("examples/params/iterative_template.yaml")
 
     if LOCAL_MODE:
         launch(template)
@@ -94,14 +85,10 @@ if __name__ == "__main__":
             f"data/{template['SAVE_NAME']}/{template['EXP_NAME']}/yaml", yaml_dir
         )
 
-        # params = {"RANDOM_KEYS": list(range(26, 36)), "NUM_EVAL_WORKERS": 8}
         params = {
-            "RANDOM_KEYS": list(range(1)),
-            # "RANDOM_KEYS": list(range(6)),
-            # "RANDOM_KEYS": [20, 21, 22, 23, 24],
+            "RANDOM_KEYS": list(range(2, 4)),
             # "NUM_EVAL_WORKERS": 8,
         }
-        # params = {"RANDOM_KEYS": [9], "NUM_EVAL_WORKERS": 8}
         all_params = create_params(template, params)
         for param in tqdm(all_params, desc="Launching jobs"):
             # Launch program

@@ -389,11 +389,19 @@ class IRDOptimalControl(object):
         sample_info = sampler.get_extra_fields(group_by_chain=True)
         sample_rates = sample_info["mean_accept_prob"][:, -1]
         num_samples = sample_ws.shape[1]
-        visualize_chains(
+        # Visualize histogram per feature
+        visualize_mcmc_feature(
             chains=sample_ws,
             rates=sample_rates,
             fig_dir=f"{self._save_dir}/mcmc",
-            title=f"seed_{self._rng_name}_{save_name}_samples_{num_samples}",
+            title=f"seed_{self._rng_name}_{save_name}_samples_{num_samples}_feature",
+            **self._weight_params,
+        )
+        # Visualize distribution per feature pairs
+        visualize_mcmc_pairs(
+            chains=sample_ws,
+            fig_dir=f"{self._save_dir}/mcmc/pairs",
+            title=f"seed_{self._rng_name}_{save_name}_samples_{num_samples}_pairs",
             **self._weight_params,
         )
         samples = self.create_particles(

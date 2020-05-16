@@ -6,9 +6,9 @@ from rdb.optim.mpc import shooting_method
 from rdb.infer.utils import *
 from functools import partial
 from jax import random
-from time import time
 import numpyro.distributions as dist
 import gym, rdb.envs.drive2d
+import time
 import ray
 
 ENV_NAME = "Week6_01-v0"
@@ -109,11 +109,11 @@ def test_single_evaluator():
         parallel=False,
         initialize_wait=True,
     )
-    t1 = time()
+    t1 = time.time()
     particles = server.compute_tasks(
         particles, [task] * num_tasks, [str(task)] * num_tasks, verbose=True
     )
-    print(f"Single worker time {time() - t1:.3f}")
+    print(f"Single worker time {time.time() - t1:.3f}")
 
 
 test_single_evaluator()
@@ -126,11 +126,11 @@ def test_parallel_evaluator():
     server = ParticleServer(
         env_fn, controller_fn, num_workers=num_workers, initialize_wait=True
     )
-    t1 = time()
+    t1 = time.time()
     particles = server.compute_tasks(
         particles, [task] * num_tasks, [str(task)] * num_tasks, verbose=True
     )
-    print(f"Parallel worker time {time() - t1:.3f}")
+    print(f"Parallel worker time {time.time() - t1:.3f}")
 
 
 test_parallel_evaluator()

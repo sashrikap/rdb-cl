@@ -44,7 +44,6 @@ def main(random_key):
             env,
             env.main_car.cost_runtime,
             dt=env.dt,
-            replan=False,
             name=name,
             **DESIGNER_CONTROLLER_ARGS,
         )
@@ -52,12 +51,7 @@ def main(random_key):
 
     def ird_controller_fn(env, name=""):
         controller, runner = build_mpc(
-            env,
-            env.main_car.cost_runtime,
-            dt=env.dt,
-            replan=False,
-            name=name,
-            **IRD_CONTROLLER_ARGS,
+            env, env.main_car.cost_runtime, dt=env.dt, name=name, **IRD_CONTROLLER_ARGS
         )
         return controller, runner
 
@@ -125,7 +119,6 @@ def main(random_key):
         if key not in ACTIVE_ARGS["active_fns"]:
             del active_fns[key]
 
-    EXP_ARGS["eval_seed"] = random.PRNGKey(EXP_ARGS["eval_seed"])
     experiment = ExperimentActiveIRD(
         ird_model,
         env_fn=env_fn,

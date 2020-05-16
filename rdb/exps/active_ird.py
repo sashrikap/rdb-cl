@@ -33,9 +33,9 @@ from rdb.infer.utils import *
 from rdb.exps.utils import *
 from tqdm.auto import tqdm
 from jax import random
-from time import time
 import jax.numpy as np
 import numpy as onp
+import time
 import copy
 import yaml
 import os
@@ -49,7 +49,7 @@ class ExperimentActiveIRD(object):
         model (object): IRD model
         iteration (int): algorithm iterations
         num_eval (int): how many particles to sample from posterior belief
-        eval_method (str): "map" or "uniform"
+        eval_method (str): "map" or "mean"
         num_active_tasks (int): # task candidates for active selection
         num_active_sample (int): running acquisition function on belief
             samples is costly, so subsample belief particles
@@ -100,7 +100,7 @@ class ExperimentActiveIRD(object):
         # Random key & function
         self._rng_key = None
         self._rng_name = None
-        self._eval_seed = eval_seed
+        self._eval_seed = random.PRNGKey(eval_seed)
         self._iterations = iterations
         # Designer simulation
         self._num_prior_tasks = num_prior_tasks
@@ -108,7 +108,7 @@ class ExperimentActiveIRD(object):
         # Evaluation
         self._num_eval = num_eval
         self._eval_method = eval_method
-        assert eval_method in {"map", "uniform"}
+        assert eval_method in {"map", "mean"}
         self._num_eval_tasks = num_eval_tasks
         self._eval_env_name = eval_env_name
         # Active Task proposal
@@ -121,7 +121,7 @@ class ExperimentActiveIRD(object):
         self._save_root = save_root
         self._exp_name = exp_name
         self._save_dir = f"{self._save_root}/{self._exp_name}"
-        self._last_time = time()
+        self._last_time = time.time()
         # Load design and cache
         self._num_load_design = num_load_design
         self._design_data = design_data
@@ -261,7 +261,7 @@ class ExperimentActiveIRD(object):
             for sp, key in zip(samples, active_keys):
                 if self._obs_method == "map":
                     obs = sp[0].map_estimate(1)
-                elif self._obs_method == "uniform":
+                elif self._obs_method == "mean":
                     obs = sp[0].subsample(1)
                 # if len(self._hist_obs[key]) == 0:
                 #     if self._initial_obs is None:
@@ -356,7 +356,7 @@ class ExperimentActiveIRD(object):
 
         Note:
             self._num_eval: number of sub samples for evaluation
-            self._eval_method: use MAP/uniform sample
+            self._eval_method: use mean/mean sample
 
         Criteria:
             * Relative Reward.
@@ -365,7 +365,7 @@ class ExperimentActiveIRD(object):
         """
 
         # Compute belief features
-        if method == "uniform":
+        if method == "mean":
             belief_sample = belief.subsample(num_samples)
         elif method == "map":
             belief_sample = belief.map_estimate(num_samples, log_scale=False)
@@ -382,13 +382,11 @@ class ExperimentActiveIRD(object):
         feats_violates = []
         desc = f"Evaluating method {fn_key}"
         for task in tqdm(eval_tasks, desc=desc):
-            diff_perf, diff_vios_arr, diff_vios = belief_sample.compare_with(
-                task, target=target
-            )
-            performances.append(diff_perf.mean())
-            num_violates.append(diff_vios_arr.mean())  # (nweights,) -> (1,)
-            feats_violates.append(diff_vios)
-            # import pdb; pdb.set_trace()
+            comparisons = belief_sample.compare_with(task, target=target)
+            performances.append(comparisons["rews"].mean())
+            num_violates.append(comparisons["vios"].mean())  # (nweights,) -> (1,)
+            feats_violates.append(comparisons["vios_by_name"])
+
         avg_violate = np.mean(np.array(num_violates, dtype=float))
         avg_perform = np.mean(np.array(performances, dtype=float))
         avg_feats_violate = feats_violates[0] * (1 / float(len(eval_tasks)))
@@ -421,16 +419,13 @@ class ExperimentActiveIRD(object):
 
         target = self._designer_server.designer.truth
         desc = f"Evaluating method {fn_key}"
-        diff_perf, diff_vios_arr, diff_vios = belief_map.compare_with(
-            next_task, target=target
-        )
-        map_perform = diff_perf
-        map_violate = diff_vios_arr  # (nweights,)
-        diff_perf, diff_vios_arr, diff_vios = joint_obs.compare_with(
-            next_task, target=target
-        )
-        obs_perform = diff_perf
-        obs_violate = diff_vios_arr
+        diff_perf, diff_vios_arr, diff_vios
+        belief_comparisons = belief_map.compare_with(next_task, target=target)
+        map_perform = belief_comparisons["rews"]
+        map_violate = belief_comparisons["vios"]  # (nweights,)
+        obs_comparisons = joint_obs.compare_with(next_task, target=target)
+        obs_perform = obs_comparisons["rews"]
+        obs_violate = obs_comparisons["vios"]
 
         print(f"    MAP Violation diff {map_violate.mean():.2f}")
         print(f"    MAP Performance diff {map_perform.mean():.2f}")
@@ -577,12 +572,12 @@ class ExperimentActiveIRD(object):
 
     def _log_time(self, caption=""):
         if self._last_time is not None:
-            secs = time() - self._last_time
+            secs = time.time() - self._last_time
             h = secs // (60 * 60)
             m = (secs - h * 60 * 60) // 60
             s = secs - (h * 60 * 60) - (m * 60)
             print(f">>> Active IRD {caption} Time: {int(h)}h {int(m)}m {s:.2f}s")
-        self._last_time = time()
+        self._last_time = time.time()
 
     def _plot_candidate_scores(self, itr, debug_dir=None):
         if debug_dir is None:

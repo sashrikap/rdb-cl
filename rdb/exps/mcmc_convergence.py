@@ -20,9 +20,9 @@ from functools import partial
 from tqdm.auto import tqdm
 from rdb.infer import *
 from jax import random
-from time import time
 import jax.numpy as np
 import numpy as onp
+import time
 import copy
 import os
 
@@ -59,7 +59,7 @@ class ExperimentMCMC(object):
         # Active Task proposal
         self._exp_params = exp_params
         self._save_root = save_root
-        self._last_time = time()
+        self._last_time = time.time()
         # Load design and cache
         self._design_data = design_data
         # Designer relevant data
@@ -269,7 +269,7 @@ class ExperimentMCMC(object):
         new_tasks = random_choice(self._get_rng_task(), all_tasks, 1)
         ## Simulate
         # for n_prior in range(len(self._all_designer_prior_tasks)):
-        for n_prior in range(2, 6):
+        for n_prior in range(5, 6):
 
             self._log_time(f"Designer Prior {n_prior} Begin")
             print(f"Experiment mode ({self._rng_name}) {exp_mode}")
@@ -343,12 +343,12 @@ class ExperimentMCMC(object):
 
     def _log_time(self, caption=""):
         if self._last_time is not None:
-            secs = time() - self._last_time
+            secs = time.time() - self._last_time
             h = secs // (60 * 60)
             m = (secs - h * 60 * 60) // 60
             s = secs - (h * 60 * 60) - (m * 60)
             print(f">>> Active IRD {caption} Time: {int(h)}h {int(m)}m {s:.2f}s")
-        self._last_time = time()
+        self._last_time = time.time()
 
     def update_key(self, rng_key):
         self._rng_name = str(rng_key)

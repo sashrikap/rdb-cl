@@ -37,7 +37,7 @@ WINDOW_H = 1200
 pyglet.resource.path.append(str(Path(__file__).parent.parent.joinpath("assets")))
 
 
-class DriveWorld(RenderEnv, gym.Env):
+class DriveWorld(RenderEnv):
     """General driving world.
 
     Attributes:
@@ -80,8 +80,8 @@ class DriveWorld(RenderEnv, gym.Env):
         self._cm = matplotlib.cm.coolwarm
         self._viz_heat_fn = None
         self._viz_constraint_fn = None
-        self._layers = utils.EnvGroups()
-        self._texts = utils.TextGroups()
+        self._layers = None
+        self._texts = None
 
         # Dyanmics, features, constraints and metadata functions
         self._xdim = onp.prod(self.state.shape)
@@ -115,7 +115,8 @@ class DriveWorld(RenderEnv, gym.Env):
     def xdim(self):
         return self._xdim
 
-    def _get_state(self):
+    @property
+    def state(self):
         """Current state
 
         Output:
@@ -131,7 +132,8 @@ class DriveWorld(RenderEnv, gym.Env):
         state = np.concatenate(state, axis=1)
         return state
 
-    def _set_state(self, state):
+    @state.setter
+    def state(self, state):
         cars = self._cars + [self.main_car]
         last_idx = 0
         for car in cars:
@@ -423,13 +425,13 @@ class DriveWorld(RenderEnv, gym.Env):
         """ For plotting purpose, meshgrid version of all_tasks"""
         return self._grid_tasks
 
-    def _do_reset(self):
+    def reset(self):
         # super().reset()
         for car in self._cars:
             car.reset()
         self.main_car.reset()
 
-    def _do_step(self, action):
+    def step(self, action):
         for car in self._cars:
             car.control(self.dt)
         self.main_car.control(action, self.dt)
@@ -544,6 +546,10 @@ class DriveWorld(RenderEnv, gym.Env):
         )
 
     def _setup_render(self):
+        ## Setup render batch
+        self._layers = utils.EnvGroups()
+        self._texts = utils.TextGroups()
+
         ## Setup background
         self._grass = pyglet.resource.texture("grass.png")
         W = 10

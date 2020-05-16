@@ -3,23 +3,23 @@ RANDOM_KEYS: [0]
 # RANDOM_KEYS: [0, 1, 2, 3]
 FIXED_TASK_SEED: 0
 
-ENV_NAME: "Week6_02-v1"
-# ENV_NAME: "Week6_01-v1"
+ENV_NAME: Week6_02-v1
+# ENV_NAME: Week6_01-v1
 
 ## MPC Specific
 IRD_CONTROLLER_ARGS:
   horizon: 10
-  # engine: "jax"
-  # method: "adam"
-  engine: "scipy"
-  method: "lbfgs"
+  # engine: jax
+  # method: adam
+  engine: scipy
+  method: lbfgs
 
 DESIGNER_CONTROLLER_ARGS:
   horizon: 10
-  # engine: "jax"
-  # method: "adam"
-  engine: "scipy"
-  method: "lbfgs"
+  # engine: jax
+  # method: adam
+  engine: scipy
+  method: lbfgs
 
 
 
@@ -29,17 +29,17 @@ EXP_ARGS:
   num_eval_tasks: 2000
   # num_eval_tasks: 40
   exp_iterations: 16
-  save_name: "200224"
-  # EXP_NAME: "active_ird_sum_beta_50_dprior_3_irdvar_3_dvar_0.2_week602_scipy"
-  EXP_NAME: "active_ird_sum_beta_50_true_w_irdvar_3_dvar_02_602_scipy"
-  # EXP_NAME: "test"
-  # EXP_NAME: "active_ird_exp_ird_beta_50_prior_2"
+  save_name: 200224
+  # EXP_NAME: active_ird_sum_beta_50_dprior_3_irdvar_3_dvar_0.2_week602_scipy
+  EXP_NAME: active_ird_sum_beta_50_true_w_irdvar_3_dvar_02_602_scipy
+  # EXP_NAME: test
+  # EXP_NAME: active_ird_exp_ird_beta_50_prior_2
 ## Designer Settigns
 DESIGNER_ARGS:
-  task_method: "sum"
-  # task_method: "sum"
+  task_method: sum
+  # task_method: sum
   num_normalizers: 200
-  sample_method: "MH"
+  sample_method: MH
   sample_init_args:
     proposal_var: 0.2
     max_val: 15.0
@@ -54,10 +54,10 @@ DESIGNER_ARGS:
   true_w: NULL
 ## IRD Settings
 IRD_ARGS:
-  task_method: "sum"
-  # task_method: "sum"
+  task_method: sum
+  # task_method: sum
   num_normalizers: 200
-  sample_method: "MH"
+  sample_method: MH
   sample_init_args:
     proposal_var: 3
     max_val: 15.0
@@ -77,12 +77,12 @@ EVAL_ARGS:
 ACTIVE_ARGS:
   num_active_tasks: 72
   num_active_sample: 1000
-  active_fns: ["infogain", "ratiomean", "ratiomin", "random"]
-  # active_fns: ["infogain"]
-  # active_fns: ["ratiomean", "ratiomin", "random"]
-  # active_fns: ["infogain", "ratiomean", "ratiomin"]
-  # active_fns: ["random"]
-  # active_fns: ["infogain", "ratiomean", "ratiomin"]
+  active_fns: [infogain, ratiomean, ratiomin, random]
+  # active_fns: [infogain]
+  # active_fns: [ratiomean, ratiomin, random]
+  # active_fns: [infogain, ratiomean, ratiomin]
+  # active_fns: [random]
+  # active_fns: [infogain, ratiomean, ratiomin]
 
 
 
@@ -91,11 +91,11 @@ ACTIVE_ARGS:
 #   num_eval_map: 2
 #   num_eval_tasks: 40
 #   exp_iterations: 8
-#   save_name: "test"
-#   EXP_NAME: "random_ird_exp_natural_one_hybrid_ird_1000_1000"
+#   save_name: test
+#   EXP_NAME: random_ird_exp_natural_one_hybrid_ird_1000_1000
 # DESIGNER_ARGS:
 #   num_normalizers: 10
-#   sample_method: "MH"
+#   sample_method: MH
 #   sample_init_args:
 #     proposal_var: 0.5
 #     max_val: 15.0
@@ -110,7 +110,7 @@ ACTIVE_ARGS:
 #   true_w: NULL
 # IRD_ARGS:
 #   num_normalizers: 12
-#   sample_method: "MH"
+#   sample_method: MH
 #   sample_init_args:
 #     proposal_var: 2
 #     max_val: 15.0
@@ -126,27 +126,27 @@ ACTIVE_ARGS:
 # ACTIVE_ARGS:
 #   num_active_tasks: 72
 #   num_active_sample: 10
-#   # active_fns: ["infogain", "ratiomean", "ratiomin", "random"]
-#   active_fns: ["infogain"]
-#   # active_fns: ["random"]
-#   # active_fns: ["infogain", "ratiomean", "ratiomin"]
-#   # active_fns: ["random"]
-#   # active_fns: ["infogain", "ratiomean", "ratiomin"]
+#   # active_fns: [infogain, ratiomean, ratiomin, random]
+#   active_fns: [infogain]
+#   # active_fns: [random]
+#   # active_fns: [infogain, ratiomean, ratiomin]
+#   # active_fns: [random]
+#   # active_fns: [infogain, ratiomean, ratiomin]
 
 
 
 ## Plotting & weight scaling
 WEIGHT_PARAMS:
-  normalized_key: "dist_cars"
+  normalized_key: dist_cars
   max_weights: 15.0
   bins: 200
   feature_keys:
-  - "dist_cars"
-  - "dist_lanes"
-  - "dist_fences"
-  - "dist_objects"
-  - "speed"
-  - "control"
+  - dist_cars
+  - dist_lanes
+  - dist_fences
+  - dist_objects
+  - speed
+  - control
 
 TRUE_W:
   control: 0.1

@@ -10,19 +10,15 @@ from rdb.exps.utils import Profiler
 import multiprocessing
 
 
-class RenderEnv(object):
+class RenderEnv(gym.Env):
     """Environment with interpolation-based subrender.
 
-    Requirement: subclass implement
-        env._get_state()
-        env._set_state(state)
-        env._do_step(...)
-        env._do_reset(...)
-
     Workflow:
-        env.step()
-        for i in range(subframes):
-            env.subrender()
+        env.prepare_subrender()
+        for t in range(T):
+            env.step(acs)
+            for i in range(subframes):
+                env.step_subrender()
 
     """
 
@@ -32,51 +28,31 @@ class RenderEnv(object):
         self._subcount = 0
         self._state, self._prev_state, self._curr_state = None, None, None
 
-    # def _seed(self):
-    #     raise NotImplementedError
-
-    def reset(self):
-        self._prev_state = None
-        self._do_reset()
-
     @property
     def subframes(self):
         return self._subframes
 
-    @property
-    def state(self):
-        return self._get_state()
-
-    @state.setter
-    def state(self, state):
-        self._prev_state = None
+    def step_subrender(self, *args, **kwargs):
+        self._prev_state = copy.deepcopy(self._curr_state)
+        self.state = self._curr_state
         self._subcount = 0
-        self._set_state(state)
-
-    def step(self, *args):
-        self._prev_state = copy.deepcopy(self.state)
-        self._subcount = 0
-        self._do_step(*args)
+        self.step(*args, **kwargs)
         self._curr_state = copy.deepcopy(self.state)
 
-    def _do_step(self, *args):
+    def step(self, *args, **kwargs):
         raise NotImplementedError
 
-    def _get_state(self):
-        raise NotImplementedError
-
-    def _set_state(self, state):
-        raise NotImplementedError
-
-    def _do_reset(self):
-        raise NotImplementedError
+    def prepare_subrender(self):
+        self._prev_state = copy.deepcopy(self.state)
+        self._curr_state = copy.deepcopy(self.state)
+        self._subcount = 0
 
     def subrender(self, *args, **kwargs):
         ratio = float(self._subcount / self._subframes)
-        sub_state = self._prev_state * ratio + self._curr_state * (1 - ratio)
+        sub_state = self._prev_state * (1 - ratio) + self._curr_state * ratio
         self._subcount += 1
         self.state = sub_state
-        self.render(*args, **kwargs)
+        return self.render(*args, **kwargs)
 
     def render(self, mode, text="", *args, **kwargs):
         pass
@@ -95,20 +71,19 @@ def forward_env(env, actions, init_state=None, text=None):
     env.state = init_state
     actions = onp.array(actions)
     frames = []
-    subframe_op = getattr(env, "sub_render", None)
-    has_subframe = callable(subframe_op)
-
-    def render_frames():
-        if has_subframe:
-            for s_i in range(env.subframes):
-                frames.append(env.sub_render("rgb_array", s_i, text=text))
-        else:
-            frames.append(env.render("rgb_array", text=text))
+    has_subframe = env.subframes > 0
 
     nacs = actions.shape[1]
-    for ai in range(nacs):
-        env.step(actions[:, ai])
-        render_frames()
+    if has_subframe:
+        env.prepare_subrender()
+        for ai in range(nacs):
+            env.step_subrender(actions[:, ai])
+            for s_i in range(env.subframes):
+                frames.append(env.subrender(mode="rgb_array", text=text))
+    else:
+        for ai in range(nacs):
+            env.step(actions[:, ai])
+            frames.append(env.render(mode="rgb_array", text=text))
 
     # frames = frames[1:]
     return frames

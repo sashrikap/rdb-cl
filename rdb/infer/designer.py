@@ -2,11 +2,11 @@ import os
 import jax
 import copy
 import json
+import time
 import pprint
 import numpy as onp
 import jax.numpy as np
 import numpyro, itertools
-from time import time
 from jax import random
 from os.path import join
 from rdb.exps.utils import *

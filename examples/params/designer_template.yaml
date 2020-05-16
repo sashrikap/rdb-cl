@@ -18,25 +18,25 @@ MAX_WEIGHT: 10.0
 HIST_BINS: 200
 # BETA: 2
 # DESIGNER_PROPOSAL_VAR: 1
-# EXP_NAME: "designer_informed_beta_2"
+# EXP_NAME: designer_informed_beta_2
 # BETA: 4
 # DESIGNER_PROPOSAL_VAR: 1
-# EXP_NAME: "designer_informed_beta_4"
+# EXP_NAME: designer_informed_beta_4
 # BETA: 6
 # DESIGNER_PROPOSAL_VAR: 1
-# EXP_NAME: "designer_informed_beta_6"
+# EXP_NAME: designer_informed_beta_6
 # BETA: 8
 # DESIGNER_PROPOSAL_VAR: 1
-# EXP_NAME: "designer_informed_beta_8"
+# EXP_NAME: designer_informed_beta_8
 BETA: 16
 DESIGNER_PROPOSAL_VAR: 0.5
-EXP_NAME: "designer_informed_beta_16"
+EXP_NAME: designer_informed_beta_16
 # BETA: 32
 # DESIGNER_PROPOSAL_VAR: 0.5
-# EXP_NAME: "designer_informed_beta_32"
+# EXP_NAME: designer_informed_beta_32
 
 
-SAVE_NAME: "200129"
+SAVE_NAME: 200129
 
 ## Full Params
 NUM_DESIGNERS: 400
@@ -55,14 +55,14 @@ NUM_EVAL_TASKS: 16384
 # NUM_EVAL_TASKS: 12
 
 ## Task and weight specific
-NORMALIZED_KEY: "dist_cars"
+NORMALIZED_KEY: dist_cars
 FEATURE_KEYS:
-- "dist_cars"
-- "dist_lanes"
-- "dist_fences"
-- "dist_objects"
-- "speed"
-- "control"
+- dist_cars
+- dist_lanes
+- dist_fences
+- dist_objects
+- speed
+- control
 
 TASK: [0.2, -0.7, 0.0, 0.4]
 TRUE_W:

@@ -3,55 +3,57 @@ RANDOM_KEYS: [21]
 # RANDOM_KEYS: [0, 1, 2, 3]
 # FIXED_TASK_SEED: null
 
-# ENV_NAME: "Week6_02-v1"
-# ENV_NAME: "Week6_01-v1"
-ENV_NAME: "Week6_03-v1"
+# ENV_NAME: Week6_02-v1
+# ENV_NAME: Week6_01-v1
+ENV_NAME: Week6_03-v1
 
 ## MPC Specific
 IRD_CONTROLLER_ARGS:
   horizon: 10
-  engine: "jax"
-  method: "adam"
-  # engine: "scipy"
-  # method: "lbfgs"
+  replan: 5
+  engine: jax
+  method: adam
+  # engine: scipy
+  # method: lbfgs
 
 DESIGNER_CONTROLLER_ARGS:
   horizon: 10
-  engine: "jax"
-  method: "adam"
-  # engine: "scipy"
-  # method: "lbfgs"
+  replan: 5
+  engine: jax
+  method: adam
+  # engine: scipy
+  # method: lbfgs
 
 
 ## Saving
-SAVE_NAME: "200406"
-# EXP_NAME: "active_ird_beta_50_true_w_irdvar_3_lbfgs"
-# EXP_NAME: "active_ird_beta_50_true_w_map_mean_irdvar_3_adam200"
-# EXP_NAME: "active_ird_beta_50_true_w_map_sum_irdvar_3_adam200"
-# EXP_NAME: "active_ird_beta_50_true_w_map_sum_irdvar_3_week602_adam200"
-# EXP_NAME: "active_ird_sum_beta_50_dprior_3_irdvar_3_dvar_0.2_week602_scipy"
-# EXP_NAME: "active_ird_sum_beta_50_dprior_2_irdvar_3_dvar_02_602_scipy"
-# EXP_NAME: "active_ird_sum_beta_1_true_w_irdvar_3_dvar_02_602_scipy"
-# EXP_NAME: "active_ird_sum_beta_1_true_w_irdvar_3_601_scipy"
-# EXP_NAME: "active_ird_sum_ibeta_20_true_w_irdvar_3_dbeta_1_602_adam"
-# EXP_NAME: "active_ird_sum_ibeta_20_true_w2_irdvar_3_dbeta_1_602_adam"
-# EXP_NAME: "active_ird_sum_ibeta_20_true_w_irdvar_3_dbeta_1_602_adam"
-# EXP_NAME: "active_ird_sum_ibeta_5_test_true_w_irdvar_3_dbeta_1_602_adam"
-# EXP_NAME: "active_ird_sum_ibeta_80_irdvar_3_true_w_w1_eval_unif_128_602_adam"
-EXP_NAME: "active_ird_ibeta_50_true_w1_eval_unif_128_ratio_seed_0_603_adam"
-# EXP_NAME: "active_ird_sum_ibeta_50_dprior_2_dbeta_20_obs_uniform_w1_unif_128_602_adam"
-# EXP_NAME: "test"
-# EXP_NAME: "active_ird_beta_50_prior_2"
+SAVE_NAME: 200406
+# EXP_NAME: active_ird_beta_50_true_w_irdvar_3_lbfgs
+# EXP_NAME: active_ird_beta_50_true_w_map_mean_irdvar_3_adam200
+# EXP_NAME: active_ird_beta_50_true_w_map_sum_irdvar_3_adam200
+# EXP_NAME: active_ird_beta_50_true_w_map_sum_irdvar_3_week602_adam200
+# EXP_NAME: active_ird_sum_beta_50_dprior_3_irdvar_3_dvar_0.2_week602_scipy
+# EXP_NAME: active_ird_sum_beta_50_dprior_2_irdvar_3_dvar_02_602_scipy
+# EXP_NAME: active_ird_sum_beta_1_true_w_irdvar_3_dvar_02_602_scipy
+# EXP_NAME: active_ird_sum_beta_1_true_w_irdvar_3_601_scipy
+# EXP_NAME: active_ird_sum_ibeta_20_true_w_irdvar_3_dbeta_1_602_adam
+# EXP_NAME: active_ird_sum_ibeta_20_true_w2_irdvar_3_dbeta_1_602_adam
+# EXP_NAME: active_ird_sum_ibeta_20_true_w_irdvar_3_dbeta_1_602_adam
+# EXP_NAME: active_ird_sum_ibeta_5_test_true_w_irdvar_3_dbeta_1_602_adam
+# EXP_NAME: active_ird_sum_ibeta_80_irdvar_3_true_w_w1_eval_unif_128_602_adam
+EXP_NAME: active_ird_ibeta_50_true_w1_eval_unif_128_ratio_seed_0_603_adam
+# EXP_NAME: active_ird_sum_ibeta_50_dprior_2_dbeta_20_obs_mean_w1_unif_128_602_adam
+# EXP_NAME: test
+# EXP_NAME: active_ird_beta_50_prior_2
 
 
 # Full sampling
 EXP_ARGS:
   num_eval: 128
-  eval_method: "uniform"
-  obs_method: "uniform"
-  # eval_method: "map"
+  eval_method: mean
+  obs_method: mean
+  # eval_method: map
   num_eval_tasks: 500
-  eval_env_name: "Week6_02-v1"
+  eval_env_name: Week6_02-v1
   # num_eval_tasks: 40
   iterations: 16
   num_active_tasks: 144
@@ -61,9 +63,9 @@ EXP_ARGS:
   num_prior_tasks: 2
 ## Designer Settigns
 DESIGNER_ARGS:
-  task_method: "sum"
+  task_method: sum
   num_normalizers: 1000
-  sample_method: "MH"
+  sample_method: MH
   sample_init_args:
     proposal_var: 0.3
     max_val: 15.0
@@ -75,8 +77,8 @@ DESIGNER_ARGS:
   beta: 20
 ## IRD Settings
 IRD_ARGS:
-  task_method: "sum"
-  sample_method: "MH"
+  task_method: sum
+  sample_method: MH
   sample_init_args:
     proposal_var: 3
     max_val: 15.0
@@ -95,32 +97,32 @@ EVAL_ARGS:
   num_active_workers: 2
   max_batch: 500
 ACTIVE_ARGS:
-  # active_fns: ["infogain", "ratiomean", "ratiomin", "random"]
-  # active_fns: ["difficult"]
-  # active_fns: ["infogain"]
-  # active_fns: ["ratiomean", "ratiomin", "random"]
-  # active_fns: ["infogain", "ratiomean", "ratiomin"]
-  # active_fns: ["random"]
-  active_fns: ["ratiomean", "ratiomin"]
+  # active_fns: [infogain, ratiomean, ratiomin, random]
+  # active_fns: [difficult]
+  # active_fns: [infogain]
+  # active_fns: [ratiomean, ratiomin, random]
+  # active_fns: [infogain, ratiomean, ratiomin]
+  # active_fns: [random]
+  active_fns: [ratiomean, ratiomin]
 
 
 # ## Testing
 # ## Saving
-# SAVE_NAME: "200330"
-# EXP_NAME: "test"
+# SAVE_NAME: 200330
+# EXP_NAME: test
 # EXP_ARGS:
 #   num_eval: 2
 #   num_eval_tasks: 40
-#   obs_method: "uniform"
+#   obs_method: mean
 #   iterations: 8
 #   eval_seed: 0
 #   use_true_w: True
 #   num_prior_tasks: 2
-#   eval_env_name: "Week6_02-v1"
+#   eval_env_name: Week6_02-v1
 # DESIGNER_ARGS:
-#   task_method: "sum"
+#   task_method: sum
 #   num_normalizers: 10
-#   sample_method: "MH"
+#   sample_method: MH
 #   sample_init_args:
 #     proposal_var: 0.5
 #     max_val: 15.0
@@ -130,8 +132,8 @@ ACTIVE_ARGS:
 #     num_chains: 1
 #   beta: 20
 # IRD_ARGS:
-#   sample_method: "MH"
-#   task_method: "sum"
+#   sample_method: MH
+#   task_method: sum
 #   sample_init_args:
 #     proposal_var: 2
 #     max_val: 15.0
@@ -148,27 +150,27 @@ ACTIVE_ARGS:
 # ACTIVE_ARGS:
 #   num_active_tasks: 72
 #   num_active_sample: 10
-#   # active_fns: ["infogain", "ratiomean", "ratiomin", "random"]
-#   active_fns: ["infogain", "random"]
-#   # active_fns: ["random"]
-#   # active_fns: ["infogain", "ratiomean", "ratiomin"]
-#   # active_fns: ["random"]
-#   # active_fns: ["infogain", "ratiomean", "ratiomin"]
+#   # active_fns: [infogain, ratiomean, ratiomin, random]
+#   active_fns: [infogain, random]
+#   # active_fns: [random]
+#   # active_fns: [infogain, ratiomean, ratiomin]
+#   # active_fns: [random]
+#   # active_fns: [infogain, ratiomean, ratiomin]
 
 
 
 ## Plotting & weight scaling
 WEIGHT_PARAMS:
-  normalized_key: "dist_cars"
+  normalized_key: dist_cars
   max_weights: 15.0
   bins: 200
   feature_keys:
-  - "dist_cars"
-  - "dist_lanes"
-  - "dist_fences"
-  - "dist_objects"
-  - "speed"
-  - "control"
+  - dist_cars
+  - dist_lanes
+  - dist_fences
+  - dist_objects
+  - speed
+  - control
 
 # ## True w1 (601)
 # TRUE_W:

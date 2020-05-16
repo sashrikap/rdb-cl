@@ -1,4 +1,4 @@
-# ENV_NAME: "Week6_01-v0"
+# ENV_NAME: Week6_01-v0
 
 #RANDOM_KEYS: [0, 1, 2, 3]
 RANDOM_KEYS: [1]
@@ -11,52 +11,51 @@ FIXED_TASK_SEED: null
 PARALLEL: True
 
 
-NUM_PRIOR_MODE: "design"
-# NUM_PRIOR_MODE: "random"
+NUM_PRIOR_MODE: design
+# NUM_PRIOR_MODE: random
 
 
 
 EXP_ITERATIONS: 24
-ENV_NAME: "Week6_02-v1"
-# ENV_NAME: "Week6_01-v1"
+ENV_NAME: Week6_02-v1
+# ENV_NAME: Week6_01-v1
 ## MPC Specific
 CONTROLLER_ARGS:
   horizon: 10
-  # engine: "scipy"
-  # method: "lbfgs"
-  engine: "jax"
-  method: "adam"
+  # engine: scipy
+  # method: lbfgs
+  engine: jax
+  method: adam
 
 
-GCP_LABEL: "ird_sample_1000_norm_200"
+GCP_LABEL: ird_sample_1000_norm_200
 
 
 ## Designer settigns
-USER_TRUE_W: False
-# DESIGNER_EXP_MODE: "designer_convergence_true_w_prior_tasks_norm_200_beta_50_var_0.25"
-# DESIGNER_EXP_MODE: "designer_convergence_true_w_random_tasks_norm_200_beta_50_var_0.25"
-# DESIGNER_EXP_MODE: "designer_convergence_random_w_random_tasks_norm_200_beta_50_var_0.25"
-# DESIGNER_EXP_MODE: "designer_convergence_true_w_more_features_norm_200_beta_50_var_0.25"
+# DESIGNER_EXP_MODE: designer_convergence_true_w_prior_tasks_norm_200_beta_50_var_0.25
+# DESIGNER_EXP_MODE: designer_convergence_true_w_random_tasks_norm_200_beta_50_var_0.25
+# DESIGNER_EXP_MODE: designer_convergence_random_w_random_tasks_norm_200_beta_50_var_0.25
+# DESIGNER_EXP_MODE: designer_convergence_true_w_more_features_norm_200_beta_50_var_0.25
 
 
 # IRD_PROPOSAL_VARS: [1.0, 0.5, 0.2]
-# IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks_norm_200_beta_50_var_1"
-# IRD_EXP_MODE: "ird_convergence_true_w_random_tasks_norm_200_beta_50_var_1"
-# IRD_EXP_MODE: "ird_convergence_random_w_random_tasks_norm_200_beta_50_var_1"
-# IRD_EXP_MODE: "ird_convergence_true_w_more_features_norm_200_beta_50_var_1"
+# IRD_EXP_MODE: ird_convergence_true_w_prior_tasks_norm_200_beta_50_var_1
+# IRD_EXP_MODE: ird_convergence_true_w_random_tasks_norm_200_beta_50_var_1
+# IRD_EXP_MODE: ird_convergence_random_w_random_tasks_norm_200_beta_50_var_1
+# IRD_EXP_MODE: ird_convergence_true_w_more_features_norm_200_beta_50_var_1
 
 
 
 ## Full sampling
 IRD_ARGS:
-  task_method: "sum"
-  sample_method: "MH"
+  task_method: sum
+  sample_method: MH
   sample_init_args:
     proposal_var: 3
     max_val: 15.0
   proposal_decay: 0.9
-  # sample_method: "HMC"
-  # sample_method: "NUTS"
+  # sample_method: HMC
+  # sample_method: NUTS
   # sample_init_args:
   #   step_size: 0.2
   beta: 50
@@ -66,22 +65,22 @@ IRD_ARGS:
     # num_warmup: 200
     # num_samples: 1000
     num_chains: 3
-  # exp_name: "ird_convergence_random_w_random_tasks_norm_1000_beta_10_var_5"
-  #exp_name: "ird_convergence_true_w_random_tasks_w_norm_1000_beta_5_var_3_week602"
-  # exp_name: "ird_convergence_true_w_random_tasks_w2_beta_1_var_3_week602"
-  # exp_name: "ird_convergence_true_w_random_tasks_w1_beta_80_var_3_week602"
-  # exp_name: "ird_convergence_true_w_random_tasks_w3_beta_20_var_3_week602"
-  # exp_name: "ird_convergence_true_w_random_tasks_w1_beta_5_var_3_week602"
-  #exp_name: "ird_convergence_true_w_random_tasks_w1_beta_50_nodenom_var_3_week602"
-  # exp_name: "ird_convergence_true_w_random_tasks_w1_beta_1000_var_0.3_week602"
-  exp_name: "ird_convergence_true_w_same_tasks_w1_beta_50_var_3_week602"
-  # exp_name: "ird_convergence_true_w_prior_tasks_norm_200_beta_50_var_3"
-  # exp_name: "ird_convergence_true_w_prior_tasks_sum_norm_200_beta_50_var_2"
-  # exp_name: "ird_convergence_true_w_random_tasks_sum_norm_200_beta_50_var_2"
+  # exp_name: ird_convergence_random_w_random_tasks_norm_1000_beta_10_var_5
+  #exp_name: ird_convergence_true_w_random_tasks_w_norm_1000_beta_5_var_3_week602
+  # exp_name: ird_convergence_true_w_random_tasks_w2_beta_1_var_3_week602
+  # exp_name: ird_convergence_true_w_random_tasks_w1_beta_80_var_3_week602
+  # exp_name: ird_convergence_true_w_random_tasks_w3_beta_20_var_3_week602
+  # exp_name: ird_convergence_true_w_random_tasks_w1_beta_5_var_3_week602
+  #exp_name: ird_convergence_true_w_random_tasks_w1_beta_50_nodenom_var_3_week602
+  # exp_name: ird_convergence_true_w_random_tasks_w1_beta_1000_var_0.3_week602
+  exp_name: ird_convergence_true_w_same_tasks_w1_beta_50_var_3_week602
+  # exp_name: ird_convergence_true_w_prior_tasks_norm_200_beta_50_var_3
+  # exp_name: ird_convergence_true_w_prior_tasks_sum_norm_200_beta_50_var_2
+  # exp_name: ird_convergence_true_w_random_tasks_sum_norm_200_beta_50_var_2
 
 DESIGNER_ARGS:
-  task_method: "sum"
-  sample_method: "MH"
+  task_method: sum
+  sample_method: MH
   num_normalizers: 1000
   sample_init_args:
     proposal_var: 0.1 # week6_02
@@ -93,13 +92,12 @@ DESIGNER_ARGS:
     num_warmup: 100
     num_chains: 1
   beta: 20
-  use_true_w: False
-  # exp_name: "designer_convergence_true_w_prior_tasks_norm_200_beta_50_var_2"
-  # exp_name: "designer_convergence_true_w_prior_tasks_mean_norm_200_beta_50_var_2"
-  # exp_name: "designer_convergence_true_w_prior_tasks_sum_norm_200_beta_50_var_2"
-  #exp_name: "designer_convergence_true_w_random_tasks_sum_no_norm_beta_20_var_1_week602"
-  exp_name: "designer_convergence_true_w_random_tasks_w1_beta_20_dprior_2_var_1_week602"
-SAVE_NAME: "200331"
+  # exp_name: designer_convergence_true_w_prior_tasks_norm_200_beta_50_var_2
+  # exp_name: designer_convergence_true_w_prior_tasks_mean_norm_200_beta_50_var_2
+  # exp_name: designer_convergence_true_w_prior_tasks_sum_norm_200_beta_50_var_2
+  #exp_name: designer_convergence_true_w_random_tasks_sum_no_norm_beta_20_var_1_week602
+  exp_name: designer_convergence_true_w_random_tasks_w1_beta_20_dprior_2_var_1_week602
+SAVE_NAME: 200331
 
 
 # # Test sampling
@@ -110,9 +108,9 @@ SAVE_NAME: "200331"
 #     num_warmup: 12
 #     num_samples: 8
 #     num_chains: 3
-#   sample_method: "MH"
-#   # exp_name: "ird_convergence_random_w_random_tasks_norm_200_beta_50_var_1"
-#   exp_name: "ird_convergence_true_w_prior_tasks_norm_200_beta_50_var_1"
+#   sample_method: MH
+#   # exp_name: ird_convergence_random_w_random_tasks_norm_200_beta_50_var_1
+#   exp_name: ird_convergence_true_w_prior_tasks_norm_200_beta_50_var_1
 
 
 # DESIGNER_ARGS:
@@ -124,28 +122,26 @@ SAVE_NAME: "200331"
 #     num_warmup: 14
 #     num_chains: 1
 #   beta: 10
-#   # use_true_w: True
-#   use_true_w: False
 #   true_w: NULL
-#   sample_method: "MH"
-#   exp_name: "designer_convergence_true_w_prior_tasks_norm_200_beta_50_var_1"
+#   sample_method: MH
+#   exp_name: designer_convergence_true_w_prior_tasks_norm_200_beta_50_var_1
 
-# SAVE_NAME: "test"
+# SAVE_NAME: test
 
 
 
 WEIGHT_PARAMS:
   ## Plotting & weight scaling
-  normalized_key: "dist_cars"
+  normalized_key: dist_cars
   max_weights: 15.0
   bins: 200
   feature_keys:
-  - "dist_cars"
-  - "dist_lanes"
-  - "dist_fences"
-  - "dist_objects"
-  - "speed"
-  - "control"
+  - dist_cars
+  - dist_lanes
+  - dist_fences
+  - dist_objects
+  - speed
+  - control
 
 
 
@@ -170,7 +166,7 @@ NUM_EVAL_MAP: 2
 # NUM_DESIGNERS: 8
 # NUM_EVAL_TASKS: 2
 # NUM_EVAL_MAP: 1
-# SAVE_NAME: "test"
-# DESIGNER_EXP_MODE: "designer_convergence_true_w_prior_tasks"
-# # DESIGNER_EXP_MODE: "designer_convergence_true_w_random_tasks"
-# IRD_EXP_MODE: "ird_convergence_true_w_prior_tasks"
+# SAVE_NAME: test
+# DESIGNER_EXP_MODE: designer_convergence_true_w_prior_tasks
+# # DESIGNER_EXP_MODE: designer_convergence_true_w_random_tasks
+# IRD_EXP_MODE: ird_convergence_true_w_prior_tasks

@@ -1,4 +1,5 @@
 from rdb.visualize.plot import *
+from rdb.infer import DictList
 import numpy as np
 
 
@@ -9,10 +10,10 @@ def get_weights(num_feats=5, num_weights=1000):
         for fi in range(num_feats):
             w[str(fi)] = 10 * (np.random.random() - 0.5)
         output.append(w)
-    return output
+    return DictList(output)
 
 
-def test_weights():
+def ttest_weights():
     weights = get_weights()
     plot_weights(
         weights_dicts=weights,
@@ -37,7 +38,7 @@ def ttest_weight_comparisons():
     )
 
 
-def test_weight_correlations():
+def ttest_weight_correlations():
     N = 10
     all_scores = [np.random.random(N), np.random.random(N)]
     all_labels = ["Abc", "Def"]
@@ -46,4 +47,18 @@ def test_weight_correlations():
         all_labels,
         path="data/test/test_plot_correlation.png",
         title="Abc vs Def",
+    )
+
+
+def test_weight_ed():
+    all_weights = [get_weights(), get_weights()]
+    plot_weights_2d(
+        all_weights_dicts=all_weights,
+        all_weights_colors=["b", "g"],
+        key_i="0",
+        key_j="1",
+        all_labels=["a", "b", "c"],
+        path="data/test/test_plot_2d.png",
+        log_scale=False,
+        title="Test plot",
     )

@@ -12,9 +12,9 @@ from rdb.visualize.plot import *
 from rdb.infer.utils import *
 from rdb.exps.utils import *
 from tqdm.auto import tqdm
-from time import time
 import jax.numpy as np
 import numpy as onp
+import time
 import copy
 import yaml
 import os
@@ -34,7 +34,7 @@ class ExperimentInteractiveIRD(object):
         num_eval_tasks=4,
         num_eval=-1,
         eval_env_name=None,
-        eval_method="map",
+        eval_method="uniform",
         eval_seed=None,
         num_propose=4,
         # Active sampling
@@ -55,7 +55,7 @@ class ExperimentInteractiveIRD(object):
         self._eval_server = eval_server
         # Random key & function
         self._rng_key, self._rng_name = None, None
-        self._eval_seed = eval_seed
+        self._eval_seed = random.PRNGKey(eval_seed)
         # Evaluation
         self._num_eval = num_eval
         self._eval_method = eval_method
@@ -75,10 +75,10 @@ class ExperimentInteractiveIRD(object):
         self._exp_name = exp_name
         self._design_root = design_root
         self._test_mode = test_mode
-        self._design_dir = f"{self._design_root}/{self._exp_name}"
         self._save_root = save_root
+        self._design_dir = f"{self._design_root}/{self._exp_name}"
         self._save_dir = f"{self._save_root}/{self._exp_name}"
-        self._last_time = time()
+        self._last_time = time.time()
 
     def update_key(self, rng_key):
         self._rng_name = self._model.rng_name = f"{rng_key[-1]:02d}"
@@ -461,12 +461,12 @@ class ExperimentInteractiveIRD(object):
 
     def _log_time(self, caption=""):
         if self._last_time is not None:
-            secs = time() - self._last_time
+            secs = time.time() - self._last_time
             h = secs // (60 * 60)
             m = (secs - h * 60 * 60) // 60
             s = secs - (h * 60 * 60) - (m * 60)
             print(f">>> Interactive IRD {caption} Time: {int(h)}h {int(m)}m {s:.2f}s")
-        self._last_time = time()
+        self._last_time = time.time()
 
     def _plot_candidate_scores(self, candidate_scores):
         ranking_dir = os.path.join(self._save_root, self._exp_name, "candidates")

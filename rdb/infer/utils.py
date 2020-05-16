@@ -17,7 +17,7 @@ from tqdm.auto import tqdm, trange
 from rdb.exps.utils import Profiler
 from scipy.stats import gaussian_kde
 from numpyro.infer import HMC, MCMC, NUTS, SA
-from rdb.visualize.plot import plot_weights_comparison
+from rdb.visualize.plot import plot_weights_hist, plot_weights_2d
 
 # from rdb.infer.mcmc import MH as RDB_MH
 
@@ -102,7 +102,7 @@ def random_choice(rng_key, items, num, probs=None, replacement=True, complement=
     if not replacement:
         # no replacement
         assert probs is None, "Cannot use probs without replacement"
-        assert num < len(items), f"Only has {len(items)} items"
+        assert num <= len(items), f"Only has {len(items)} items"
         arr = random.uniform(rng_key, shape=(len(items),))
         arr = onp.array(arr)
         idxs = onp.argsort(arr)[:num]
@@ -184,7 +184,7 @@ def collect_trajs(
         us0 (ndarray) initial action
             shape (nbatch, T, udim)
 
-    Output:
+    Output - dict with fields
         actions (ndarray): (nbatch, T, udim)
         costs (ndarray): (nbatch,)
         feats (DictList): nfeats * (nbatch, T)
@@ -265,8 +265,94 @@ def collect_trajs(
                 feats = feats.concat(feats_i[list(valid_i)], axis=0)
                 feats_sum = feats_sum.concat(feats_sum_i[list(valid_i)], axis=0)
                 violations = violations.concat(violations_i[list(valid_i)], axis=0)
+    return dict(
+        actions=actions,
+        costs=costs,
+        feats=feats,
+        feats_sum=feats_sum,
+        violations=violations,
+    )
 
-    return actions, costs, feats, feats_sum, violations
+
+def collect_lowerbound_trajs(
+    weights_arr, states, runner, desc=None, jax=False, max_batch=-1
+):
+    """Utility for collecting features under zero actions.
+
+    Args:
+        states (ndarray): initial state for the task
+            shape (nbatch, xdim)
+
+    Output:
+        costs (ndarray): (nbatch,)
+        feats (DictList): nfeats * (nbatch, T)
+        feats_sum (DictList): nfeats * (nbatch,)
+        violations (DictList): nvios * (nbatch, T)
+
+    """
+    feats = None
+    feats_sum = None
+    violations = None
+    xdim = states.shape[1]
+    nfeats = weights_arr.shape[0]
+    nbatch = weights_arr.shape[1]
+    actions = None
+    assert len(states.shape) == 2 and len(states) == nbatch
+
+    if max_batch == -1:
+        ## xs (T, nbatch, xdim), costs (nbatch)
+        xs, costs, info = runner(
+            states, actions, weights=None, weights_arr=weights_arr, jax=jax
+        )
+        feats, feats_sum, violations = (
+            info["feats"],
+            info["feats_sum"],
+            info["violations"],
+        )
+
+    else:
+        num_iterations = math.ceil(nbatch / max_batch)
+        for it in range(num_iterations):
+            it_begin = it * max_batch
+            it_end = min((it + 1) * max_batch, nbatch)
+            idxs = onp.zeros(nbatch, dtype=bool)
+            idxs[it_begin:it_end] = True
+            valid_i = onp.ones(max_batch, dtype=bool)
+            states_i = states[list(idxs)]
+            weights_arr_i = weights_arr[:, list(idxs)]
+            if it == num_iterations - 1:
+                # Pad state/weight pairs with 0 (valid=False)
+                valid_i[it_end - it_begin :] = False
+                num_pad = num_iterations * max_batch - nbatch
+                states_pad = np.zeros((num_pad, xdim))
+                states_i = np.concatenate([states_i, states_pad], axis=0)
+                weights_pad = np.ones((nfeats, num_pad))
+                weights_arr_i = np.concatenate([weights_arr_i, weights_pad], axis=1)
+            actions_i = None
+            ## xs (T, nbatch, xdim), costs (nbatch)
+            xs_i, costs_i, info_i = runner(
+                states_i, actions_i, weights=None, weights_arr=weights_arr_i, jax=jax
+            )
+            feats_i, feats_sum_i = info_i["feats"], info_i["feats_sum"]
+            violations_i = info_i["violations"]
+            if it == 0:
+                costs = costs_i[list(valid_i)]
+                feats = feats_i[list(valid_i)]
+                feats_sum = feats_sum_i[list(valid_i)]
+                violations = violations_i[list(valid_i)]
+            else:
+                costs = np.concatenate([costs, costs_i[list(valid_i)]], axis=0)
+                feats = feats.concat(feats_i[list(valid_i)], axis=0)
+                feats_sum = feats_sum.concat(feats_sum_i[list(valid_i)], axis=0)
+                violations = violations.concat(violations_i[list(valid_i)], axis=0)
+
+    return dict(
+        actions=None,
+        costs=costs,
+        feats=feats,
+        feats_sum=feats_sum,
+        violations=violations,
+    )
 
 
 # ========================================================
@@ -274,7 +360,7 @@ def collect_trajs(
 # ========================================================
 
 
-def visualize_chains(chains, rates, fig_dir, title, **kwargs):
+def visualize_mcmc_feature(chains, rates, fig_dir, title, **kwargs):
     """Visualize multiple MCMC chains to check convergence.
 
     Args:
@@ -300,6 +386,51 @@ def visualize_chains(chains, rates, fig_dir, title, **kwargs):
         all_labels.append(
             f"Chain({ci}): accept {len(chain_i)} ({(100 * rate_i):.02f}%)"
         )
-    plot_weights_comparison(
+    plot_weights_hist(
         chains, colors, all_labels, path=f"{fig_dir}/{title}.png", title=title, **kwargs
     )
+
+
+def visualize_mcmc_pairs(chains, fig_dir, title, normalized_key="", **kwargs):
+    """Visualize feature pairs of MCMC chains.
+
+    Args:
+        chains (DictList): list of accepted chains
+            shape: nfeats * (nchains, nsamples)
+        normalized_key (str): feature to skip
+        num_plots=10, visualize ~10%, 20%...99% samples
+        fig_dir (str): directory to save the figure
+        title (str): figure name, gets padded with plot index
+
+    """
+    import itertools
+    import matplotlib.cm as cm
+
+    # Copy
+    chains = DictList(chains)
+    del chains[normalized_key]
+    feat_keys = list(chains.keys())
+
+    colors = cm.Spectral(np.linspace(0, 1, len(chains) + 1))
+    os.makedirs(fig_dir, exist_ok=True)
+    all_weights = []
+    all_colors = []
+    all_labels = []
+    # for ci, chain in enumerate(chains):
+    ci = 0
+    chain = chains[0]
+    for i in range(len(feat_keys)):
+        for j in range(i + 1, len(feat_keys)):
+            key_i = feat_keys[i]
+            key_j = feat_keys[j]
+
+            plot_weights_2d(
+                chain,
+                colors[ci],
+                key_i,
+                key_j,
+                all_labels,
+                path=f"{fig_dir}/{title}_{key_i}_vs_{key_j}_chain_{ci}.png",
+                title=f"{title} {key_i} vs {key_j}",
+                **kwargs,
+            )

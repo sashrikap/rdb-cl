@@ -10,7 +10,6 @@ Optional TODO:
 
 """
 
-from time import time
 from functools import partial
 from rdb.optim.utils import *
 from rdb.optim.optimizer import *
@@ -21,6 +20,7 @@ from jax.ops import index_update
 import jax.random as random
 import jax.numpy as np
 import numpy as onp
+import time
 import jax
 
 key = random.PRNGKey(0)
@@ -152,7 +152,7 @@ def build_mpc(
     f_cost,
     horizon=10,
     dt=0.1,
-    replan=True,
+    replan=-1,
     T=None,
     engine="scipy",
     method="lbfgs",
@@ -169,7 +169,7 @@ def build_mpc(
             `f_cost(state, act, weight)`, use weight at runtime
         horizon (int): planning horizon
         dt (float): timestep size
-        replan (bool): bool, plan once or replan at every step
+        replan (int): replan interval, < 0 if no replan
         T (int): trajectory length, if replan=False, must be None
 
     Note:
@@ -230,7 +230,12 @@ def build_mpc(
         test_mode=test_mode,
     )
     runner = Runner(
-        env, roll_forward=t_traj, roll_costs=t_costs, roll_features=t_feats, name=name
+        env,
+        roll_forward=t_traj,
+        roll_costs=t_costs,
+        roll_features=t_feats,
+        name=name,
+        T=T,
     )
 
     return optimizer, runner

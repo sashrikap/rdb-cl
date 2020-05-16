@@ -20,6 +20,7 @@ DESIGNER_CONTROLLER_ARGS:
   engine: jax
   horizon: 10
   method: adam
+  replan: 5
 ENV_NAME: Week6_03-v1
 EVAL_ARGS:
   max_batch: 500
@@ -28,13 +29,12 @@ EVAL_ARGS:
   parallel: true
 EXP_ARGS:
   eval_env_name: Week6_02-v1
-  eval_method: uniform
+  eval_method: mean
   eval_seed: 0
   num_active_sample: 500
   num_active_tasks: 512
   num_eval: 512
   num_eval_tasks: 500
-  num_propose: 4
 EXP_NAME: interactive_proposal_divide_training_03_propose_04
 IRD_ARGS:
   beta: 50
@@ -52,9 +52,10 @@ IRD_CONTROLLER_ARGS:
   engine: jax
   horizon: 10
   method: adam
+  replan: 5
 RANDOM_KEYS:
-- 10
-SAVE_NAME: '200413'
+- 0
+SAVE_NAME: '200501'
 WEIGHT_PARAMS:
   bins: 200
   feature_keys:

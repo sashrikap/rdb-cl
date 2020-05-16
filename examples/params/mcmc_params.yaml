@@ -15,7 +15,6 @@ DESIGNER_ARGS:
     proposal_var: 0.5
   sample_method: MH
   true_w: null
-  use_true_w: false
 ENV_NAME: Week6_01-v1
 EXPERIMENT_ARGS:
   num_eval_map: 2
@@ -42,7 +41,6 @@ PARALLEL: true
 RANDOM_KEYS:
 - 1
 SAVE_NAME: '200219'
-USER_TRUE_W: false
 WEIGHT_PARAMS:
   bins: 200
   feature_keys:

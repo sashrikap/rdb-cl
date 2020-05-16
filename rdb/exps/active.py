@@ -13,6 +13,7 @@ Credits:
 
 import jax.numpy as np
 import numpy as onp
+import time
 import math
 import jax
 from rdb.infer.utils import random_uniform
@@ -24,7 +25,6 @@ from functools import partial
 from tqdm.auto import tqdm
 from rdb.infer import *
 from jax import random
-from time import time
 
 
 class ActiveInfoGain(object):
@@ -71,6 +71,7 @@ class ActiveInfoGain(object):
 
             #  shape (nfeats, nbins)
             next_probs = (which_bins * ratio).sum(axis=1)
+            # Normalize
             next_probs = next_probs / next_probs.sum(axis=1, keepdims=True)
             next_densities = next_probs * (1 / delta)
             ent = 0.0

@@ -165,15 +165,17 @@ class Car(object):
 
 
 class FixSpeedCar(Car):
-    def __init__(self, env, init_state, fix_speed, horizon=1, color="orange"):
+    def __init__(self, env, init_state, fix_speed, horizon=1, color="red"):
         self.env = env
         super().__init__(env, init_state, horizon, color)
         self.fix_speed = fix_speed
         self.dynamics_fn = build_fixspeed_dynamics(fix_speed)
 
     def control(self, dt):
-        self._state += (
-            self.dynamics_fn(self._state, np.zeros((len(self._state), self.udim))) * dt
+        self.state = (
+            self.state
+            + self.dynamics_fn(self._state, np.zeros((len(self._state), self.udim)))
+            * dt
         )
         self._curr_control = onp.zeros((1, 2))
 
@@ -233,7 +235,7 @@ class OptimalControlCar(Car):
 
         self._curr_control = onp.array(u)
         diff = self.dynamics_fn(self._state, u)
-        self._state += self.dynamics_fn(self._state, u) * dt
+        self.state = self.state + self.dynamics_fn(self._state, u) * dt
 
     def copy(self):
         return OptimalControlCar(
@@ -242,7 +244,7 @@ class OptimalControlCar(Car):
 
 
 class UserControlCar(Car):
-    def __init__(self, init_state, color="orange", force=1.0):
+    def __init__(self, init_state, color="red", force=1.0):
         self._force = force
         super().__init__(init_state, horizon=1, color=color)
         pass

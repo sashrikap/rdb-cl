@@ -1,4 +1,4 @@
-# ENV_NAME: "Week6_01-v0"
+# ENV_NAME: Week6_01-v0
 
 
 RANDOM_KEYS: [26]
@@ -9,30 +9,30 @@ NUM_WARMUPS: 1000
 NUM_ACTIVE_TASKS: 36
 PARALLEL: True
 
-# ACTIVE_FNS: ["infogain", "ratiomean", "ratiomin"]
-# EXP_NAME: "active_ird_exp_one"
+# ACTIVE_FNS: [infogain, ratiomean, ratiomin]
+# EXP_NAME: active_ird_exp_one
 # EXP_ITERATIONS: 12
-# ENV_NAME: "Week6_01-v0"
+# ENV_NAME: Week6_01-v0
 # NUM_EVAL_TASKS: -1
 
 
-ACTIVE_FNS: ["infogain", "ratiomean", "ratiomin"]
-EXP_NAME: "active_ird_exp_two"
+ACTIVE_FNS: [infogain, ratiomean, ratiomin]
+EXP_NAME: active_ird_exp_two
 EXP_ITERATIONS: 12
-ENV_NAME: "Week6_02-v0"
+ENV_NAME: Week6_02-v0
 NUM_EVAL_TASKS: 4096
 
-# ACTIVE_FNS: ["infogain", "ratiomean", "ratiomin"]
-# EXP_NAME: "active_ird_exp_three"
+# ACTIVE_FNS: [infogain, ratiomean, ratiomin]
+# EXP_NAME: active_ird_exp_three
 # EXP_ITERATIONS: 12
-# ENV_NAME: "Week6_03-v0"
+# ENV_NAME: Week6_03-v0
 # NUM_EVAL_TASKS: 4096
 
 
-# ACTIVE_FNS: ["random"]
-# EXP_NAME: "random_ird_exp_mid"
+# ACTIVE_FNS: [random]
+# EXP_NAME: random_ird_exp_mid
 # EXP_ITERATIONS: 64
-# ENV_NAME: "Week6_01-v0"
+# ENV_NAME: Week6_01-v0
 # NUM_EVAL_TASKS: -1
 
 
@@ -45,7 +45,7 @@ USER_TRUE_W: False
 # NUM_SAMPLES: 1000
 # NUM_ACTIVE_SAMPLES: 500
 # NUM_EVAL_MAP: 4
-# SAVE_NAME: "200117"
+# SAVE_NAME: 200117
 
 
 ## Testing
@@ -54,7 +54,7 @@ NUM_SAMPLES: 10
 NUM_ACTIVE_SAMPLES: 5
 NUM_EVAL_TASKS: 2
 NUM_EVAL_MAP: 1
-SAVE_NAME: "test"
+SAVE_NAME: test
 
 
 NUM_EVAL_WORKERS: 1
@@ -75,14 +75,14 @@ HORIZON: 10
 
 
 ## Task and weight specific
-NORMALIZED_KEY: "dist_cars"
+NORMALIZED_KEY: dist_cars
 FEATURE_KEYS:
-- "dist_cars"
-- "dist_lanes"
-- "dist_fences"
-- "dist_objects"
-- "speed"
-- "control"
+- dist_cars
+- dist_lanes
+- dist_fences
+- dist_objects
+- speed
+- control
 
 TRUE_W:
     dist_cars: 1.0

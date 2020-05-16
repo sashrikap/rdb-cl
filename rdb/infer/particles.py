@@ -85,11 +85,16 @@ class Particles(object):
         self._expanded_name = f"weights_seed_{self._rng_name}_{self._save_name}"
 
     def build_cache(self):
+        self._cache_actions = {}
         self._cache_feats = {}
         self._cache_costs = {}
         self._cache_feats_sum = {}
         self._cache_violations = {}
-        self._cache_actions = {}
+        ## Lowerbound
+        self._cache_feats_lb = {}
+        self._cache_costs_lb = {}
+        self._cache_feats_sum_lb = {}
+        self._cache_violations_lb = {}
 
     def _merge_dict(self, dicta, dictb):
         """Used when merging with another Particles. Keep common key, value pairs."""
@@ -150,6 +155,17 @@ class Particles(object):
             self._cache_violations, ps._cache_violations
         )
         new_ps._cache_actions = self._merge_dict(self._cache_actions, ps._cache_actions)
+
+        ## Lb cache
+        new_ps._cache_costs_lb = self._merge_dict(
+            self._cache_costs_lb, ps._cache_costs_lb
+        )
+        new_ps._cache_feats_sum_lb = self._merge_dict(
+            self._cache_feats_sum_lb, ps._cache_feats_sum_lb
+        )
+        new_ps._cache_violations_lb = self._merge_dict(
+            self._cache_violations_lb, ps._cache_violations_lb
+        )
         return new_ps
 
     def tile(self, num):
@@ -162,6 +178,16 @@ class Particles(object):
                 num, axis=0
             )
             new_ps._cache_costs[key] = onp.tile(self._cache_costs[key], num)
+            ## Lb cache
+            new_ps._cache_feats_lb[key] = self._cache_feats_lb[key].tile(num, axis=0)
+            new_ps._cache_feats_sum_lb[key] = self._cache_feats_sum_lb[key].tile(
+                num, axis=0
+            )
+            new_ps._cache_violations_lb[key] = self._cache_violations_lb[key].tile(
+                num, axis=0
+            )
+            new_ps._cache_costs_lb[key] = onp.tile(self._cache_costs_lb[key], num)
+            ## Actions
             acs_shape = [1] * len(self._cache_actions[key].shape)
             acs_shape[0] = num
             new_ps._cache_actions[key] = onp.tile(self._cache_actions[key], acs_shape)
@@ -179,6 +205,18 @@ class Particles(object):
                 num, axis=0
             )
             new_ps._cache_costs[key] = onp.repeat(self._cache_costs[key], num, axis=0)
+            ## Lb cache
+            new_ps._cache_feats_lb[key] = self._cache_feats_lb[key].repeat(num, axis=0)
+            new_ps._cache_feats_sum_lb[key] = self._cache_feats_sum_lb[key].repeat(
+                num, axis=0
+            )
+            new_ps._cache_violations_lb[key] = self._cache_violations_lb[key].repeat(
+                num, axis=0
+            )
+            new_ps._cache_costs_lb[key] = onp.repeat(
+                self._cache_costs_lb[key], num, axis=0
+            )
+            ## Actions
             new_ps._cache_actions[key] = onp.repeat(
                 self._cache_actions[key], num, axis=0
             )
@@ -241,11 +279,12 @@ class Particles(object):
             for key, val in ws.items():
                 print(f"  {key}: {val:.3f}")
 
-    def get_features(self, tasks, desc=None):
+    def get_features(self, tasks, lower=False, desc=None):
         """Compute expected features for sample weights on task.
 
         Return:
             features (DictList): nfeats * (ntasks, nparticles, T)
+            lower (bool): return features for lowerbound trajectories
 
         Note:
             * Computing feature is costly. Caches features under task_name.
@@ -254,54 +293,71 @@ class Particles(object):
         self.compute_tasks(tasks, desc=desc)
         all_feats = []
         for task in tasks:
+            task_name = self.get_task_name(task)
+            feats = self._cache_feats[task_name]
             #  shape nfeats * (nparticles, T)
-            feats = self._cache_feats[self.get_task_name(task)]
             all_feats.append(feats)
         return DictList(all_feats)
 
-    def get_features_sum(self, tasks, desc=None):
+    def get_features_sum(self, tasks, lower=False, desc=None):
         """Compute expected feature sums for sample weights on task.
 
         Return:
             feats_sum (DictList): nfeats * (ntasks, nparticles)
+            lower (bool): return feats sums for lowerbound trajectories
 
         """
         self.compute_tasks(tasks, desc=desc)
         all_feats_sum = []
         for task in tasks:
+            task_name = self.get_task_name(task)
+            if lower:
+                feats_sum = self._cache_feats_sum_lb[task_name]
+            else:
+                feats_sum = self._cache_feats_sum[task_name]
             #  shape nfeats * (nparticles)
-            feats_sum = self._cache_feats_sum[self.get_task_name(task)]
             all_feats_sum.append(feats_sum)
         return DictList(all_feats_sum)
 
-    def get_costs(self, tasks, desc=None):
+    def get_costs(self, tasks, lower=False, desc=None):
         """Compute expected feature sums for sample weights on task.
 
         Return:
-            feats_sum (DictList): (ntasks, nfeats, nparticles)
+            costs (ndarray): (ntasks, nparticles)
+            lower (bool): return costs for lowerbound trajectories
 
         """
         self.compute_tasks(tasks, desc=desc)
         all_costs = []
         for task in tasks:
+            task_name = self.get_task_name(task)
+            if lower:
+                all_costs.append(self._cache_costs_lb[task_name])
+            else:
+                all_costs.append(self._cache_costs[task_name])
             #  shape nfeats * (nparticles)
-            all_costs.append(self._cache_costs[self.get_task_name(task)])
-        return DictList(all_costs)
+        return np.array(all_costs)
 
-    def get_violations(self, tasks, desc=None):
+    def get_violations(self, tasks, lower=False, desc=None):
         """Compute violations sum (cached) for sample weights on task.
 
         Return:
             violations (DictList): nvios * (ntasks, nparticles)
+            lower (bool): return violations for lowerbound trajectories
 
         """
         self.compute_tasks(tasks, desc=desc)
         all_vios = []
         for task in tasks:
-            #  shape nvios * (nparticles, T)
-            violations = self._cache_violations[self.get_task_name(task)]
-            #  shape nvios * (nparticles)
-            vios_sum = violations.sum(axis=1)
+            task_name = self.get_task_name(task)
+            if lower:
+                #  shape nvios * (nparticles, T)
+                violations = self._cache_violations_lb[task_name]
+                #  shape nvios * (nparticles)
+                vios_sum = violations.sum(axis=1)
+            else:
+                violations = self._cache_violations[task_name]
+                vios_sum = violations.sum(axis=1)
             all_vios.append(vios_sum)
         return DictList(all_vios)
 
@@ -354,7 +410,7 @@ class Particles(object):
             if us0 is not None:
                 batch_us0 = us0.reshape((-1, T, udim))
             batch_weights_arr = batch_weights.prepare(feats_keys).numpy_array()
-            batch_acs, batch_costs, batch_feats, batch_feats_sum, batch_vios = collect_trajs(
+            batch_trajs = collect_trajs(
                 batch_weights_arr,
                 batch_states,
                 self._controller,
@@ -364,20 +420,33 @@ class Particles(object):
                 jax=jax,
                 max_batch=max_batch,
             )
+            lower_trajs = collect_lowerbound_trajs(
+                batch_weights_arr,
+                batch_states,
+                self._runner,
+                jax=jax,
+                max_batch=max_batch,
+            )
             #  shape (ntasks, nweights, T, acs_dim)
-            all_actions = batch_acs.reshape((ntasks, nweights, T, udim))
+            all_actions = batch_trajs["actions"].reshape((ntasks, nweights, T, udim))
             #  shape (ntasks, nweights)
-            all_costs = batch_costs.reshape((ntasks, nweights))
+            all_costs = batch_trajs["costs"].reshape((ntasks, nweights))
+            low_costs = lower_trajs["costs"].reshape((ntasks, nweights))
             #  shape (ntasks, nweights, T)
-            all_feats = batch_feats.reshape((ntasks, nweights, T))
+            all_feats = batch_trajs["feats"].reshape((ntasks, nweights, T))
+            low_feats = lower_trajs["feats"].reshape((ntasks, nweights, T))
             #  shape (ntasks, nweights)
-            all_feats_sum = batch_feats_sum.reshape((ntasks, nweights))
+            all_feats_sum = batch_trajs["feats_sum"].reshape((ntasks, nweights))
+            low_feats_sum = lower_trajs["feats_sum"].reshape((ntasks, nweights))
             #  shape (ntasks, nweights, T)
-            all_vios = batch_vios.reshape((ntasks, nweights, T))
+            all_vios = batch_trajs["violations"].reshape((ntasks, nweights, T))
+            low_vios = lower_trajs["violations"].reshape((ntasks, nweights, T))
         else:
             ## Rollout (nweights,) iteratively for each task in (ntasks,)
             all_actions, all_vios, all_costs = [], [], []
+            low_actions, low_vios, low_costs = [], [], []
             all_feats, all_feats_sum = [], []
+            low_feats, low_feats_sum = [], []
             batch_us0 = None
             if us0 is not None:
                 #  shape (ntasks * nweights, 1, T, udim)
@@ -393,7 +462,7 @@ class Particles(object):
                     #  shape (nweights, task_dim)
                     batch_states = np.tile(state_i, (nweights, 1))
                     us0_i = batch_us0[ti]
-                    acs, costs, feats, feats_sum, vios = collect_trajs(
+                    trajs = collect_trajs(
                         weights_arr,
                         batch_states,
                         self._controller,
@@ -402,17 +471,32 @@ class Particles(object):
                         jax=jax,
                         max_batch=max_batch,
                     )
-                    all_actions.append(acs)
-                    all_feats.append(feats)
-                    all_costs.append(costs)
-                    all_feats_sum.append(feats_sum)
-                    all_vios.append(vios)
+                    low_trajs = collect_lowerbound_trajs(
+                        weights_arr,
+                        batch_states,
+                        self._runner,
+                        jax=jax,
+                        max_batch=max_batch,
+                    )
+                    all_actions.append(trajs["actions"])
+                    all_vios.append(trajs["violations"])
+                    all_feats.append(trajs["feats"])
+                    all_costs.append(trajs["costs"])
+                    all_feats_sum.append(trajs["feats_sum"])
+                    low_vios.append(low_trajs["violations"])
+                    low_feats.append(low_trajs["feats"])
+                    low_costs.append(low_trajs["costs"])
+                    low_feats_sum.append(low_trajs["feats_sum"])
                 else:
                     all_actions.append(self._cache_actions[name_i])
+                    all_vios.append(self._cache_violations[name_i])
                     all_feats.append(self._cache_feats[name_i])
                     all_costs.append(self._cache_costs[name_i])
                     all_feats_sum.append(self._cache_feats_sum[name_i])
-                    all_vios.append(self._cache_violations[name_i])
+                    low_vios.append(self._cache_violations_lb[name_i])
+                    low_feats.append(self._cache_feats_lb[name_i])
+                    low_costs.append(self._cache_costs_lb[name_i])
+                    low_feats_sum.append(self._cache_feats_sum_lb[name_i])
 
         ## Cache
         for i, task in enumerate(tasks):
@@ -422,6 +506,10 @@ class Particles(object):
             self._cache_costs[task_name] = all_costs[i]
             self._cache_feats_sum[task_name] = all_feats_sum[i]
             self._cache_violations[task_name] = all_vios[i]
+            self._cache_feats_lb[task_name] = low_feats[i]
+            self._cache_costs_lb[task_name] = low_costs[i]
+            self._cache_feats_sum_lb[task_name] = low_feats_sum[i]
+            self._cache_violations_lb[task_name] = low_vios[i]
 
     def __getitem__(self, key):
         """Indexing by key or by index.
@@ -438,11 +526,17 @@ class Particles(object):
                 new_ws = [new_ws]
             new_ws = DictList(new_ws)
             new_ps = self._clone(new_ws)
-            new_ps._cache_feats = self._index_dict(self._cache_feats, key)
-            new_ps._cache_costs = self._index_dict(self._cache_costs, key)
-            new_ps._cache_feats_sum = self._index_dict(self._cache_feats_sum, key)
-            new_ps._cache_violations = self._index_dict(self._cache_violations, key)
             new_ps._cache_actions = self._index_dict(self._cache_actions, key)
+            new_ps._cache_feats = self._index_dict(self._cache_feats, key)
+            new_ps._cache_feats_lb = self._index_dict(self._cache_feats_lb, key)
+            new_ps._cache_costs = self._index_dict(self._cache_costs, key)
+            new_ps._cache_costs_lb = self._index_dict(self._cache_costs_lb, key)
+            new_ps._cache_feats_sum = self._index_dict(self._cache_feats_sum, key)
+            new_ps._cache_feats_sum_lb = self._index_dict(self._cache_feats_sum_lb, key)
+            new_ps._cache_violations = self._index_dict(self._cache_violations, key)
+            new_ps._cache_violations_lb = self._index_dict(
+                self._cache_violations_lb, key
+            )
             return new_ps
 
         else:
@@ -478,10 +572,15 @@ class Particles(object):
             out[task_name] = dict(
                 task=task,
                 task_name=task_name,
-                actions=self._cache_actions[task_name],
-                feats=self._cache_feats[task_name],
-                feats_sum=self._cache_feats_sum[task_name],
-                violations=self._cache_violations[task_name],
+                cache_actions=self._cache_actions[task_name],
+                cache_feats=self._cache_feats[task_name],
+                cache_feats_lb=self._cache_feats_lb[task_name],
+                cache_feats_sum=self._cache_feats_sum[task_name],
+                cache_feats_sum_lb=self._cache_feats_sum_lb[task_name],
+                cache_costs=self._cache_costs[task_name],
+                cache_costs_lb=self._cache_costs_lb[task_name],
+                cache_violations=self._cache_violations[task_name],
+                cache_violations_lb=self._cache_violations_lb[task_name],
             )
         return out
 
@@ -497,10 +596,16 @@ class Particles(object):
             task_name = self.get_task_name(task)
             assert task_name in data
             if task_name not in self.cached_names:
-                self._cache_actions[task_name] = data[task_name]["actions"]
-                self._cache_feats[task_name] = data[task_name]["feats"]
-                self._cache_feats_sum[task_name] = data[task_name]["feats_sum"]
-                self._cache_violations[task_name] = data[task_name]["violations"]
+                dt = data[task_name]
+                self._cache_actions[task_name] = dt["cache_actions"]
+                self._cache_feats[task_name] = dt["cache_feats"]
+                self._cache_feats_lb[task_name] = dt["cache_feats_lb"]
+                self._cache_feats_sum[task_name] = dt["cache_feats_sum"]
+                self._cache_feats_sum_lb[task_name] = dt["cache_feats_sum_lb"]
+                self._cache_costs[task_name] = dt["cache_costs"]
+                self._cache_costs_lb[task_name] = dt["cache_costs_lb"]
+                self._cache_violations[task_name] = dt["cache_violations"]
+                self._cache_violations_lb[task_name] = dt["cache_violations_lb"]
 
     def merge_bulk_tasks(self, tasks, bulk_data):
         """Merge dumped data from distributed bulk data.
@@ -510,59 +615,93 @@ class Particles(object):
             data (dict): {"actions": (ntasks, nweights, T, task_dim), ...}
 
         """
-        assert len(tasks) == bulk_data["actions"].shape[0]
-        assert len(self.weights) == bulk_data["actions"].shape[1]
+        assert len(tasks) == bulk_data["cache_actions"].shape[0]
+        assert len(self.weights) == bulk_data["cache_actions"].shape[1]
         for ti, task in enumerate(tasks):
             task_name = self.get_task_name(task)
             if task_name not in self.cached_names:
-                self._cache_actions[task_name] = bulk_data["actions"][ti]
-                self._cache_feats[task_name] = bulk_data["feats"][ti]
-                self._cache_feats_sum[task_name] = bulk_data["feats_sum"][ti]
-                self._cache_violations[task_name] = bulk_data["violations"][ti]
+                self._cache_actions[task_name] = bulk_data["cache_actions"][ti]
+                self._cache_costs[task_name] = bulk_data["cache_costs"][ti]
+                self._cache_feats[task_name] = bulk_data["cache_feats"][ti]
+                self._cache_feats_sum[task_name] = bulk_data["cache_feats_sum"][ti]
+                self._cache_violations[task_name] = bulk_data["cache_violations"][ti]
+                self._cache_costs_lb[task_name] = bulk_data["cache_costs_lb"][ti]
+                self._cache_feats_lb[task_name] = bulk_data["cache_feats_lb"][ti]
+                self._cache_feats_sum_lb[task_name] = bulk_data["cache_feats_sum_lb"][
+                    ti
+                ]
+                self._cache_violations_lb[task_name] = bulk_data["cache_violations_lb"][
+                    ti
+                ]
 
-    def compare_with(self, task, target, verbose=False):
-        """Compare with a set of target weights (usually true weights). Returns log
-        prob ratio of reward, measured by target w.
+    def compare_with(self, task, target, relative=False):
+        """Compare with a set of target weights (usually true weights).
+
+        Returns:
+            (1) reward (if target w = None)
+            (2) regret measured by target w (if target w specified)
+            (3) relative regret measured by target w (if target w specified, relative=True)
+                relative = (rew - rew_{u_0}) / (rew_{u_target} - rew_{u_0}), where
+                u_0 is all zero action, u_target is optimal action under target w
 
         Args:
             target (Particles): target to compare against; if None, no target
 
-        Output:
-            diff_rews (ndarray): (nbatch,)
-            diff_vios_arr (ndarray): (nbatch, )
-            diff_vios (ndarray): (nbatch,)
+        Output - dict with following keys:
+            rews (ndarray): (nbatch,)
+            vios (ndarray): (nbatch,)
+            vios_by_name (DictList): (nvios, nbatch)
 
         Requires:
             * compute_features
 
         """
+        eps = 1e-8
         nbatch = len(self.weights)
-        #  shape (nfeats, nbatch, )
+        #  shape nfeats * (nbatch, )
         this_fsums = self.get_features_sum([task])[0]
-        #  shape (nvios, nbatch)
+        #  shape nvios * (nbatch,)
         this_vios = self.get_violations([task])[0]
         if target is not None:
-            #  shape (nfeats, nbatch, )
+            #  shape nfeats * (nbatch, )
             target_ws = target.weights.tile(nbatch, axis=0)
             target_ws = target_ws.normalize_by_key(self._normalized_key)
             assert len(target.weights) == 1, "Can only compare with 1 target weights."
             that_fsums = target.get_features_sum([task])[0]
             that_vios = target.get_violations([task])[0]
+            ## Compute absolute difference
             diff_costs = target_ws * (this_fsums - that_fsums)
-            diff_vios = this_vios - that_vios
+            diff_vios_by_name = this_vios - that_vios
             #  shape (nbatch,)
             diff_rews = -1 * diff_costs.onp_array().mean(axis=0)
-            diff_vios_arr = diff_vios.onp_array().sum(axis=0)
-            if verbose:
-                print(
-                    f"Diff rew {len(diff_rews)} items: mean {diff_rews.mean():.3f} std {diff_rews.std():.3f} max {diff_rews.max():.3f} min {diff_rews.min():.3f}"
-                )
-            return diff_rews, diff_vios_arr, diff_vios
+            diff_vios_sum = diff_vios_by_name.onp_array().sum(axis=0)
+
+            ## Compute relative difference
+            lower_fsums = self.get_features_sum([task], lower=True)[0]
+            lower_vios = self.get_violations([task], lower=True)[0]
+            max_diff_costs = target_ws * (that_fsums - lower_fsums)
+            max_diff_rews = -1 * max_diff_costs.onp_array().mean(axis=0)
+            max_diff_vios_by_name = that_vios - lower_vios
+            max_diff_vios_sum = max_diff_vios_by_name.onp_array().sum(axis=0)
+
+            return dict(
+                rews=diff_rews,
+                vios=diff_vios_sum,
+                vios_by_name=diff_vios_by_name,
+                rews_relative=diff_rews / (max_diff_rews + eps),
+                vios_relative=diff_vios_sum / (max_diff_vios_sum + eps),
+            )
         else:
             this_costs = np.zeros(nbatch)
             this_rews = np.zeros(nbatch)
-            this_vios_arr = this_vios.onp_array().sum(axis=0)
-            return this_rews, this_vios_arr, this_vios
+            this_vios_sum = this_vios.onp_array().sum(axis=0)
+            return dict(
+                rews=this_rews,
+                vios=this_vios_sum,
+                vios_by_name=this_vios,
+                rews_relative=0.0,
+                vios_relative=0.0,
+            )
 
     def resample(self, probs):
         """Resample from particles using list of new probs. Used for particle filter update."""
@@ -584,7 +723,6 @@ class Particles(object):
         bins,
         max_weights,
         hist_probs=None,
-        verbose=True,
         method="histogram",
         log_scale=False,
         **kwargs,
@@ -822,9 +960,9 @@ class Particles(object):
         diff_rews, diff_vios = [], []
         for task in tasks:
             # (nbatch,)
-            diff_rew, diff_vio, _ = self.compare_with(task, target)
-            diff_rews.append(diff_rew)
-            diff_vios.append(diff_vio)
+            comparisons = self.compare_with(task, target)
+            diff_rews.append(comparisons["rews"])
+            diff_vios.append(comparisons["vios"])
         # Dims: (n_tasks, nbatch,) -> (n_tasks,)
         diff_rews = onp.array(diff_rews).mean(axis=1)
         diff_vios = onp.array(diff_vios).mean(axis=1)

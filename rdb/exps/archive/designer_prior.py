@@ -11,9 +11,9 @@ from rdb.infer.particles import Particles
 from rdb.exps.utils import Profiler
 from numpyro.handlers import seed
 from tqdm.auto import tqdm
-from time import time
 import jax.numpy as np
 import numpy as onp
+import time
 import copy
 import os
 

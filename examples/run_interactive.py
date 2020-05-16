@@ -40,12 +40,7 @@ def main():
 
     def ird_controller_fn(env, name=""):
         controller, runner = build_mpc(
-            env,
-            env.main_car.cost_runtime,
-            dt=env.dt,
-            replan=False,
-            name=name,
-            **IRD_CONTROLLER_ARGS,
+            env, env.main_car.cost_runtime, dt=env.dt, name=name, **IRD_CONTROLLER_ARGS
         )
         return controller, runner
 
@@ -54,7 +49,6 @@ def main():
             env,
             env.main_car.cost_runtime,
             dt=env.dt,
-            replan=False,
             name=name,
             **DESIGNER_CONTROLLER_ARGS,
         )
@@ -127,7 +121,6 @@ def main():
         if key not in ACTIVE_ARGS["active_fns"]:
             del active_fns[key]
 
-    EXP_ARGS["eval_seed"] = random.PRNGKey(EXP_ARGS["eval_seed"])
     if ONLY_EVALUATE:
         exp_mode = "evaluate"
     elif ONLY_VISUALIZE:
@@ -159,8 +152,14 @@ def main():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process arguments.")
     parser.add_argument("--GCP_MODE", action="store_true")
-    parser.add_argument("--ONLY_EVALUATE", action="store_true")
-    parser.add_argument("--ONLY_VISUALIZE", action="store_true")
+    parser.add_argument(
+        "--ONLY_EVALUATE", action="store_true", help="Evaluate user design (proposed)"
+    )
+    parser.add_argument(
+        "--ONLY_VISUALIZE",
+        action="store_true",
+        help="Visualize user design (training) on proposed tasks",
+    )
     args = parser.parse_args()
 
     GCP_MODE = args.GCP_MODE
@@ -180,7 +179,5 @@ if __name__ == "__main__":
     else:
         PARAMS = load_params("/dar_payload/rdb/examples/params/interactive_params.yaml")
         locals().update(PARAMS)
-    if not GCP_MODE:
-        NUM_EVAL_WORKERS = 4
 
     main()

@@ -58,6 +58,7 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
         main_car.max_throttle = max_throttle
         main_car.max_steer = max_steer
         main_car.max_brake = max_brake
+        main_car.max_speed = max_speed
         # Define objects
         objs = []
         for state in obstacle_states:

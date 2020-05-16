@@ -27,6 +27,7 @@ class Runner(object):
         env (object): environment
         roll_forward (fn): return (T, nbatch, xdim)
         roll_costs (fn): return (T, nbatch, 1)
+        T (int): trajectory length
 
     Examples:
         >>> xs = roll_forward(x0, us)
@@ -35,11 +36,12 @@ class Runner(object):
     """
 
     def __init__(
-        self, env, roll_forward=None, roll_costs=None, roll_features=None, name=""
+        self, env, roll_forward=None, roll_costs=None, roll_features=None, name="", T=1
     ):
         self._env = env
         self._dt = env.dt
         self._name = name
+        self._T = T
         # Dynamics function
         self._roll_forward = roll_forward
         if roll_forward is None:
@@ -254,11 +256,17 @@ class Runner(object):
         assert self._roll_costs is not None, "Cost function improperly defined"
 
         if weights_arr is None:
+            assert weights is not None, "Must provide weights or weights_arr"
             weights_arr = (
                 DictList(weights, expand_dims=not batch)
                 .prepare(self._env.features_keys)
                 .numpy_array()
             )
+        nbatch = x0.shape[0]
+        if actions is None:
+            udim = self._env.udim
+            actions = np.zeros((nbatch, self._T, udim))
+
         # Track JIT recompile
         t_compile = None
         a_shape = actions.shape
@@ -266,14 +274,14 @@ class Runner(object):
             print(f"JIT - Runner <{self._name}>")
             print(f"JIT - Runner first compile: ac {a_shape}")
             self._a_shape = a_shape
-            t_compile = time()
+            t_compile = time.time()
         elif actions.shape != self._a_shape:
             print(f"JIT - Runner <{self._name}>")
             print(
                 f"JIT - Runner recompile: ac {actions.shape}, previously {self._a_shape}"
             )
             self._a_shape = a_shape
-            t_compile = time()
+            t_compile = time.time()
 
         # Rollout
         #  shape (nbatch, T, udim) -> (T, nbatch, udim)
@@ -320,7 +328,7 @@ class Runner(object):
         # Track JIT recompile
         if t_compile is not None:
             print(
-                f"JIT - Runner finish compile in {time() - t_compile:.3f}s: ac {self._a_shape}"
+                f"JIT - Runner finish compile in {time.time() - t_compile:.3f}s: ac {self._a_shape}"
             )
 
         # DictList conveniently deals with list of dicts
