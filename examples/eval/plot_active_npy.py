@@ -38,10 +38,14 @@ colors = {
 }
 
 
-def plot_perform(data_dir, exp_name, data):
+def plot_perform(data_dir, exp_name, data, relative=False):
     sns.set_palette("husl")
     for i, (method, mdict) in enumerate(data.items()):
-        perf = onp.array(mdict["perform"])
+        if relative:
+            perf = -1 * onp.array(mdict["rel_perform"])
+            # perf = onp.array(mdict["rel_perform"])
+        else:
+            perf = onp.array(mdict["perform"])
         sns.tsplot(
             time=range(1, 1 + len(perf[0])),
             color=colors[method],
@@ -52,7 +56,8 @@ def plot_perform(data_dir, exp_name, data):
     plt.legend(loc="lower right")
     plt.xlabel("Iteration")
     plt.ylabel("Performance Gap")
-    plt.title("IRD Posterior vs True_w Performance")
+    # import pdb; pdb.set_trace()
+    plt.title(f"{'Relative ' if relative else ''}IRD Posterior vs True_w Performance")
     plt.savefig(os.path.join(data_dir, exp_name, "performance.png"))
     plt.tight_layout()
     plt.show()
@@ -166,51 +171,63 @@ def plot_data():
             if method not in data.keys():
                 data[method] = {
                     "perform": [],
+                    "rel_perform": [],
                     "log_prob_true": [],
                     "violation": [],
+                    "rel_violation": [],
                     "feats_violation": [],
                 }
             data[method]["perform"].append([])
+            data[method]["rel_perform"].append([])
             data[method]["log_prob_true"].append([])
             data[method]["violation"].append([])
+            data[method]["rel_violation"].append([])
             data[method]["feats_violation"].append([])
             for h in hist:
                 data[method]["perform"][-1].append(h["perform"])
+                data[method]["rel_perform"][-1].append(h["rel_perform"])
                 data[method]["violation"][-1].append(h["violation"])
+                data[method]["rel_violation"][-1].append(h["rel_violation"])
                 data[method]["log_prob_true"][-1].append(h["log_prob_true"])
                 data[method]["feats_violation"][-1].append(h["feats_violation"])
     for method, mdict in data.items():
         if "random" in method:
             mdict["perform"] = cleanup(mdict["perform"], MAX_RANDOM_LEN)
+            mdict["rel_perform"] = cleanup(mdict["rel_perform"], MAX_RANDOM_LEN)
             mdict["violation"] = cleanup(mdict["violation"], MAX_RANDOM_LEN)
+            mdict["rel_violation"] = cleanup(mdict["rel_violation"], MAX_RANDOM_LEN)
             mdict["log_prob_true"] = cleanup(mdict["log_prob_true"], MAX_RANDOM_LEN)
             mdict["feats_violation"] = cleanup(mdict["feats_violation"], MAX_RANDOM_LEN)
         else:
             mdict["perform"] = cleanup(mdict["perform"], MAX_LEN)
+            mdict["rel_perform"] = cleanup(mdict["rel_perform"], MAX_LEN)
             mdict["violation"] = cleanup(mdict["violation"], MAX_LEN)
+            mdict["rel_violation"] = cleanup(mdict["rel_violation"], MAX_LEN)
             mdict["log_prob_true"] = cleanup(mdict["log_prob_true"], MAX_LEN)
             mdict["feats_violation"] = cleanup(mdict["feats_violation"], MAX_LEN)
         print(method, mdict["perform"].shape)
 
-    plot_feats_violate(exp_dir, exp_name, data)
-    plot_perform(exp_dir, exp_name, data)
-    plot_violate(exp_dir, exp_name, data)
-    plot_log_prob(exp_dir, exp_name, data)
+    # plot_feats_violate(exp_dir, exp_name, data, itr=5)
+    plot_perform(exp_dir, exp_name, data, relative=True)
+    # plot_perform(exp_dir, exp_name, data, relative=False)
+    # plot_violate(exp_dir, exp_name, data)
+    # plot_log_prob(exp_dir, exp_name, data)
 
 
 if __name__ == "__main__":
     N = -1
     use_seeds = list(range(30))
     not_seeds = []
-    MAX_LEN = 15
-    MAX_RANDOM_LEN = 15
+    MAX_LEN = 6
+    MAX_RANDOM_LEN = 6
     PADDING = 0
 
     use_seeds = [str(random.PRNGKey(si)) for si in use_seeds]
     not_seeds = [str(random.PRNGKey(si)) for si in not_seeds]
     not_methods = []
 
-    exp_dir = "data/200406"
+    exp_dir = "data/200516"
     # exp_name = "active_ird_exp_ird_beta_50_true_w_map_sum_irdvar_3_adam200"
-    exp_name = "active_ird_ibeta_50_true_w1_eval_unif_128_ratio_seed_0_603_adam"
+    # exp_name = "active_ird_ibeta_50_true_w1_eval_mean_128_seed_0_603_adam"
+    exp_name = "active_ird_ibeta_50_true_w1_eval_mean_128_seed_0_603_adam"
     plot_data()

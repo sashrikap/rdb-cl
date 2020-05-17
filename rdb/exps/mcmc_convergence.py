@@ -269,7 +269,7 @@ class ExperimentMCMC(object):
         new_tasks = random_choice(self._get_rng_task(), all_tasks, 1)
         ## Simulate
         # for n_prior in range(len(self._all_designer_prior_tasks)):
-        for n_prior in range(5, 6):
+        for n_prior in range(2, 6):
 
             self._log_time(f"Designer Prior {n_prior} Begin")
             print(f"Experiment mode ({self._rng_name}) {exp_mode}")
@@ -291,9 +291,7 @@ class ExperimentMCMC(object):
                 "num_samples"
             ]
             save_name = f"designer_sample_{num_samples:04d}_prior_{n_prior:02d}"
-            samples = self._designer.simulate(new_tasks, save_name=save_name)
-            samples.save()
-            obs = samples.subsample(1)
+            obs = self._designer.simulate(new_tasks, save_name=save_name)
 
             ## Visualize performance
             # obs.visualize_comparisons(

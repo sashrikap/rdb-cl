@@ -41,6 +41,8 @@ class Designer(object):
         num_normalizers,
         proposal_decay=1.0,
         ## Sampling
+        design_mode="independent",
+        select_mode="mean",
         task_method="sum",
         sample_method="MH",
         sample_init_args={},
@@ -70,7 +72,13 @@ class Designer(object):
         self._norm_prior = None
         self._proposal_decay = proposal_decay
 
-        # Sampling Prior and kernel
+        ## Designer model
+        assert design_mode in {"independent", "joint"}
+        self._design_mode = design_mode
+        assert select_mode in {"mean", "map"}
+        self._select_mode = select_mode
+
+        ## Sampling Prior and kernel
         self._prior_fn = prior_fn
         self._prior = None
         self._model = None
@@ -170,7 +178,7 @@ class Designer(object):
             runner=self._norm_runner,
             controller=self._norm_controller,
         )
-        # Build likelihood and model
+        ## Build likelihood and model
         self._prior = self._prior_fn("designer")
         if self._truth is not None:
             self._truth.update_key(rng_truth)
@@ -192,27 +200,29 @@ class Designer(object):
                 controller=self._norm_controller,
             )
 
-    def simulate(self, new_tasks, save_name, tqdm_position=0):
+    def simulate(self, tasks, save_name, tqdm_position=0):
         """Sample 1 set of weights from b(design_w) given true_w and prior tasks.
 
         Example:
             >>> designer.simulate(task, "designer_task_1")
 
         Args:
-            new_tasks: new environment task
-                shape (1, task_dim)
+            tasks: new environment task
+                shape (n, task_dim)
             save_name (save_name): name for saving parameters and visualizations
 
         """
         print(f"Sampling Designer (prior={len(self._prior_tasks)}): {save_name}")
-        ## Sample based on prior tasks + new_tasks
+        ## Sample based on prior_tasks + tasks
         assert self._truth is not None, "Need assumed designer truth."
         assert self._prior_tasks is not None, "Need >=0 prior tasks."
-        if len(self._prior_tasks) == 0:
-            assert len(new_tasks.shape) == 2 and len(new_tasks) == 1
-            tasks = new_tasks
-        else:
-            tasks = onp.concatenate([self._prior_tasks, new_tasks])
+
+        ## Independent design mode
+        print("tasks shape", tasks.shape)
+        assert len(tasks.shape) == 2
+        if self._design_mode == "independent":
+            tasks = [tasks[-1]]
+        tasks = onp.concatenate([self._prior_tasks, tasks])
 
         ## ==============================================================
         ## ======================= MCMC Sampling ========================
@@ -250,7 +260,7 @@ class Designer(object):
         sample_rates = sample_info["mean_accept_prob"][:, -1]
         num_samples = sample_ws.shape[1]
 
-        visualize_chains(
+        visualize_mcmc_feature(
             chains=sample_ws,
             rates=sample_rates,
             fig_dir=f"{self._save_dir}/mcmc",
@@ -264,8 +274,14 @@ class Designer(object):
             save_name=save_name,
         )
         particles.visualize(true_w=self.true_w, obs_w=None)
-        return particles
-        # return particles.map_estimate(1)
+        particles.save()
+
+        if self._select_mode == "map":
+            return particles.map_estimate(1)
+        elif self._select_mode == "mean":
+            return particles.subsample(1)
+        else:
+            raise NotImplementedError
 
     def _build_model(self, tasks):
         """Build Designer PGM model."""

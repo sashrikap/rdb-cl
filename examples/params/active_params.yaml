@@ -1,24 +1,30 @@
 ACTIVE_ARGS:
   active_fns:
+  - infogain
   - ratiomean
   - ratiomin
+  - difficult
+  - random
 DESIGNER_ARGS:
   beta: 20
+  design_mode: joint
   num_normalizers: 1000
   proposal_decay: 0.7
   sample_args:
     num_chains: 1
-    num_samples: 500
-    num_warmup: 100
+    num_samples: 150
+    num_warmup: 10
   sample_init_args:
     max_val: 15.0
-    proposal_var: 0.3
+    proposal_var: 0.1
   sample_method: MH
+  select_mode: mean
   task_method: sum
 DESIGNER_CONTROLLER_ARGS:
   engine: jax
   horizon: 10
   method: adam
+  replan: 5
 ENV_NAME: Week6_03-v1
 EVAL_ARGS:
   max_batch: 500
@@ -29,7 +35,7 @@ EXP_ARGS:
   eval_env_name: Week6_02-v1
   eval_method: mean
   eval_seed: 0
-  iterations: 16
+  iterations: 12
   num_active_sample: 500
   num_active_tasks: 144
   num_eval: 128
@@ -37,7 +43,7 @@ EXP_ARGS:
   num_prior_tasks: 2
   obs_method: mean
   use_true_w: true
-EXP_NAME: active_ird_ibeta_50_true_w1_eval_unif_128_ratio_seed_0_603_adam
+EXP_NAME: active_ird_ibeta_50_joint_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam
 IRD_ARGS:
   beta: 50
   proposal_decay: 0.9
@@ -54,8 +60,10 @@ IRD_CONTROLLER_ARGS:
   engine: jax
   horizon: 10
   method: adam
+  replan: 5
 RANDOM_KEYS:
 - 3
+SAVE_NAME: 200516
 TRUE_W:
   control: 0.2
   dist_cars: 2.0
@@ -75,4 +83,3 @@ WEIGHT_PARAMS:
   - control
   max_weights: 15.0
   normalized_key: dist_cars
-save_name: '200406'

@@ -26,11 +26,11 @@ def launch(params_dict):
             ].replace(".", "")
 
         launch_mode = mode.GCPMode(
-            zone="us-west1-a",
-            instance_type="n1-standard-4",
-            # zone="us-west2-a",  # 40 c2 isntance
+            # zone="us-west1-a",
+            # instance_type="n1-standard-4",
+            zone="us-west2-a",  # 40 c2 isntance
             # zone="us-east1-b",  # 8 c2 isntance
-            # instance_type="c2-standard-4",
+            instance_type="c2-standard-4",
             preemptible=False,
             # preemptible=True,
             gcp_image="active-ird-rss-v01",

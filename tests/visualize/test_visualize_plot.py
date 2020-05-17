@@ -50,14 +50,12 @@ def ttest_weight_correlations():
     )
 
 
-def test_weight_ed():
-    all_weights = [get_weights(), get_weights()]
+def test_weight_2d():
+    chain = get_weights()
     plot_weights_2d(
-        all_weights_dicts=all_weights,
-        all_weights_colors=["b", "g"],
-        key_i="0",
-        key_j="1",
-        all_labels=["a", "b", "c"],
+        weights_dicts=chain,
+        # weights_colors=["b", "g"],
+        keys=chain.keys(),
         path="data/test/test_plot_2d.png",
         log_scale=False,
         title="Test plot",

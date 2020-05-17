@@ -94,9 +94,8 @@ def plot_weights(
 
 def plot_weights_2d(
     weights_dicts,
-    weights_color,
-    key_i,
-    key_j,
+    # weights_color,
+    keys,
     highlight_dicts=[],
     highlight_colors=[],
     highlight_labels=[],
@@ -110,6 +109,7 @@ def plot_weights_2d(
     """Plot weights for visualizing.
 
     Args:
+        weight_dicts (DictList)
         key_i (str): first feature key
         key_j (str): second feature key
         highlight_dicts (list): list of weight dictionaries
@@ -119,38 +119,58 @@ def plot_weights_2d(
 
     """
     assert len(highlight_dicts) == len(highlight_colors) == len(highlight_labels)
-    fig, axs = plt.subplots(1, figsize=(8, 8), dpi=80)
+    # fig, axs = plt.subplots(1, figsize=(8, 8), dpi=80)
+    nkeys = len(keys)
+    fig, axs = plt.subplots(nkeys, nkeys, figsize=(2.4 * nkeys, 2.4 * nkeys), dpi=80)
 
     weights_dicts = weights_dicts.log() if not log_scale else weights_dicts
-    values_i = weights_dicts[key_i]
-    values_j = weights_dicts[key_j]
-    axs.plot(
-        values_i,
-        values_j,
-        "^",
-        color=weights_color,
-        # facecolor=color,
-        alpha=0.5,
-    )
-    axs.set_xlim(-max_weights, max_weights)
-    axs.set_ylim(-max_weights, max_weights)
-    ## Highlight value
-    for j, (d, c, label) in enumerate(
-        zip(highlight_dicts, highlight_colors, highlight_labels)
-    ):
-        if d is None or key not in d:
-            continue
-        val_i = d[key_i]
-        val_j = d[key_j]
-        if not log_scale:
-            val_i = onp.log(val_i)
-            val_j = onp.log(val_j)
-        axs.plot(val_i, val_j, c=c)
-        # add 0.05 gap so that labels don't overlap
-        axs.text(val_i, val_j, label, size=10)
-    # axs.legend(loc=loc)
-    axs.set_xlabel(key_i)
-    axs.set_ylabel(key_j)
+
+    for i, key_i in enumerate(keys):
+        for j, key_j in enumerate(keys):
+            if i == nkeys - 1:
+                axs[i, j].set_xlabel(key_i)
+            if j == 0:
+                axs[i, j].set_ylabel(key_j)
+
+            if i == j:
+                axs[i, j].set_yticklabels([])
+                axs[i, j].set_xticklabels([])
+                continue
+
+            values_i = weights_dicts[key_i]
+            values_j = weights_dicts[key_j]
+            axs[i, j].plot(
+                values_i,
+                values_j,
+                "^",
+                # color=weights_color,
+                # facecolor=color,
+                markersize=3,
+                alpha=0.5,
+            )
+            axs[i, j].set_xlim(-max_weights, max_weights)
+            axs[i, j].set_ylim(-max_weights, max_weights)
+            ## Highlight value
+            for j, (d, c, label) in enumerate(
+                zip(highlight_dicts, highlight_colors, highlight_labels)
+            ):
+                if d is None or key not in d:
+                    continue
+                val_i = d[key_i]
+                val_j = d[key_j]
+                if not log_scale:
+                    val_i = onp.log(val_i)
+                    val_j = onp.log(val_j)
+                axs[i, j].plot(val_i, val_j, c=c)
+                # add 0.05 gap so that labels don't overlap
+                axs[i, j].text(val_i, val_j, label, size=10)
+            # axs.legend(loc=loc)
+            # axs[i, j].set_title(f"{key_i} vs {key_j}")
+            axs[i, j].set_yticklabels([])
+            axs[i, j].set_xticklabels([])
+            # axs[i, j].set_xlabel(key_i)
+            # axs[i, j].set_ylabel(key_j)
+
     plt.tight_layout()
     if title is not None:
         fig.suptitle(title)

@@ -411,26 +411,15 @@ def visualize_mcmc_pairs(chains, fig_dir, title, normalized_key="", **kwargs):
     del chains[normalized_key]
     feat_keys = list(chains.keys())
 
-    colors = cm.Spectral(np.linspace(0, 1, len(chains) + 1))
+    # colors = cm.Spectral(np.linspace(0, 1, len(chains) + 1))
     os.makedirs(fig_dir, exist_ok=True)
-    all_weights = []
-    all_colors = []
-    all_labels = []
-    # for ci, chain in enumerate(chains):
-    ci = 0
-    chain = chains[0]
-    for i in range(len(feat_keys)):
-        for j in range(i + 1, len(feat_keys)):
-            key_i = feat_keys[i]
-            key_j = feat_keys[j]
-
-            plot_weights_2d(
-                chain,
-                colors[ci],
-                key_i,
-                key_j,
-                all_labels,
-                path=f"{fig_dir}/{title}_{key_i}_vs_{key_j}_chain_{ci}.png",
-                title=f"{title} {key_i} vs {key_j}",
-                **kwargs,
-            )
+    for ci, chain in enumerate(chains):
+        plot_weights_2d(
+            weights_dicts=chain,
+            # colors[ci],
+            keys=feat_keys,
+            # all_labels,
+            path=f"{fig_dir}/{title}_chain_{ci}.png",
+            title=f"{title} Chain {ci}",
+            **kwargs,
+        )

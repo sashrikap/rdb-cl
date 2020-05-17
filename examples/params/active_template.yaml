@@ -26,27 +26,11 @@ DESIGNER_CONTROLLER_ARGS:
 
 
 ## Saving
-SAVE_NAME: 200406
-# EXP_NAME: active_ird_beta_50_true_w_irdvar_3_lbfgs
-# EXP_NAME: active_ird_beta_50_true_w_map_mean_irdvar_3_adam200
-# EXP_NAME: active_ird_beta_50_true_w_map_sum_irdvar_3_adam200
-# EXP_NAME: active_ird_beta_50_true_w_map_sum_irdvar_3_week602_adam200
-# EXP_NAME: active_ird_sum_beta_50_dprior_3_irdvar_3_dvar_0.2_week602_scipy
-# EXP_NAME: active_ird_sum_beta_50_dprior_2_irdvar_3_dvar_02_602_scipy
-# EXP_NAME: active_ird_sum_beta_1_true_w_irdvar_3_dvar_02_602_scipy
-# EXP_NAME: active_ird_sum_beta_1_true_w_irdvar_3_601_scipy
-# EXP_NAME: active_ird_sum_ibeta_20_true_w_irdvar_3_dbeta_1_602_adam
-# EXP_NAME: active_ird_sum_ibeta_20_true_w2_irdvar_3_dbeta_1_602_adam
-# EXP_NAME: active_ird_sum_ibeta_20_true_w_irdvar_3_dbeta_1_602_adam
-# EXP_NAME: active_ird_sum_ibeta_5_test_true_w_irdvar_3_dbeta_1_602_adam
-# EXP_NAME: active_ird_sum_ibeta_80_irdvar_3_true_w_w1_eval_unif_128_602_adam
-EXP_NAME: active_ird_ibeta_50_true_w1_eval_unif_128_ratio_seed_0_603_adam
-# EXP_NAME: active_ird_sum_ibeta_50_dprior_2_dbeta_20_obs_mean_w1_unif_128_602_adam
-# EXP_NAME: test
-# EXP_NAME: active_ird_beta_50_prior_2
-
-
 # Full sampling
+SAVE_NAME: 200516
+EXP_NAME: active_ird_ibeta_50_true_w1_eval_mean_128_seed_0_603_adam
+# EXP_NAME: active_ird_ibeta_50_indep_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam
+EXP_NAME: active_ird_ibeta_50_joint_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam
 EXP_ARGS:
   num_eval: 128
   eval_method: mean
@@ -55,24 +39,28 @@ EXP_ARGS:
   num_eval_tasks: 500
   eval_env_name: Week6_02-v1
   # num_eval_tasks: 40
-  iterations: 16
+  iterations: 12
   num_active_tasks: 144
   num_active_sample: 500
   eval_seed: 0
   use_true_w: True
+  # use_true_w: False
   num_prior_tasks: 2
 ## Designer Settigns
 DESIGNER_ARGS:
   task_method: sum
   num_normalizers: 1000
   sample_method: MH
+  # design_mode: independent
+  design_mode: joint
+  select_mode: mean
   sample_init_args:
-    proposal_var: 0.3
+    proposal_var: 0.1
     max_val: 15.0
   proposal_decay: 0.7
   sample_args:
-    num_samples: 500
-    num_warmup: 100
+    num_samples: 150
+    num_warmup: 10
     num_chains: 1
   beta: 20
 ## IRD Settings
@@ -88,27 +76,24 @@ IRD_ARGS:
     num_warmup: 200
     num_samples: 8000
     num_chains: 3
-    # num_warmup: 100
-    # num_samples: 1000
-    # num_chains: 1
 EVAL_ARGS:
   parallel: True
   num_eval_workers: 2
   num_active_workers: 2
   max_batch: 500
 ACTIVE_ARGS:
-  # active_fns: [infogain, ratiomean, ratiomin, random]
-  # active_fns: [difficult]
+  active_fns: [infogain, ratiomean, ratiomin, difficult, random]
+  # active_fns: [infogain, random, difficult]
   # active_fns: [infogain]
   # active_fns: [ratiomean, ratiomin, random]
   # active_fns: [infogain, ratiomean, ratiomin]
   # active_fns: [random]
-  active_fns: [ratiomean, ratiomin]
+  # active_fns: [ratiomean, ratiomin]
 
 
 # ## Testing
 # ## Saving
-# SAVE_NAME: 200330
+# SAVE_NAME: 200516
 # EXP_NAME: test
 # EXP_ARGS:
 #   num_eval: 2
@@ -116,13 +101,17 @@ ACTIVE_ARGS:
 #   obs_method: mean
 #   iterations: 8
 #   eval_seed: 0
-#   use_true_w: True
+#   # use_true_w: True
+#   use_true_w: False
 #   num_prior_tasks: 2
 #   eval_env_name: Week6_02-v1
 # DESIGNER_ARGS:
 #   task_method: sum
 #   num_normalizers: 10
 #   sample_method: MH
+#   # design_mode: independent
+#   design_mode: joint
+#   select_mode: mean
 #   sample_init_args:
 #     proposal_var: 0.5
 #     max_val: 15.0
@@ -150,8 +139,8 @@ ACTIVE_ARGS:
 # ACTIVE_ARGS:
 #   num_active_tasks: 72
 #   num_active_sample: 10
-#   # active_fns: [infogain, ratiomean, ratiomin, random]
-#   active_fns: [infogain, random]
+#   active_fns: [infogain, ratiomean, ratiomin, difficult, random]
+#   # active_fns: [infogain, random, difficult]
 #   # active_fns: [random]
 #   # active_fns: [infogain, ratiomean, ratiomin]
 #   # active_fns: [random]

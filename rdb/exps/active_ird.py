@@ -94,8 +94,6 @@ class ExperimentActiveIRD(object):
         self._true_w = true_w
         self._active_fns = active_fns
         self._eval_server = eval_server
-        self._designer_server = DesignerServer(designer_fn)
-        self._designer_server.register(len(active_fns))
         self._obs_method = obs_method
         # Random key & function
         self._rng_key = None
@@ -105,6 +103,9 @@ class ExperimentActiveIRD(object):
         # Designer simulation
         self._num_prior_tasks = num_prior_tasks
         self._use_true_w = use_true_w
+        self._designer_server = DesignerServer(designer_fn)
+        if not use_true_w:
+            self._designer_server.register(len(active_fns))
         # Evaluation
         self._num_eval = num_eval
         self._eval_method = eval_method
@@ -251,23 +252,14 @@ class ExperimentActiveIRD(object):
                     self._compare_on_next(key, hist_beliefs[-1], hist_obs[-1], task)
 
             ### Simulate Designer ###
-            latest_tasks = [ts[-1] for ts in self._hist_tasks.values()]
             if self._use_true_w:
-                samples = [self._designer_server.designer.truth] * len(active_keys)
+                all_obs = [self._designer_server.designer.truth] * len(active_keys)
             else:
-                samples = self._designer_server.simulate(
-                    onp.array(latest_tasks), methods=active_keys, itr=itr
+                tasks = onp.array(list(self._hist_tasks.values()))
+                all_obs = self._designer_server.simulate(
+                    onp.array(tasks), methods=active_keys, itr=itr
                 )
-            for sp, key in zip(samples, active_keys):
-                if self._obs_method == "map":
-                    obs = sp[0].map_estimate(1)
-                elif self._obs_method == "mean":
-                    obs = sp[0].subsample(1)
-                # if len(self._hist_obs[key]) == 0:
-                #     if self._initial_obs is None:
-                #         self._initial_obs = obs
-                #     else:
-                #         obs = self._initial_obs
+            for obs, key in zip(all_obs, active_keys):
                 self._hist_obs[key].append(obs)
             self._log_time(f"Itr {itr} Designer Simulated")
 
@@ -377,18 +369,22 @@ class ExperimentActiveIRD(object):
         )
         self._eval_server.compute_tasks("Evaluation", target, eval_tasks, verbose=True)
 
-        num_violates = []
-        performances = []
+        all_violates, rel_violates = [], []
+        all_performs, rel_performs = [], []
         feats_violates = []
         desc = f"Evaluating method {fn_key}"
         for task in tqdm(eval_tasks, desc=desc):
             comparisons = belief_sample.compare_with(task, target=target)
-            performances.append(comparisons["rews"].mean())
-            num_violates.append(comparisons["vios"].mean())  # (nweights,) -> (1,)
+            all_performs.append(comparisons["rews"].mean())
+            all_violates.append(comparisons["vios"].mean())  # (nweights,) -> (1,)
+            rel_performs.append(comparisons["rews_relative"].mean())
+            rel_violates.append(comparisons["vios_relative"].mean())
             feats_violates.append(comparisons["vios_by_name"])
 
-        avg_violate = np.mean(np.array(num_violates, dtype=float))
-        avg_perform = np.mean(np.array(performances, dtype=float))
+        avg_violate = np.mean(np.array(all_violates, dtype=float))
+        avg_perform = np.mean(np.array(all_performs, dtype=float))
+        avg_rel_violate = np.mean(np.array(rel_violates, dtype=float))
+        avg_rel_perform = np.mean(np.array(rel_performs, dtype=float))
         avg_feats_violate = feats_violates[0] * (1 / float(len(eval_tasks)))
         for fv in feats_violates[1:]:
             avg_feats_violate += fv * (1 / float(len(eval_tasks)))
@@ -397,7 +393,9 @@ class ExperimentActiveIRD(object):
         else:
             log_prob_true = 0.0
         print(f"    Average Violation diff {avg_violate:.2f}")
+        print(f"    Average Violation rel {avg_rel_violate:.2f}")
         print(f"    Average Performance diff {avg_perform:.2f}")
+        print(f"    Average Performance rel {avg_rel_perform:.2f}")
         print(f"    True Weights Log Prob {log_prob_true:.2f}")
 
         info = {
@@ -405,37 +403,52 @@ class ExperimentActiveIRD(object):
             "feats_violation": dict(avg_feats_violate),
             "perform": avg_perform,
             "log_prob_true": log_prob_true,
+            "rel_violation": avg_rel_violate,
+            "rel_perform": avg_rel_perform,
         }
         if cache:
             self._active_eval_hist[fn_key].append(info)
         return info
 
-    def _compare_on_next(self, fn_key, belief, joint_obs, next_task, cache=True):
+    def _compare_on_next(
+        self, fn_key, belief, joint_obs, next_task, cache=True, sample_method="mean"
+    ):
         """Compare observation and MAP estimate on next proposed task"""
-        belief_map = belief.map_estimate(self._num_eval, log_scale=False)
+        if sample_method == "map":
+            belief_sample = belief.map_estimate(self._num_eval, log_scale=False)
+        elif sample_method == "mean":
+            belief_sample = belief.subsample(self._num_eval)
+
         print(f"Evaluating method {fn_key} on next task")
-        belief_map.compute_tasks([next_task])
+        belief_sample.compute_tasks([next_task])
         joint_obs.compute_tasks([next_task])
 
         target = self._designer_server.designer.truth
         desc = f"Evaluating method {fn_key}"
-        diff_perf, diff_vios_arr, diff_vios
-        belief_comparisons = belief_map.compare_with(next_task, target=target)
-        map_perform = belief_comparisons["rews"]
-        map_violate = belief_comparisons["vios"]  # (nweights,)
-        obs_comparisons = joint_obs.compare_with(next_task, target=target)
+        belief_comparisons = belief_sample.compare_with(
+            next_task, target=target, relative=True
+        )
+        belief_perform = belief_comparisons["rews"]
+        belief_violate = belief_comparisons["vios"]  # (nweights,)
+        obs_comparisons = joint_obs.compare_with(
+            next_task, target=target, relative=True
+        )
         obs_perform = obs_comparisons["rews"]
         obs_violate = obs_comparisons["vios"]
 
-        print(f"    MAP Violation diff {map_violate.mean():.2f}")
-        print(f"    MAP Performance diff {map_perform.mean():.2f}")
+        print(f"    Belief Violation diff {belief_violate.mean():.2f}")
+        print(f"    Belief Performance diff {belief_perform.mean():.2f}")
         print(f"    Obs Violation diff {obs_violate.mean():.2f}")
         print(f"    Obs Performance diff {obs_perform.mean():.2f}")
         info = {
-            "map_violation": map_violate.tolist(),
-            "obs_violation": obs_violate.tolist(),
-            "map_perform": map_perform.tolist(),
+            "belief_perform": belief_perform.tolist(),
+            "belief_perform_relative": belief_comparisons["rews_relative"],
+            "belief_violation": belief_violate.tolist(),
+            "belief_violation_relative": belief_comparisons["vios_relative"],
             "obs_perform": obs_perform.tolist(),
+            "obs_perform_relative": obs_comparisons["rews_relative"],
+            "obs_violation": obs_violate.tolist(),
+            "obs_violation_relative": obs_comparisons["vios_relative"],
         }
         if cache:
             self._active_map_vs_obs_hist[fn_key].append(info)
