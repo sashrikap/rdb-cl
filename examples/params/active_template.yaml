@@ -27,10 +27,10 @@ DESIGNER_CONTROLLER_ARGS:
 
 ## Saving
 # Full sampling
-SAVE_NAME: 200516
-EXP_NAME: active_ird_ibeta_50_true_w1_eval_mean_128_seed_0_603_adam
-# EXP_NAME: active_ird_ibeta_50_indep_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam
-EXP_NAME: active_ird_ibeta_50_joint_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam
+SAVE_NAME: 200518
+# EXP_NAME: active_ird_ibeta_50_true_w1_eval_mean_128_seed_0_603_adam
+EXP_NAME: active_ird_ibeta_50_w0_indep_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam
+# EXP_NAME: active_ird_ibeta_50_w0_joint_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam
 EXP_ARGS:
   num_eval: 128
   eval_method: mean
@@ -51,8 +51,8 @@ DESIGNER_ARGS:
   task_method: sum
   num_normalizers: 1000
   sample_method: MH
-  # design_mode: independent
-  design_mode: joint
+  design_mode: independent
+  # design_mode: joint
   select_mode: mean
   sample_init_args:
     proposal_var: 0.1
@@ -161,36 +161,27 @@ WEIGHT_PARAMS:
   - speed
   - control
 
-# ## True w1 (601)
-# TRUE_W:
-#   control: 2
-#   dist_cars: 1.5
-#   dist_fences: 5.35
-#   dist_lanes: 4
-#   dist_objects: 2.25
-#   speed: 4
+## True w0 (602)
+TRUE_W:
+  control: 2
+  dist_cars: 2.0
+  dist_fences: 5.35
+  dist_lanes: 2.5
+  dist_objects: 4.25
+  speed: 5
+  speed_over: 80
 
 # ## True w1 (602)
 # TRUE_W:
-#   control: 2
-#   dist_cars: 2.0
-#   dist_fences: 5.35
-#   dist_lanes: 2.5
-#   dist_objects: 4.25
-#   speed: 5
-#   speed_over: 80
+#     control: 0.2
+#     dist_cars: 2.0
+#     dist_fences: 5.35
+#     dist_lanes: 2.5
+#     dist_objects: 2.25
+#     speed: 5
+#     speed_over: 80
 
-## True w2 (602)
-TRUE_W:
-    control: 0.2
-    dist_cars: 2.0
-    dist_fences: 5.35
-    dist_lanes: 2.5
-    dist_objects: 2.25
-    speed: 5
-    speed_over: 80
-
-# ## True w3 (602)
+# ## True w2 (602)
 # TRUE_W:
 #   control: 0.00139391
 #   dist_cars: 1.0

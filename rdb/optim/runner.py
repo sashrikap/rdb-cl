@@ -100,7 +100,7 @@ class Runner(object):
         if path is None:
             path = join(dirname(rdb.__file__), "..", "data", "recording.mp4")
         os.makedirs(dirname(path), exist_ok=True)
-        # self._env.reset()
+        self._env.reset()
         self._env.state = state
         render_env(self._env, state, actions, fps=3, path=path, text=text)
         if close:
@@ -141,7 +141,7 @@ class Runner(object):
         if path is None:
             path = join(dirname(rdb.__file__), "..", "data", "thumbnail.png")
         os.makedirs(dirname(path), exist_ok=True)
-        # self._env.reset()
+        self._env.reset()
         for car in self._env.cars:
             print(car.state)
         print(self._env._main_car.state)
@@ -161,7 +161,7 @@ class Runner(object):
         if path is None:
             path = join(dirname(rdb.__file__), "..", "data", "heatmap.png")
         os.makedirs(dirname(path), exist_ok=True)
-        # self._env.reset()
+        self._env.reset()
         self._env.state = state
         frame = self._env.render(
             mode="rgb_array", draw_heat=True, weights=weights, text=text
@@ -180,7 +180,7 @@ class Runner(object):
         if path is None:
             path = join(dirname(rdb.__file__), "..", "data", "boundarymap.png")
         os.makedirs(dirname(path), exist_ok=True)
-        # self._env.reset()
+        self._env.reset()
         self._env.state = state
         frame = self._env.render(
             "rgb_array", draw_boundary=True, weights=weights, text=text
@@ -197,7 +197,7 @@ class Runner(object):
         if path is None:
             path = join(dirname(rdb.__file__), "..", "data", "constraint.png")
         os.makedirs(dirname(path), exist_ok=True)
-        # self._env.reset()
+        self._env.reset()
         self._env.state = state
         frame = self._env.render(mode="rgb_array", draw_constraint_key=key, text=text)
         frame = imresize(frame, (width, width))

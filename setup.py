@@ -27,7 +27,9 @@ setup(
         "ray",
         "ipython",
         "tqdm",
-        "imageio==2.1.2",
+        "imageio==2.5",
         "ipywidgets",
+        "flask",
+        "imageio-ffmpeg",
     ],
 )

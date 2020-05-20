@@ -81,7 +81,7 @@ ACTIVE_ARGS:
 
 # EXP_ARGS:
 #   num_eval: 22
-#   eval_method: uniform
+#   eval_method: mean
 #   num_eval_tasks: 10
 #   eval_env_name: Week6_02-v1
 #   num_active_tasks: 20

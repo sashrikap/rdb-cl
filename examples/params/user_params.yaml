@@ -1,24 +1,20 @@
 ACTIVE_ARGS:
   active_fns:
-  - infogain
-  - ratiomean
-  - ratiomin
-  - difficult
   - random
+  - infogain
+  - difficult
 DESIGNER_ARGS:
   beta: 20
-  design_mode: independent
   num_normalizers: 1000
   proposal_decay: 0.7
   sample_args:
     num_chains: 1
-    num_samples: 150
-    num_warmup: 10
+    num_samples: 500
+    num_warmup: 100
   sample_init_args:
     max_val: 15.0
-    proposal_var: 0.1
+    proposal_var: 0.3
   sample_method: MH
-  select_mode: mean
   task_method: sum
 DESIGNER_CONTROLLER_ARGS:
   engine: jax
@@ -35,15 +31,11 @@ EXP_ARGS:
   eval_env_name: Week6_02-v1
   eval_method: mean
   eval_seed: 0
-  iterations: 12
   num_active_sample: 500
-  num_active_tasks: 144
-  num_eval: 128
+  num_active_tasks: 64
+  num_eval: 512
   num_eval_tasks: 500
-  num_prior_tasks: 2
-  obs_method: mean
-  use_true_w: true
-EXP_NAME: active_ird_ibeta_50_w0_indep_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam
+EXP_NAME: iterative_divide
 IRD_ARGS:
   beta: 50
   proposal_decay: 0.9
@@ -62,16 +54,8 @@ IRD_CONTROLLER_ARGS:
   method: adam
   replan: 5
 RANDOM_KEYS:
-- 3
-SAVE_NAME: 200518
-TRUE_W:
-  control: 2
-  dist_cars: 2.0
-  dist_fences: 5.35
-  dist_lanes: 2.5
-  dist_objects: 4.25
-  speed: 5
-  speed_over: 80
+- 0
+SAVE_NAME: 200501
 WEIGHT_PARAMS:
   bins: 200
   feature_keys:

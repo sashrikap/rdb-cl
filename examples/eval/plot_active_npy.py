@@ -42,8 +42,8 @@ def plot_perform(data_dir, exp_name, data, relative=False):
     sns.set_palette("husl")
     for i, (method, mdict) in enumerate(data.items()):
         if relative:
-            perf = -1 * onp.array(mdict["rel_perform"])
-            # perf = onp.array(mdict["rel_perform"])
+            # perf = -1 * onp.array(mdict["rel_perform"])
+            perf = onp.array(mdict["rel_perform"])
         else:
             perf = onp.array(mdict["perform"])
         sns.tsplot(
@@ -218,8 +218,8 @@ if __name__ == "__main__":
     N = -1
     use_seeds = list(range(30))
     not_seeds = []
-    MAX_LEN = 6
-    MAX_RANDOM_LEN = 6
+    MAX_LEN = 9
+    MAX_RANDOM_LEN = 9
     PADDING = 0
 
     use_seeds = [str(random.PRNGKey(si)) for si in use_seeds]
@@ -229,5 +229,8 @@ if __name__ == "__main__":
     exp_dir = "data/200516"
     # exp_name = "active_ird_exp_ird_beta_50_true_w_map_sum_irdvar_3_adam200"
     # exp_name = "active_ird_ibeta_50_true_w1_eval_mean_128_seed_0_603_adam"
-    exp_name = "active_ird_ibeta_50_true_w1_eval_mean_128_seed_0_603_adam"
+    # exp_name = "active_ird_ibeta_50_true_w1_eval_mean_128_seed_0_603_adam"
+    exp_name = (
+        "active_ird_ibeta_50_joint_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam"
+    )
     plot_data()

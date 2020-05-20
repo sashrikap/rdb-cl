@@ -68,6 +68,7 @@ def save_video(frames, fps, width, path):
 
 def forward_env(env, actions, init_state=None, text=None):
     # Render and save environment given pre-specified actions
+    # Require: environment has been reset
     env.state = init_state
     actions = onp.array(actions)
     frames = []
@@ -92,6 +93,7 @@ def forward_env(env, actions, init_state=None, text=None):
 def render_env(
     env, state, actions, fps, path="data/video.mp4", width=450, savepng=False, text=None
 ):
+    # Require: environment has been reset
     frames = forward_env(env, actions, state, text=text)
     save_video(frames, int(fps / env.dt), width, path)
     if savepng:

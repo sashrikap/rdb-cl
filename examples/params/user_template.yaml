@@ -1,0 +1,145 @@
+# ENV_NAME: Week6_01-v0
+
+
+RANDOM_KEYS: [0]
+
+ENV_NAME: Week6_03-v1
+
+## MPC Specific
+IRD_CONTROLLER_ARGS:
+  horizon: 10
+  replan: 5
+  engine: jax
+  method: adam
+DESIGNER_CONTROLLER_ARGS:
+  horizon: 10
+  replan: 5
+  engine: jax
+  method: adam
+
+
+
+# # Full sampling
+# SAVE_NAME: 200518
+# EXP_NAME: user_independent
+# MP4_ROOT: /home/jerrhe/Dropbox/Projects/SafeRew/file_server
+
+# ## Experiment Arguments
+# EXP_ARGS:
+#   num_eval: 512
+#   eval_method: mean
+#   num_eval_tasks: 500
+#   eval_env_name: Week6_02-v1
+#   num_active_tasks: 64
+#   num_active_sample: 500
+#   eval_seed: 0
+#   ## Server specific
+
+# ## IRD Settings
+# IRD_ARGS:
+#   task_method: sum
+#   sample_method: MH
+#   sample_init_args:
+#     proposal_var: 3
+#     max_val: 15.0
+#   proposal_decay: 0.9
+#   beta: 50
+#   sample_args:
+#     num_warmup: 200
+#     num_samples: 8000
+#     num_chains: 3
+# DESIGNER_ARGS:
+#   task_method: sum
+#   num_normalizers: 1000
+#   sample_method: MH
+#   sample_init_args:
+#     proposal_var: 0.3
+#     max_val: 15.0
+#   proposal_decay: 0.7
+#   sample_args:
+#     num_samples: 500
+#     num_warmup: 100
+#     num_chains: 1
+#   beta: 2
+# ## Evaluation Settings
+# EVAL_ARGS:
+#   parallel: True
+#   num_eval_workers: 2
+#   num_active_workers: 2
+#   max_batch: 500
+# ## Active Settings
+# ACTIVE_ARGS:
+#   # active_fns: [random, infogain, ratiomean, ratiomin, difficult]
+#   active_fns: [random, infogain, difficult]
+#   # active_fns: [ratiomean, ratiomin]
+
+
+
+# Testing
+## Experiment Arguments
+SAVE_NAME: test_independent
+EXP_NAME: user_independent
+MP4_ROOT: /home/jerrhe/Dropbox/Projects/SafeRew/file_server
+
+
+EXP_ARGS:
+  num_eval: 22
+  eval_method: mean
+  num_eval_tasks: 10
+  eval_env_name: Week6_02-v1
+  num_active_tasks: 20
+  num_active_sample: 500
+  eval_seed: 0
+## IRD Settings
+IRD_ARGS:
+  task_method: sum
+  sample_method: MH
+  sample_init_args:
+    proposal_var: 3
+    max_val: 15.0
+  proposal_decay: 0.9
+  beta: 50
+  sample_args:
+    num_warmup: 100
+    num_samples: 500
+    num_chains: 3
+DESIGNER_ARGS:
+  task_method: sum
+  num_normalizers: 20
+  sample_method: MH
+  sample_init_args:
+    proposal_var: 0.3
+    max_val: 15.0
+  proposal_decay: 0.7
+  sample_args:
+    num_samples: 500
+    num_warmup: 100
+    num_chains: 1
+  beta: 20
+## Evaluation Settings
+EVAL_ARGS:
+  parallel: True
+  num_eval_workers: 2
+  num_active_workers: 2
+  max_batch: 500
+## Active Settings
+ACTIVE_ARGS:
+  #active_fns: [random, infogain, ratiomin, ratiomean, difficult]
+  active_fns: [random, infogain, difficult]
+
+
+
+
+
+## Plotting & weight scaling
+WEIGHT_PARAMS:
+  normalized_key: dist_cars
+  max_weights: 15.0
+  bins: 200
+  feature_keys:
+  - dist_cars
+  - dist_lanes
+  - dist_fences
+  - dist_objects
+  - speed
+  - control

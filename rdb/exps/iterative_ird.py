@@ -39,7 +39,7 @@ class ExperimentIterativeIRD(object):
         num_eval_tasks=4,
         num_eval=-1,
         eval_env_name=None,
-        eval_method="uniform",
+        eval_method="mean",
         eval_seed=None,
         # Active sampling
         num_active_tasks=4,
@@ -71,8 +71,8 @@ class ExperimentIterativeIRD(object):
         self._exp_mode = exp_mode
         assert self._exp_mode in {"design", "evaluate"}
         # Save path
-        assert "batch" in exp_name or "divide" in exp_name
-        self._batch_mode = "batch" in exp_name
+        assert "joint" in exp_name or "independent" in exp_name
+        self._joint_mode = "joint" in exp_name
         self._exp_params = exp_params
         self._exp_name = exp_name
         self._design_root = design_root
@@ -153,7 +153,7 @@ class ExperimentIterativeIRD(object):
         for method in self._active_fns.keys():
             num_ws = len(self._obs_ws[method])
             all_ws = self._obs_ws[method]
-            if self._batch_mode:
+            if self._joint_mode:
                 all_ws = [all_ws[-1]] * num_ws
             obs = self._model.create_particles(
                 all_ws,
