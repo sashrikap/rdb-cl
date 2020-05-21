@@ -142,9 +142,8 @@ class Runner(object):
             path = join(dirname(rdb.__file__), "..", "data", "thumbnail.png")
         os.makedirs(dirname(path), exist_ok=True)
         self._env.reset()
-        for car in self._env.cars:
-            print(car.state)
-        print(self._env._main_car.state)
+        # for car in self._env.cars:
+        #     print(car.state)
         self._env.state = state
         frame = self._env.render(mode="rgb_array", text=text)
         frame = imresize(frame, (width, width))

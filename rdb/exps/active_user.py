@@ -31,6 +31,7 @@ import os
 api = Flask(__name__)
 experiment = None
 CORS(api)
+PORT = 5000
 lock = Lock()
 
 ##======================================================##
@@ -58,6 +59,7 @@ def start_design():
     req_data = request.get_json()
     print("Received start_design data:", req_data)
     server_state = experiment.start_design(user_id=req_data["user_id"])
+    print("Return start_design data:", server_state)
     return json.dumps(server_state)
 
 
@@ -199,6 +201,7 @@ class ExperimentActiveUser(object):
         eval_seed=None,
         test_mode=False,
         # Active sampling
+        num_initial_tasks=0,
         num_active_tasks=4,
         num_active_sample=-1,
         exp_mode="design",
@@ -229,6 +232,8 @@ class ExperimentActiveUser(object):
         self._num_propose = 1
         self._test_mode = test_mode
         # Active Task proposal
+        self._num_initial_tasks = num_initial_tasks
+        self._initial_tasks = None
         self._num_active_tasks = num_active_tasks
         self._num_active_sample = num_active_sample
         self._exp_mode = exp_mode
@@ -239,25 +244,44 @@ class ExperimentActiveUser(object):
         self._exp_params = exp_params
         self._exp_name = exp_name
         self._design_root = design_root
+        self._design_dir = f"{design_root}/{exp_name}"
         self._save_root = save_root
+        self._save_dir = f"{save_root}/{exp_name}"
         self._mp4_root = mp4_root
+        self._mp4_dir = f"{mp4_root}/{exp_name}"
         self._last_time = time.time()
 
     def update_key(self, rng_key):
         self._rng_name = self._model.rng_name = f"{rng_key[-1]:02d}"
         self._rng_key, rng_model, rng_active = random.split(rng_key, 3)
-        # self._model.update_key(rng_model)
+        self._model.update_key(rng_model)
         save_params(f"{self._save_root}/params_{self._rng_name}.yaml", self._exp_params)
         ## Active functions
-        # rng_active_keys = random.split(rng_active, len(list(self._active_fns.keys())))
-        # for fn, rng_key_fn in zip(list(self._active_fns.values()), rng_active_keys):
-        #     fn.update_key(rng_key_fn)
+        rng_active_keys = random.split(rng_active, len(list(self._active_fns.keys())))
+        for fn, rng_key_fn in zip(list(self._active_fns.values()), rng_active_keys):
+            fn.update_key(rng_key_fn)
 
-        ## Build cache
+        ## Training and evaluation tasks
+        self._train_tasks = self._model.env.all_tasks
+        ## Propose first task
+        self._initial_tasks = random_choice(
+            self._get_rng_task(), self._train_tasks, self._num_initial_tasks
+        )
+
+        ## Build server state store
         self._states = {}
 
+        ## Build cache for proposal
+        self._obs, self._obs_ws = {}, {}
+        self._beliefs = {}
+        self._eval_info = {}
+
     def run(self):
-        api.run(host="0.0.0.0", port=5000)
+        api.run(host="0.0.0.0", port=PORT)
+
+    ##======================================================##
+    ##==================== Server Methods ==================##
+    ##======================================================##
 
     def _build_state(self, user_id):
         active_keys = self._active_keys
@@ -300,6 +324,15 @@ class ExperimentActiveUser(object):
         )
         return new_state
 
+    def _log_time(self, caption=""):
+        if self._last_time is not None:
+            secs = time.time() - self._last_time
+            h = secs // (60 * 60)
+            m = (secs - h * 60 * 60) // 60
+            s = secs - (h * 60 * 60) - (m * 60)
+            print(f">>> Iterative IRD {caption} Time: {int(h)}h {int(m)}m {s:.2f}s")
+        self._last_time = time.time()
+
     def _get_tasks_thumbnail_urls(self, user_id, itr, tasks):
         """Generate thumbnails and return urls (relative)
         Input:
@@ -312,9 +345,12 @@ class ExperimentActiveUser(object):
             self._env.set_task(task)
             self._env.reset()
             state = self._env.state
-            path = f"{user_id}/rng_{self._rng_name}_thumbnail_{itr}_joint_{index}.png"
-            self._runner.collect_thumbnail(self._env.state, path=path, close=False)
-            thumbnail_urls.append(path)
+            img_path = (
+                f"{user_id}/rng_{self._rng_name}_thumbnail_{itr}_joint_{index}.png"
+            )
+            save_path = f"{self._mp4_dir}/{img_path}"
+            self._runner.collect_thumbnail(self._env.state, path=save_path, close=False)
+            thumbnail_urls.append(save_path)
         return thumbnail_urls
 
     def start_design(self, user_id):
@@ -331,17 +367,18 @@ class ExperimentActiveUser(object):
                 ]
             )
         else:
-            tasks = onp.array(
-                [
-                    [-1.75, -2.0, -0.16, -1.3, 0.1, 0.4],
-                    [-2.0, -1.0, -0.16, 0.4, 0.1, -0.8],
-                    [-1.75, -1.75, -0.16, -1.0, 0.1, -1.7],
-                ]
-            )
+            assert self._initial_tasks is not None
+            tasks = onp.array(self._initial_tasks)
 
         ## Initialize design state
         state = self._build_state(user_id)
         self._states[user_id] = state
+
+        ## Initialize cache
+        self._obs[user_id] = {method: [] for method in self._active_keys}
+        self._obs_ws[user_id] = {method: [] for method in self._active_keys}
+        self._beliefs[user_id] = {method: [] for method in self._active_keys}
+        self._eval_info[user_id] = {method: [] for method in self._active_keys}
 
         ## Propose initial tasks
         state["training_iter"] = 0
@@ -356,7 +393,7 @@ class ExperimentActiveUser(object):
             state["curr_tasks"] = tasks.tolist()
             state["curr_imgs"] = urls
         else:
-            state["curr_tasks"] = [tasks[0]]
+            state["curr_tasks"] = [tasks[0].tolist()]
             state["curr_imgs"] = [urls[0]]
 
         return state
@@ -380,16 +417,14 @@ class ExperimentActiveUser(object):
                 m: [-1.75, -2.0, -0.16, -1.3, 0.1, 0.4] for m in curr_active_keys
             }  # method (str) -> task (list)
         else:
-            new_tasks = {
-                m: [-1.75, -2.0, -0.16, -1.3, 0.1, 0.4] for m in curr_active_keys
-            }  # method (str) -> task (list)
+            new_tasks = self.propose(user_id)
 
         state["proposal_iter"] += 1
         itr = state["proposal_iter"]
         for method, task in new_tasks.items():
             urls = self._get_tasks_thumbnail_urls(user_id, itr, [task])
             state["all_proposal_imgs"][method] += urls
-            state["all_proposal_tasks"][method] += [task]
+            state["all_proposal_tasks"][method] += [list(task)]
             state["all_proposal_weights"][method].append([])
 
         if self._joint_mode:
@@ -402,6 +437,7 @@ class ExperimentActiveUser(object):
         else:
             state["curr_tasks"] = [state["all_proposal_tasks"][method][itr]]
             state["curr_imgs"] = [state["all_proposal_imgs"][method][itr]]
+        self._save(user_id)
         return state
 
     def next_design(self, user_id, user_state):
@@ -431,13 +467,13 @@ class ExperimentActiveUser(object):
             state["training_iter"] += 1
             if self._joint_mode:
                 need_new_proposal = True
-                state["final_training_weights"] = [weights] * num_train
+                state["final_training_weights"] = [dict(weights)] * num_train
                 state["is_training"] = False
                 state["curr_tasks"] = []
                 state["curr_imgs"] = []
                 state["curr_mp4s"] = []
             else:
-                state["final_training_weights"].append(weights)
+                state["final_training_weights"].append(dict(weights))
                 if state["training_iter"] == num_train:
                     need_new_proposal = True
                     state["is_training"] = False
@@ -453,7 +489,7 @@ class ExperimentActiveUser(object):
         else:
             # Proposal mode
             method = state["curr_active_keys"][state["curr_method_idx"]]
-            state["final_proposal_weights"][method].append(weights)
+            state["final_proposal_weights"][method].append(dict(weights))
 
             if state["curr_method_idx"] + 1 == len(self._active_keys):
                 need_new_proposal = True
@@ -485,6 +521,7 @@ class ExperimentActiveUser(object):
 
         state["need_new_proposal"] = need_new_proposal
 
+        self._save(user_id)
         return state
 
     def try_design(self, user_id, weights, user_state):
@@ -503,14 +540,17 @@ class ExperimentActiveUser(object):
         if state["is_training"]:
             if self._joint_mode:
                 for idx in range(len(state["all_training_tasks"])):
-                    state["all_training_weights"][idx].append(weights)
+                    state["all_training_weights"][idx].append(dict(weights))
             else:
-                state["all_training_weights"][state["training_iter"]].append(weights)
+                state["all_training_weights"][state["training_iter"]].append(
+                    dict(weights)
+                )
         else:
             method = state["curr_method"]
             state["all_proposal_weights"][method][state["proposal_iter"]].append(
-                weights
+                dict(weights)
             )
+        self._save(user_id)
         return state
 
     def make_video(self, user_id, index, user_state):
@@ -543,7 +583,7 @@ class ExperimentActiveUser(object):
                 mp4_path = f"{user_id}/rng_{self._rng_name}_method_{method}_proposal_{itr:02d}_trial_{trial:02d}_joint_{index:02d}.mp4"
 
             state["curr_mp4s"][index] = mp4_path
-            save_path = f"{self._mp4_root}/{mp4_path}"
+            save_path = f"{self._mp4_dir}/{mp4_path}"
             print(f"Getting video {user_id}, iteration={itr}, trial={trial}, {index}")
             if not self._test_mode:
                 actions = self._controller(env_state, weights=weights, batch=False)
@@ -554,8 +594,302 @@ class ExperimentActiveUser(object):
             print(f"Saved video to {save_path}")
         return mp4_path
 
+    ##======================================================##
+    ##=================== Utility Methods ==================##
+    ##======================================================##
 
-def run_experiment_server(evaluate=False, gcp_mode=False, test_mode=False):
+    def _get_rng_eval(self):
+        if self._eval_seed is not None:
+            self._eval_seed, rng_task = random.split(self._eval_seed)
+        else:
+            self._rng_key, rng_task = random.split(self._rng_key)
+        return rng_task
+
+    def _get_rng_task(self):
+        self._rng_key, rng_task = random.split(self._rng_key)
+        return rng_task
+
+    def propose(self, user_id):
+        self._log_time(f"Proposal Started")
+        state = self._states[user_id]
+
+        # Gather current tasks and observations
+        tasks = self._get_final_tasks(user_id)
+        obs_ws = self._get_final_weights(user_id)
+        obs_ws_lens = [len(ws) for ws in obs_ws.values()]
+        assert all([n == obs_ws_lens[0] for n in obs_ws_lens])
+
+        ## IRD inference
+        for method in self._active_fns.keys():
+            num_ws = len(obs_ws[method])
+            all_ws = obs_ws[method]
+            if self._joint_mode:
+                all_ws = [all_ws[-1]] * num_ws
+            obs = self._model.create_particles(
+                all_ws,
+                save_name=f"active_user_obs",
+                controller=self._model._designer._sample_controller,
+                runner=self._model._designer._sample_runner,
+            )
+            belief = self._model.sample(
+                tasks=tasks[method],
+                obs=obs,
+                save_name=f"ird_belief_method_{method}_itr_{num_ws}",
+            )
+            if len(self._beliefs[user_id][method]) < num_ws:
+                self._beliefs[user_id][method].append(belief)
+                self._obs[user_id][method].append(obs)
+            else:
+                self._beliefs[user_id][method][num_ws - 1] = belief
+                self._obs[user_id][method][num_ws - 1] = obs
+
+        ## Propose next task
+        candidates = random_choice(
+            self._get_rng_task(), self._train_tasks, self._num_active_tasks
+        )
+        candidate_scores = {}
+        proposed_tasks = {method: None for method in self._active_keys}
+        for method in self._active_fns.keys():
+            self._log_time(f"Running proposal for: {method}")
+            next_task = self._propose_task(
+                user_id, method, candidates, candidate_scores
+            )
+            proposed_tasks[method] = next_task
+        self._plot_candidate_scores(candidate_scores)
+        self._log_time(f"Proposal finished")
+        self._save(user_id)
+        return proposed_tasks
+
+    def _get_final_tasks(self, user_id):
+        state = self._states[user_id]
+        tasks = {method: [] for method in self._active_keys}
+        for method in self._active_keys:
+            tasks[method] = (
+                state["all_training_tasks"] + state["all_proposal_tasks"][method]
+            )
+        return tasks
+
+    def _get_final_weights(self, user_id):
+        state = self._states[user_id]
+        obs_ws = {method: [] for method in self._active_keys}
+        for method in self._active_keys:
+            obs_ws[method] = (
+                state["final_training_weights"]
+                + state["final_proposal_weights"][method]
+            )
+        return obs_ws
+
+    def _propose_task(self, user_id, method, candidates, candidate_scores):
+        state = self._states[user_id]
+
+        tasks = self._get_final_tasks(user_id)
+        obs = self._obs[user_id][method]
+        belief = self._beliefs[user_id][method][-1].subsample(self._num_active_sample)
+
+        next_task = None
+        if method == "difficult":
+            train_difficulties = self._model.env.all_task_difficulties
+            N_top = 1000
+            difficult_ids = onp.argsort(train_difficulties)[-N_top:]
+            difficult_tasks = self._model.env.all_tasks[difficult_ids]
+            next_id = random_choice(
+                self._get_rng_task(),
+                onp.arange(N_top),
+                self._num_propose,
+                replacement=False,
+            )[0]
+            next_task = difficult_tasks[next_id]
+        elif method == "random":
+            next_task = random_choice(
+                self._get_rng_task(), candidates, self._num_propose, replacement=False
+            )[0]
+        else:
+            ## Pre-empt heavy computations
+            self._eval_server.compute_tasks("Active", belief, candidates, verbose=True)
+            self._eval_server.compute_tasks("Active", obs[-1], candidates, verbose=True)
+            scores = []
+            desc = "Evaluaitng candidate tasks"
+            feats_keys = self._model._env.features_keys
+            for next_task in tqdm(candidates, desc=desc):
+                scores.append(
+                    self._active_fns[method](
+                        onp.array([next_task]), belief, obs, feats_keys, verbose=False
+                    )
+                )
+            scores = onp.array(scores)
+
+            print(
+                f"Function {method} chose task {onp.argmax(scores)} among {len(scores)}"
+            )
+            next_idxs = onp.argsort(-1 * scores)[: self._num_propose]
+            next_task = candidates[next_idxs[0]]
+
+            candidate_scores[method] = scores
+        return next_task
+
+    def _plot_candidate_scores(self, candidate_scores):
+        ranking_dir = os.path.join(self._save_root, self._exp_name, "candidates")
+        os.makedirs(ranking_dir, exist_ok=True)
+        for method in candidate_scores.keys():
+            cand_scores = onp.array(candidate_scores[method])
+            other_scores = []
+            other_keys = []
+            other_scores_all = copy.deepcopy(candidate_scores)
+            del other_scores_all[method]
+            for key in other_scores_all.keys():
+                other_scores.append(other_scores_all[key])
+                other_keys.append(key)
+            # Ranking plot
+            if len(other_keys) > 0:
+                file = f"key_{self._rng_name}_fn_{method}_ranking.png"
+                path = os.path.join(ranking_dir, file)
+                print(f"Candidate plot saved to {path}")
+                plot_rankings(
+                    cand_scores,
+                    method,
+                    other_scores,
+                    other_keys,
+                    path=path,
+                    title=f"Iterative: {method}",
+                    yrange=[-0.4, 4],
+                    loc="upper left",
+                    normalize=True,
+                    delta=0.8,
+                    annotate_rankings=True,
+                )
+                for other_s, other_k in zip(other_scores, other_keys):
+                    file = f"key_{self._rng_name}_compare_{method}_vs_{other_k}.png"
+                    path = os.path.join(ranking_dir, file)
+                    plot_ranking_corrs(
+                        [cand_scores, other_s], [method, other_k], path=path
+                    )
+
+    def evaluate(self, user_id):
+        state = self._states[user_id]
+
+        # Gather current tasks and observations
+        tasks = self._get_final_tasks(user_id)
+        obs_ws = self._get_final_weights(user_id)
+        obs_ws_lens = [len(ws) for ws in obs_ws.values()]
+        assert all([n == obs_ws_lens[0] for n in obs_ws_lens])
+
+        all_obs = {m: [] for m in self._active_keys}
+        all_beliefs = {m: [] for m in self._active_keys}
+
+        eval_env = self._env_fn(self._eval_env_name)
+        self._eval_tasks = random_choice(
+            self._get_rng_eval(),
+            eval_env.all_tasks,
+            self._num_eval_tasks,
+            replacement=False,
+        )
+        # Load belief
+        # npz_path = f"{self._save_dir}/{self._exp_name}_seed_{self._rng_name}.npz"
+        yaml_save = f"{self._design_dir}/yaml/rng_{self._rng_name}_designs.yaml"
+        with open(yaml_save, "r") as stream:
+            hist_data = yaml.safe_load(stream)
+
+        wi = 0
+        done = False
+        while not done:
+            for method in self._active_fns.keys():
+                self._log_time(f"Loading evaluation for: {method}")
+                n_tasks = len(obs_ws[method])
+                if wi + 1 > n_tasks:
+                    done = True
+                elif wi + 1 > 2:
+                    done = True
+                else:
+                    obs = self._model.create_particles(
+                        obs_ws[method][: (wi + 1)],
+                        save_name=f"active_user_obs",
+                        controller=self._model._designer._sample_controller,
+                        runner=self._model._designer._sample_runner,
+                    )
+                    belief = self._model.sample(
+                        onp.array(tasks[method][: wi + 1]),
+                        obs=obs,
+                        save_name=f"ird_belief_method_{method}_itr_{wi + 1}",
+                    )
+                    # belief.load()
+                    all_obs[method].append(obs)
+                    all_beliefs[method].append(belief)
+            wi += 1
+        self._log_time(f"Loading finished")
+
+        # Compute belief features
+        eval_info = {
+            key: {"violation": [], "feats_violation": [], "all_violation": []}
+            for key in self._active_fns.keys()
+        }
+        for method in self._active_fns.keys():
+            self._log_time(f"Running evaluation for: {method}")
+            for belief in all_beliefs[method]:
+                if self._eval_method == "mean":
+                    belief_sample = belief.subsample(self._num_eval)
+                elif self._eval_method == "map":
+                    belief_sample = belief.map_estimate(self._num_eval, log_scale=False)
+
+                desc = f"Evaluating method {method}"
+                print(f"{desc}: Begin")
+                self._eval_server.compute_tasks(
+                    "Evaluation", belief_sample, self._eval_tasks, verbose=True
+                )
+                # (DictList): nvios * (ntasks, nparticles)
+                feats_vios = belief_sample.get_violations(self._eval_tasks)
+                feats_vios_arr = feats_vios.onp_array()
+                avg_violate = feats_vios_arr.sum(axis=0).mean()
+                print(f"    Average Violation {avg_violate:.2f}")
+                eval_info[method]["violation"].append(avg_violate)
+                eval_info[method]["feats_violation"].append(
+                    dict(feats_vios.mean(axis=(0, 1)))
+                )
+                eval_info[method]["all_violation"].append(dict(feats_vios.mean(axis=1)))
+
+                self._eval_info[user_id] = eval_info
+                self._save_eval()
+        self._log_time(f"Evaluation finished")
+        return eval_info
+
+    def _save(self, user_id):
+        ## Save beliefs
+        for method in self._active_keys:
+            for belief in self._beliefs[user_id][method]:
+                belief.save()
+
+        ## Save proposed tasks
+        data = dict(
+            seed=self._rng_name,
+            exp_params=self._exp_params,
+            env_id=str(self._model.env_id),
+            states=self._states,
+        )
+        npz_path = f"{self._save_dir}/{self._exp_name}_seed_{self._rng_name}.npz"
+        os.makedirs(os.path.dirname(npz_path), exist_ok=True)
+        with open(npz_path, "wb+") as f:
+            np.savez(f, **data)
+
+        ## Save user input yaml
+        yaml_save = f"{self._save_dir}/yaml/rng_{self._rng_name}_designs.yaml"
+        os.makedirs(os.path.dirname(yaml_save), exist_ok=True)
+        tasks = self._get_final_tasks(user_id)
+        obs_ws = self._get_final_weights(user_id)
+
+        with open(yaml_save, "w+") as stream:
+            yaml.dump(
+                dict(tasks=tasks, designs=obs_ws), stream, default_flow_style=False
+            )
+
+    def _save_eval(self):
+        npy_path = f"{self._save_dir}/{self._exp_name}_eval_seed_{self._rng_name}.npy"
+        os.makedirs(os.path.dirname(npy_path), exist_ok=True)
+        data = dict(eval_info=self._eval_info, eval_tasks=self._eval_tasks)
+        np.save(npy_path, data)
+
+
+def run_experiment_server(
+    evaluate=False, gcp_mode=False, test_mode=False, register_both=False
+):
     """Iterative Experiment runner.
     """
     from rdb.exps.active import ActiveInfoGain, ActiveRatioTest, ActiveRandom
@@ -634,7 +968,10 @@ def run_experiment_server(evaluate=False, gcp_mode=False, test_mode=False):
             weight_params=p.WEIGHT_PARAMS,
             max_batch=p.EVAL_ARGS["max_batch"],
         )
-        if evaluate:
+        if register_both:
+            eval_server.register("Evaluation", p.EVAL_ARGS["num_eval_workers"])
+            eval_server.register("Active", p.EVAL_ARGS["num_eval_workers"])
+        elif evaluate:
             eval_server.register("Evaluation", p.EVAL_ARGS["num_eval_workers"])
         else:
             eval_server.register("Active", p.EVAL_ARGS["num_active_workers"])

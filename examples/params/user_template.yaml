@@ -33,6 +33,7 @@ DESIGNER_CONTROLLER_ARGS:
 #   num_active_tasks: 64
 #   num_active_sample: 500
 #   eval_seed: 0
+#   num_initial_tasks: 3
 #   ## Server specific
 
 # ## IRD Settings
@@ -87,9 +88,10 @@ EXP_ARGS:
   eval_method: mean
   num_eval_tasks: 10
   eval_env_name: Week6_02-v1
-  num_active_tasks: 20
+  num_active_tasks: 7
   num_active_sample: 500
   eval_seed: 0
+  num_initial_tasks: 3
 ## IRD Settings
 IRD_ARGS:
   task_method: sum

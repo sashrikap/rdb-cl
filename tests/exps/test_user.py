@@ -3,7 +3,7 @@ import pytest
 
 ## Test user apis
 experiment = run_experiment_server(test_mode=True)
-# experiment.run()
+experiment_notest = run_experiment_server(test_mode=False, register_both=True)
 
 
 def dict_equal(da, db):
@@ -16,7 +16,7 @@ def dict_equal(da, db):
 
 
 @pytest.mark.parametrize("joint_mode", [True, False])
-def test_start(joint_mode):
+def ttest_start(joint_mode):
     experiment._joint_mode = joint_mode
 
     user_id = "abc"
@@ -56,7 +56,7 @@ def test_start(joint_mode):
 
 
 @pytest.mark.parametrize("joint_mode", [True, False])
-def test_try_design(joint_mode):
+def ttest_try_design(joint_mode):
     experiment._joint_mode = joint_mode
 
     user_id = "abc"
@@ -101,7 +101,7 @@ def test_try_design(joint_mode):
 
 
 @pytest.mark.parametrize("joint_mode", [True, False])
-def test_make_video(joint_mode):
+def ttest_make_video(joint_mode):
     experiment._joint_mode = joint_mode
 
     user_id = "abc"
@@ -152,7 +152,7 @@ def test_make_video(joint_mode):
 
 
 @pytest.mark.parametrize("joint_mode", [True, False])
-def test_second_try(joint_mode):
+def ttest_second_try(joint_mode):
     experiment._joint_mode = joint_mode
 
     user_id = "abc"
@@ -205,7 +205,7 @@ def test_second_try(joint_mode):
 
 
 @pytest.mark.parametrize("joint_mode", [True, False])
-def test_accept_training_design(joint_mode):
+def ttest_accept_training_design(joint_mode):
     experiment._joint_mode = joint_mode
 
     user_id = "abc"
@@ -261,7 +261,7 @@ def test_accept_training_design(joint_mode):
 
 
 @pytest.mark.parametrize("joint_mode", [True, False])
-def test_finish_training_design(joint_mode):
+def ttest_finish_training_design(joint_mode):
     experiment._joint_mode = joint_mode
 
     user_id = "abc"
@@ -312,7 +312,7 @@ def test_finish_training_design(joint_mode):
 
 
 @pytest.mark.parametrize("joint_mode", [True, False])
-def test_one_proposal_design(joint_mode):
+def ttest_one_proposal_design(joint_mode):
     experiment._joint_mode = joint_mode
 
     user_id = "abc"
@@ -353,7 +353,7 @@ def test_one_proposal_design(joint_mode):
 
 
 @pytest.mark.parametrize("joint_mode", [True, False])
-def test_one_proposal_try(joint_mode):
+def ttest_one_proposal_try(joint_mode):
     experiment._joint_mode = joint_mode
 
     user_id = "abc"
@@ -396,7 +396,7 @@ def test_one_proposal_try(joint_mode):
 
 
 @pytest.mark.parametrize("joint_mode", [True, False])
-def test_one_proposal_mp4(joint_mode):
+def ttest_one_proposal_mp4(joint_mode):
     experiment._joint_mode = joint_mode
 
     user_id = "abc"
@@ -430,7 +430,7 @@ def test_one_proposal_mp4(joint_mode):
 
 
 @pytest.mark.parametrize("joint_mode", [True, False])
-def test_one_proposal_accept(joint_mode):
+def ttest_one_proposal_accept(joint_mode):
     experiment._joint_mode = joint_mode
 
     user_id = "abc"
@@ -470,7 +470,7 @@ def test_one_proposal_accept(joint_mode):
 
 
 @pytest.mark.parametrize("joint_mode", [True, False])
-def test_two_proposal_try(joint_mode):
+def ttest_two_proposal_try(joint_mode):
     experiment._joint_mode = joint_mode
 
     user_id = "abc"
@@ -519,7 +519,7 @@ def test_two_proposal_try(joint_mode):
 
 
 @pytest.mark.parametrize("joint_mode", [True, False])
-def test_two_proposal_accept(joint_mode):
+def ttest_two_proposal_accept(joint_mode):
     experiment._joint_mode = joint_mode
 
     user_id = "abc"
@@ -567,7 +567,7 @@ def test_two_proposal_accept(joint_mode):
 
 
 @pytest.mark.parametrize("joint_mode", [True, False])
-def test_two_proposal_iteration(joint_mode):
+def ttest_two_proposal_iteration(joint_mode):
     experiment._joint_mode = joint_mode
 
     user_id = "abc"
@@ -603,7 +603,7 @@ def test_two_proposal_iteration(joint_mode):
 
 
 @pytest.mark.parametrize("joint_mode", [True, False])
-def test_two_proposal_iteration_start(joint_mode):
+def ttest_two_proposal_iteration_start(joint_mode):
     experiment._joint_mode = joint_mode
 
     user_id = "abc"
@@ -639,3 +639,99 @@ def test_two_proposal_iteration_start(joint_mode):
         assert len(server_state["all_proposal_imgs"][key]) == 2
         assert server_state["is_training"] == False  # changed
         assert server_state["proposal_iter"] == 1
+
+
+@pytest.mark.parametrize("joint_mode", [True, False])
+def test_task_proposal(joint_mode):
+    experiment = experiment_notest
+    experiment._joint_mode = joint_mode
+
+    user_id = "abc"
+    weights = {
+        "dist_cars": 1,
+        "dist_lanes": 2,
+        "dist_fences": 3,
+        "dist_objects": 4,
+        "speed": 5,
+        "control": 6,
+    }
+    user_state = experiment.start_design(user_id)
+    user_state = experiment.try_design(user_id, weights, user_state)
+    user_state = experiment.next_design(user_id, user_state)
+    while not user_state["need_new_proposal"]:
+        user_state = experiment.try_design(user_id, weights, user_state)
+        user_state = experiment.next_design(user_id, user_state)
+    server_state = experiment.new_proposal(user_id, user_state)
+
+    curr_active_keys = server_state["curr_active_keys"]
+    for key in curr_active_keys:
+        user_state = experiment.try_design(user_id, weights, user_state)
+        user_state = experiment.next_design(user_id, user_state)
+
+    user_state = experiment.new_proposal(user_id, user_state)
+    server_state = user_state
+
+    assert server_state["need_new_proposal"] == False
+    assert server_state["user_id"] == user_id
+    assert server_state["curr_weights"] == None
+    assert server_state["curr_trial"] == -1
+    assert server_state["curr_method_idx"] == 0
+    assert server_state["curr_method"] != None
+    assert server_state["proposal_iter"] == 1
+
+    curr_active_keys = server_state["curr_active_keys"]
+    for key in curr_active_keys:
+        assert len(server_state["all_proposal_weights"][key]) == 2
+        assert len(server_state["all_proposal_tasks"][key]) == 2
+        assert len(server_state["all_proposal_imgs"][key]) == 2
+        assert server_state["is_training"] == False  # changed
+        assert server_state["proposal_iter"] == 1
+
+
+@pytest.mark.parametrize("joint_mode", [True, False])
+def test_exp_eval(joint_mode):
+    experiment = experiment_notest
+    experiment._joint_mode = joint_mode
+
+    user_id = "abc"
+    weights = {
+        "dist_cars": 1,
+        "dist_lanes": 2,
+        "dist_fences": 3,
+        "dist_objects": 4,
+        "speed": 5,
+        "control": 6,
+    }
+    user_state = experiment.start_design(user_id)
+    user_state = experiment.try_design(user_id, weights, user_state)
+    user_state = experiment.next_design(user_id, user_state)
+    while not user_state["need_new_proposal"]:
+        user_state = experiment.try_design(user_id, weights, user_state)
+        user_state = experiment.next_design(user_id, user_state)
+    server_state = experiment.new_proposal(user_id, user_state)
+
+    curr_active_keys = server_state["curr_active_keys"]
+    for key in curr_active_keys:
+        user_state = experiment.try_design(user_id, weights, user_state)
+        user_state = experiment.next_design(user_id, user_state)
+
+    user_state = experiment.new_proposal(user_id, user_state)
+    server_state = user_state
+
+    assert server_state["need_new_proposal"] == False
+    assert server_state["user_id"] == user_id
+    assert server_state["curr_weights"] == None
+    assert server_state["curr_trial"] == -1
+    assert server_state["curr_method_idx"] == 0
+    assert server_state["curr_method"] != None
+    assert server_state["proposal_iter"] == 1
+
+    curr_active_keys = server_state["curr_active_keys"]
+    for key in curr_active_keys:
+        assert len(server_state["all_proposal_weights"][key]) == 2
+        assert len(server_state["all_proposal_tasks"][key]) == 2
+        assert len(server_state["all_proposal_imgs"][key]) == 2
+        assert server_state["is_training"] == False  # changed
+        assert server_state["proposal_iter"] == 1
+
+    experiment.evaluate(user_id)

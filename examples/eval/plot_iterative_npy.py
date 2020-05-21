@@ -55,7 +55,7 @@ def plot_iterative_eval():
     plt.ylabel("Violation")
     plt.title("IRD Posterior Violation")
     plt.savefig(f"{exp_dir}/{exp_name}/violations.png")
-    # plt.show()
+    plt.show()
 
     # ys = [np.mean(np.array(all_eval[fn_key])) for fn_key in methods]
     # yerr = [np.std(np.array(all_eval[fn_key])) for fn_key in methods]
@@ -65,7 +65,8 @@ def plot_iterative_eval():
 
 
 if __name__ == "__main__":
-    use_seeds = [0, 1, 2, 3]  # list(range(30))
+    # use_seeds = [0, 1, 2, 3]  # list(range(30))
+    use_seeds = [3]  # list(range(30))
     not_seeds = []
 
     not_methods = []

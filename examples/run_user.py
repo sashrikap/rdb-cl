@@ -9,5 +9,6 @@ from rdb.exps.active_user import run_experiment_server
 
 
 if __name__ == "__main__":
-    experiment = run_experiment_server()
+    test_mode = True
+    experiment = run_experiment_server(test_mode=test_mode)
     experiment.run()
