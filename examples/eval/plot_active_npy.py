@@ -226,11 +226,11 @@ if __name__ == "__main__":
     not_seeds = [str(random.PRNGKey(si)) for si in not_seeds]
     not_methods = []
 
-    exp_dir = "data/200516"
+    exp_dir = "data/200521"
     # exp_name = "active_ird_exp_ird_beta_50_true_w_map_sum_irdvar_3_adam200"
     # exp_name = "active_ird_ibeta_50_true_w1_eval_mean_128_seed_0_603_adam"
     # exp_name = "active_ird_ibeta_50_true_w1_eval_mean_128_seed_0_603_adam"
     exp_name = (
-        "active_ird_ibeta_50_joint_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam"
+        "active_ird_ibeta_50_w1_joint_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam"
     )
     plot_data()

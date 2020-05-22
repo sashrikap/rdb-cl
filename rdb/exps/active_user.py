@@ -143,12 +143,9 @@ def make_video():
         }
 
     """
-    print("Received make_video args:", request.args)
     req_data = request.get_json()
     url = experiment.make_video(
-        user_id=req_data["user_id"],
-        index=int(req_data["index"]),
-        user_state=req_data["state"],
+        user_id=req_data["user_id"], index=int(req_data["index"])
     )
     data = {"mp4_url": url}
     return json.dumps(data)
@@ -201,6 +198,7 @@ class ExperimentActiveUser(object):
         eval_seed=None,
         test_mode=False,
         # Active sampling
+        num_iterations=4,
         num_initial_tasks=0,
         num_active_tasks=4,
         num_active_sample=-1,
@@ -230,6 +228,7 @@ class ExperimentActiveUser(object):
         self._num_eval_tasks = num_eval_tasks
         self._eval_env_name = eval_env_name
         self._num_propose = 1
+        self._num_iterations = num_iterations
         self._test_mode = test_mode
         # Active Task proposal
         self._num_initial_tasks = num_initial_tasks
@@ -244,11 +243,8 @@ class ExperimentActiveUser(object):
         self._exp_params = exp_params
         self._exp_name = exp_name
         self._design_root = design_root
-        self._design_dir = f"{design_root}/{exp_name}"
         self._save_root = save_root
-        self._save_dir = f"{save_root}/{exp_name}"
         self._mp4_root = mp4_root
-        self._mp4_dir = f"{mp4_root}/{exp_name}"
         self._last_time = time.time()
 
     def update_key(self, rng_key):
@@ -345,12 +341,14 @@ class ExperimentActiveUser(object):
             self._env.set_task(task)
             self._env.reset()
             state = self._env.state
-            img_path = (
-                f"{user_id}/rng_{self._rng_name}_thumbnail_{itr}_joint_{index}.png"
-            )
-            save_path = f"{self._mp4_dir}/{img_path}"
+            if self._joint_mode:
+                img_path = f"{self._exp_name}/{user_id}/rng_{self._rng_name}_joint_iter_{itr}_index_{index}.png"
+            else:
+                img_path = f"{self._exp_name}/{user_id}/rng_{self._rng_name}_indep_iter_{itr}_index_{index}.png"
+            save_path = f"{self._mp4_root}/{img_path}"
+            print(f"Saving image to {save_path}")
             self._runner.collect_thumbnail(self._env.state, path=save_path, close=False)
-            thumbnail_urls.append(save_path)
+            thumbnail_urls.append(img_path)
         return thumbnail_urls
 
     def start_design(self, user_id):
@@ -458,6 +456,7 @@ class ExperimentActiveUser(object):
         weights = state["curr_weights"]
         state["curr_weights"] = None
         state["curr_trial"] = -1
+        state["curr_mp4s"] = []
 
         need_new_proposal = True
         if state["is_training"]:
@@ -471,7 +470,6 @@ class ExperimentActiveUser(object):
                 state["is_training"] = False
                 state["curr_tasks"] = []
                 state["curr_imgs"] = []
-                state["curr_mp4s"] = []
             else:
                 state["final_training_weights"].append(dict(weights))
                 if state["training_iter"] == num_train:
@@ -479,13 +477,11 @@ class ExperimentActiveUser(object):
                     state["is_training"] = False
                     state["curr_tasks"] = []
                     state["curr_imgs"] = []
-                    state["curr_mp4s"] = []
                 else:
                     need_new_proposal = False
                     idx = state["training_iter"]
                     state["curr_tasks"] = [state["all_training_tasks"][idx]]
                     state["curr_imgs"] = [state["all_training_imgs"][idx]]
-                    state["curr_mp4s"] = []
         else:
             # Proposal mode
             method = state["curr_active_keys"][state["curr_method_idx"]]
@@ -511,13 +507,11 @@ class ExperimentActiveUser(object):
                         state["all_training_imgs"]
                         + state["all_proposal_imgs"][next_method]
                     )
-                    state["curr_mp4s"] = []
                 else:
                     state["curr_tasks"] = [
                         state["all_proposal_tasks"][next_method][idx]
                     ]
                     state["curr_imgs"] = [state["all_proposal_imgs"][next_method][idx]]
-                    state["curr_mp4s"] = []
 
         state["need_new_proposal"] = need_new_proposal
 
@@ -553,7 +547,7 @@ class ExperimentActiveUser(object):
         self._save(user_id)
         return state
 
-    def make_video(self, user_id, index, user_state):
+    def make_video(self, user_id, index):
         """Generates mp4 visualization for user specified rewards
 
         Before:
@@ -568,6 +562,7 @@ class ExperimentActiveUser(object):
         method = state["curr_method"]
         trial = state["curr_trial"]
         weights = state["curr_weights"]
+        print(f"Received make video request index {index}")
 
         ## Make video for {itr}-{trial}-{index}
         with lock:
@@ -577,13 +572,13 @@ class ExperimentActiveUser(object):
 
             if state["is_training"]:
                 itr = state["training_iter"]
-                mp4_path = f"{user_id}/rng_{self._rng_name}_method_{method}_training_{itr:02d}_trial_{trial:02d}_joint_{index:02d}.mp4"
+                mp4_path = f"{self._exp_name}/{user_id}/rng_{self._rng_name}_training_{itr:02d}_trial_{trial:02d}_joint_{index:02d}.mp4"
             else:
                 itr = state["proposal_iter"]
-                mp4_path = f"{user_id}/rng_{self._rng_name}_method_{method}_proposal_{itr:02d}_trial_{trial:02d}_joint_{index:02d}.mp4"
+                mp4_path = f"{self._exp_name}/{user_id}/rng_{self._rng_name}_method_{method}_proposal_{itr:02d}_trial_{trial:02d}_joint_{index:02d}.mp4"
 
             state["curr_mp4s"][index] = mp4_path
-            save_path = f"{self._mp4_dir}/{mp4_path}"
+            save_path = f"{self._mp4_root}/{mp4_path}"
             print(f"Getting video {user_id}, iteration={itr}, trial={trial}, {index}")
             if not self._test_mode:
                 actions = self._controller(env_state, weights=weights, batch=False)
@@ -785,7 +780,10 @@ class ExperimentActiveUser(object):
         )
         # Load belief
         # npz_path = f"{self._save_dir}/{self._exp_name}_seed_{self._rng_name}.npz"
-        yaml_save = f"{self._design_dir}/yaml/rng_{self._rng_name}_designs.yaml"
+        yaml_save = (
+            f"{self._save_dir}/{self._exp_name}/yaml/rng_{self._rng_name}_designs.yaml"
+        )
+        os.makedirs(os.path.dirname(yaml_save), exist_ok=True)
         with open(yaml_save, "r") as stream:
             hist_data = yaml.safe_load(stream)
 
@@ -864,13 +862,15 @@ class ExperimentActiveUser(object):
             env_id=str(self._model.env_id),
             states=self._states,
         )
-        npz_path = f"{self._save_dir}/{self._exp_name}_seed_{self._rng_name}.npz"
+        npz_path = f"{self._save_root}/{self._exp_name}/{self._exp_name}_seed_{self._rng_name}.npz"
         os.makedirs(os.path.dirname(npz_path), exist_ok=True)
         with open(npz_path, "wb+") as f:
             np.savez(f, **data)
 
         ## Save user input yaml
-        yaml_save = f"{self._save_dir}/yaml/rng_{self._rng_name}_designs.yaml"
+        yaml_save = (
+            f"{self._save_root}/{self._exp_name}/yaml/rng_{self._rng_name}_designs.yaml"
+        )
         os.makedirs(os.path.dirname(yaml_save), exist_ok=True)
         tasks = self._get_final_tasks(user_id)
         obs_ws = self._get_final_weights(user_id)
@@ -881,7 +881,7 @@ class ExperimentActiveUser(object):
             )
 
     def _save_eval(self):
-        npy_path = f"{self._save_dir}/{self._exp_name}_eval_seed_{self._rng_name}.npy"
+        npy_path = f"{self._save_root}/{self._exp_name}/{self._exp_name}_eval_seed_{self._rng_name}.npy"
         os.makedirs(os.path.dirname(npy_path), exist_ok=True)
         data = dict(eval_info=self._eval_info, eval_tasks=self._eval_tasks)
         np.save(npy_path, data)

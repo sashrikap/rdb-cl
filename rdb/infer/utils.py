@@ -414,6 +414,9 @@ def visualize_mcmc_pairs(chains, fig_dir, title, normalized_key="", **kwargs):
     # colors = cm.Spectral(np.linspace(0, 1, len(chains) + 1))
     os.makedirs(fig_dir, exist_ok=True)
     for ci, chain in enumerate(chains):
+        if ci > 0:
+            # Only visualize first chain
+            continue
         plot_weights_2d(
             weights_dicts=chain,
             # colors[ci],

@@ -27,9 +27,10 @@ DESIGNER_CONTROLLER_ARGS:
 
 ## Saving
 # Full sampling
-SAVE_NAME: 200518
+SAVE_NAME: 200521
 # EXP_NAME: active_ird_ibeta_50_true_w1_eval_mean_128_seed_0_603_adam
-EXP_NAME: active_ird_ibeta_50_w0_indep_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam
+# EXP_NAME: active_ird_ibeta_50_w1_joint_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam
+EXP_NAME: active_ird_ibeta_50_w1_indep_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam
 # EXP_NAME: active_ird_ibeta_50_w0_joint_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam
 EXP_ARGS:
   num_eval: 128
@@ -43,8 +44,8 @@ EXP_ARGS:
   num_active_tasks: 144
   num_active_sample: 500
   eval_seed: 0
-  use_true_w: True
-  # use_true_w: False
+  # use_true_w: True
+  use_true_w: False
   num_prior_tasks: 2
 ## Designer Settigns
 DESIGNER_ARGS:
@@ -82,8 +83,8 @@ EVAL_ARGS:
   num_active_workers: 2
   max_batch: 500
 ACTIVE_ARGS:
-  active_fns: [infogain, ratiomean, ratiomin, difficult, random]
-  # active_fns: [infogain, random, difficult]
+  # active_fns: [infogain, ratiomean, ratiomin, difficult, random]
+  active_fns: [infogain, random, difficult]
   # active_fns: [infogain]
   # active_fns: [ratiomean, ratiomin, random]
   # active_fns: [infogain, ratiomean, ratiomin]
@@ -161,25 +162,15 @@ WEIGHT_PARAMS:
   - speed
   - control
 
-## True w0 (602)
+## True w1 (602)
 TRUE_W:
-  control: 2
-  dist_cars: 2.0
-  dist_fences: 5.35
-  dist_lanes: 2.5
-  dist_objects: 4.25
-  speed: 5
-  speed_over: 80
-
-# ## True w1 (602)
-# TRUE_W:
-#     control: 0.2
-#     dist_cars: 2.0
-#     dist_fences: 5.35
-#     dist_lanes: 2.5
-#     dist_objects: 2.25
-#     speed: 5
-#     speed_over: 80
+    control: 0.2
+    dist_cars: 2.0
+    dist_fences: 5.35
+    dist_lanes: 2.5
+    dist_objects: 2.25
+    speed: 5
+    speed_over: 80
 
 # ## True w2 (602)
 # TRUE_W:

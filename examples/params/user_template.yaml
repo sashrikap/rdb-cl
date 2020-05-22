@@ -22,6 +22,7 @@ DESIGNER_CONTROLLER_ARGS:
 # # Full sampling
 # SAVE_NAME: 200518
 # EXP_NAME: user_independent
+# # EXP_NAME: user_joint
 # MP4_ROOT: /home/jerrhe/Dropbox/Projects/SafeRew/file_server
 
 # ## Experiment Arguments
@@ -33,6 +34,7 @@ DESIGNER_CONTROLLER_ARGS:
 #   num_active_tasks: 64
 #   num_active_sample: 500
 #   eval_seed: 0
+#   num_iterations: 8
 #   num_initial_tasks: 3
 #   ## Server specific
 
@@ -80,6 +82,7 @@ DESIGNER_CONTROLLER_ARGS:
 ## Experiment Arguments
 SAVE_NAME: test_independent
 EXP_NAME: user_independent
+# EXP_NAME: user_joint
 MP4_ROOT: /home/jerrhe/Dropbox/Projects/SafeRew/file_server
 
 
@@ -91,6 +94,7 @@ EXP_ARGS:
   num_active_tasks: 7
   num_active_sample: 500
   eval_seed: 0
+  num_iterations: 8
   num_initial_tasks: 3
 ## IRD Settings
 IRD_ARGS:

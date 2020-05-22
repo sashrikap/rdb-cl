@@ -1,10 +1,8 @@
 ACTIVE_ARGS:
   active_fns:
   - infogain
-  - ratiomean
-  - ratiomin
-  - difficult
   - random
+  - difficult
 DESIGNER_ARGS:
   beta: 20
   design_mode: independent
@@ -42,8 +40,8 @@ EXP_ARGS:
   num_eval_tasks: 500
   num_prior_tasks: 2
   obs_method: mean
-  use_true_w: true
-EXP_NAME: active_ird_ibeta_50_w0_indep_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam
+  use_true_w: false
+EXP_NAME: active_ird_ibeta_50_w1_indep_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam
 IRD_ARGS:
   beta: 50
   proposal_decay: 0.9
@@ -63,13 +61,13 @@ IRD_CONTROLLER_ARGS:
   replan: 5
 RANDOM_KEYS:
 - 3
-SAVE_NAME: 200518
+SAVE_NAME: 200521
 TRUE_W:
-  control: 2
+  control: 0.2
   dist_cars: 2.0
   dist_fences: 5.35
   dist_lanes: 2.5
-  dist_objects: 4.25
+  dist_objects: 2.25
   speed: 5
   speed_over: 80
 WEIGHT_PARAMS:
