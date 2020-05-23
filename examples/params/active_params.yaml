@@ -31,17 +31,17 @@ EVAL_ARGS:
   parallel: true
 EXP_ARGS:
   eval_env_name: Week6_02-v1
-  eval_method: mean
+  eval_method: post_mean
   eval_seed: 0
   iterations: 12
   num_active_sample: 500
   num_active_tasks: 144
   num_eval: 128
-  num_eval_tasks: 500
+  num_eval_tasks: 4096
   num_prior_tasks: 2
   obs_method: mean
   use_true_w: false
-EXP_NAME: active_ird_ibeta_50_w1_indep_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam
+EXP_NAME: active_ird_ibeta_50_w1_indep_dbeta_20_dvar_0.1_eval_postmean_4096_seed_0_603_adam
 IRD_ARGS:
   beta: 50
   proposal_decay: 0.9

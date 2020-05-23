@@ -30,14 +30,17 @@ DESIGNER_CONTROLLER_ARGS:
 SAVE_NAME: 200521
 # EXP_NAME: active_ird_ibeta_50_true_w1_eval_mean_128_seed_0_603_adam
 # EXP_NAME: active_ird_ibeta_50_w1_joint_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam
-EXP_NAME: active_ird_ibeta_50_w1_indep_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam
+# EXP_NAME: active_ird_ibeta_50_w1_indep_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam
 # EXP_NAME: active_ird_ibeta_50_w0_joint_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam
+EXP_NAME: active_ird_ibeta_50_w1_indep_dbeta_20_dvar_0.1_eval_postmean_4096_seed_0_603_adam
+# EXP_NAME: active_ird_ibeta_50_w0_joint_dbeta_20_dvar_0.1_eval_postmean_4096_seed_0_603_adam
 EXP_ARGS:
+  #eval_method: mean
   num_eval: 128
-  eval_method: mean
+  # num_eval_tasks: 500
+  eval_method: post_mean
+  num_eval_tasks: 4096
   obs_method: mean
-  # eval_method: map
-  num_eval_tasks: 500
   eval_env_name: Week6_02-v1
   # num_eval_tasks: 40
   iterations: 12
@@ -99,11 +102,12 @@ ACTIVE_ARGS:
 # EXP_ARGS:
 #   num_eval: 2
 #   num_eval_tasks: 40
+#   eval_method: post_mean
 #   obs_method: mean
 #   iterations: 8
 #   eval_seed: 0
-#   # use_true_w: True
-#   use_true_w: False
+#   use_true_w: True
+#   # use_true_w: False
 #   num_prior_tasks: 2
 #   eval_env_name: Week6_02-v1
 # DESIGNER_ARGS:

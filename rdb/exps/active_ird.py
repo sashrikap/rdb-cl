@@ -109,7 +109,7 @@ class ExperimentActiveIRD(object):
         # Evaluation
         self._num_eval = num_eval
         self._eval_method = eval_method
-        assert eval_method in {"map", "mean"}
+        assert eval_method in {"map", "mean", "post_mean"}
         self._num_eval_tasks = num_eval_tasks
         self._eval_env_name = eval_env_name
         # Active Task proposal
@@ -276,11 +276,7 @@ class ExperimentActiveIRD(object):
 
                 ## Evaluate, plot and Save
                 self._evaluate(
-                    key,
-                    belief,
-                    self._eval_tasks,
-                    method=self._eval_method,
-                    num_samples=self._num_eval,
+                    key, belief, self._eval_tasks, num_samples=self._num_eval
                 )
                 self._save(itr=itr, fn_key=key)
                 self._log_time(f"Itr {itr} {key} Eval & Save")
@@ -341,7 +337,7 @@ class ExperimentActiveIRD(object):
         next_task = candidates[onp.argmax(scores)]
         return next_task, scores
 
-    def _evaluate(self, fn_key, belief, eval_tasks, method, num_samples, cache=True):
+    def _evaluate(self, fn_key, belief, eval_tasks, num_samples, cache=True):
         """Evaluate current sampled belief on eval task.
 
         Computation: n_map(~4) * n_eval(5~10k) tasks
@@ -357,10 +353,18 @@ class ExperimentActiveIRD(object):
         """
 
         # Compute belief features
-        if method == "mean":
+        if self._eval_method == "mean":
             belief_sample = belief.subsample(num_samples)
-        elif method == "map":
+        elif self._eval_method == "map":
             belief_sample = belief.map_estimate(num_samples, log_scale=False)
+        elif self._eval_method == "post_mean":
+            weights_mean = belief.weights.mean(axis=0)
+            belief_sample = self._model.create_particles(
+                [weights_mean],
+                save_name=f"ird_prior_sample",
+                controller=self._model._sample_controller,
+                runner=self._model._sample_runner,
+            )
 
         target = self._designer_server.designer.truth
         print(f"Evaluating method {fn_key}: Begin")
