@@ -73,10 +73,10 @@ class ExperimentActiveIRD(object):
         eval_seed=None,
         # Observation model
         obs_method="map",
-        use_true_w=False,
-        num_prior_tasks=0,
+        num_prior_tasks=0,  # for designer
         # Active sampling
         num_active_tasks=4,
+        num_initial_tasks=1,
         num_active_sample=-1,
         # Debugging
         fixed_candidates=None,
@@ -95,20 +95,18 @@ class ExperimentActiveIRD(object):
         self._active_fns = active_fns
         self._eval_server = eval_server
         self._obs_method = obs_method
-        self._joint_mode = "joint" in exp_name
 
         # Random key & function
         self._rng_key = None
         self._rng_name = None
         self._eval_seed = random.PRNGKey(eval_seed)
         self._iterations = iterations
+        self._num_prior_tasks = num_prior_tasks
 
         # Designer simulation
-        self._num_prior_tasks = num_prior_tasks
-        self._use_true_w = use_true_w
         self._designer_server = DesignerServer(designer_fn)
-        if not use_true_w:
-            self._designer_server.register(len(active_fns))
+        self._designer_server.register(len(active_fns))
+        self._joint_mode = self._designer_server.designer.design_mode == "joint"
 
         # Evaluation
         self._num_eval = num_eval
@@ -119,6 +117,7 @@ class ExperimentActiveIRD(object):
 
         # Active Task proposal
         self._num_active_tasks = num_active_tasks
+        self._num_initial_tasks = num_initial_tasks
         self._fixed_candidates = fixed_candidates
         self._num_active_sample = num_active_sample
         self._fixed_belief_tasks = fixed_belief_tasks
@@ -135,8 +134,7 @@ class ExperimentActiveIRD(object):
 
     def _build_cache(self):
         """ Build cache data """
-        self._initial_task = None
-        self._initial_obs = None
+        self._initial_tasks, self._initial_scores = None, None
         self._active_eval_hist = {}
         self._active_map_vs_obs_hist = {}
         self._hist_tasks = {}
@@ -215,69 +213,35 @@ class ExperimentActiveIRD(object):
         )
         self._designer_server.set_prior_tasks(prior_tasks)
 
+        ### Initial Design
+        active_keys = list(self._active_fns.keys())
+        tasks, scores = self._propose_initial_tasks()
+        if self._joint_mode:
+            obs = self._designer_server.designer.simulate(
+                onp.array(tasks), save_name=f"initial_joint_{self._num_initial_tasks}"
+            )
+            initial_obs = [obs] * self._num_initial_tasks
+        else:
+            initial_obs = []
+            for idx in range(1, self._num_initial_tasks + 1):
+                obs = self._designer_server.designer.simulate(
+                    onp.array(tasks)[:idx],
+                    save_name=f"initial_independent_{idx}_{self._num_initial_tasks}",
+                )
+                initial_obs.append(obs)
+        for key in active_keys:
+            self._hist_obs[key] = [ob for ob in initial_obs]
+            self._hist_tasks[key] = copy.deepcopy(tasks)
+            self._hist_cand_scores[key] = copy.deepcopy(scores)
+
         ### Main Experiment Loop ###
         for itr in range(0, self._iterations):
-            ## Candidates for next tasks
-            candidates = random_choice(
-                self._get_rng_task(), self._train_tasks, self._num_active_tasks
-            )
-            self._hist_candidates.append(candidates)
-
-            ### Run Active IRD on Candidates ###
-            print(f"\nActive IRD ({self._rng_name}) iteration {itr}")
-            active_keys = list(self._active_fns.keys())
-            for key in active_keys:
-                hist_beliefs = self._hist_beliefs[key]
-                hist_obs = self._hist_obs[key]
-                hist_tasks = self._hist_tasks[key]
-                print(f"Method: {key}")
-
-                ## Actively Task Proposal
-                if len(hist_obs) == 0:
-                    task, scores = self._propose_random_task()
-                    if self._initial_task is None:
-                        self._initial_task = task
-                    else:
-                        task = self._initial_task
-                elif key == "random":
-                    task, scores = self._propose_random_task()
-                elif key == "difficult":
-                    if self._train_difficulties is None:
-                        self._train_difficulties = self._model.env.all_task_difficulties
-                    task, scores = self._propose_random_task()
-                    task_ids = onp.argsort(self._train_difficulties)[-1000:]
-                    difficult_tasks = self._train_tasks[task_ids]
-                    task = random_choice(self._get_rng_task(), difficult_tasks, 1)[0]
-                else:
-                    belief = hist_beliefs[-1].subsample(self._num_active_sample)
-                    task, scores = self._propose_task(
-                        candidates, belief, hist_obs, hist_tasks, key
-                    )
-
-                self._hist_tasks[key].append(task)
-                self._hist_cand_scores[key].append(scores)
-                self._plot_candidate_scores(itr)
-                self._log_time(f"Itr {itr} {key} Propose")
-                if len(hist_beliefs) > 0:
-                    self._compare_on_next(key, hist_beliefs[-1], hist_obs[-1], task)
-
-            ### Simulate Designer ###
-            if self._use_true_w:
-                all_obs = [self._designer_server.designer.truth] * len(active_keys)
-            else:
-                tasks = onp.array(list(self._hist_tasks.values()))
-                all_obs = self._designer_server.simulate(
-                    onp.array(tasks), methods=active_keys, itr=itr
-                )
-            for obs, key in zip(all_obs, active_keys):
-                self._hist_obs[key].append(obs)
-            self._log_time(f"Itr {itr} Designer Simulated")
-
             ### IRD Sampling w/ Divide And Conquer ###
-            obs = self._hist_obs[key]
-            if self._joint_mode:  # joint design, use same obs
-                obs = [obs[-1]] * len(obs)
+            print(f"\nActive IRD ({self._rng_name}) iteration {itr}")
             for key in active_keys:
+                obs = self._hist_obs[key]
+                if self._joint_mode:  # joint design, use same obs
+                    obs = [obs[-1]] * len(obs)
                 belief = self._model.sample(
                     tasks=onp.array(self._hist_tasks[key]),
                     obs=obs,
@@ -292,9 +256,52 @@ class ExperimentActiveIRD(object):
                 self._save(itr=itr, fn_key=key)
                 self._log_time(f"Itr {itr} {key} Eval & Save")
 
+            ### Actively Task Proposal
+            candidates = random_choice(
+                self._get_rng_task(), self._train_tasks, self._num_active_tasks
+            )
+            self._hist_candidates.append(candidates)
+            for key in active_keys:
+                hist_beliefs = self._hist_beliefs[key]
+                hist_tasks = self._hist_tasks[key]
+                hist_obs = self._hist_obs[key]
+                print(f"Method: {key}")
+                belief = hist_beliefs[-1].subsample(self._num_active_sample)
+                task, scores = self._propose_task(
+                    candidates, belief, hist_obs, hist_tasks, key
+                )
+                self._hist_tasks[key].append(task)
+                self._hist_cand_scores[key].append(scores)
+                self._plot_candidate_scores(itr)
+
+                self._log_time(f"Itr {itr} {key} Propose")
+                if len(hist_beliefs) > 0:
+                    self._compare_on_next(key, hist_beliefs[-1], hist_obs[-1], task)
+
+            ### Simulate Designer ###
+            tasks = onp.array(list(self._hist_tasks.values()))
+            all_obs = self._designer_server.simulate(
+                onp.array(tasks), methods=active_keys, itr=itr
+            )
+            for obs, key in zip(all_obs, active_keys):
+                self._hist_obs[key].append(obs)
+            self._log_time(f"Itr {itr} Designer Simulated")
+
+    def _propose_initial_tasks(self):
+        assert self._num_initial_tasks > 0
+        if self._initial_tasks is None:
+            tasks = random_choice(
+                self._get_rng_task(), self._train_tasks, self._num_initial_tasks
+            ).tolist()
+            scores = [onp.zeros(self._num_active_tasks)] * self._num_initial_tasks
+            self._initial_tasks = tasks
+            self._initial_scores = scores
+            return tasks, scores
+        else:
+            return self._initial_tasks, self._initial_scores
+
     def _propose_random_task(self):
-        """Used to choose first task, when user initial design is not provided.
-        """
+        """Choose random task."""
 
         assert (
             self._num_load_design < 0
@@ -320,32 +327,49 @@ class ExperimentActiveIRD(object):
             * Use small task space to avoid being too slow.
 
         """
-
         assert len(hist_obs) == len(hist_tasks), "Observation and tasks mismatch"
         assert len(hist_obs) > 0, "Need at least 1 observation"
-        # Compute belief features
-        active_fn = self._active_fns[fn_key]
-        print(f"Active proposal method {fn_key}: Begin")
-        if fn_key != "random":
-            ## =============== Pre-empt heavy computations =====================
-            self._eval_server.compute_tasks("Active", belief, candidates, verbose=True)
-            self._eval_server.compute_tasks(
-                "Active", hist_obs[-1], candidates, verbose=True
-            )
-
-        scores = []
-        desc = "Evaluaitng candidate tasks"
-        feats_keys = self._model._env.features_keys
-        for next_task in tqdm(candidates, desc=desc):
-            scores.append(
-                active_fn(
-                    onp.array([next_task]), belief, hist_obs, feats_keys, verbose=False
+        if fn_key == "random":
+            next_task, scores = self._propose_random_task()
+        elif fn_key == "difficult":
+            if self._train_difficulties is None:
+                self._train_difficulties = self._model.env.all_task_difficulties
+            _, scores = self._propose_random_task()
+            task_ids = onp.argsort(self._train_difficulties)[-1000:]
+            difficult_tasks = self._train_tasks[task_ids]
+            next_task = random_choice(self._get_rng_task(), difficult_tasks, 1)[0]
+        else:
+            # Compute belief features
+            active_fn = self._active_fns[fn_key]
+            print(f"Active proposal method {fn_key}: Begin")
+            if fn_key != "random":
+                ## =============== Pre-empt heavy computations =====================
+                self._eval_server.compute_tasks(
+                    "Active", belief, candidates, verbose=True
                 )
-            )
-        scores = onp.array(scores)
+                self._eval_server.compute_tasks(
+                    "Active", hist_obs[-1], candidates, verbose=True
+                )
 
-        print(f"Function {fn_key} chose task {onp.argmax(scores)} among {len(scores)}")
-        next_task = candidates[onp.argmax(scores)]
+            scores = []
+            desc = "Evaluaitng candidate tasks"
+            feats_keys = self._model._env.features_keys
+            for next_task in tqdm(candidates, desc=desc):
+                scores.append(
+                    active_fn(
+                        onp.array([next_task]),
+                        belief,
+                        hist_obs,
+                        feats_keys,
+                        verbose=False,
+                    )
+                )
+            scores = onp.array(scores)
+
+            print(
+                f"Function {fn_key} chose task {onp.argmax(scores)} among {len(scores)}"
+            )
+            next_task = candidates[onp.argmax(scores)]
         return next_task, scores
 
     def _evaluate(self, fn_key, cache=True):
@@ -663,22 +687,28 @@ class ExperimentActiveIRD(object):
     def _plot_candidate_scores(self, itr, debug_dir=None):
         if debug_dir is None:
             debug_dir = self._save_root
+
+        offset = itr + self._num_initial_tasks
         hist_scores = self._hist_cand_scores
         ranking_dir = os.path.join(debug_dir, self._exp_name, "candidates")
         os.makedirs(ranking_dir, exist_ok=True)
         for fn_key in hist_scores.keys():
             # Check current active function
-            if len(hist_scores[fn_key]) <= itr or fn_key == "random":
+            if (
+                len(hist_scores[fn_key]) <= offset
+                or fn_key == "random"
+                or fn_key == "difficult"
+            ):
                 continue
-            cand_scores = onp.array(hist_scores[fn_key][itr])
+            cand_scores = onp.array(hist_scores[fn_key][offset])
             other_scores = []
             other_keys = []
             # Check other active function
             other_scores_all = copy.deepcopy(hist_scores)
             del other_scores_all[fn_key]
             for key in other_scores_all.keys():
-                if len(other_scores_all[key]) > itr:
-                    other_scores.append(other_scores_all[key][itr])
+                if len(other_scores_all[key]) > offset:
+                    other_scores.append(other_scores_all[key][offset])
                     other_keys.append(key)
 
             # Ranking plot

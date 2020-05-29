@@ -17,6 +17,7 @@ DESIGNER_ARGS:
   sample_method: MH
   select_mode: mean
   task_method: sum
+  use_true_w: false
 DESIGNER_CONTROLLER_ARGS:
   engine: jax
   horizon: 10
@@ -37,10 +38,10 @@ EXP_ARGS:
   num_active_tasks: 144
   num_eval: 128
   num_eval_tasks: 500
+  num_initial_tasks: 3
   num_prior_tasks: 0
   obs_method: mean
-  use_true_w: false
-EXP_NAME: active_ird_ibeta_50_w1_joint_dbeta_1_dvar_1_prior_0_eval_mean_128_seed_0_603_adam
+EXP_NAME: active_ird_ibeta_50_w1_joint_dbeta_1_dvar_1_initial_3_eval_mean_128_prior_0_seed_0_603_adam
 IRD_ARGS:
   beta: 50
   proposal_decay: 0.9
@@ -60,7 +61,7 @@ IRD_CONTROLLER_ARGS:
   replan: 5
 RANDOM_KEYS:
 - 3
-SAVE_NAME: 200528
+SAVE_NAME: 200529
 TRUE_W:
   control: 0.2
   dist_cars: 2.0

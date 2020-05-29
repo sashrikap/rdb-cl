@@ -124,7 +124,7 @@ def plot_weights_2d(
     # fig, axs = plt.subplots(1, figsize=(8, 8), dpi=80)
     nkeys = len(keys)
     # For higher quality, choose dpi>=80
-    fig, axs = plt.subplots(nkeys, nkeys, figsize=(2.4 * nkeys, 2.4 * nkeys), dpi=20)
+    fig, axs = plt.subplots(nkeys, nkeys, figsize=(4 * nkeys, 4 * nkeys), dpi=20)
 
     weights_dicts = weights_dicts.log() if not log_scale else weights_dicts
 

@@ -261,8 +261,8 @@ if __name__ == "__main__":
     N = -1
     use_seeds = [0, 1, 2, 3]
     not_seeds = []
-    MAX_LEN = 2
-    MAX_RANDOM_LEN = 2
+    MAX_LEN = 9
+    MAX_RANDOM_LEN = 9
     PADDING = 0
 
     use_seeds = [str(random.PRNGKey(si)) for si in use_seeds]
@@ -270,9 +270,9 @@ if __name__ == "__main__":
     not_methods = ["ratiomin"]
     plot_obs = True
 
-    exp_dir = "data/200528"
+    exp_dir = "data/200529"
     # exp_name = "active_ird_exp_ird_beta_50_true_w_map_sum_irdvar_3_adam200"
     # exp_name = "active_ird_ibeta_50_true_w1_eval_mean_128_seed_0_603_adam"
     # exp_name = "active_ird_ibeta_50_true_w1_eval_mean_128_seed_0_603_adam"
-    exp_name = "active_ird_ibeta_50_w1_joint_dbeta_1_dvar_1_prior_0_eval_mean_128_seed_0_603_adam"
+    exp_name = "active_ird_ibeta_50_w1_joint_dbeta_1_dvar_1_initial_3_eval_mean_128_prior_0_seed_0_603_adam"
     plot_data()

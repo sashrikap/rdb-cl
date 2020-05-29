@@ -41,6 +41,7 @@ class Designer(object):
         num_normalizers,
         proposal_decay=1.0,
         ## Sampling
+        use_true_w=False,
         design_mode="independent",
         select_mode="mean",
         task_method="sum",
@@ -73,6 +74,7 @@ class Designer(object):
         self._proposal_decay = proposal_decay
 
         ## Designer model
+        self._use_true_w = use_true_w
         assert design_mode in {"independent", "joint"}
         self._design_mode = design_mode
         assert select_mode in {"mean", "map"}
@@ -95,6 +97,14 @@ class Designer(object):
 
         ## Designer Prior tasks
         self._prior_tasks = []
+
+    @property
+    def use_true_w(self):
+        return self._use_true_w
+
+    @property
+    def design_mode(self):
+        return self._design_mode
 
     @property
     def likelihood(self):
@@ -213,6 +223,15 @@ class Designer(object):
 
         """
         print(f"Sampling Designer (prior={len(self._prior_tasks)}): {save_name}")
+        if self._use_true_w:
+            particles = self.create_particles(
+                [self.true_w],
+                controller=self._one_controller,
+                runner=self._one_runner,
+                save_name=save_name,
+            )
+            return particles
+
         ## Sample based on prior_tasks + tasks
         assert self._truth is not None, "Need assumed designer truth."
         assert self._prior_tasks is not None, "Need >=0 prior tasks."
