@@ -160,12 +160,6 @@ def submit_design():
     return json.dumps(server_state)
 
 
-@api.route("/companies", methods=["GET"])
-def get_companies():
-    companies = [{"id": 1, "name": "Company One"}, {"id": 2, "name": "Company Two"}]
-    return json.dumps(companies)
-
-
 ##======================================================##
 ##===================== Server Class ===================##
 ##======================================================##
@@ -286,6 +280,7 @@ class ExperimentActiveUser(object):
             user_id=user_id,
             joint_mode=self._joint_mode,  # (bool)
             active_keys=active_keys,  # [method (str)]
+            num_iterations=self._num_iterations,  # (int)
             ## Temporary
             curr_weights=None,  # weights (dict)
             curr_tasks=[],  # [task (list)]
@@ -317,6 +312,7 @@ class ExperimentActiveUser(object):
                 m: [] for m in active_keys
             },  # method (str) -> [weights (dict)]
             need_new_proposal=False,  # (bool)
+            proposal_finished=False,
         )
         return new_state
 
@@ -329,7 +325,7 @@ class ExperimentActiveUser(object):
             print(f">>> Iterative IRD {caption} Time: {int(h)}h {int(m)}m {s:.2f}s")
         self._last_time = time.time()
 
-    def _get_tasks_thumbnail_urls(self, user_id, itr, tasks):
+    def _get_tasks_thumbnail_urls(self, user_id, itr, tasks, is_training=True):
         """Generate thumbnails and return urls (relative)
         Input:
             tasks (ndarray)
@@ -341,10 +337,11 @@ class ExperimentActiveUser(object):
             self._env.set_task(task)
             self._env.reset()
             state = self._env.state
+            stage_str = "training" if is_training else "proposal"
             if self._joint_mode:
-                img_path = f"{self._exp_name}/{user_id}/rng_{self._rng_name}_joint_iter_{itr}_index_{index}.png"
+                img_path = f"{self._exp_name}/{user_id}/rng_{self._rng_name}_joint_{stage_str}_iter_{itr}_index_{index}.png"
             else:
-                img_path = f"{self._exp_name}/{user_id}/rng_{self._rng_name}_indep_iter_{itr}_index_{index}.png"
+                img_path = f"{self._exp_name}/{user_id}/rng_{self._rng_name}_indep_{stage_str}_iter_{itr}_index_{index}.png"
             save_path = f"{self._mp4_root}/{img_path}"
             print(f"Saving image to {save_path}")
             self._runner.collect_thumbnail(self._env.state, path=save_path, close=False)
@@ -381,7 +378,7 @@ class ExperimentActiveUser(object):
         ## Propose initial tasks
         state["training_iter"] = 0
         itr = state["training_iter"]
-        urls = self._get_tasks_thumbnail_urls(user_id, itr, tasks)
+        urls = self._get_tasks_thumbnail_urls(user_id, itr, tasks, is_training=True)
         state["all_training_tasks"] = tasks.tolist()
         state["all_training_imgs"] = urls
         for idx in range(len(state["all_training_tasks"])):
@@ -420,7 +417,9 @@ class ExperimentActiveUser(object):
         state["proposal_iter"] += 1
         itr = state["proposal_iter"]
         for method, task in new_tasks.items():
-            urls = self._get_tasks_thumbnail_urls(user_id, itr, [task])
+            urls = self._get_tasks_thumbnail_urls(
+                user_id, itr, [task], is_training=False
+            )
             state["all_proposal_imgs"][method] += urls
             state["all_proposal_tasks"][method] += [list(task)]
             state["all_proposal_weights"][method].append([])
@@ -512,6 +511,10 @@ class ExperimentActiveUser(object):
                         state["all_proposal_tasks"][next_method][idx]
                     ]
                     state["curr_imgs"] = [state["all_proposal_imgs"][next_method][idx]]
+
+        # Whether all iterations finished
+        if state["proposal_iter"] + 1 == state["num_iterations"]:
+            state["proposal_finished"] = True
 
         state["need_new_proposal"] = need_new_proposal
 

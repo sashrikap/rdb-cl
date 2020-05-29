@@ -5,8 +5,21 @@ import jax.numpy as np
 import numpy as onp
 import matplotlib.pyplot as plt
 import seaborn as sns
+import matplotlib
 
-sns.set()
+matplotlib.rcParams["text.usetex"] = True
+matplotlib.rc("font", family="serif", serif=["Palatino"])
+sns.set(font="serif", font_scale=1.4)
+sns.set_style(
+    "white",
+    {
+        "font.family": "serif",
+        "font.weight": "normal",
+        "font.serif": ["Times", "Palatino", "serif"],
+        "axes.facecolor": "white",
+        "lines.markeredgewidth": 1,
+    },
+)
 
 
 def plot_proposal_eval():
@@ -41,6 +54,15 @@ def plot_proposal_eval():
     plt.bar(xs, ys, yerr=yerr)
     plt.xticks(xs, methods)
     plt.show()
+
+
+colors = {
+    "random": "gray",
+    "infogain": "darkorange",
+    "difficult": "purple",
+    "ratiomean": "peru",
+    "ratiomin": "darkred",
+}
 
 
 def plot_training_proposal_eval(mode="bar"):
@@ -84,14 +106,6 @@ def plot_training_proposal_eval(mode="bar"):
         for fn_key in methods:
             all_training_eval[fn_key].append(data["training_eval"][fn_key]["violation"])
 
-    colors = {
-        "random": "gray",
-        "infogain": "darkorange",
-        "difficult": "purple",
-        "ratiomean": "peru",
-        "ratiomin": "darkred",
-    }
-
     if mode == "dot":
         fig, ax = plt.subplots(figsize=(8, 8))
         for fn_key in methods:
@@ -112,7 +126,7 @@ def plot_training_proposal_eval(mode="bar"):
                 color=colors[fn_key],
                 markersize=9,
             )
-        plt.title("MAP Improvement")
+        plt.title("Posterior Improvement (Higher is better)")
         plt.xlabel("Training Violations")
         plt.ylabel("Improvement")
         plt.legend(loc="upper left")
@@ -139,11 +153,78 @@ def plot_training_proposal_eval(mode="bar"):
         ax.set_xticks(x)
         ax.set_xticklabels([f"Sample {i}" for i in range(len(use_seeds))])
         plt.xlabel("Training Tasks")
-        plt.title("MAP Improvement")
+        plt.title("Posterior Improvement (Higher is better)")
         plt.ylabel("Violation Improvement")
         plt.legend(loc="upper left")
         # plt.show()
         plt.savefig(os.path.join(exp_dir, exp_name, f"proposal_{mode}.png"))
+
+
+medianprops = dict(linestyle="-", linewidth=2.5, color="firebrick")
+
+
+def plot_box_proposal_ratio():
+    all_training_data = []
+    all_visualize_data = []
+    methods = None
+    for seed in use_seeds:
+        if seed in not_seeds:
+            continue
+        training_file_name = f"training_rng_{seed:02d}.npy"
+        training_file_path = f"{exp_dir}/{exp_name}/{training_file_name}"
+        if os.path.isfile(training_file_path):
+            all_training_data.append(
+                np.load(training_file_path, allow_pickle=True).item()
+            )
+        visualize_file_name = f"visualize_rng_{seed:02d}.npy"
+        visualize_file_path = f"{exp_dir}/{exp_name}/{visualize_file_name}"
+        if os.path.isfile(visualize_file_path):
+            all_visualize_data.append(
+                np.load(visualize_file_path, allow_pickle=True).item()
+            )
+
+    # Gather active function names
+    for data in all_training_data:
+        prop_data = data["training_eval"]
+        if methods is None:
+            methods = list(prop_data.keys())
+        else:
+            assert set(methods) == set(list(prop_data.keys()))
+    # Gather eval output for each active function
+    all_training_eval = {fn_key: [] for fn_key in methods}
+    all_visualize_eval = {fn_key: [] for fn_key in methods}
+    for data in all_visualize_data:
+        for fn_key in methods:
+            all_visualize_eval[fn_key] = all_visualize_eval[fn_key] + list(
+                data["proposal_eval"][fn_key]["violation_per_task"]
+            )
+    for data in all_training_data:
+        for fn_key in methods:
+            all_training_eval[fn_key].append(data["training_eval"][fn_key]["violation"])
+    fig, ax = plt.subplots(figsize=(8, 8))
+    ratios = []
+    for fn_key in methods:
+        xs, ys = [], []
+        num_propose = int(
+            len(all_visualize_eval[fn_key]) / len(all_training_eval[fn_key])
+        )
+        ys = np.array(all_visualize_eval[fn_key])
+        xs = np.array(all_training_eval[fn_key]).repeat(num_propose)
+        ratios.append(ys / xs)
+    rects = ax.boxplot(
+        ratios, showfliers=False, patch_artist=True, medianprops=medianprops
+    )
+
+    for patch, method in zip(rects["boxes"], methods):
+        patch.set_facecolor(colors[method])
+        patch.set_alpha(0.7)
+
+    plt.title("Violation on Proposed Task (Higher is better)")
+    plt.xlabel("Method")
+    plt.ylabel("Violation")
+    plt.legend(loc="upper left")
+    plt.savefig(os.path.join(exp_dir, exp_name, f"next_ratio.png"))
+    plt.show()
 
 
 if __name__ == "__main__":
@@ -153,7 +234,8 @@ if __name__ == "__main__":
     not_methods = []
     exp_dir = "data/200413"
     # exp_name = "active_ird_exp_ird_beta_50_true_w_map_sum_irdvar_3_adam200"
-    exp_name = "interactive_proposal_divide_training_03_propose_04"
+    exp_name = "interactive_proposal_divide_training_03_propose_04_old"
     # plot_proposal_eval()
-    plot_training_proposal_eval("bar")
+    # plot_training_proposal_eval("bar")
     # plot_training_proposal_eval("dot")
+    plot_box_proposal_ratio()

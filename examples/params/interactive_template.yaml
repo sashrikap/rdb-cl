@@ -1,7 +1,7 @@
 # ENV_NAME: "Week6_01-v0"
 
 
-RANDOM_KEYS: [0]
+RANDOM_KEYS: [3]
 
 ENV_NAME: "Week6_03-v1"
 
@@ -19,9 +19,11 @@ DESIGNER_CONTROLLER_ARGS:
 
 
 # Full sampling
-SAVE_NAME: 200501
+# SAVE_NAME: 200501
+SAVE_NAME: 200413
 #EXP_NAME: interactive_proposal_divide_training_03_propose_04
-EXP_NAME: interactive_proposal_divide_training_03_propose_04
+# EXP_NAME: interactive_proposal_divide_training_03_propose_04
+EXP_NAME: interactive_proposal_divide_training_03_propose_04_old
 # EXP_NAME: interactive_proposal_batch_training_03_propose_04
 # SAVE_NAME: 200411
 # EXP_NAME: interactive_proposal_batch_training_03_propose_08

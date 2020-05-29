@@ -27,6 +27,7 @@ weights = {
     "speed": 0.05,
     "control": 0.1,
 }
+normal_key = "dist_cars"
 
 
 def get_mpc(engine, method):
@@ -35,7 +36,7 @@ def get_mpc(engine, method):
         main_car.cost_runtime,
         horizon,
         env.dt,
-        replan=False,
+        replan=5,
         T=T,
         engine=engine,
         method=method,
@@ -56,6 +57,12 @@ def run_single(states, optimizer, runner, weights):
         state_i = state_i[None, :]
         acs_i = optimizer(state_i, weights=weights, batch=False)
         traj_i, cost_i, info_i = runner(state_i, acs_i, weights=weights, batch=False)
+        weights_dict = (
+            DictList([weights]).prepare(env.features_keys).normalize_by_key(normal_key)
+        )
+        max_feats = DictList([env.max_feats_dict])
+        feats_sum = info_i["feats_sum"]
+        costs_to_max = (weights_dict * (feats_sum - max_feats)).onp_array().mean(axis=0)
         costs_single.append(cost_i)
     costs_single = onp.concatenate(costs_single)
     return costs_single

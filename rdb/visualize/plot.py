@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib
+
+matplotlib.use("Agg")
 import numpy as onp
 import rdb
 from rdb.exps.utils import Profiler

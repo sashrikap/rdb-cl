@@ -184,14 +184,23 @@ class ActiveRatioTest(ActiveInfoGain):
 
         if not verbose:
             desc = None
+        worst_feats_sum = DictList([belief._env.max_feats_dict])
         next_feats_sum = belief.get_features_sum(next_task).prepare(feats_keys)
         user_feats_sum = obs.get_features_sum(next_task).prepare(feats_keys)
         #  shape (nweights,)
-        next_costs = (belief.weights * next_feats_sum).numpy_array().mean(axis=0)
-        user_costs = (belief.weights * user_feats_sum).numpy_array().mean(axis=0)
+        next_costs = (
+            (belief.weights * (next_feats_sum - worst_feats_sum))
+            .numpy_array()
+            .mean(axis=0)
+        )
+        user_costs = (
+            (belief.weights * (user_feats_sum - worst_feats_sum))
+            .numpy_array()
+            .mean(axis=0)
+        )
         next_rews = -1 * next_costs
         user_rews = -1 * user_costs
-        ratios = self._beta * (user_rews - next_rews)
+        ratios = self._beta * (user_rews - next_rews) / next_rews
         if self._debug:
             min_idx = np.argmin(ratios)
             print(f"Active method {self._method}")

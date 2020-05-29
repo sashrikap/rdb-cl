@@ -1,7 +1,6 @@
 from os.path import join, expanduser, isdir, dirname
 from itertools import product
 from jax import random
-import matplotlib.pyplot as plt
 import jax.numpy as np
 import logging, time
 import numpy as onp

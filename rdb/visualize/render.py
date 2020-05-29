@@ -1,6 +1,9 @@
 import gym
 import copy
 import numpy as onp
+import matplotlib
+
+matplotlib.use("Agg")
 from functools import partial
 from matplotlib import pyplot as plt
 from os import makedirs

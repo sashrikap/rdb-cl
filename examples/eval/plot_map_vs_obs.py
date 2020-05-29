@@ -6,8 +6,21 @@ import numpy as onp
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import nonzero
+import matplotlib
 
-sns.set()
+matplotlib.rcParams["text.usetex"] = True
+matplotlib.rc("font", family="serif", serif=["Palatino"])
+sns.set(font="serif", font_scale=1.4)
+sns.set_style(
+    "white",
+    {
+        "font.family": "serif",
+        "font.weight": "normal",
+        "font.serif": ["Times", "Palatino", "serif"],
+        "axes.facecolor": "white",
+        "lines.markeredgewidth": 1,
+    },
+)
 
 colors = {
     "random": "gray",
@@ -78,12 +91,12 @@ def load_data(eval_plot_data, map_plot_data, obs_plot_data, exp_name, save_name=
             for _idx in range(len(map_hist)):
                 # for _idx in range(len(map_hist)):
                 map_plot_data[method].append(
-                    onp.array(map_hist[_idx]["belief_perform_relative"]).mean()
+                    onp.array(map_hist[_idx]["belief_perform_normalized"]).mean()
                 )
                 obs_plot_data[method].append(
-                    onp.array(map_hist[_idx]["obs_perform_relative"]).mean()
+                    onp.array(map_hist[_idx]["obs_perform_normalized"]).mean()
                 )
-                eval_plot_data[method].append(eval_hist[_idx]["perform"])
+                eval_plot_data[method].append(eval_hist[_idx]["normalized_perform"])
 
 
 def get_bin_mean(a, b_start, b_end):
@@ -121,7 +134,7 @@ def plot_dot_data(eval_plot_data, map_plot_data, obs_plot_data):
     # plt.xticks(x, list(data.keys()))
     plt.legend(loc="upper left")
     xy_range = (-0.5, 5)
-    ax.plot(xy_range, xy_range, "k--", linewidth=1, color="gray")
+    # ax.plot(xy_range, xy_range, "k--", linewidth=1, color="gray")
 
     # ax.set_xlim(*xy_range)
     # ax.set_ylim(*xy_range)
@@ -141,7 +154,49 @@ def plot_dot_data(eval_plot_data, map_plot_data, obs_plot_data):
     plt.show()
 
 
-def plot_line_data(eval_plot_data, map_plot_data, obs_plot_data):
+medianprops = dict(linestyle="-", linewidth=2.5, color="firebrick")
+
+
+def plot_box_data(eval_plot_data, map_plot_data, obs_plot_data):
+    # Only look at first proposed task
+    _, ax = plt.subplots(figsize=(10, 10))
+
+    n = 0
+    methods = []
+    ratios = []
+    errs = []
+    for method in eval_plot_data:
+        methods.append(method)
+        method_ratios = onp.array(map_plot_data[method]) / onp.array(
+            eval_plot_data[method]
+        )
+        ratios.append(method_ratios)
+
+    # plt.xticks(x, list(data.keys()))
+    ax.set_ylabel("Posterior Regret on Proposed task")
+    ax.set_xlabel("Method")
+    x = onp.arange(len(methods)) + 1
+    rects = ax.boxplot(
+        ratios,
+        whis=(0, 95),
+        showfliers=False,
+        patch_artist=True,
+        medianprops=medianprops,
+    )
+
+    for patch, method in zip(rects["boxes"], methods):
+        patch.set_facecolor(colors[method])
+        patch.set_alpha(0.7)
+
+    # plt.axis('scaled')
+    ax.set_title(f"Posterior regret on next task (higher is better)")
+    ax.set_xticks(x)
+    ax.set_xticklabels(methods)
+    plt.savefig(os.path.join(exp_dir, exp_name, f"box_map_vs_eval.png"))
+    plt.show()
+
+
+def plot_bar_data(eval_plot_data, map_plot_data, obs_plot_data):
     # Only look at first proposed task
     _, ax = plt.subplots(figsize=(10, 10))
 
@@ -161,20 +216,14 @@ def plot_line_data(eval_plot_data, map_plot_data, obs_plot_data):
     ax.set_ylabel("Posterior Regret on Proposed task")
     ax.set_xlabel("Method")
     x = onp.arange(len(methods))
-    rects = ax.bar(
-        x,
-        ratios,
-        # yerrs=errs
-    )
+    rects = ax.bar(x, ratios, yerr=errs, align="center")
     # plt.axis('scaled')
     ax.set_title(
         f"Posterior regret on next task vs Current posterior regret (higher is better)"
     )
-    print(errs)
-    print(methods)
-    ax.set_xticks(x, methods)
-    # ax.set_xticklabels(methods)
-    # plt.savefig(os.path.join(exp_dir, exp_name, f"map_vs_eval.png"))
+    ax.set_xticks(x)
+    ax.set_xticklabels(methods)
+    plt.savefig(os.path.join(exp_dir, exp_name, f"bar_map_vs_eval.png"))
     plt.show()
 
 
@@ -257,11 +306,46 @@ def plot_binned_data(eval_plot_data, map_plot_data, obs_plot_data, plot_obs=Fals
     plt.show()
 
 
+def plot_line_data(eval_plot_data, map_plot_data, obs_plot_data):
+    # Only look at first proposed task
+    _, ax = plt.subplots(figsize=(10, 10))
+
+    n = 0
+    methods = []
+    ratios = []
+    errs = []
+    for method in eval_plot_data:
+        methods.append(method)
+        method_ratios = onp.array(map_plot_data[method]) / onp.array(
+            eval_plot_data[method]
+        )
+        mean_ratios = []
+        idx = 0
+        while idx < len(method_ratios):
+            mean_ratios.append(method_ratios[idx : idx + MAX_LEN])
+            idx += len(method_ratios)
+        ratios.append(np.array(mean_ratios).mean(axis=0))
+
+    # plt.xticks(x, list(data.keys()))
+    ax.set_ylabel("Posterior Regret on Proposed task")
+    ax.set_xlabel("Method")
+    for mi, m in enumerate(methods):
+        x = onp.arange(len(ratios[mi]))
+        rects = ax.plot(x, ratios[mi], label=m)
+    plt.legend(loc="upper right")
+
+    ax.set_title(
+        f"Posterior regret on next task vs Current posterior regret (higher is better)"
+    )
+    plt.savefig(os.path.join(exp_dir, exp_name, f"line_map_vs_eval.png"))
+    plt.show()
+
+
 if __name__ == "__main__":
     N = -1
     all_seeds = [0, 1, 2, 3, 21, 22]
     not_seeds = []
-    exp_dir = "data/200521"
+    exp_dir = "data/200523"
     exp_name = (
         "active_ird_ibeta_50_w1_joint_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam"
     )
@@ -269,8 +353,8 @@ if __name__ == "__main__":
     # exp_name = "active_ird_ibeta_50_w0_joint_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam"
     # alt_name = "active_ird_ibeta_50_true_w1_eval_unif_128_seed_0_603_adam"
 
-    MAX_LEN = 4
-    MAX_RANDOM_LEN = 4
+    MAX_LEN = 12
+    MAX_RANDOM_LEN = 12
     PADDING = 0
 
     use_seeds = [str(random.PRNGKey(si)) for si in all_seeds]
@@ -282,6 +366,8 @@ if __name__ == "__main__":
     obs_plot_data = {}
     load_data(eval_plot_data, map_plot_data, obs_plot_data, exp_name)
     # load_data(eval_plot_data, map_plot_data, exp_name, alt_name)
-    plot_dot_data(eval_plot_data, map_plot_data, obs_plot_data)
+    # plot_dot_data(eval_plot_data, map_plot_data, obs_plot_data)
     # plot_binned_data(eval_plot_data, map_plot_data, obs_plot_data)
+    # plot_bar_data(eval_plot_data, map_plot_data, obs_plot_data)
     # plot_line_data(eval_plot_data, map_plot_data, obs_plot_data)
+    plot_box_data(eval_plot_data, map_plot_data, obs_plot_data)

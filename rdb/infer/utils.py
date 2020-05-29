@@ -374,6 +374,9 @@ def visualize_mcmc_feature(chains, rates, fig_dir, title, **kwargs):
 
     """
     import itertools
+    import matplotlib
+
+    matplotlib.use("Agg")
     import matplotlib.cm as cm
 
     assert len(chains) == len(rates)
@@ -404,6 +407,9 @@ def visualize_mcmc_pairs(chains, fig_dir, title, normalized_key="", **kwargs):
 
     """
     import itertools
+    import matplotlib
+
+    matplotlib.use("Agg")
     import matplotlib.cm as cm
 
     # Copy

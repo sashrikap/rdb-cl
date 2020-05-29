@@ -3,7 +3,22 @@ import gym
 import rdb.envs.drive2d
 import matplotlib.pyplot as plt
 import numpy as onp
+import matplotlib
+import seaborn as sns
 
+matplotlib.rcParams["text.usetex"] = True
+matplotlib.rc("font", family="serif", serif=["Palatino"])
+sns.set(font="serif", font_scale=1.4)
+sns.set_style(
+    "white",
+    {
+        "font.family": "serif",
+        "font.weight": "normal",
+        "font.serif": ["Times", "Palatino", "serif"],
+        "axes.facecolor": "white",
+        "lines.markeredgewidth": 1,
+    },
+)
 
 ROOT_DIR = "data/env_distribution"
 
@@ -202,8 +217,8 @@ data = [
 ]
 
 # import pdb; pdb.set_trace()
-# keys = ["random", "infogain"]
-keys = []
+keys = ["random", "infogain"]
+# keys = []
 colors = ["gray", "darkorange"]
 nbins = 80
 
@@ -228,7 +243,7 @@ n, bins3, patches3 = ax0.hist(
     alpha=0.5,
     bins=nbins,
     histtype="stepfilled",
-    label=f"Sparse ({int(len(tasks3) / 1000)}k)",
+    label=f"Training ({int(len(tasks3) / 1000)}k)",
 )
 n, bins2, patches2 = ax0.hist(
     difficulties2,
@@ -237,8 +252,11 @@ n, bins2, patches2 = ax0.hist(
     alpha=0.5,
     bins=nbins,
     histtype="stepfilled",
-    label=f"Dense ({int(len(tasks2) / 1000)}k)",
+    label=f"Test ({int(len(tasks2) / 1000)}k)",
 )
+ax0.set_yticklabels([])
+ax0.set_xticklabels([])
+
 # ax0.legend(loc="upper right")
 
 for ki, (key, c) in enumerate(zip(keys, colors)):
@@ -266,6 +284,9 @@ for ki, (key, c) in enumerate(zip(keys, colors)):
     axs[1 + ki].hist(
         bins[:-1], bins, weights=factor * counts, facecolor=c, histtype="stepfilled"
     )
+    axs[1 + ki].set_yticklabels([])
+    axs[1 + ki].set_xticklabels([])
+
 
 ax0.legend(loc="upper right")
 # axs.set_title("Proposals")

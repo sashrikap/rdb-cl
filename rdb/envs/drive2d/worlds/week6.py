@@ -11,7 +11,8 @@ import numpyro.distributions as dist
 import itertools, copy
 from collections import OrderedDict
 from rdb.optim.utils import *
-from rdb.envs.drive2d.core import car, objects, feature, constraints
+from rdb.envs.drive2d.core import car, objects, constraints
+from rdb.envs.drive2d.core.feature import *
 from rdb.envs.drive2d.worlds.highway import HighwayDriveWorld
 from functools import partial
 from numpyro.handlers import seed
@@ -121,69 +122,113 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
             * Exponent : exp(run_over)
 
         """
+        max_feats_dict = OrderedDict()
         nlr_feats_dict = OrderedDict()
         # Sum across ncars & state (nbatch, ncars, state)
         sum_items = partial(np.sum, axis=(1, 2))
         # Sum across state (nbatch, state)
         sum_state = partial(np.sum, axis=1)
-        # Gaussian
-        ncars = len(self._cars)
+        fence_const = 3.0
+        ctrl_const = 3.0
+        speed_const = 5.0
+
+        ## Car distance feature
+        ncars, car_dim = len(self._cars), 2
+        sigcar = np.array([self._car_width / 2, self._car_length])
         nlr_feats_dict["dist_cars"] = compose(
-            sum_items,
-            partial(
-                feature.gaussian_feat,
-                sigma=np.array([self._car_width / 2, self._car_length]),
-            ),
+            sum_items, partial(gaussian_feat, sigma=sigcar)
         )
-        # Gaussian
+        # max_feats_dict["dist_cars"] = np.sum(gaussian_feat(np.zeros((car_dim, ncars, car_dim)), sigma=sigcar))
+        max_feats_dict["dist_cars"] = np.sum(
+            gaussian_feat(np.zeros((car_dim, 1, car_dim)), sigma=sigcar)
+        )
+
+        ## Lane distance feature
         nlr_feats_dict["dist_lanes"] = compose(
             sum_items,
-            feature.neg_feat,
-            partial(feature.gaussian_feat, sigma=self._car_length),
-            partial(feature.item_index_feat, index=self._goal_lane),
+            neg_feat,
+            partial(gaussian_feat, sigma=self._car_length),
+            partial(item_index_feat, index=self._goal_lane),
         )
+        max_feats_dict["dist_lanes"] = 0.0
+
+        ## Fence distance feature
+        max_fence = fence_const * self._lane_width
         nlr_feats_dict["dist_fences"] = compose(
             sum_items,
-            # feature.quadratic_feat,
-            # feature.neg_relu_feat,
-            feature.relu_feat,
+            # quadratic_feat, # neg_relu_feat,
+            partial(relu_feat, max_val=max_fence),
             lambda dist: dist,
         )
-        nobjs = len(self._objects)
-        nlr_feats_dict["dist_objects"] = compose(
-            sum_items,
-            partial(
-                feature.gaussian_feat,
-                sigma=np.array([self._car_width / 2, self._car_length * 2]),
-            ),
-        )
-        nlr_feats_dict["control"] = compose(sum_state, feature.quadratic_feat)
-        nlr_feats_dict["control_throttle"] = compose(sum_state, feature.quadratic_feat)
-        nlr_feats_dict["control_brake"] = compose(sum_state, feature.quadratic_feat)
-        nlr_feats_dict["control_turn"] = compose(sum_state, feature.quadratic_feat)
+        max_feats_dict["dist_fences"] = max_fence
 
-        nlr_feats_dict["speed"] = compose(
-            sum_state, partial(feature.quadratic_feat, goal=self._goal_speed)
+        ## Object distance feature
+        nobjs, obj_dim = len(self._objects), 2
+        sigobj = np.array([self._car_width / 2, self._car_length * 2])
+        nlr_feats_dict["dist_objects"] = compose(
+            sum_items, partial(gaussian_feat, sigma=sigobj)
         )
+        # max_feats_dict["dist_objects"] = np.sum(gaussian_feat(
+        #     np.zeros((obj_dim, nobjs, obj_dim)), sigma=sigobj
+        # ))
+        max_feats_dict["dist_objects"] = np.sum(
+            gaussian_feat(np.zeros((obj_dim, 1, obj_dim)), sigma=sigobj)
+        )
+
+        ## Control features
+        ones = np.ones((1, 1))  # (nbatch=1, dim=1)
+        max_control = np.array([self._max_steer, self._max_throttle]) * ctrl_const
+        nlr_feats_dict["control"] = compose(
+            sum_state, partial(quadratic_feat, max_val=max_control)
+        )
+        max_feats_dict["control"] = np.sum(quadratic_feat(ones * max_control))
+        nlr_feats_dict["control_throttle"] = compose(
+            sum_state, partial(quadratic_feat, max_val=self._max_throttle * ctrl_const)
+        )
+        max_feats_dict["control_throttle"] = np.sum(
+            quadratic_feat(ones * self._max_throttle * ctrl_const)
+        )
+        nlr_feats_dict["control_brake"] = compose(
+            sum_state, partial(quadratic_feat, max_val=self._max_brake * ctrl_const)
+        )
+        max_feats_dict["control_brake"] = np.sum(
+            quadratic_feat(ones * self._max_brake * ctrl_const)
+        )
+        nlr_feats_dict["control_turn"] = compose(
+            sum_state, partial(quadratic_feat, max_val=self._max_steer * ctrl_const)
+        )
+        max_feats_dict["control_turn"] = np.sum(
+            quadratic_feat(ones * self._max_steer * ctrl_const)
+        )
+
+        ## Speed features
+        max_dspeed = speed_const * (self._max_speed - self._goal_speed)
+        nlr_feats_dict["speed"] = compose(
+            sum_state,
+            partial(quadratic_feat, goal=self._goal_speed, max_val=max_dspeed),
+        )
+        max_feats_dict["speed"] = np.sum(quadratic_feat(ones * max_dspeed))
         nlr_feats_dict["speed_over"] = compose(
             sum_state,
-            feature.quadratic_feat,
-            partial(feature.more_than, y=self._goal_speed),
+            partial(quadratic_feat, max_val=max_dspeed),
+            partial(more_than, y=self._goal_speed),
         )
+        max_feats_dict["speed_over"] = np.sum(quadratic_feat(ones * max_dspeed))
         nlr_feats_dict["speed_under"] = compose(
             sum_state,
-            feature.quadratic_feat,
-            partial(feature.less_than, y=self._goal_speed),
+            partial(quadratic_feat, max_val=max_dspeed),
+            partial(less_than, y=self._goal_speed),
         )
+        max_feats_dict["speed_under"] = np.sum(quadratic_feat(ones * max_dspeed))
         nlr_feats_dict = chain_dict_funcs(nlr_feats_dict, feats_dict)
 
-        # Speed up
+        ## JAX compile
         for key, fn in nlr_feats_dict.items():
             nlr_feats_dict[key] = jax.jit(fn)
 
-        return nlr_feats_dict
+        return nlr_feats_dict, max_feats_dict
 
-    def _get_constraints_fn(self):
+    def _build_constraints_fn(self):
         constraints_dict = OrderedDict()
         constraints_dict["offtrack"] = constraints.build_offtrack(env=self)
         constraints_dict["overspeed"] = constraints.build_overspeed(
@@ -203,16 +248,15 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
         )
         constraints_dict["collision"] = constraints.build_collision(env=self)
         constraints_dict["crash_objects"] = constraints.build_crash_objects(env=self)
-        constraints_fn = merge_dict_funcs(constraints_dict)
+        self._constraints_fn = merge_dict_funcs(constraints_dict)
+        self._constraints_dict = constraints_dict
 
-        return constraints_dict, constraints_fn
-
-    def _get_metadata_fn(self):
+    def _build_metadata_fn(self):
         metadata_dict = OrderedDict()
         metadata_dict["overtake0"] = constraints.build_overtake(env=self, car_idx=0)
         metadata_dict["overtake1"] = constraints.build_overtake(env=self, car_idx=1)
-        metadata_fn = merge_dict_funcs(metadata_dict)
-        return metadata_dict, metadata_fn
+        self._metadata_fn = merge_dict_funcs(metadata_dict)
+        self._metadata_dict = metadata_dict
 
     def update_key(self, rng_key):
         super().update_key(rng_key)

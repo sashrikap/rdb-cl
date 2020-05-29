@@ -2,10 +2,9 @@ ACTIVE_ARGS:
   active_fns:
   - infogain
   - random
-  - difficult
 DESIGNER_ARGS:
-  beta: 20
-  design_mode: independent
+  beta: 1
+  design_mode: joint
   num_normalizers: 1000
   proposal_decay: 0.7
   sample_args:
@@ -14,7 +13,7 @@ DESIGNER_ARGS:
     num_warmup: 10
   sample_init_args:
     max_val: 15.0
-    proposal_var: 0.1
+    proposal_var: 1
   sample_method: MH
   select_mode: mean
   task_method: sum
@@ -31,17 +30,17 @@ EVAL_ARGS:
   parallel: true
 EXP_ARGS:
   eval_env_name: Week6_02-v1
-  eval_method: post_mean
+  eval_method: mean
   eval_seed: 0
   iterations: 12
   num_active_sample: 500
   num_active_tasks: 144
   num_eval: 128
-  num_eval_tasks: 4096
-  num_prior_tasks: 2
+  num_eval_tasks: 500
+  num_prior_tasks: 0
   obs_method: mean
   use_true_w: false
-EXP_NAME: active_ird_ibeta_50_w1_indep_dbeta_20_dvar_0.1_eval_postmean_4096_seed_0_603_adam
+EXP_NAME: active_ird_ibeta_50_w1_joint_dbeta_1_dvar_1_prior_0_eval_mean_128_seed_0_603_adam
 IRD_ARGS:
   beta: 50
   proposal_decay: 0.9
@@ -61,7 +60,7 @@ IRD_CONTROLLER_ARGS:
   replan: 5
 RANDOM_KEYS:
 - 3
-SAVE_NAME: 200521
+SAVE_NAME: 200528
 TRUE_W:
   control: 0.2
   dist_cars: 2.0

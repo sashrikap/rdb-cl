@@ -94,7 +94,7 @@ EXP_ARGS:
   num_active_tasks: 7
   num_active_sample: 500
   eval_seed: 0
-  num_iterations: 8
+  num_iterations: 3
   num_initial_tasks: 3
 ## IRD Settings
 IRD_ARGS:

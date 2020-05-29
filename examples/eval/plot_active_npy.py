@@ -5,13 +5,29 @@ import jax.numpy as np
 import numpy as onp
 import matplotlib.pyplot as plt
 import seaborn as sns
+import matplotlib
 
-sns.set()
+matplotlib.rcParams["text.usetex"] = True
+matplotlib.rc("font", family="serif", serif=["Palatino"])
+sns.set(font="serif", font_scale=1.4)
+sns.set_style(
+    "white",
+    {
+        "font.family": "serif",
+        "font.weight": "normal",
+        "font.serif": ["Times", "Palatino", "serif"],
+        "axes.facecolor": "white",
+        "lines.markeredgewidth": 1,
+    },
+)
 
 
 def read_seed(path):
     # print(path)
-    data = np.load(path, allow_pickle=True).item()
+    if path.endswith("npy"):
+        data = np.load(path, allow_pickle=True).item()
+    elif path.endswith("npz"):
+        data = np.load(path, allow_pickle=True)
     return data
 
 
@@ -23,7 +39,7 @@ def cleanup(arr, max_len):
         for a in arr:
             if len(a) >= max_len + PADDING:
                 arrs.append(a[PADDING : PADDING + max_len])
-        if isinstance(arrs[0], dict):
+        if len(arrs) > 0 and isinstance(arrs[0], dict):
             return arrs
         else:
             return onp.array(arrs)
@@ -38,12 +54,15 @@ colors = {
 }
 
 
-def plot_perform(data_dir, exp_name, data, relative=False):
+def plot_perform(data_dir, exp_name, data, relative=False, normalized=False):
     sns.set_palette("husl")
+    fig, ax = plt.subplots(figsize=(10, 8))
     for i, (method, mdict) in enumerate(data.items()):
         if relative:
             # perf = -1 * onp.array(mdict["rel_perform"])
             perf = onp.array(mdict["rel_perform"])
+        elif normalized:
+            perf = -1 * onp.array(mdict["normalized_perform"])
         else:
             perf = onp.array(mdict["perform"])
         sns.tsplot(
@@ -52,12 +71,28 @@ def plot_perform(data_dir, exp_name, data, relative=False):
             data=perf,
             condition=method,
         )
+        if plot_obs:
+            obs_perf = -1 * mdict["obs_perform_normalized"]
+            # sns.tsplot(
+            #     time=range(1, 1 + len(perf[0])),
+            #     color=colors[method],
+            #     data=obs_perf,
+            #     linestyle="--",
+            #     condition=method + " w/o IRD",
+            # )
+            ax.plot(
+                range(1, 1 + len(perf[0])),
+                onp.array(obs_perf).mean(axis=0),
+                color=colors[method],
+                linestyle="--",
+                label=method + " w/o IRD",
+            )
     plt.xticks(range(1, 1 + len(perf[0])))
-    plt.legend(loc="lower right")
+    plt.legend(loc="upper right")
     plt.xlabel("Iteration")
-    plt.ylabel("Performance Gap")
+    plt.ylabel("Regret")
     # import pdb; pdb.set_trace()
-    plt.title(f"{'Relative ' if relative else ''}IRD Posterior vs True_w Performance")
+    plt.title(f"Posterior Regret")
     plt.savefig(os.path.join(data_dir, exp_name, "performance.png"))
     plt.tight_layout()
     plt.show()
@@ -77,7 +112,7 @@ def plot_violate(data_dir, exp_name, data):
     plt.legend(loc="lower right")
     plt.xlabel("Iteration")
     plt.ylabel("Violation Gap")
-    plt.title("IRD Posterior vs True_w Violation")
+    plt.title("IRD Posterior Violation")
     plt.savefig(os.path.join(data_dir, exp_name, "violation.png"))
     plt.tight_layout()
     plt.show()
@@ -137,8 +172,8 @@ def plot_feats_violate(data_dir, exp_name, data, itr=-1):
 
 
 def plot_data():
-    seedpaths = []
-    seeddata = []
+    npypaths = []
+    npydata = []
     if os.path.isdir(os.path.join(exp_dir, exp_name)):
         for file in sorted(os.listdir(os.path.join(exp_dir, exp_name))):
             if (
@@ -155,23 +190,22 @@ def plot_data():
                     not_bools = [str(s) in exp_path for s in not_seeds]
                     print(file, use_bools, not_bools)
                     if onp.any(use_bools) and not onp.any(not_bools):
-                        seedpaths.append(exp_path)
+                        npypaths.append(exp_path)
 
-    for exp_path in seedpaths:
-        exp_read = read_seed(exp_path)
-        # print(exp_path)
-        # print(exp_path, len(exp_read["infogain"]))
-        seeddata.append(exp_read)
+    for exp_path in npypaths:
+        npydata.append(read_seed(exp_path))
 
     data = {}
-    for idx, (sd, spath) in enumerate(zip(seeddata, seedpaths)):
-        for method, hist in sd.items():
+    for idx, (npy_data, npy_path) in enumerate(zip(npydata, npypaths)):
+        for method, yhist in npy_data.items():
             if method in not_methods:
                 continue
             if method not in data.keys():
                 data[method] = {
                     "perform": [],
                     "rel_perform": [],
+                    "normalized_perform": [],
+                    "obs_perform_normalized": [],
                     "log_prob_true": [],
                     "violation": [],
                     "rel_violation": [],
@@ -179,36 +213,45 @@ def plot_data():
                 }
             data[method]["perform"].append([])
             data[method]["rel_perform"].append([])
+            data[method]["normalized_perform"].append([])
             data[method]["log_prob_true"].append([])
             data[method]["violation"].append([])
+            data[method]["obs_perform_normalized"].append([])
             data[method]["rel_violation"].append([])
             data[method]["feats_violation"].append([])
-            for h in hist:
-                data[method]["perform"][-1].append(h["perform"])
-                data[method]["rel_perform"][-1].append(h["rel_perform"])
-                data[method]["violation"][-1].append(h["violation"])
-                data[method]["rel_violation"][-1].append(h["rel_violation"])
-                data[method]["log_prob_true"][-1].append(h["log_prob_true"])
-                data[method]["feats_violation"][-1].append(h["feats_violation"])
+            for yh in yhist:
+                data[method]["perform"][-1].append(yh["perform"])
+                data[method]["rel_perform"][-1].append(yh["rel_perform"])
+                data[method]["normalized_perform"][-1].append(yh["normalized_perform"])
+                data[method]["violation"][-1].append(yh["violation"])
+                data[method]["rel_violation"][-1].append(yh["rel_violation"])
+                data[method]["log_prob_true"][-1].append(yh["log_prob_true"])
+                data[method]["feats_violation"][-1].append(yh["feats_violation"])
+                if plot_obs:
+                    # length 1 array
+                    data[method]["obs_perform_normalized"][-1].append(
+                        yh["obs_normalized_perform"]
+                    )
     for method, mdict in data.items():
         if "random" in method:
-            mdict["perform"] = cleanup(mdict["perform"], MAX_RANDOM_LEN)
-            mdict["rel_perform"] = cleanup(mdict["rel_perform"], MAX_RANDOM_LEN)
-            mdict["violation"] = cleanup(mdict["violation"], MAX_RANDOM_LEN)
-            mdict["rel_violation"] = cleanup(mdict["rel_violation"], MAX_RANDOM_LEN)
-            mdict["log_prob_true"] = cleanup(mdict["log_prob_true"], MAX_RANDOM_LEN)
-            mdict["feats_violation"] = cleanup(mdict["feats_violation"], MAX_RANDOM_LEN)
+            max_len = MAX_RANDOM_LEN
         else:
-            mdict["perform"] = cleanup(mdict["perform"], MAX_LEN)
-            mdict["rel_perform"] = cleanup(mdict["rel_perform"], MAX_LEN)
-            mdict["violation"] = cleanup(mdict["violation"], MAX_LEN)
-            mdict["rel_violation"] = cleanup(mdict["rel_violation"], MAX_LEN)
-            mdict["log_prob_true"] = cleanup(mdict["log_prob_true"], MAX_LEN)
-            mdict["feats_violation"] = cleanup(mdict["feats_violation"], MAX_LEN)
+            max_len = MAX_LEN
+        mdict["perform"] = cleanup(mdict["perform"], max_len)
+        mdict["rel_perform"] = cleanup(mdict["rel_perform"], max_len)
+        mdict["normalized_perform"] = cleanup(mdict["normalized_perform"], max_len)
+        mdict["violation"] = cleanup(mdict["violation"], max_len)
+        mdict["rel_violation"] = cleanup(mdict["rel_violation"], max_len)
+        mdict["log_prob_true"] = cleanup(mdict["log_prob_true"], max_len)
+        mdict["feats_violation"] = cleanup(mdict["feats_violation"], max_len)
+        if plot_obs:
+            mdict["obs_perform_normalized"] = cleanup(
+                mdict["obs_perform_normalized"], max_len
+            )
         print(method, mdict["perform"].shape)
 
     # plot_feats_violate(exp_dir, exp_name, data, itr=5)
-    plot_perform(exp_dir, exp_name, data, relative=True)
+    plot_perform(exp_dir, exp_name, data, relative=False, normalized=True)
     # plot_perform(exp_dir, exp_name, data, relative=False)
     # plot_violate(exp_dir, exp_name, data)
     # plot_log_prob(exp_dir, exp_name, data)
@@ -216,21 +259,20 @@ def plot_data():
 
 if __name__ == "__main__":
     N = -1
-    use_seeds = list(range(30))
+    use_seeds = [0, 1, 2, 3]
     not_seeds = []
-    MAX_LEN = 9
-    MAX_RANDOM_LEN = 9
+    MAX_LEN = 2
+    MAX_RANDOM_LEN = 2
     PADDING = 0
 
     use_seeds = [str(random.PRNGKey(si)) for si in use_seeds]
     not_seeds = [str(random.PRNGKey(si)) for si in not_seeds]
-    not_methods = []
+    not_methods = ["ratiomin"]
+    plot_obs = True
 
-    exp_dir = "data/200521"
+    exp_dir = "data/200528"
     # exp_name = "active_ird_exp_ird_beta_50_true_w_map_sum_irdvar_3_adam200"
     # exp_name = "active_ird_ibeta_50_true_w1_eval_mean_128_seed_0_603_adam"
     # exp_name = "active_ird_ibeta_50_true_w1_eval_mean_128_seed_0_603_adam"
-    exp_name = (
-        "active_ird_ibeta_50_w1_joint_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam"
-    )
+    exp_name = "active_ird_ibeta_50_w1_joint_dbeta_1_dvar_1_prior_0_eval_mean_128_seed_0_603_adam"
     plot_data()

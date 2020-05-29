@@ -634,7 +634,7 @@ class Particles(object):
                     ti
                 ]
 
-    def compare_with(self, task, target, relative=False):
+    def compare_with(self, task, target, relative=False, normalized=False):
         """Compare with a set of target weights (usually true weights).
 
         Returns:
@@ -643,6 +643,12 @@ class Particles(object):
             (3) relative regret measured by target w (if target w specified, relative=True)
                 relative = (rew - rew_{u_0}) / (rew_{u_target} - rew_{u_0}), where
                 u_0 is all zero action, u_target is optimal action under target w
+
+        Note:
+            - Relative difference (rew - rew_{u_0}) / (rew_{u_target} - rew_{u_0})
+              u_0 is all zero action, relative is not contained between 0~1
+            - Normalized difference (rew - rew_min) / (rew_{u_target} - rew_min)
+              Contained between 0~1
 
         Args:
             target (Particles): target to compare against; if None, no target
@@ -684,12 +690,17 @@ class Particles(object):
             max_diff_vios_by_name = that_vios - lower_vios
             max_diff_vios_sum = max_diff_vios_by_name.onp_array().sum(axis=0)
 
+            ## Compute normalized difference
+            worst_fsums = DictList([self._env.max_feats_dict])
+            worst_diff_costs = target_ws * (that_fsums - worst_fsums)
+            worst_diff_rews = -1 * worst_diff_costs.onp_array().mean(axis=0)
             return dict(
                 rews=diff_rews,
                 vios=diff_vios_sum,
                 vios_by_name=diff_vios_by_name,
                 rews_relative=diff_rews / (max_diff_rews + eps),
                 vios_relative=diff_vios_sum / (max_diff_vios_sum + eps),
+                rews_normalized=diff_rews / (worst_diff_rews + eps),
             )
         else:
             this_costs = np.zeros(nbatch)
@@ -701,6 +712,7 @@ class Particles(object):
                 vios_by_name=this_vios,
                 rews_relative=0.0,
                 vios_relative=0.0,
+                rews_normalized=0.0,
             )
 
     def resample(self, probs):

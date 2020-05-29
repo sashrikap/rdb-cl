@@ -69,6 +69,9 @@ def test_collision():
     state_side[8] = state_side[4] + env.car_width
 
     def render_state(state):
+        import matplotlib
+
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
         env.set_init_state(state)
@@ -118,6 +121,9 @@ def test_offtrack():
     state_right[8] = 1.5 * env.lane_width - 0.5 * env.car_width - 0.05
 
     def render_state(state):
+        import matplotlib
+
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
         env.set_init_state(state)

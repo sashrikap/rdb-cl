@@ -135,6 +135,7 @@ def main(random_key):
     """ Experiment """
     experiment.update_key(rng_key)
     experiment.run()
+    # experiment.run_fix()
     ray.shutdown()  # Prepare for next run, which reinitialize ray with different seed
 
 

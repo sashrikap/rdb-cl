@@ -312,7 +312,7 @@ def item_index_feat(data, index):
 
 
 @jax.jit
-def quadratic_feat(data, goal=None):
+def quadratic_feat(data, goal=None, max_val=np.inf):
     """Compute square(data - goal).
 
     Args:
@@ -323,7 +323,9 @@ def quadratic_feat(data, goal=None):
     assert is_state(data) or is_item_state(data)
     if goal is None:
         goal = np.zeros_like(data)
-    return np.square(data - goal)
+    diff_val = data - goal
+    diff_val = np.minimum(diff_val, max_val)
+    return np.square(diff_val)
 
 
 @jax.jit
@@ -366,7 +368,7 @@ def positive_const_feat(data):
 
 
 @jax.jit
-def relu_feat(data):
+def relu_feat(data, max_val=np.inf):
     """Compute f(x) = x if x >= 0; 0 otherwise.
 
     Args:
@@ -374,7 +376,8 @@ def relu_feat(data):
 
     """
     assert is_state(data) or is_item_state(data)
-    return np.maximum(data, 0)
+    val = np.maximum(data, 0)
+    return np.minimum(val, max_val)
 
 
 @jax.jit

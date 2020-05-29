@@ -34,7 +34,7 @@ class ExperimentInteractiveIRD(object):
         num_eval_tasks=4,
         num_eval=-1,
         eval_env_name=None,
-        eval_method="uniform",
+        eval_method="mean",
         eval_seed=None,
         num_propose=4,
         # Active sampling
@@ -59,7 +59,7 @@ class ExperimentInteractiveIRD(object):
         # Evaluation
         self._num_eval = num_eval
         self._eval_method = eval_method
-        assert eval_method in {"map", "uniform"}
+        assert eval_method in {"map", "mean"}
         self._num_eval_tasks = num_eval_tasks
         self._eval_env_name = eval_env_name
         self._num_propose = num_propose
@@ -312,19 +312,31 @@ class ExperimentInteractiveIRD(object):
         viz_dir = f"{self._save_dir}/visualize"
         os.makedirs(viz_dir, exist_ok=True)
 
+        num_bs = len(self._ird_beliefs[fn_key])
         for fn_key in self._active_fns.keys():
-            belief_map = self._ird_beliefs[fn_key].map_estimate(num_map_visualize)
-            for wi, ws in enumerate(belief_map.weights):
-                for ti, task in enumerate(exp_data[f"proposal_tasks"][fn_key]):
-                    self._model.env.set_task(task)
-                    self._model.env.reset()
-                    state = self._model.env.state
-                    actions = controller(state, weights=ws, batch=False)
-                    viz_path = f"{viz_dir}/rng_{self._rng_name}_method_{fn_key}_task_{ti:02d}_map_{wi:02d}.mp4"
-                    text = f"Method:{fn_key} prior: {len(training_tasks)}"
-                    runner.collect_mp4(state, actions, path=viz_path, text=text)
-                    print(f"Saved to {viz_path}")
-            self._log_time(f"Visualize {fn_key} Done")
+            belief = self._ird_beliefs[fn_key]
+            eval_info = self._evaluate(
+                fn_key,
+                belief,
+                exp_data[f"proposal_tasks"][fn_key],
+                self._eval_method,
+                self._num_eval,
+            )
+            eval_data["proposal_eval"][fn_key] = eval_info
+
+        # for fn_key in self._active_fns.keys():
+        #     belief_map = self._ird_beliefs[fn_key].map_estimate(num_map_visualize)
+        #     for wi, ws in enumerate(belief_map.weights):
+        #         for ti, task in enumerate(exp_data[f"proposal_tasks"][fn_key]):
+        #             self._model.env.set_task(task)
+        #             self._model.env.reset()
+        #             state = self._model.env.state
+        #             actions = controller(state, weights=ws, batch=False)
+        #             viz_path = f"{viz_dir}/rng_{self._rng_name}_method_{fn_key}_task_{ti:02d}_map_{wi:02d}.mp4"
+        #             text = f"Method:{fn_key} prior: {len(training_tasks)}"
+        #             runner.collect_mp4(state, actions, path=viz_path, text=text)
+        #             print(f"Saved to {viz_path}")
+        #     self._log_time(f"Visualize {fn_key} Done")
 
     def _load_design(self, load_path):
         """
@@ -377,7 +389,7 @@ class ExperimentInteractiveIRD(object):
 
         Note:
             self._num_eval: number of sub samples for evaluation
-            self._eval_method: use MAP/uniform sample
+            self._eval_method: use map/mean sample
 
         Criteria:
             * Relative Reward.
@@ -385,7 +397,7 @@ class ExperimentInteractiveIRD(object):
 
         """
         # Compute belief features
-        if method == "uniform":
+        if method == "mean":
             belief_sample = belief.subsample(num_samples)
         elif method == "map":
             belief_sample = belief.map_estimate(num_samples, log_scale=False)
@@ -404,6 +416,7 @@ class ExperimentInteractiveIRD(object):
         # import pdb; pdb.set_trace()
         info = {
             "violation": avg_violate,
+            "violation_per_task": feats_vios_arr.sum(axis=0).mean(axis=1),
             "feats_violation": dict(feats_vios.mean(axis=(0, 1))),
         }
         return info

@@ -222,7 +222,8 @@ class Designer(object):
         assert len(tasks.shape) == 2
         if self._design_mode == "independent":
             tasks = [tasks[-1]]
-        tasks = onp.concatenate([self._prior_tasks, tasks])
+        if len(self._prior_tasks) > 0:
+            tasks = onp.concatenate([self._prior_tasks, tasks])
 
         ## ==============================================================
         ## ======================= MCMC Sampling ========================

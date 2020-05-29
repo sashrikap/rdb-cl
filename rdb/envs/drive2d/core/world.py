@@ -19,7 +19,6 @@ from tqdm import tqdm
 from numpyro.handlers import seed
 
 import pyglet
-import matplotlib.cm
 from pyglet import gl, graphics
 
 from rdb.envs.drive2d.core import lane, feature, car, utils
@@ -77,7 +76,7 @@ class DriveWorld(RenderEnv):
         self._headless = False
         self._grass = None
         self._magnify = 1.0
-        self._cm = matplotlib.cm.coolwarm
+        self._cm = None
         self._viz_heat_fn = None
         self._viz_constraint_fn = None
         self._layers = None
@@ -85,13 +84,11 @@ class DriveWorld(RenderEnv):
 
         # Dyanmics, features, constraints and metadata functions
         self._xdim = onp.prod(self.state.shape)
-        self._dynamics_fn, self._indices = self._get_dynamics_fn()
-        self._raw_features_dict, self._raw_features_fn, self._features_dict, self._features_fn = (
-            self._get_features_fn()
-        )
+        self._build_dynamics_fn()
+        self._build_features_fn()
         # Compute violations, metadata and task naturalness
-        self._constraints_dict, self._constraints_fn = self._get_constraints_fn()
-        self._metadata_dict, self._metadata_fn = self._get_metadata_fn()
+        self._build_constraints_fn()
+        self._build_metadata_fn()
         self._compile()
 
         # For sampling tasks
@@ -177,6 +174,10 @@ class DriveWorld(RenderEnv):
         return self._features_fn
 
     @property
+    def max_feats_dict(self):
+        return self._max_feats_dict
+
+    @property
     def constraints_fn(self):
         return self._constraints_fn
 
@@ -247,7 +248,7 @@ class DriveWorld(RenderEnv):
         self._constraints_fn = jax.jit(self._constraints_fn)
         self._metadata_fn = jax.jit(self._metadata_fn)
 
-    def _get_dynamics_fn(self):
+    def _build_dynamics_fn(self):
         """Build Dict(key: dynamics_fn) mapping.
 
         Example:
@@ -280,8 +281,8 @@ class DriveWorld(RenderEnv):
             fn = index_func(obj.dynamics_fn, idx)
             fns[key] = fn
             indices[key] = idx
-        dynamics_fn = concat_funcs(fns.values(), axis=1)
-        return dynamics_fn, indices
+        self._dynamics_fn = concat_funcs(fns.values(), axis=1)
+        self._indices = indices
 
     def _get_raw_features_dict(self):
         """Build dict(key: feature_fn) mapping.
@@ -376,29 +377,33 @@ class DriveWorld(RenderEnv):
 
         return feats_dict
 
-    def _get_features_fn(self):
+    def _build_features_fn(self):
         """Compute raw features and non-linear features.
 
         """
         raw_feats_dict = self._get_raw_features_dict()
-        nlr_feats_dict = self._get_nonlinear_features_dict(raw_feats_dict)
+        nlr_feats_dict, max_feats_dict = self._get_nonlinear_features_dict(
+            raw_feats_dict
+        )
         nlr_feats_dict = sort_dict_by_keys(nlr_feats_dict, raw_feats_dict.keys())
         # Pre-compile individual feature functions, for speed up
         for key, fn in nlr_feats_dict.items():
             nlr_feats_dict[key] = jax.jit(fn)
 
         # One-input-multi-output
-        raw_feats_dict_fn = merge_dict_funcs(raw_feats_dict)
-        merged_feats_dict_fn = merge_dict_funcs(nlr_feats_dict)
-        return raw_feats_dict, raw_feats_dict_fn, nlr_feats_dict, merged_feats_dict_fn
+        self._raw_features_dict = raw_feats_dict
+        self._raw_features_fn = merge_dict_funcs(raw_feats_dict)
+        self._features_fn = merge_dict_funcs(nlr_feats_dict)
+        self._features_dict = nlr_feats_dict
+        self._max_feats_dict = sort_dict_by_keys(max_feats_dict, raw_feats_dict.keys())
 
     def _get_nonlinear_features_dict(self, feats_dict):
         raise NotImplementedError
 
-    def _get_constraints_fn(self):
+    def _build_constraints_fn(self):
         return {}, lambda x: x
 
-    def _get_metadata_fn(self):
+    def _build_metadata_fn(self):
         return {}, lambda x: x
 
     def _get_natural_tasks(self, tasks):
@@ -722,6 +727,13 @@ class DriveWorld(RenderEnv):
         self._viz_constraint_fn = val
 
     def _draw_heatmap(self, heat_fn):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.cm
+
+        self._cm = matplotlib.cm.coolwarm
+
         center = self.main_car.state[0, :2]
         c0 = center - onp.array([1.0, 1.0]) / self._magnify
         c1 = center + onp.array([1.0, 1.0]) / self._magnify

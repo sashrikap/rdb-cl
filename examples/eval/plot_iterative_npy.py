@@ -5,8 +5,22 @@ import jax.numpy as np
 import numpy as onp
 import matplotlib.pyplot as plt
 import seaborn as sns
+import matplotlib
 
-sns.set()
+matplotlib.rcParams["text.usetex"] = True
+matplotlib.rc("font", family="serif", serif=["Palatino"])
+sns.set(font="serif", font_scale=1.4)
+sns.set_style(
+    "white",
+    {
+        "font.family": "serif",
+        "font.weight": "normal",
+        "font.serif": ["Times", "Palatino", "serif"],
+        "axes.facecolor": "white",
+        "lines.markeredgewidth": 1,
+    },
+)
+
 colors = {
     "random": "gray",
     "infogain": "darkorange",
@@ -39,7 +53,7 @@ def plot_iterative_eval():
             all_eval[fn_key].append(data[fn_key]["violation"])
             if n_xs is None:
                 n_xs = len(data[fn_key]["violation"])
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(10, 8))
 
     sns.set_palette("husl")
     for i, (method, evals) in enumerate(all_eval.items()):
@@ -53,7 +67,7 @@ def plot_iterative_eval():
     plt.legend(loc="upper right")
     plt.xlabel("Iteration")
     plt.ylabel("Violation")
-    plt.title("IRD Posterior Violation")
+    plt.title("Posterior Violation")
     plt.savefig(f"{exp_dir}/{exp_name}/violations.png")
     plt.show()
 
@@ -65,8 +79,8 @@ def plot_iterative_eval():
 
 
 if __name__ == "__main__":
-    # use_seeds = [0, 1, 2, 3]  # list(range(30))
-    use_seeds = [3]  # list(range(30))
+    use_seeds = [0, 1, 2, 3]  # list(range(30))
+    # use_seeds = [3]  # list(range(30))
     not_seeds = []
 
     not_methods = []

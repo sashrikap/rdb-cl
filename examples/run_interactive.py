@@ -62,8 +62,7 @@ def main():
         weight_params=WEIGHT_PARAMS,
         max_batch=EVAL_ARGS["max_batch"],
     )
-    if not ONLY_VISUALIZE:
-        eval_server.register("Evaluation", EVAL_ARGS["num_eval_workers"])
+    eval_server.register("Evaluation", EVAL_ARGS["num_eval_workers"])
     if not ONLY_EVALUATE and not ONLY_VISUALIZE:
         eval_server.register("Active", EVAL_ARGS["num_active_workers"])
     ## Prior sampling & likelihood functions for PGM
