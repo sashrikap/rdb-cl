@@ -138,7 +138,7 @@ class ExperimentActiveIRD(object):
         self._active_eval_hist = {}
         self._active_map_vs_obs_hist = {}
         self._hist_tasks = {}
-        self._hist_obs, self._hist_beliefs = {}, {}
+        self._hist_obs, self._hist_beliefs, self._hist_proxies = {}, {}, {}
         self._hist_candidates = []
         self._hist_cand_scores = {}
         self._eval_tasks = []
@@ -155,7 +155,6 @@ class ExperimentActiveIRD(object):
         # Set name
         self._rng_name = str(rng_key)
         self._model.rng_name = str(rng_key)
-        self._designer_server.set_rng_name(str(rng_key))
         # Model and designer
         self._rng_key, rng_model, rng_designer, rng_choice, rng_active = random.split(
             rng_key, 5
@@ -163,6 +162,7 @@ class ExperimentActiveIRD(object):
         self._model.update_key(rng_model)
         self._designer_server.update_key(rng_designer)
         self._designer_server.set_true_w(self._true_w)
+        self._designer_server.set_rng_name(str(rng_key))
         # Active functions
         rng_active_keys = random.split(rng_active, len(list(self._active_fns.keys())))
         for fn, rng_key_fn in zip(list(self._active_fns.values()), rng_active_keys):
@@ -216,23 +216,36 @@ class ExperimentActiveIRD(object):
         ### Initial Design
         active_keys = list(self._active_fns.keys())
         tasks, scores = self._propose_initial_tasks()
+        tasks = onp.array([[-0.3, 0.5, -0.08, -0.9, 0.12, -0.9]]).tolist()
+        ## initial tasks v1
+        # tasks = onp.array([[-0.3 ,  0.5 , -0.08,  -0.9 ,  0.12,  -0.9 ], [0.4 ,  -0.5 , 0.08,  0.5 ,  0.12,  -0.9 ]]).tolist()
+        ## initial tasks v2
+        # tasks = onp.array([[-0.3 ,  0.5 , -0.08,  -0.9 ,  0.12,  -0.9 ], [0.4 ,  -0.5 , 0.08,  -0.5 ,  0.12,  -0.9 ]]).tolist()
         if self._joint_mode:
-            obs = self._designer_server.designer.simulate(
+            self._log_time("Initial designer sampling Begin")
+            proxies = self._designer_server.designer.simulate(
                 onp.array(tasks), save_name=f"initial_joint_{self._num_initial_tasks}"
             )
-            initial_obs = [obs] * self._num_initial_tasks
+            initial_proxies = [proxies] * self._num_initial_tasks
+            initial_obs = [proxies.subsample(1)] * self._num_initial_tasks
         else:
-            initial_obs = []
+            initial_obs, initial_proxies = [], []
             for idx in range(1, self._num_initial_tasks + 1):
-                obs = self._designer_server.designer.simulate(
+                self._log_time(
+                    f"Initial designer sampling Begin {idx}/{self._num_initial_tasks}"
+                )
+                proxies = self._designer_server.designer.simulate(
                     onp.array(tasks)[:idx],
                     save_name=f"initial_independent_{idx}_{self._num_initial_tasks}",
                 )
-                initial_obs.append(obs)
+                initial_proxies.append(proxies)
+                initial_obs.append(proxies.subsample(1))
         for key in active_keys:
             self._hist_obs[key] = [ob for ob in initial_obs]
+            self._hist_proxies[key] = [proxies for proxies in initial_proxies]
             self._hist_tasks[key] = copy.deepcopy(tasks)
             self._hist_cand_scores[key] = copy.deepcopy(scores)
+        self._log_time("Initial designer sampling Finished")
 
         ### Main Experiment Loop ###
         for itr in range(0, self._iterations):
@@ -280,11 +293,12 @@ class ExperimentActiveIRD(object):
 
             ### Simulate Designer ###
             tasks = onp.array(list(self._hist_tasks.values()))
-            all_obs = self._designer_server.simulate(
+            all_proxies = self._designer_server.simulate(
                 onp.array(tasks), methods=active_keys, itr=itr
             )
-            for obs, key in zip(all_obs, active_keys):
-                self._hist_obs[key].append(obs)
+            for proxies, key in zip(all_proxies, active_keys):
+                self._hist_proxies[key].append(proxies)
+                self._hist_obs[key].append(proxies.subsample(1))
             self._log_time(f"Itr {itr} Designer Simulated")
 
     def _propose_initial_tasks(self):
@@ -387,10 +401,52 @@ class ExperimentActiveIRD(object):
 
         """
         belief = self._hist_beliefs[fn_key][-1]
-        obs = self._hist_obs[fn_key][-1]
+        proxies = self._hist_proxies[fn_key][-1]
         target = self._designer_server.designer.truth
 
-        # Compute belief features
+        ## Compute proxies features
+        proxies_sample = proxies.subsample(self._num_eval)
+        self._eval_server.compute_tasks(
+            "Evaluation", proxies_sample, self._eval_tasks, verbose=True
+        )
+        self._eval_server.compute_tasks(
+            "Evaluation", target, self._eval_tasks, verbose=True
+        )
+        obs_all_violates, obs_rel_violates = [], []
+        obs_all_performs, obs_rel_performs = [], []
+        obs_normalized_performs = []
+        obs_feats_violates = []
+        desc = f"Evaluating method {fn_key}"
+        for task in tqdm(self._eval_tasks, desc=desc):
+            comparisons = proxies_sample.compare_with(task, target=target)
+            obs_all_performs.append(comparisons["rews"].mean())
+            obs_all_violates.append(comparisons["vios"].mean())  # (nweights,) -> (1,)
+            obs_rel_performs.append(comparisons["rews_relative"].mean())
+            obs_rel_violates.append(comparisons["vios_relative"].mean())
+            obs_feats_violates.append(comparisons["vios_by_name"])
+            obs_normalized_performs.append(comparisons["rews_normalized"].mean())
+
+        obs_avg_violate = onp.mean(onp.array(obs_all_violates, dtype=float))
+        obs_avg_perform = onp.mean(onp.array(obs_all_performs, dtype=float))
+        obs_avg_rel_violate = onp.mean(onp.array(obs_rel_violates, dtype=float))
+        obs_avg_rel_perform = onp.mean(onp.array(obs_rel_performs, dtype=float))
+        obs_avg_feats_violate = obs_feats_violates[0] * (
+            1 / float(len(self._eval_tasks))
+        )
+        obs_avg_normalized_perform = onp.mean(
+            onp.array(obs_normalized_performs, dtype=float)
+        )
+        for fv in obs_feats_violates[1:]:
+            obs_avg_feats_violate += fv * (1 / float(len(self._eval_tasks)))
+        print(f"    Obs Average Violation diff {obs_avg_violate:.2f}")
+        print(f"    Obs Average Violation rel {obs_avg_rel_violate:.2f}")
+        print(f"    Obs Average Performance diff {obs_avg_perform:.2f}")
+        print(
+            f"    Obs Average Performance normalized {obs_avg_normalized_perform:.2f}"
+        )
+        print(f"    Obs Average Performance rel {obs_avg_rel_perform:.2f}")
+
+        ## Compute belief features
         if self._eval_method == "mean":
             belief_sample = belief.subsample(self._num_eval)
         elif self._eval_method == "map":
@@ -442,47 +498,6 @@ class ExperimentActiveIRD(object):
         print(f"    Average Performance rel {avg_rel_perform:.2f}")
         print(f"    Average Performance normalized {avg_normalized_perform:.2f}")
         print(f"    True Weights Log Prob {log_prob_true:.2f}")
-
-        # Compute obs features
-        self._eval_server.compute_tasks(
-            "Evaluation", obs, self._eval_tasks, verbose=True
-        )
-        self._eval_server.compute_tasks(
-            "Evaluation", target, self._eval_tasks, verbose=True
-        )
-        obs_all_violates, obs_rel_violates = [], []
-        obs_all_performs, obs_rel_performs = [], []
-        obs_normalized_performs = []
-        obs_feats_violates = []
-        desc = f"Evaluating method {fn_key}"
-        for task in tqdm(self._eval_tasks, desc=desc):
-            comparisons = obs.compare_with(task, target=target)
-            obs_all_performs.append(comparisons["rews"].mean())
-            obs_all_violates.append(comparisons["vios"].mean())  # (nweights,) -> (1,)
-            obs_rel_performs.append(comparisons["rews_relative"].mean())
-            obs_rel_violates.append(comparisons["vios_relative"].mean())
-            obs_feats_violates.append(comparisons["vios_by_name"])
-            obs_normalized_performs.append(comparisons["rews_normalized"].mean())
-
-        obs_avg_violate = onp.mean(onp.array(obs_all_violates, dtype=float))
-        obs_avg_perform = onp.mean(onp.array(obs_all_performs, dtype=float))
-        obs_avg_rel_violate = onp.mean(onp.array(obs_rel_violates, dtype=float))
-        obs_avg_rel_perform = onp.mean(onp.array(obs_rel_performs, dtype=float))
-        obs_avg_feats_violate = obs_feats_violates[0] * (
-            1 / float(len(self._eval_tasks))
-        )
-        obs_avg_normalized_perform = onp.mean(
-            onp.array(obs_normalized_performs, dtype=float)
-        )
-        for fv in obs_feats_violates[1:]:
-            obs_avg_feats_violate += fv * (1 / float(len(self._eval_tasks)))
-        print(f"    Obs Average Violation diff {obs_avg_violate:.2f}")
-        print(f"    Obs Average Violation rel {obs_avg_rel_violate:.2f}")
-        print(f"    Obs Average Performance diff {obs_avg_perform:.2f}")
-        print(
-            f"    Obs Average Performance normalized {obs_avg_normalized_perform:.2f}"
-        )
-        print(f"    Obs Average Performance rel {obs_avg_rel_perform:.2f}")
 
         info = {
             "violation": avg_violate,

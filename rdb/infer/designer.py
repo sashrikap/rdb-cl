@@ -196,7 +196,7 @@ class Designer(object):
     def update_prior(self, keys):
         update_normalizer = False
         for key in keys:
-            if key != self._normalized_key:
+            if key != self._normalized_key and key not in self._prior.feature_keys:
                 self._prior.add_feature(key)
                 update_normalizer = True
         if update_normalizer:
@@ -287,8 +287,15 @@ class Designer(object):
             title=f"seed_{self._rng_name}_{save_name}_samples_{num_samples:04d}",
             **self._weight_params,
         )
+        # Visualize distribution per feature pairs
+        visualize_mcmc_pairs(
+            chains=sample_ws,
+            fig_dir=f"{self._save_dir}/mcmc/pairs",
+            title=f"seed_{self._rng_name}_{save_name}_samples_{num_samples}_pairs",
+            **self._weight_params,
+        )
         particles = self.create_particles(
-            sample_ws[0].exp(),
+            sample_ws[0].exp(),  # first chain
             controller=self._one_controller,
             runner=self._one_runner,
             save_name=save_name,
@@ -296,12 +303,13 @@ class Designer(object):
         particles.visualize(true_w=self.true_w, obs_w=None)
         particles.save()
 
-        if self._select_mode == "map":
-            return particles.map_estimate(1)
-        elif self._select_mode == "mean":
-            return particles.subsample(1)
-        else:
-            raise NotImplementedError
+        # if self._select_mode == "map":
+        #     return particles.map_estimate(1)
+        # elif self._select_mode == "mean":
+        #     return particles.subsample(1)
+        # else:
+        #     raise NotImplementedError
+        return particles
 
     def _build_model(self, tasks):
         """Build Designer PGM model."""
@@ -389,10 +397,10 @@ class Designer(object):
             Note:
                 * nbatch dimension has two uses
                   (1) nbatch=1 in designer.sample
-                  (1) nbatch=nnorms in ird.sample
+                  (1) nbatch=nobs, ntasks=1 in ird.sample
                 * To stabilize MH sampling
                   (1) sum across tasks
-                  (2) average across features
+                  (2) sum across features
 
             Return:
                 log_probs (ndarray): (ntasks, nbatch, )
@@ -412,8 +420,9 @@ class Designer(object):
             ## ======= Computing Numerator: sample_xxx =======
             #  shape (nfeats, ntasks, nbatch)
             sample_costs = true_ws * sample_feats_sum
-            #  shape (nfeats, ntasks, nbatch) -> (ntasks, nbatch, ), average across features
-            sample_rews = -beta * sample_costs.mean(axis=0)
+            #  shape (nfeats, ntasks, nbatch) -> (ntasks, nbatch, ), sum across features
+            # sample_rews = -beta * sample_costs.mean(axis=0)
+            sample_rews = -beta * sample_costs.sum(axis=0)
 
             assert sample_rews.shape == (ntasks, nbatch)
             #  shape (ntasks, nbatch,)
@@ -448,7 +457,7 @@ class Designer(object):
                   (1) nbatch=nobs, ntasks=1 in ird.sample
                 * To stabilize MH sampling
                   (1) sum across tasks
-                  (2) average across features
+                  (2) sum across features
 
             Return:
                 log_probs (ndarray): (nbatch, )
@@ -482,7 +491,8 @@ class Designer(object):
             #  shape (nfeats, ntasks, nbatch, nnorms + 2)
             normal_costs = normal_truth * normal_feats_sum_2
             #  shape (ntasks, nbatch, nnorms + 2)
-            normal_rews = -beta * normal_costs.mean(axis=0)
+            # normal_rews = -beta * normal_costs.mean(axis=0)
+            normal_rews = -beta * normal_costs.sum(axis=0)
 
             # Normalize by tasks
             # normal_rews -= np.expand_dims(sample_rews, axis=2)

@@ -581,3 +581,94 @@ class Week6_03_v1(HighwayDriveWorld_Week6):
             obstacle_states=obstacle_states,
             task_naturalness=task_naturalness,
         )
+
+
+class Week6_04_v1(Week6_03_v1):
+    """Highway merging scenario with more sparse events, but contains more features.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def _get_nonlinear_features_dict(self, feats_dict):
+        nlr_feats_dict, max_feats_dict = super()._get_nonlinear_features_dict(
+            feats_dict
+        )
+
+        this_nlr_feats_dict = {}
+        sum_items = partial(np.sum, axis=(1, 2))
+
+        ## Lane distance feature to non-goal lanes
+        far_lane = np.abs(len(self._lanes) - 1 - self._goal_lane)
+        key = f"dist_far_lanes"
+        this_nlr_feats_dict[key] = compose(
+            sum_items,
+            neg_feat,
+            partial(gaussian_feat, sigma=self._car_length),
+            partial(item_index_feat, index=far_lane),
+        )
+        max_feats_dict[key] = 0.0
+
+        key = f"dist_mid_lanes"
+        this_nlr_feats_dict[key] = compose(
+            sum_items,
+            neg_feat,
+            partial(gaussian_feat, sigma=self._car_length),
+            partial(item_index_feat, index=0),
+        )
+        max_feats_dict[key] = 0.0
+
+        key = f"neg_dist_far_lanes"
+        this_nlr_feats_dict[key] = compose(
+            sum_items,
+            partial(gaussian_feat, sigma=self._car_length),
+            partial(item_index_feat, index=far_lane),
+        )
+        max_feats_dict[key] = np.sum(
+            gaussian_feat(np.zeros((1, 1, 1)), sigma=self._car_length)
+        )
+
+        key = f"neg_dist_lanes"
+        this_nlr_feats_dict[key] = compose(
+            sum_items,
+            partial(gaussian_feat, sigma=self._car_length),
+            partial(item_index_feat, index=self._goal_lane),
+        )
+        max_feats_dict[key] = np.sum(
+            gaussian_feat(np.zeros((1, 1, 1)), sigma=self._car_length)
+        )
+
+        ## Speed features
+        del nlr_feats_dict["speed"]
+        speed_const = 5.0
+        sum_state = partial(np.sum, axis=1)
+        ones = np.ones((1, 1))  # (nbatch=1, dim=1)
+        max_dspeed = speed_const * (self._max_speed - self._goal_speed)
+
+        for speed_key, speed in zip(
+            ["speed_90", "speed_80", "speed_70", "speed_60"], [0.9, 0.8, 0.7, 0.6]
+        ):
+            this_nlr_feats_dict[speed_key] = compose(
+                sum_state, partial(quadratic_feat, goal=speed, max_val=max_dspeed)
+            )
+            max_feats_dict[speed_key] = np.sum(quadratic_feat(ones * max_dspeed))
+
+        this_mapping = {
+            "dist_far_lanes": "dist_lanes",
+            "dist_mid_lanes": "dist_lanes",
+            "neg_dist_lanes": "dist_lanes",
+            "neg_dist_far_lanes": "dist_lanes",
+            "speed_90": "speed",
+            "speed_80": "speed",
+            "speed_70": "speed",
+            "speed_60": "speed",
+        }
+
+        ## Chain up child functions and attach to parent feats dict
+        this_nlr_feats_dict = chain_dict_funcs(
+            this_nlr_feats_dict, feats_dict, this_mapping
+        )
+        for key, fn in this_nlr_feats_dict.items():
+            nlr_feats_dict[key] = fn
+
+        return nlr_feats_dict, max_feats_dict

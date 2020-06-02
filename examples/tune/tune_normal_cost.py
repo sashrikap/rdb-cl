@@ -65,7 +65,7 @@ def get_init_states(nbatch):
     num_tasks = len(env.all_tasks)
     task = env.all_tasks[onp.random.randint(0, num_tasks, size=1)]
     states = onp.concatenate([env.get_init_state(task[0])] * nbatch, axis=0)
-    return states
+    return task, states
 
 
 def run_single(states):
@@ -99,7 +99,7 @@ def run_batch(states):
 def tune_normal_cost(nbatch):
     """Compare method {engine, method} vs single l-bfgs"""
 
-    states = get_init_states(nbatch)
+    task, states = get_init_states(nbatch)
     cost_one = run_single(states)
     costs_batch = run_batch(states)
 
@@ -111,6 +111,10 @@ def tune_normal_cost(nbatch):
     print(
         f"Ratios mean {np.mean(ratios):.02f} std {np.std(ratios):.02f} max {np.max(ratios):.02f} min {np.min(ratios):.02f}"
     )
+    if np.max(ratios) > 1:
+        import pdb
+
+        pdb.set_trace()
     print(f"Better than {100 * (regrets > 0).sum() / float(nbatch)} percent")
 
 

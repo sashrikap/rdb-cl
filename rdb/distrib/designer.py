@@ -187,6 +187,7 @@ class DesignerServer(object):
 
     def set_rng_name(self, rng_name):
         if self._parallel:
+            self._local_designer.rng_name = rng_name
             for wi in range(len(self._workers)):
                 self._workers[wi].set_rng_name.remote(rng_name)
 

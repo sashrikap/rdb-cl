@@ -61,7 +61,7 @@ class ExperimentIterativeIRD(object):
         self._eval_server = eval_server
         self._num_eval = num_eval
         self._eval_method = eval_method
-        assert eval_method in {"map", "uniform"}
+        assert eval_method in {"map", "mean"}
         self._num_eval_tasks = num_eval_tasks
         self._eval_env_name = eval_env_name
         self._num_propose = 1
@@ -71,8 +71,13 @@ class ExperimentIterativeIRD(object):
         self._exp_mode = exp_mode
         assert self._exp_mode in {"design", "evaluate"}
         # Save path
-        assert "joint" in exp_name or "independent" in exp_name
-        self._joint_mode = "joint" in exp_name
+        assert (
+            "joint" in exp_name
+            or "independent" in exp_name
+            or "divide" in exp_name
+            or "batch" in exp_name
+        )
+        self._joint_mode = "joint" in exp_name or "batch" in exp_name
         self._exp_params = exp_params
         self._exp_name = exp_name
         self._design_root = design_root
@@ -323,7 +328,14 @@ class ExperimentIterativeIRD(object):
 
         # Compute belief features
         eval_info = {
-            key: {"violation": [], "feats_violation": [], "all_violation": []}
+            key: {
+                "violation": [],
+                "feats_violation": [],
+                "all_violation": [],
+                "obs_violation": [],
+                "obs_feats_violation": [],
+                "obs_all_violation": [],
+            }
             for key in self._active_fns.keys()
         }
         for method in self._active_fns.keys():
@@ -334,12 +346,10 @@ class ExperimentIterativeIRD(object):
                 elif self._eval_method == "map":
                     belief_sample = belief.map_estimate(self._num_eval, log_scale=False)
 
-                print(f"Evaluating method {method}: Begin")
+                print(f"Evaluating method {method} belief: Begin")
                 self._eval_server.compute_tasks(
                     "Evaluation", belief_sample, self._eval_tasks, verbose=True
                 )
-
-                desc = f"Evaluating method {method}"
                 # (DictList): nvios * (ntasks, nparticles)
                 feats_vios = belief_sample.get_violations(self._eval_tasks)
                 feats_vios_arr = feats_vios.onp_array()
@@ -351,6 +361,26 @@ class ExperimentIterativeIRD(object):
                 )
                 eval_info[method]["all_violation"].append(dict(feats_vios.mean(axis=1)))
                 self._save_eval(eval_info)
+
+            for obs in self._obs[method]:
+                print(f"Evaluating method {method} observation: Begin")
+                self._eval_server.compute_tasks(
+                    "Evaluation", obs, self._eval_tasks, verbose=True
+                )
+                # (DictList): nvios * (ntasks, nparticles)
+                feats_vios = obs.get_violations(self._eval_tasks)
+                feats_vios_arr = feats_vios.onp_array()
+                avg_violate = feats_vios_arr.sum(axis=0).mean()
+                print(f"    Average Violation {avg_violate:.2f}")
+                eval_info[method]["obs_violation"].append(avg_violate)
+                eval_info[method]["obs_feats_violation"].append(
+                    dict(feats_vios.mean(axis=(0, 1)))
+                )
+                eval_info[method]["obs_all_violation"].append(
+                    dict(feats_vios.mean(axis=1))
+                )
+                self._save_eval(eval_info)
+
         self._log_time(f"Evaluation finished")
         return eval_info
 
@@ -389,6 +419,75 @@ class ExperimentIterativeIRD(object):
         npy_path = f"{self._save_dir}/{self._exp_name}_eval_seed_{self._rng_name}.npy"
         data = dict(eval_info=eval_info, eval_tasks=self._eval_tasks)
         np.save(npy_path, eval_info)
+
+    def add_evaluate_obs(self):
+        self.reset()
+        npy_path = f"{self._save_dir}/{self._exp_name}_eval_seed_{self._rng_name}.npy"
+        eval_info = np.load(npy_path, allow_pickle=True).item()
+
+        eval_env = self._env_fn(self._eval_env_name)
+        self._eval_tasks = random_choice(
+            self._get_rng_eval(),
+            eval_env.all_tasks,
+            self._num_eval_tasks,
+            replacement=False,
+        )
+        # Load belief
+        # npz_path = f"{self._save_dir}/{self._exp_name}_seed_{self._rng_name}.npz"
+        yaml_save = f"{self._design_dir}/yaml/rng_{self._rng_name}_designs.yaml"
+        with open(yaml_save, "r") as stream:
+            hist_data = yaml.safe_load(stream)
+
+        self._obs_ws = hist_data["designs"]
+        self._tasks = hist_data["tasks"]
+        wi = 0
+        done = False
+        for method in self._active_fns.keys():
+            self._log_time(f"Loading evaluation for: {method}")
+            obs_ws = self._obs_ws[method]
+            tasks = self._tasks[method]
+            n_tasks = len(obs_ws)
+            assert len(obs_ws) == n_tasks
+            for wi in range(len(obs_ws)):
+                obs = self._model.create_particles(
+                    [obs_ws[wi]],
+                    save_name=f"iterative_obs_{wi}",
+                    controller=self._model._designer._sample_controller,
+                    runner=self._model._designer._sample_runner,
+                )
+                self._obs[method].append(obs)
+        self._log_time(f"Loading finished")
+
+        # Compute belief features
+        for key in self._active_fns.keys():
+            eval_info[key]["obs_violation"] = []
+            eval_info[key]["obs_feats_violation"] = []
+            eval_info[key]["obs_all_violation"] = []
+
+        for method in self._active_fns.keys():
+            self._log_time(f"Running evaluation for: {method}")
+            for io, obs in enumerate(self._obs[method]):
+
+                print(f"Evaluating method {method} itr {io}: Begin")
+                self._eval_server.compute_tasks(
+                    "Evaluation", obs, self._eval_tasks, verbose=True
+                )
+
+                desc = f"Evaluating method {method}"
+                # (DictList): nvios * (ntasks, nparticles)
+                feats_vios = obs.get_violations(self._eval_tasks)
+                feats_vios_arr = feats_vios.onp_array()
+                avg_violate = feats_vios_arr.sum(axis=0).mean()
+                print(f"    Average Violation {avg_violate:.2f}")
+                eval_info[method]["obs_violation"].append(avg_violate)
+                eval_info[method]["obs_feats_violation"].append(
+                    dict(feats_vios.mean(axis=(0, 1)))
+                )
+                eval_info[method]["obs_all_violation"].append(
+                    dict(feats_vios.mean(axis=1))
+                )
+                self._save_eval(eval_info)
+        self._log_time(f"Evaluation finished")
 
 
 class objectview(object):

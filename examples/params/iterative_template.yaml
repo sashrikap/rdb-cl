@@ -1,7 +1,7 @@
 # ENV_NAME: Week6_01-v0
 
 
-RANDOM_KEYS: [0]
+RANDOM_KEYS: [1]
 
 ENV_NAME: Week6_03-v1
 
@@ -58,7 +58,7 @@ DESIGNER_ARGS:
     num_samples: 500
     num_warmup: 100
     num_chains: 1
-  beta: 20
+  beta: 10
 ## Evaluation Settings
 EVAL_ARGS:
   parallel: True

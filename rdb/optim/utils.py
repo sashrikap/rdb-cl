@@ -160,18 +160,27 @@ def merge_dict_funcs(funcs_dict):
     return func
 
 
-def chain_dict_funcs(outer_dict, inner_dict):
+def chain_dict_funcs(outer_dict, inner_dict, mapping={}):
     """Chain dictionaries of functions.
 
     Example:
         >>> output[key] = outer[key](inner[key](data))
 
+    Args:
+        mapping (dict): if key is in outer_dict but not in inner_dict,
+            find inner_dict[mapping[key]]
+            useful for reusing functions from inner dict
+
     """
     output = OrderedDict()
     for key, outer in outer_dict.items():
         # if key in inner_dict.keys():
-        assert key in inner_dict
-        output[key] = compose(outer, inner_dict[key])
+        if key not in inner_dict:
+            assert key in mapping
+            inner = inner_dict[mapping[key]]
+        else:
+            inner = inner_dict[key]
+        output[key] = compose(outer, inner)
     return output
 
 

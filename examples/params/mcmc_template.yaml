@@ -17,14 +17,14 @@ NUM_PRIOR_MODE: design
 
 
 EXP_ITERATIONS: 24
-ENV_NAME: Week6_03-v1
-# ENV_NAME: Week6_01-v1
+# ENV_NAME: Week6_04-v1
+ENV_NAME: Week6_02-v1
 ## MPC Specific
 CONTROLLER_ARGS:
   horizon: 10
   # engine: scipy
   # method: lbfgs
-  replan: True
+  replan: 5
   engine: jax
   method: adam
 
@@ -67,8 +67,8 @@ DESIGNER_ARGS:
     num_warmup: 50
     num_chains: 1
   beta: 20
-  exp_name: designer_convergence_true_w_random_tasks_w1_beta_20_dprior_2_var_1_week602
-SAVE_NAME: 200515
+  exp_name: designer_convergence_true_w_random_tasks_w1_beta_20_dprior_0_var_0.1_week602
+SAVE_NAME: 200529
 
 
 # # Test sampling
@@ -111,6 +111,9 @@ WEIGHT_PARAMS:
   - dist_lanes
   - dist_fences
   - dist_objects
+  # - dist_lanes_1
+  # - dist_lanes_2
+  - speed_over
   - speed
   - control
 

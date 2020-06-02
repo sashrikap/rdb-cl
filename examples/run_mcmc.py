@@ -44,12 +44,7 @@ def main(random_key):
 
     def controller_fn(env, name=""):
         controller, runner = build_mpc(
-            env,
-            env.main_car.cost_runtime,
-            dt=env.dt,
-            replan=False,
-            name=name,
-            **CONTROLLER_ARGS,
+            env, env.main_car.cost_runtime, dt=env.dt, name=name, **CONTROLLER_ARGS
         )
         return controller, runner
 

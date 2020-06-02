@@ -385,7 +385,7 @@ class DriveWorld(RenderEnv):
         nlr_feats_dict, max_feats_dict = self._get_nonlinear_features_dict(
             raw_feats_dict
         )
-        nlr_feats_dict = sort_dict_by_keys(nlr_feats_dict, raw_feats_dict.keys())
+        # nlr_feats_dict = sort_dict_by_keys(nlr_feats_dict, raw_feats_dict.keys())
         # Pre-compile individual feature functions, for speed up
         for key, fn in nlr_feats_dict.items():
             nlr_feats_dict[key] = jax.jit(fn)
@@ -395,7 +395,8 @@ class DriveWorld(RenderEnv):
         self._raw_features_fn = merge_dict_funcs(raw_feats_dict)
         self._features_fn = merge_dict_funcs(nlr_feats_dict)
         self._features_dict = nlr_feats_dict
-        self._max_feats_dict = sort_dict_by_keys(max_feats_dict, raw_feats_dict.keys())
+        # self._max_feats_dict = sort_dict_by_keys(max_feats_dict, raw_feats_dict.keys())
+        self._max_feats_dict = max_feats_dict
 
     def _get_nonlinear_features_dict(self, feats_dict):
         raise NotImplementedError

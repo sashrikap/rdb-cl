@@ -93,7 +93,7 @@ def random_choice(rng_key, items, num, probs=None, replacement=True, complement=
         * Sample with replacement
 
     """
-    if num < 0:
+    if num < 0 or num > len(items):
         if complement:
             return items, []
         else:

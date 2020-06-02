@@ -242,12 +242,7 @@ class IRDOptimalControl(object):
         #  shape (1, ntasks, task_dim)
         obs_tasks = tasks[None, :]
 
-        try:
-            assert obs_ws.shape == (nfeats, ntasks)
-        except:
-            import pdb
-
-            pdb.set_trace()
+        assert obs_ws.shape == (nfeats, ntasks)
         assert obs_feats_sum.shape == (nfeats, 1, ntasks)
 
         ## Designer kernels
@@ -258,7 +253,7 @@ class IRDOptimalControl(object):
             sample_feats_sum=obs_feats_sum,
             normal_feats_sum=designer_normal_fsum,
             tasks=obs_tasks,
-            beta=self.beta,
+            beta=self._designer.beta,
         )
 
         ## Operation over tasks
@@ -272,6 +267,11 @@ class IRDOptimalControl(object):
 
         def _model():
             #  shape (nfeats, 1)
+            nonlocal tasks
+            nonlocal ntasks
+            nonlocal obs_feats_sum
+            nonlocal designer_ll
+            nonlocal designer_normal_fsum
             true_ws = self._prior(1).prepare(feats_keys)
 
             ## ======= Not jit-able optimization: requires scipy/jax optimizer ======
@@ -286,7 +286,7 @@ class IRDOptimalControl(object):
             true_feats_sum = obs_feats_sum
             # true_ws = true_ws.numpy_array()
             true_ws = true_ws.normalize_across_keys().numpy_array()
-            log_prob = _likelihood(true_ws, true_feats_sum)
+            log_prob = _likelihood(true_ws, true_feats_sum) * self._beta
             numpyro.factor("ird_log_probs", log_prob)
 
         @jax.jit
@@ -315,7 +315,7 @@ class IRDOptimalControl(object):
             ird_true_ws_n = np.repeat(ird_true_ws, ntasks, axis=1)
             #  shape (ntasks,), designer nbatch = ntasks
             # ird_true_probs = designer_ll(ird_true_ws_n, ird_true_feats_sum)
-            ird_true_probs = designer_ll(ird_true_ws_n)
+            ird_true_probs = designer_ll(ird_true_ws_n) * self._beta
             assert ird_true_probs.shape == (ntasks,)
 
             ## ==================================================
@@ -371,11 +371,12 @@ class IRDOptimalControl(object):
         self._rng_key, rng_sampler = random.split(self._rng_key, 2)
         print(f"Sampling IRD (obs={len(obs)}): {save_name}, chains={num_chains}")
         t1 = time()
-        sampler.run(
-            rng_sampler,
-            init_params=dict(init_params),
-            extra_fields=["mean_accept_prob"],
-        )
+        with jax.disable_jit():
+            sampler.run(
+                rng_sampler,
+                init_params=dict(init_params),
+                extra_fields=["mean_accept_prob"],
+            )
 
         ## ==============================================================
         ## ====================== Analyze Samples =======================

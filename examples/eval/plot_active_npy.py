@@ -85,7 +85,7 @@ def plot_perform(data_dir, exp_name, data, relative=False, normalized=False):
                 onp.array(obs_perf).mean(axis=0),
                 color=colors[method],
                 linestyle="--",
-                label=method + " w/o IRD",
+                label=method + " proxy",
             )
     plt.xticks(range(1, 1 + len(perf[0])))
     plt.legend(loc="upper right")
@@ -261,8 +261,8 @@ if __name__ == "__main__":
     N = -1
     use_seeds = [0, 1, 2, 3]
     not_seeds = []
-    MAX_LEN = 9
-    MAX_RANDOM_LEN = 9
+    MAX_LEN = 3
+    MAX_RANDOM_LEN = 3
     PADDING = 0
 
     use_seeds = [str(random.PRNGKey(si)) for si in use_seeds]
@@ -270,9 +270,9 @@ if __name__ == "__main__":
     not_methods = ["ratiomin"]
     plot_obs = True
 
-    exp_dir = "data/200529"
+    exp_dir = "data/200601"
     # exp_name = "active_ird_exp_ird_beta_50_true_w_map_sum_irdvar_3_adam200"
     # exp_name = "active_ird_ibeta_50_true_w1_eval_mean_128_seed_0_603_adam"
     # exp_name = "active_ird_ibeta_50_true_w1_eval_mean_128_seed_0_603_adam"
-    exp_name = "active_ird_ibeta_50_w1_joint_dbeta_1_dvar_1_initial_3_eval_mean_128_prior_0_seed_0_603_adam"
+    exp_name = "active_ird_new_ibeta_5_w1_joint_dbeta_1_initial_2v1_prior_0_eval_map_128_seed_0_604_adam"
     plot_data()

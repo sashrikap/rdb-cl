@@ -260,9 +260,9 @@ class Particles(object):
         if num_samples is None or num_samples < 0:
             return self
         else:
-            assert (
-                len(self._weights) >= num_samples
-            ), f"Not enough samples for {num_samples}."
+            # assert (
+            #     len(self._weights) >= num_samples
+            # ), f"Not enough samples for {num_samples}."
             self._rng_key, rng_random = random.split(self._rng_key)
             weights = random_choice(
                 rng_random, self._weights, num_samples, replacement=True

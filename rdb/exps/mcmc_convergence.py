@@ -269,7 +269,7 @@ class ExperimentMCMC(object):
         new_tasks = random_choice(self._get_rng_task(), all_tasks, 1)
         ## Simulate
         # for n_prior in range(len(self._all_designer_prior_tasks)):
-        for n_prior in range(2, 6):
+        for n_prior in range(0, 6):
 
             self._log_time(f"Designer Prior {n_prior} Begin")
             print(f"Experiment mode ({self._rng_name}) {exp_mode}")

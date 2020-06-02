@@ -45,12 +45,15 @@ def plot_iterative_eval():
     # Gather active function names
     # Gather eval output for each active function
     all_eval = dict()
+    all_obs = dict()
     n_xs = None
     for data in all_data:
         for fn_key in data.keys():
             if fn_key not in all_eval:
                 all_eval[fn_key] = []
+                all_obs[fn_key] = []
             all_eval[fn_key].append(data[fn_key]["violation"])
+            all_obs[fn_key].append(data[fn_key]["obs_violation"])
             if n_xs is None:
                 n_xs = len(data[fn_key]["violation"])
     fig, ax = plt.subplots(figsize=(10, 8))
@@ -62,6 +65,13 @@ def plot_iterative_eval():
             color=colors[method],
             data=onp.array(evals),
             condition=method,
+        )
+        ax.plot(
+            range(1, 1 + n_xs),
+            onp.array(all_obs[method]).mean(axis=0),
+            color=colors[method],
+            linestyle="--",
+            label=method + " proxy",
         )
     plt.xticks(range(1, 1 + n_xs))
     plt.legend(loc="upper right")
