@@ -59,7 +59,7 @@ def plot_proposal_eval():
 colors = {
     "random": "gray",
     "infogain": "darkorange",
-    "difficult": "purple",
+    "difficult": "cornflowerblue",
     "ratiomean": "peru",
     "ratiomin": "darkred",
 }
@@ -219,9 +219,19 @@ def plot_box_proposal_ratio():
         patch.set_facecolor(colors[method])
         patch.set_alpha(0.7)
 
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    # plt.tick_params(
+    #     axis='x',          # changes apply to the x-axis
+    #     which='both',      # both major and minor ticks are affected
+    #     bottom=False,      # ticks along the bottom edge are off
+    #     top=False,         # ticks along the top edge are off
+    #     labelbottom=False) # labels along the bottom edge are off
+    plt.xticks(np.arange(2), ("", "", ""))
+    ax.tick_params(axis="both", which="both", length=0)
     plt.title("Violation on Proposed Task (Higher is better)")
     plt.xlabel("Method")
-    plt.ylabel("Violation")
+    plt.ylabel("Relative Violation")
     plt.legend(loc="upper left")
     plt.savefig(os.path.join(exp_dir, exp_name, f"next_ratio.png"))
     plt.show()

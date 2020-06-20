@@ -1,7 +1,7 @@
 # ENV_NAME: Week6_01-v0
 
 
-RANDOM_KEYS: [1]
+RANDOM_KEYS: [3]
 
 ENV_NAME: Week6_03-v1
 
@@ -20,28 +20,32 @@ DESIGNER_CONTROLLER_ARGS:
 
 # Full sampling
 SAVE_NAME: 200501
-EXP_NAME: iterative_divide
+EXP_NAME: iterative_divide_default_02
 # EXP_NAME: interactive_proposal_batch_training_03_propose_04
 # SAVE_NAME: 200411
 
 ## Experiment Arguments
 EXP_ARGS:
-  num_eval: 512
-  eval_method: mean
+  num_eval: 64
+  eval_method: map
   num_eval_tasks: 500
   eval_env_name: Week6_02-v1
   num_active_tasks: 64
   num_active_sample: 500
   eval_seed: 0
+  iterations: 5
+  load_previous: False
+  initial_tasks_file: Week6_04_1v2
+  plan_beta: 10
 ## IRD Settings
 IRD_ARGS:
   task_method: sum
   sample_method: MH
   sample_init_args:
-    proposal_var: 3
+    proposal_var: 0.5
     max_val: 15.0
-  proposal_decay: 0.9
-  beta: 50
+  proposal_decay: 0.7
+  beta: 1
   sample_args:
     num_warmup: 200
     num_samples: 8000
@@ -62,8 +66,8 @@ DESIGNER_ARGS:
 ## Evaluation Settings
 EVAL_ARGS:
   parallel: True
-  num_eval_workers: 2
-  num_active_workers: 2
+  num_eval_workers: 1
+  num_active_workers: 1
   max_batch: 500
 ## Active Settings
 ACTIVE_ARGS:
@@ -86,7 +90,9 @@ ACTIVE_ARGS:
 #   eval_env_name: Week6_02-v1
 #   num_active_tasks: 20
 #   num_active_sample: 500
+#   iterations: 5
 #   eval_seed: 0
+#   initial_tasks_file: Week6_04_1v2
 # ## IRD Settings
 # IRD_ARGS:
 #   task_method: sum
@@ -94,7 +100,7 @@ ACTIVE_ARGS:
 #   sample_init_args:
 #     proposal_var: 3
 #     max_val: 15.0
-#   proposal_decay: 0.9
+#   proposal_decay: 0.7
 #   beta: 50
 #   sample_args:
 #     num_warmup: 100

@@ -248,10 +248,12 @@ def plot_box_data(eval_plot_data, map_plot_data, obs_plot_data):
     # plt.axis('scaled')
     ax.spines["right"].set_visible(False)
     ax.spines["top"].set_visible(False)
-    ax.set_title(f"Posterior regret on next task (higher is better)")
+    plt.yticks([], [])
+    # ax.set_title(f"Posterior regret on next task (higher is better)")
     x = onp.arange(len(methods)) + 1
     ax.set_xticks(x)
     ax.set_xticklabels(methods)
+    print(os.path.join(exp_dir, exp_name, f"box_map_vs_eval.png"))
     plt.savefig(os.path.join(exp_dir, exp_name, f"box_map_vs_eval.png"))
     plt.show()
 
@@ -273,7 +275,7 @@ def plot_bar_data(eval_plot_data, map_plot_data, obs_plot_data):
         errs.append(onp.std(method_ratios))
 
     # plt.xticks(x, list(data.keys()))
-    ax.set_ylabel("Posterior Regret on Proposed task")
+    ax.set_ylabel("Regret on Proposed task")
     ax.set_xlabel("Method")
     x = onp.arange(len(methods))
     rects = ax.bar(x, ratios, yerr=errs, align="center")
@@ -405,14 +407,8 @@ if __name__ == "__main__":
     N = -1
     all_seeds = [0, 1, 2, 3, 21, 22]
     not_seeds = []
-    exp_dir = "data/200604"
-    exp_name = (
-        "active_ird_simplified_indep_init_4v1_ibeta_6_obs_true_dbeta_0.02"
-        # "active_ird_simplified_joint_init_4v1_ibeta_6_true_w"
-    )
-    # exp_name = "active_ird_ibeta_50_w0_indep_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam"
-    # exp_name = "active_ird_ibeta_50_w0_joint_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam"
-    # alt_name = "active_ird_ibeta_50_true_w1_eval_unif_128_seed_0_603_adam"
+    exp_dir = "data"
+    exp_name = "active_ird_simplified_indep_init_4v1_ibeta_6_obs_true_dbeta_0.02"
 
     MAX_LEN = 5
     MAX_RANDOM_LEN = 5
@@ -421,7 +417,7 @@ if __name__ == "__main__":
 
     use_seeds = [str(random.PRNGKey(si)) for si in all_seeds]
     not_seeds = [str(random.PRNGKey(si)) for si in not_seeds]
-    use_method = ["infogain", "difficult", "random"]
+    use_method = ["infogain", "random"]
     not_method = ["ratiomin", "ratiomean"]
 
     eval_plot_data = {}

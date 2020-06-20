@@ -15,8 +15,8 @@ def run():
     for random_key in RANDOM_KEYS:
         rng_key = random.PRNGKey(random_key)
         experiment.update_key(rng_key)
-        # experiment.evaluate()
-        experiment.add_evaluate_obs()
+        experiment.evaluate()
+        # experiment.add_evaluate_obs()
 
 
 if __name__ == "__main__":

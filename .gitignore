@@ -9,3 +9,4 @@ data/
 examples/credentials
 examples/designs/20*
 xvfb.log
+examples/figures/*/frames

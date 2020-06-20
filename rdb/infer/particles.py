@@ -392,11 +392,13 @@ class Particles(object):
         nweights = len(self.weights)
         feats_keys = self._env.features_keys
         T, udim = self._controller.T, self._controller.udim
-        cached = [self.get_task_name(task) in self.cached_names for task in tasks]
+        new_tasks = [
+            task for task in tasks if self.get_task_name(task) not in self.cached_names
+        ]
 
         if vectorize:
             ## Rollout (nweights * ntasks) in one expanded vector
-            if all(cached):
+            if len(new_tasks) == 0:
                 return
             #  shape (ntasks, state_dim)
             states = self._env.get_init_states(onp.array(tasks))
@@ -448,6 +450,7 @@ class Particles(object):
             all_feats, all_feats_sum = [], []
             low_feats, low_feats_sum = [], []
             batch_us0 = None
+            cached_names = self.cached_names
             if us0 is not None:
                 #  shape (ntasks * nweights, 1, T, udim)
                 batch_us0 = us0.reshape((-1, T, udim)).expand_dims(axis=1)
@@ -456,7 +459,7 @@ class Particles(object):
             weights_arr = self.weights.prepare(feats_keys).numpy_array()
             for ti, task_i in enumerate(tasks):
                 name_i = self.get_task_name(task_i)
-                if name_i not in self.cached_names:
+                if name_i not in cached_names:
                     #  shape (1, task_dim)
                     state_i = self._env.get_init_states([task_i])
                     #  shape (nweights, task_dim)

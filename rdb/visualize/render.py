@@ -69,7 +69,7 @@ def save_video(frames, fps, width, path):
     clip.write_videofile(path, logger=None)
 
 
-def forward_env(env, actions, init_state=None, text=None):
+def forward_env(env, actions, init_state=None, text=None, paper=False):
     # Render and save environment given pre-specified actions
     # Require: environment has been reset
     env.state = init_state
@@ -87,7 +87,7 @@ def forward_env(env, actions, init_state=None, text=None):
     else:
         for ai in range(nacs):
             env.step(actions[:, ai])
-            frames.append(env.render(mode="rgb_array", text=text))
+            frames.append(env.render(mode="rgb_array", text=text, paper=paper))
 
     # frames = frames[1:]
     return frames
@@ -105,6 +105,29 @@ def render_env(
         for i, frame in enumerate(frames):
             frame = imresize(frame, (width, width))
             imsave(join(dirname, f"frame_{i:03d}.png"), frame)
+
+
+def capture_env(
+    env,
+    state,
+    actions,
+    fps,
+    path="data/video.mp4",
+    width=450,
+    savepng=False,
+    text=None,
+    paper=False,
+):
+    # Require: environment has been reset
+    old_subframes = env.subframes
+    env._subframes = 0
+    frames = forward_env(env, actions, state, text=text, paper=paper)
+    dirname = path.replace(".mp4", "")
+    makedirs(dirname, exist_ok=True)
+    for i, frame in enumerate(frames):
+        frame = imresize(frame, (width, width))
+        imsave(join(dirname, f"frame_{i:03d}.png"), frame)
+    env._subframes = old_subframes
 
 
 def batch_render_env(env, states, actions, paths, fps, width, workers=4):

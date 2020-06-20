@@ -116,7 +116,7 @@ def main(random_key):
         "difficult": ActiveRandom(rng_key=None),
     }
     for key in list(active_fns.keys()):
-        if key not in ACTIVE_ARGS["active_fns"]:
+        if key not in ACTIVE_FNS:
             del active_fns[key]
 
     experiment = ExperimentActiveIRD(

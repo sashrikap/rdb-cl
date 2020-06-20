@@ -1,15 +1,19 @@
-"""Experiment to check the convergence of MCMC algorithms.
+"""Experiment to check the distributional performance of IRD and designer model
+under different initial tasks and beta.
 
 Observation:
-    * MCMC process may vary under different conditions e.g.
-number of observations in IRD and number of prior tasks in designer model
+    * Designer and IRD model yield different performance under different initial tasks.
 
 Goal:
-    * Find # samples it needs to converge.
+    * Quantify how initial task affects designer & IRD performance
 
-Includes:
-    * testing ird convergence `exp.run_ird()`
-    * testing designer convergence `exp.run_designer()`
+Note:
+    * Ground truth is fixed
+    * Designer model takes initial tasks
+    * IRD model takes GT on initial tasks
+
+TODO:
+    * Quantify how IRD works under noisy observations
 
 """
 
@@ -27,8 +31,8 @@ import copy
 import os
 
 
-class ExperimentMCMC(object):
-    """MCMC Convergence experiment.
+class ExperimentTaskBeta(object):
+    """Initial task, designer and IRD beta experiment.
 
     """
 
@@ -166,97 +170,6 @@ class ExperimentMCMC(object):
         else:
             raise NotImplementedError
 
-    def _load_observations(self, exp_mode):
-        """Different mode of IRD experiments.
-
-        Args:
-            exp_mode (str)
-
-        """
-        all_tasks = self._model.env.all_tasks
-        num_obs = self._max_ird_obs_num
-        num_tasks = 100
-        for design in self._design_data["DESIGNS"]:
-            design["WEIGHTS"] = normalize_weights(
-                design["WEIGHTS"], self._normalized_key
-            )
-        rand_tasks = onp.array(
-            random_choice(self._get_rng_task(), all_tasks, num_tasks)
-        )
-
-        if exp_mode.startswith("designer"):
-            ## Designer experiment
-            pass
-
-        elif "ird_convergence_true_w_prior_tasks" in exp_mode:
-            ## Load well-defined Jerry's prior designs
-            ## Test # obs vs convergence
-            for d_data in self._design_data["DESIGNS"]:
-                design_task = d_data["TASK"]
-                # Treat final design as true_w
-                true_w = self._design_data["DESIGNS"][-1]["WEIGHTS"]
-                self._all_ird_obs_tasks.append(design_task)
-            self._all_ird_obs_ws = [true_w] * num_tasks
-
-        elif "ird_convergence_true_w_random_tasks" in exp_mode:
-            ## Use one of Jerry's prior designed w as true w
-            ## Test # random tasks vs convergence
-            self._all_ird_obs_tasks = rand_tasks
-            true_w = self._design_data["DESIGNS"][-1]["WEIGHTS"]
-            self._all_ird_obs_ws = [true_w] * num_tasks
-
-        elif "ird_convergence_true_w_same_tasks" in exp_mode:
-            ## Use one of Jerry's prior designed w as true w
-            ## Test # same tasks vs convergence
-            self._all_ird_obs_tasks = onp.array([rand_tasks[0]] * num_tasks)
-            true_w = self._design_data["DESIGNS"][-1]["WEIGHTS"]
-            self._all_ird_obs_ws = [true_w] * num_tasks
-
-        elif "ird_convergence_random_w_random_tasks" in exp_mode:
-            ## Use a random w as true w
-            ## Test # random tasks vs convergence
-            self._all_ird_obs_tasks = rand_tasks
-            rand_w = self._make_random_weights(
-                self._design_data["DESIGNS"][-1]["WEIGHTS"].keys()
-            )
-            for d_data in self._design_data["DESIGNS"]:
-                # rand_w = self._make_random_weights(d_data["WEIGHTS"].keys())
-                self._all_ird_obs_ws.append(rand_w)
-
-        elif "ird_convergence_true_w_more_features" in exp_mode:
-            ## Use a true w on random tasks
-            ## The true w has progressively more random features
-            ## Test # features (DOF) vs convergence
-            all_keys = self._model.env.features_keys
-            self._all_ird_obs_tasks = rand_tasks
-            for di, d_data in enumerate(self._design_data["DESIGNS"]):
-                # Start from n_start features
-                n_feats = di + self._nfeats_start
-                rand_w = self._make_random_weights(all_keys)
-                true_w = self._design_data["DESIGNS"][-1]["WEIGHTS"]
-                for key, val in rand_w.items():
-                    if key not in true_w:
-                        true_w[key] = val
-                    if len((true_w.keys())) == n_feats:
-                        break
-            self._all_ird_obs_ws = [true_w] * num_tasks
-
-        else:
-            raise NotImplementedError
-
-    def _make_random_weights(self, keys):
-        weights = OrderedDict()
-        for key in keys:
-            if key == self._normalized_key:
-                weights[key] = 1.0
-            else:
-                max_val = self._exp_params["WEIGHT_PARAMS"]["max_weights"]
-                self._rng_key, rng_weights = random.split(self._rng_key)
-                weights[key] = np.exp(
-                    random_uniform(rng_weights, low=-max_val, high=max_val)
-                )
-        return weights
-
     def run_designer(self, exp_mode):
         """Simulate designer on new_task. Varying the number of latent
         tasks as prior
@@ -326,11 +239,7 @@ class ExperimentMCMC(object):
         save_params(f"{save_dir}/params_{self._rng_name}.yaml", self._exp_params)
         all_tasks = self._designer.env.all_tasks
 
-        # for num_obs in range(6, len(self._all_ird_obs_ws)):
-        # for num_obs in range(1, 6):
         for num_obs in range(1, 15):
-            # for num_obs in range(4, 5):
-            # for num_obs in range(3, 6):
 
             self._log_time(f"IRD Obs {num_obs} Begin")
             print(f"Experiment mode ({self._rng_name}): {exp_mode}")

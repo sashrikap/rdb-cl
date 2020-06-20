@@ -41,11 +41,15 @@ class ExperimentIterativeIRD(object):
         eval_env_name=None,
         eval_method="mean",
         eval_seed=None,
+        iterations=5,
+        plan_beta=1.0,
         # Active sampling
+        initial_tasks_file=False,
         num_active_tasks=4,
         num_active_sample=-1,
         exp_mode="design",
         # Metadata
+        load_previous=False,
         save_root="examples/notebook/test",
         design_root="examples/notebook/test",
         exp_name="iterative_proposal",
@@ -56,6 +60,8 @@ class ExperimentIterativeIRD(object):
         self._env_fn = env_fn
         self._active_fns = active_fns
         self._rng_key, self._rng_name = None, None
+        self._iterations = iterations
+        self._plan_beta = plan_beta
         # Evaluation
         self._eval_seed = random.PRNGKey(eval_seed)
         self._eval_server = eval_server
@@ -66,9 +72,11 @@ class ExperimentIterativeIRD(object):
         self._eval_env_name = eval_env_name
         self._num_propose = 1
         # Active Task proposal
+        self._load_previous = load_previous
         self._num_active_tasks = num_active_tasks
         self._num_active_sample = num_active_sample
         self._exp_mode = exp_mode
+        self._initial_tasks_file = initial_tasks_file
         assert self._exp_mode in {"design", "evaluate"}
         # Save path
         assert (
@@ -102,7 +110,9 @@ class ExperimentIterativeIRD(object):
             h = secs // (60 * 60)
             m = (secs - h * 60 * 60) // 60
             s = secs - (h * 60 * 60) - (m * 60)
-            print(f">>> Iterative IRD {caption} Time: {int(h)}h {int(m)}m {s:.2f}s")
+            print(
+                f">>> Iterative IRD {caption} {self._rng_name} Time: {int(h)}h {int(m)}m {s:.2f}s"
+            )
         self._last_time = time.time()
 
     def _get_rng_eval(self):
@@ -120,12 +130,24 @@ class ExperimentIterativeIRD(object):
         ## Training and evaluation tasks
         self._train_tasks = self._model.env.all_tasks
         ## Propose first task
-        initial_task = random_choice(self._get_rng_task(), self._train_tasks, 1)[0]
+        if self._initial_tasks_file is None:
+            initial_task = random_choice(self._get_rng_task(), self._train_tasks, 1)[0]
+        else:
+            filepath = f"{examples_dir()}/tasks/{self._initial_tasks_file}.yaml"
+            initial_task = load_params(filepath)["TASKS"][0]
         self._tasks = {key: [initial_task] for key in self._active_fns.keys()}
         self._obs = {key: [] for key in self._active_fns.keys()}
         self._obs_ws = {key: [] for key in self._active_fns.keys()}
         self._beliefs = {key: [] for key in self._active_fns.keys()}
         self._eval_hist = {key: [] for key in self._active_fns.keys()}
+
+        if self._load_previous:
+            # Load belief
+            # npz_path = f"{self._save_dir}/{self._exp_name}_seed_{self._rng_name}.npz"
+            yaml_save = f"{self._design_dir}/yaml/rng_{self._rng_name}_designs.yaml"
+            with open(yaml_save, "r") as stream:
+                hist_data = yaml.safe_load(stream)
+            self._tasks = hist_data["tasks"]
 
     def get_task(self, method):
         """ Main function
@@ -150,6 +172,11 @@ class ExperimentIterativeIRD(object):
             self._obs_ws[method][n_tasks - 1] = obs_ws
 
     def propose(self):
+        self._save()
+        if self._load_previous:
+            ## Task already loaded
+            return
+
         self._log_time(f"Proposal Started")
         all_n_tasks = [len(tasks) for tasks in self._tasks.values()]
         assert all([n == all_n_tasks[0] for n in all_n_tasks])
@@ -288,6 +315,7 @@ class ExperimentIterativeIRD(object):
             self._num_eval_tasks,
             replacement=False,
         )
+        print(f"============== Iterative Evaluation {self._rng_name} ===============")
         # Load belief
         # npz_path = f"{self._save_dir}/{self._exp_name}_seed_{self._rng_name}.npz"
         yaml_save = f"{self._design_dir}/yaml/rng_{self._rng_name}_designs.yaml"
@@ -296,36 +324,6 @@ class ExperimentIterativeIRD(object):
 
         self._obs_ws = hist_data["designs"]
         self._tasks = hist_data["tasks"]
-        wi = 0
-        done = False
-        while not done:
-            for method in self._active_fns.keys():
-                self._log_time(f"Loading evaluation for: {method}")
-                obs_ws = self._obs_ws[method]
-                tasks = self._tasks[method]
-                n_tasks = len(obs_ws)
-                if wi + 1 > n_tasks:
-                    done = True
-                elif wi + 1 > 2:
-                    done = True
-                else:
-                    obs = self._model.create_particles(
-                        obs_ws[: (wi + 1)],
-                        save_name=f"iterative_obs",
-                        controller=self._model._designer._sample_controller,
-                        runner=self._model._designer._sample_runner,
-                    )
-                    belief = self._model.sample(
-                        onp.array(tasks[: wi + 1]),
-                        obs=obs,
-                        save_name=f"ird_belief_method_{method}_itr_{wi + 1}",
-                    )
-                    # belief.load()
-                    self._obs[method].append(obs)
-                    self._beliefs[method].append(belief)
-            wi += 1
-        self._log_time(f"Loading finished")
-
         # Compute belief features
         eval_info = {
             key: {
@@ -338,32 +336,26 @@ class ExperimentIterativeIRD(object):
             }
             for key in self._active_fns.keys()
         }
-        for method in self._active_fns.keys():
-            self._log_time(f"Running evaluation for: {method}")
-            for belief in self._beliefs[method]:
-                if self._eval_method == "uniform":
-                    belief_sample = belief.subsample(self._num_eval)
-                elif self._eval_method == "map":
-                    belief_sample = belief.map_estimate(self._num_eval, log_scale=False)
 
-                print(f"Evaluating method {method} belief: Begin")
-                self._eval_server.compute_tasks(
-                    "Evaluation", belief_sample, self._eval_tasks, verbose=True
-                )
-                # (DictList): nvios * (ntasks, nparticles)
-                feats_vios = belief_sample.get_violations(self._eval_tasks)
-                feats_vios_arr = feats_vios.onp_array()
-                avg_violate = feats_vios_arr.sum(axis=0).mean()
-                print(f"    Average Violation {avg_violate:.2f}")
-                eval_info[method]["violation"].append(avg_violate)
-                eval_info[method]["feats_violation"].append(
-                    dict(feats_vios.mean(axis=(0, 1)))
-                )
-                eval_info[method]["all_violation"].append(dict(feats_vios.mean(axis=1)))
-                self._save_eval(eval_info)
+        ## Set planning beta (higher beta for risk averse planning)
+        self._model._beta = self._plan_beta
 
-            for obs in self._obs[method]:
-                print(f"Evaluating method {method} observation: Begin")
+        for itr in range(self._iterations):
+            for method in self._active_fns.keys():
+                self._log_time(f"Itr {itr} loading evaluation for: {method}")
+                obs_ws = self._obs_ws[method]
+                tasks = self._tasks[method]
+                n_tasks = len(obs_ws)
+                obs = self._model.create_particles(
+                    obs_ws[: (itr + 1)],
+                    save_name=f"iterative_obs",
+                    controller=self._model._designer._sample_controller,
+                    runner=self._model._designer._sample_runner,
+                )
+
+                self._log_time(
+                    f"Itr {itr} evaluating method {method} observation: Begin"
+                )
                 self._eval_server.compute_tasks(
                     "Evaluation", obs, self._eval_tasks, verbose=True
                 )
@@ -371,7 +363,7 @@ class ExperimentIterativeIRD(object):
                 feats_vios = obs.get_violations(self._eval_tasks)
                 feats_vios_arr = feats_vios.onp_array()
                 avg_violate = feats_vios_arr.sum(axis=0).mean()
-                print(f"    Average Violation {avg_violate:.2f}")
+                print(f"    Average obs Violation {method}: {avg_violate:.2f}")
                 eval_info[method]["obs_violation"].append(avg_violate)
                 eval_info[method]["obs_feats_violation"].append(
                     dict(feats_vios.mean(axis=(0, 1)))
@@ -379,9 +371,39 @@ class ExperimentIterativeIRD(object):
                 eval_info[method]["obs_all_violation"].append(
                     dict(feats_vios.mean(axis=1))
                 )
+
+                belief = self._model.sample(
+                    onp.array(tasks[: itr + 1]),
+                    obs=obs,
+                    save_name=f"ird_belief_method_{method}_itr_{itr + 1}",
+                )
+                # belief.load()
+                self._obs[method].append(obs)
+                self._beliefs[method].append(belief)
+                self._log_time(f"Itr {itr} loading {method} finished")
+
+                if self._eval_method == "uniform":
+                    belief_sample = belief.subsample(self._num_eval)
+                elif self._eval_method == "map":
+                    belief_sample = belief.map_estimate(self._num_eval, log_scale=False)
+
+                self._log_time(f"Itr {itr} Evaluating method {method} belief: Begin")
+                self._eval_server.compute_tasks(
+                    "Evaluation", belief_sample, self._eval_tasks, verbose=True
+                )
+                # (DictList): nvios * (ntasks, nparticles)
+                feats_vios = belief_sample.get_violations(self._eval_tasks)
+                feats_vios_arr = feats_vios.onp_array()
+                avg_violate = feats_vios_arr.sum(axis=0).mean()
+                print(f"    Average Violation  {method}: {avg_violate:.2f}")
+                eval_info[method]["violation"].append(avg_violate)
+                eval_info[method]["feats_violation"].append(
+                    dict(feats_vios.mean(axis=(0, 1)))
+                )
+                eval_info[method]["all_violation"].append(dict(feats_vios.mean(axis=1)))
                 self._save_eval(eval_info)
 
-        self._log_time(f"Evaluation finished")
+                self._log_time(f"Itr {itr} {method} Evaluation finished")
         return eval_info
 
     def _save(self):
@@ -406,7 +428,10 @@ class ExperimentIterativeIRD(object):
         ## Save user input yaml
         yaml_save = f"{self._save_dir}/yaml/rng_{self._rng_name}_designs.yaml"
         os.makedirs(os.path.dirname(yaml_save), exist_ok=True)
-        tasks = {key: [v.tolist() for v in val] for (key, val) in self._tasks.items()}
+        tasks = {
+            key: [v.tolist() if type(v) is not list else v for v in val]
+            for (key, val) in self._tasks.items()
+        }
         # print(self._rng_name)
         with open(yaml_save, "w+") as stream:
             yaml.dump(

@@ -457,6 +457,7 @@ class DriveWorld(RenderEnv):
         draw_boundary=False,
         draw_constraint_key=None,
         weights=None,
+        paper=False,
     ):
         """
         Args:
@@ -467,6 +468,9 @@ class DriveWorld(RenderEnv):
         if self.state.shape[0] > 1:
             print("WARNING: rendering with batch mode")
 
+        if paper:
+            self._magnify = 1
+
         visible = mode == "human"
         ## Initialize rendering
         if self._window is None:
@@ -475,7 +479,7 @@ class DriveWorld(RenderEnv):
                 width=int(WINDOW_W / 2), height=int(WINDOW_H / 2), visible=visible
             )
             self._window.set_visible(True)
-            self._setup_render()
+            self._setup_render(paper=paper)
             self._window.set_visible(visible)
             # except:
             #     ## On headless server
@@ -515,7 +519,8 @@ class DriveWorld(RenderEnv):
                 self._draw_heatmap(heat_fn=self._viz_constraint_fn)
 
             gl.glPopMatrix()
-            self._update_text(text=text)
+            if not paper:
+                self._update_text(text=text)
             # self._texts.batch.draw()
 
             img_data = (
@@ -551,7 +556,7 @@ class DriveWorld(RenderEnv):
             1.0,
         )
 
-    def _setup_render(self):
+    def _setup_render(self, paper=False):
         ## Setup render batch
         self._layers = utils.EnvGroups()
         self._texts = utils.TextGroups()
@@ -559,6 +564,13 @@ class DriveWorld(RenderEnv):
         ## Setup background
         self._grass = pyglet.resource.texture("grass.png")
         W = 10
+
+        ## Setup lanes
+        # if paper:
+        #     tex_verts = ("v2f", (-W, -W, W, -W, W, W, -W, W))
+        #     tex_colors = ("c3B", [int(1 * 255)] * 12)
+        #     self._layers.batch.add(4, gl.GL_QUADS, self._layers.background, tex_verts, tex_colors)
+        # else:
         texture_grid = pyglet.image.ImageGrid(self._grass, W, W).get_texture_sequence()
         texture_group = pyglet.graphics.TextureGroup(
             texture_grid, self._layers.background
@@ -566,16 +578,18 @@ class DriveWorld(RenderEnv):
         tex_map = texture_grid.texture.tex_coords
         tex_verts = ("v2f", (-W, -W, W, -W, W, W, -W, W))
         tex_coords = ("t2f", (0.0, 0.0, W * 5.0, 0.0, W * 5.0, W * 5.0, 0.0, W * 5.0))
-
-        ## Setup lanes
         self._layers.batch.add(4, gl.GL_QUADS, texture_group, tex_verts, tex_coords)
+
         for lane in self._lanes:
             lane.register(group=self._layers.road, batch=self._layers.batch)
         # setup objects
         for obj in self._objects:
             obj.register(group=self._layers.object, batch=self._layers.batch)
         # Setup text
-        self._setup_text(self._labels, group=self._texts.text, batch=self._texts.batch)
+        if not paper:
+            self._setup_text(
+                self._labels, group=self._texts.text, batch=self._texts.batch
+            )
         # Setup Cars
         for car in self._cars:
             car.register(group=self._layers.car, batch=self._layers.batch)
@@ -717,12 +731,12 @@ class DriveWorld(RenderEnv):
             constraint_fn = self._constraints_dict[constraints_key]
             n_states = len(xs)
             state = deepcopy(self.state)
-            states = np.repeat(state, n_states, axis=0)  # (n_states, xdim)
-            phis = np.array([np.pi / 3] * n_states)
+            states = onp.repeat(state, n_states, axis=0)  # (n_states, xdim)
+            phis = onp.array([onp.pi / 3] * n_states)
             main_idx = self._indices["main_car"]
-            states[:, main_idx[0] : main_idx[0] + 3] = np.stack([xs, ys, phis], axis=1)
+            states[:, main_idx[0] : main_idx[0] + 3] = onp.stack([xs, ys, phis], axis=1)
             states = states[None, :, :]  # (1, n_states, xdim)
-            acts = np.zeros((1, n_states, self.udim))  # (1, n_states, udim)
+            acts = onp.zeros((1, n_states, self.udim))  # (1, n_states, udim)
             return 0.5 * constraint_fn(states, acts)
 
         self._viz_constraint_fn = val

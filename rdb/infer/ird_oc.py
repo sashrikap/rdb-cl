@@ -21,7 +21,6 @@ import jax
 import jax.numpy as np
 import numpy as onp
 from rdb.infer.designer import Designer, DesignerInteractive
-from numpyro.handlers import scale, condition, seed
 from rdb.infer.particles import Particles
 from jax.scipy.special import logsumexp
 from tqdm.auto import tqdm, trange
@@ -233,7 +232,10 @@ class IRDOptimalControl(object):
 
         ## ================= Prepare Designer Normalizer ================
         # self._designer.normalizer.compute_tasks(tasks, us0=obs_actions_dnorm)
+        print(f"Computing designer normalizers: {self._designer.num_normalizers}")
+        t1 = time()
         self._designer.normalizer.compute_tasks(tasks, max_batch=500)
+        print(f"Computing designer normalizers time {time() - t1}")
         #  shape (nfeats, ntasks, d_nnorms)
         designer_normal_fsum = self._designer.normalizer.get_features_sum(tasks)
         designer_normal_fsum = designer_normal_fsum.prepare(feats_keys).numpy_array()
@@ -286,7 +288,7 @@ class IRDOptimalControl(object):
             true_feats_sum = obs_feats_sum
             # true_ws = true_ws.numpy_array()
             true_ws = true_ws.normalize_across_keys().numpy_array()
-            log_prob = _likelihood(true_ws, true_feats_sum) * self._beta
+            log_prob = _likelihood(true_ws, true_feats_sum)
             numpyro.factor("ird_log_probs", log_prob)
 
         @jax.jit

@@ -119,6 +119,10 @@ class Designer(object):
         return self._normalizer
 
     @property
+    def num_normalizers(self):
+        return self._num_normalizers
+
+    @property
     def rng_name(self):
         return self._rng_name
 
@@ -252,7 +256,10 @@ class Designer(object):
         decay = self._proposal_decay ** (ntasks - 1)
         init_args["proposal_var"] = init_args["proposal_var"] * decay
         num_chains = self._sample_args["num_chains"]
-        init_params = self._truth.weights.log()
+        num_keys = len(self._prior.feature_keys)
+        init_params = DictList(
+            dict(zip(self._prior.feature_keys, np.zeros((num_keys, 1))))
+        )
         if num_chains > 1:
             #  shape nfeats * (nchains, 1)
             init_params = init_params.expand_dims(0).repeat(num_chains, axis=0)
@@ -342,7 +349,50 @@ class Designer(object):
 
         def _model():
             #  shape nfeats * (1,)
+            # new_ws = DictList([{'control': 3.0, 'dist_cars': 0.001, 'dist_fences': 0.001, 'dist_lanes': 1.0,'dist_objects': 0.001, 'speed': 1.0, 'speed_over': 0.001}]).prepare(feats_keys).normalize_across_keys()
+            # new_ws = DictList([{'control': 3.0, 'dist_cars': 0.001, 'dist_fences': 0.001, 'dist_lanes': 1.0,'dist_objects': 2, 'speed': 1.0, 'speed_over': 0.001}]).prepare(feats_keys).normalize_across_keys()
+            new_ws = (
+                DictList(
+                    [
+                        OrderedDict(
+                            [
+                                ("control", 6.1548050798294796),
+                                ("dist_fences", 0.30125449142710387),
+                                ("dist_lanes", 1.593035339312201),
+                                ("dist_objects", 0.8151314608344332),
+                                ("speed", 1.0378923794381953),
+                                ("speed_over", 0.5183017496056155),
+                                ("dist_cars", 1.0),
+                            ]
+                        )
+                    ]
+                )
+                .prepare(feats_keys)
+                .normalize_across_keys()
+            )
+            new_ws = (
+                DictList(
+                    [
+                        OrderedDict(
+                            [
+                                ("control", 6.1548050798294796),
+                                ("dist_fences", 0.30125449142710387),
+                                ("dist_lanes", 1.593035339312201),
+                                ("dist_objects", 3.5),
+                                ("speed", 1.0378923794381953),
+                                ("speed_over", 0.5183017496056155),
+                                ("dist_cars", 1.0),
+                            ]
+                        )
+                    ]
+                )
+                .prepare(feats_keys)
+                .normalize_across_keys()
+            )
             new_ws = self._prior(1).prepare(feats_keys).normalize_across_keys()
+            import pdb
+
+            pdb.set_trace()
             sample_ws = new_ws.numpy_array()
             ## ======= Not jit-able optimization: requires scipy/jax optimizer ======
             sample_ps = self.create_particles(
@@ -360,6 +410,7 @@ class Designer(object):
             log_probs = self._likelihood(
                 true_ws, sample_ws, sample_feats_sum, tasks, self.beta
             )
+            print(log_probs)
             #  shape (nbatch,)
             log_prob = task_method(log_probs)
             numpyro.factor("designer_log_prob", log_prob)

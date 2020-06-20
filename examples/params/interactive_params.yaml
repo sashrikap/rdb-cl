@@ -35,7 +35,8 @@ EXP_ARGS:
   num_active_tasks: 512
   num_eval: 512
   num_eval_tasks: 500
-EXP_NAME: interactive_proposal_divide_training_03_propose_04
+  num_propose: 8
+EXP_NAME: interactive_proposal_divide_training_03_propose_04_old
 IRD_ARGS:
   beta: 50
   proposal_decay: 0.9
@@ -54,8 +55,8 @@ IRD_CONTROLLER_ARGS:
   method: adam
   replan: 5
 RANDOM_KEYS:
-- 0
-SAVE_NAME: '200501'
+- 3
+SAVE_NAME: 200413
 WEIGHT_PARAMS:
   bins: 200
   feature_keys:

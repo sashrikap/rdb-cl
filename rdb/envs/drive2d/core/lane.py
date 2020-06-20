@@ -43,7 +43,7 @@ class StraightLane(object):
         pt2 = self.pt2 + shift
         return StraightLane(pt1, pt2, self.width)
 
-    def register(self, batch, group):
+    def register(self, batch, group, paper=False):
         normal, forward = self.normal, self.forward
         pt1, pt2, width = self.pt1, self.pt2, self.width
         W = 10
@@ -55,7 +55,11 @@ class StraightLane(object):
                 pt2 + forward * W + 0.5 * width * normal,
             ]
         )
-        colors = [int(0.4 * 255)] * 12
+        if paper:
+            colors = [int(1 * 255)] * 12
+        else:
+            colors = [int(0.4 * 255)] * 12
+
         batch.add(4, gl.GL_QUAD_STRIP, group, ("v2f", quad_strip), ("c3B", colors))
         line_strip = onp.hstack(
             [
@@ -65,5 +69,8 @@ class StraightLane(object):
                 pt1 + forward * W + 0.5 * width * normal,
             ]
         )
-        colors = [255] * 12
+        if paper:
+            colors = [0] * 12
+        else:
+            colors = [255] * 12
         batch.add(4, gl.GL_LINES, group, ("v2f", line_strip), ("c3B", colors))

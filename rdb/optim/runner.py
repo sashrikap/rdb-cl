@@ -10,7 +10,7 @@ from scipy.misc import imresize
 from os.path import join, dirname
 from collections import OrderedDict
 from rdb.exps.utils import Profiler
-from rdb.visualize.render import forward_env, render_env
+from rdb.visualize.render import forward_env, render_env, capture_env
 
 """
 Forward environments and collect trajectorys
@@ -87,6 +87,37 @@ class Runner(object):
             self._env.close_window()
         return frames
 
+    def save_frames(
+        self, state, actions, width=450, path=None, text="", close=True, paper=False
+    ):
+        """Save frames data.
+
+        Args:
+            state(ndarray): (nbatch, xdim)
+            actions(ndarray): (T, nbatch, udim)
+
+        """
+        assert len(state.shape) == 2
+        assert len(actions.shape) == 3
+        if path is None:
+            path = join(dirname(rdb.__file__), "..", "data", "recording.mp4")
+        os.makedirs(dirname(path), exist_ok=True)
+        self._env.reset()
+        self._env.state = state
+        capture_env(
+            self._env,
+            state,
+            actions,
+            fps=3,
+            path=path,
+            text=text,
+            paper=paper,
+            width=width,
+        )
+        if close:
+            self._env.close_window()
+        return path
+
     def collect_mp4(self, state, actions, width=450, path=None, text="", close=True):
         """Save mp4 data.
 
@@ -127,10 +158,12 @@ class Runner(object):
         os.makedirs(dirname(mp4_path), exist_ok=True)
         if clear:
             clear_output()
-        print(f"video path {mp4_path}")
+        # print(f"video path {mp4_path}")
         display(Video(mp4_path, width=FRAME_WIDTH))
 
-    def collect_thumbnail(self, state, width=450, path=None, text=None, close=True):
+    def collect_thumbnail(
+        self, state, width=450, path=None, text=None, close=True, paper=False
+    ):
         """Save thumbnail data.
 
         Args:
@@ -145,7 +178,7 @@ class Runner(object):
         # for car in self._env.cars:
         #     print(car.state)
         self._env.state = state
-        frame = self._env.render(mode="rgb_array", text=text)
+        frame = self._env.render(mode="rgb_array", text=text, paper=paper)
         frame = imresize(frame, (width, width))
         if close:
             self._env.close_window()

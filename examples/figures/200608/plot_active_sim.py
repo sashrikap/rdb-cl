@@ -53,6 +53,31 @@ colors = {
     "ratiomin": "darkred",
 }
 
+## Proxy regret evaluated separately
+PROXY_MEANS = {
+    "infogain": [
+        0.2684237099023214,
+        0.28381213230645097,
+        0.20618107497336602,
+        0.2584209869392536,
+        0.16898932277707351,
+    ],
+    "random": [
+        0.2684237099023214,
+        0.28099231913179384,
+        0.27150938901271937,
+        0.19122882878209124,
+        0.1570842764181364,
+    ],
+    "difficult": [
+        0.2684237099023214,
+        0.28222694291921147,
+        0.21177849994778025,
+        0.29627997066392747,
+        0.18344383808450912,
+    ],
+}
+
 
 def plot_perform(data_dir, exp_name, data, relative=False, normalized=False):
     sns.set_palette("husl")
@@ -66,47 +91,15 @@ def plot_perform(data_dir, exp_name, data, relative=False, normalized=False):
             perf = -1 * onp.array(mdict["normalized_perform"])
         else:
             perf = onp.array(mdict["perform"])
-        sns.tsplot(
-            time=range(1, 1 + len(perf[0])),
-            color=colors[method],
-            data=perf,
-            condition=method,
-        )
-        if plot_obs:
-            obs_perf = -1 * mdict["obs_perform_normalized"]
-            obs_mean = onp.array(obs_perf).mean(axis=0)
-            print(method, onp.array(obs_perf).mean(axis=0).tolist())
-            if method == "infogain":
-                obs_mean = [
-                    0.2684237099023214,
-                    0.28381213230645097,
-                    0.20618107497336602,
-                    0.2584209869392536,
-                    0.16898932277707351,
-                ]
-            elif method == "random":
-                obs_mean = [
-                    0.2684237099023214,
-                    0.28099231913179384,
-                    0.27150938901271937,
-                    0.19122882878209124,
-                    0.1570842764181364,
-                ]
-            elif method == "difficult":
-                obs_mean = [
-                    0.2684237099023214,
-                    0.28222694291921147,
-                    0.21177849994778025,
-                    0.29627997066392747,
-                    0.18344383808450912,
-                ]
-            # sns.tsplot(
-            #     time=range(1, 1 + len(perf[0])),
-            #     color=colors[method],
-            #     data=obs_perf,
-            #     linestyle="--",
-            #     condition=method + " w/o IRD",
-            # )
+        if method in plot_ird:
+            sns.tsplot(
+                time=range(1, 1 + len(perf[0])),
+                color=colors[method],
+                data=perf,
+                condition=method,
+            )
+        if method in plot_obs:
+            obs_mean = PROXY_MEANS[method]
             ax.plot(
                 range(1, 1 + len(perf[0])),
                 obs_mean,
@@ -114,16 +107,16 @@ def plot_perform(data_dir, exp_name, data, relative=False, normalized=False):
                 linestyle="--",
                 label=method + " proxy",
             )
+    ax.set_ylim(*ylims)
     plt.xticks(range(1, 1 + len(perf[0])))
     ax.spines["right"].set_visible(False)
     ax.spines["top"].set_visible(False)
-    # ax.get_legend().remove()
-    plt.legend(loc="upper center", ncol=3, bbox_to_anchor=(1, 1.2))
+    # plt.legend(loc="upper center", ncol=3, bbox_to_anchor=(1, 1.2))
+    ax.get_legend().remove()
     plt.xlabel("Iteration")
     plt.ylabel("Regret")
-    # import pdb; pdb.set_trace()
-    plt.title(f"Posterior Regret")
-    plt.savefig(os.path.join(data_dir, exp_name, "performance.png"))
+    # plt.title(f"Posterior Regret")
+    plt.savefig(os.path.join(data_dir, exp_name, fig_name))
     plt.tight_layout()
     plt.show()
 
@@ -206,15 +199,8 @@ def load_data():
     npydata = []
     if os.path.isdir(os.path.join(exp_dir, exp_name)):
         for file in sorted(os.listdir(os.path.join(exp_dir, exp_name))):
-            if (
-                # exp_name in file
-                # and "npy" in file
-                "npy" in file
-                and "map_seed" not in file
-                and file.endswith("npy")
-            ):
+            if "npy" in file and "map_seed" not in file and file.endswith("npy"):
                 exp_path = os.path.join(exp_dir, exp_name, file)
-                # print(exp_path)
                 if os.path.isfile(exp_path):
                     use_bools = [str(s) in exp_path for s in use_seeds]
                     not_bools = [str(s) in exp_path for s in not_seeds]
@@ -306,7 +292,7 @@ def load_separate_data():
                 npydata.append(read_seed(exp_path))
             for idx, (npy_data, npy_path) in enumerate(zip(npydata, npypaths)):
                 for method, yhist in npy_data.items():
-                    if method in not_methods:
+                    if method not in use_methods:
                         continue
                     if method not in data.keys():
                         data[method] = {
@@ -367,13 +353,8 @@ def load_separate_data():
 
 
 def plot_data():
-    # data = load_data()
     data = load_separate_data()
-    # plot_feats_violate(exp_dir, exp_name, data, itr=5)
     plot_perform(exp_dir, exp_name, data, relative=False, normalized=True)
-    # plot_perform(exp_dir, exp_name, data, relative=False)
-    # plot_violate(exp_dir, exp_name, data)
-    # plot_log_prob(exp_dir, exp_name, data)
 
 
 if __name__ == "__main__":
@@ -387,14 +368,12 @@ if __name__ == "__main__":
 
     use_seeds = [str(random.PRNGKey(si)) for si in use_seeds]
     not_seeds = [str(random.PRNGKey(si)) for si in not_seeds]
-    use_methods = ["random", "infogain", "difficult"]
-    not_methods = ["ratiomin"]
-    plot_obs = True
+    use_methods = ["random", "infogain"]
+    ylims = (0.0, 0.3)
+    plot_obs = ["random"]
+    plot_ird = ["random"]
 
-    exp_dir = "data/200604"
-    # exp_name = "active_ird_exp_ird_beta_50_true_w_map_sum_irdvar_3_adam200"
-    # exp_name = "active_ird_ibeta_50_true_w1_eval_mean_128_seed_0_603_adam"
-    # exp_name = "active_ird_ibeta_50_true_w1_eval_mean_128_seed_0_603_adam"
-    # exp_name = "active_ird_simplified_indep_init_4v1_ibeta_6_obs_true_dbeta_0.02"
+    fig_name = "fig_3_v2.png"
+    exp_dir = "./data"
     exp_name = "active_ird_simplified_joint_init_4v1_ibeta_6_true_w"
     plot_data()

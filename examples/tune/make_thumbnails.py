@@ -16,9 +16,9 @@ ENV_NAME = "Week6_02-v1"  # Two Blockway
 ROOT_DIR = "data/thumbnails"
 
 
-THUMBNAIL = True
-HEATMAP = True
-BOUNDMAP = True
+THUMBNAIL = False
+HEATMAP = False
+BOUNDMAP = False
 CONSTRAINTSMAP = True
 
 env = gym.make(ENV_NAME)

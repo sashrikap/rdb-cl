@@ -1,7 +1,7 @@
 # ENV_NAME: Week6_01-v0
 
 #RANDOM_KEYS: [0, 1, 2, 3]
-RANDOM_KEYS: [1]
+RANDOM_KEYS: [0]
 # RANDOM_KEYS: [22]
 # RANDOM_KEYS: [23]
 NUM_EVAL_WORKERS: 4
@@ -58,7 +58,7 @@ DESIGNER_ARGS:
   sample_method: MH
   num_normalizers: 1000
   sample_init_args:
-    proposal_var: 0.1 # week6_02
+    proposal_var: 0.001 # week6_02
     # proposal_var: 0.5  # week6_01
     max_val: 15.0
   proposal_decay: 0.7
@@ -66,9 +66,9 @@ DESIGNER_ARGS:
     num_samples: 300
     num_warmup: 50
     num_chains: 1
-  beta: 20
-  exp_name: designer_convergence_true_w_random_tasks_w1_beta_20_dprior_0_var_0.1_week602
-SAVE_NAME: 200529
+  beta: 0.2
+  exp_name: designer_convergence_true_w_prior_tasks_w1_beta_40_dprior_0_var_0.1_week602
+SAVE_NAME: 200604
 
 
 # # Test sampling

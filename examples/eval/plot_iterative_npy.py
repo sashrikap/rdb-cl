@@ -24,7 +24,7 @@ sns.set_style(
 colors = {
     "random": "gray",
     "infogain": "darkorange",
-    "difficult": "purple",
+    "difficult": "cornflowerblue",
     "ratiomean": "peru",
     "ratiomin": "darkred",
 }
@@ -60,21 +60,25 @@ def plot_iterative_eval():
 
     sns.set_palette("husl")
     for i, (method, evals) in enumerate(all_eval.items()):
+        print(method, onp.array(all_obs[method]).shape)
         sns.tsplot(
-            time=range(1, 1 + n_xs),
+            time=range(1, 1 + length),
             color=colors[method],
-            data=onp.array(evals),
+            data=onp.array(evals)[:, :length],
             condition=method,
         )
+        print(onp.array(all_obs[method]).mean(axis=0)[:length])
         ax.plot(
             range(1, 1 + n_xs),
-            onp.array(all_obs[method]).mean(axis=0),
+            onp.array(all_obs[method]).mean(axis=0)[:length],
             color=colors[method],
             linestyle="--",
             label=method + " proxy",
         )
     plt.xticks(range(1, 1 + n_xs))
-    plt.legend(loc="upper right")
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    plt.legend(loc="upper center", ncol=3)
     plt.xlabel("Iteration")
     plt.ylabel("Violation")
     plt.title("Posterior Violation")
@@ -92,8 +96,9 @@ if __name__ == "__main__":
     use_seeds = [0, 1, 2, 3]  # list(range(30))
     # use_seeds = [3]  # list(range(30))
     not_seeds = []
+    length = 5
 
     not_methods = []
     exp_dir = "data/200501"
-    exp_name = "iterative_divide"
+    exp_name = "iterative_divide_default_01"
     plot_iterative_eval()

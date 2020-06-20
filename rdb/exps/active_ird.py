@@ -71,12 +71,16 @@ class ExperimentActiveIRD(object):
         eval_env_name=None,
         eval_method="map",
         eval_seed=None,
+        obs_true=False,
+        # Initial tasks
+        initial_tasks_seed=None,
+        initial_tasks_file=None,
+        num_initial_tasks=1,
         # Observation model
         obs_method="map",
         num_prior_tasks=0,  # for designer
         # Active sampling
         num_active_tasks=4,
-        num_initial_tasks=1,
         num_active_sample=-1,
         # Debugging
         fixed_candidates=None,
@@ -85,6 +89,7 @@ class ExperimentActiveIRD(object):
         design_data=None,
         num_load_design=-1,
         save_root="data/active_ird_exp1",
+        separate_save=False,
         exp_name="active_ird_exp1",
         exp_params={},
     ):
@@ -95,6 +100,7 @@ class ExperimentActiveIRD(object):
         self._active_fns = active_fns
         self._eval_server = eval_server
         self._obs_method = obs_method
+        self._obs_true = obs_true
 
         # Random key & function
         self._rng_key = None
@@ -102,6 +108,11 @@ class ExperimentActiveIRD(object):
         self._eval_seed = random.PRNGKey(eval_seed)
         self._iterations = iterations
         self._num_prior_tasks = num_prior_tasks
+
+        # Initial tasks
+        self._initial_tasks_seed = random.PRNGKey(initial_tasks_seed)
+        self._initial_tasks_file = initial_tasks_file
+        self._num_initial_tasks = num_initial_tasks
 
         # Designer simulation
         self._designer_server = DesignerServer(designer_fn)
@@ -117,7 +128,6 @@ class ExperimentActiveIRD(object):
 
         # Active Task proposal
         self._num_active_tasks = num_active_tasks
-        self._num_initial_tasks = num_initial_tasks
         self._fixed_candidates = fixed_candidates
         self._num_active_sample = num_active_sample
         self._fixed_belief_tasks = fixed_belief_tasks
@@ -127,6 +137,10 @@ class ExperimentActiveIRD(object):
         self._save_root = save_root
         self._exp_name = exp_name
         self._save_dir = f"{self._save_root}/{self._exp_name}"
+        if separate_save:
+            active_keys = list(active_fns.keys())
+            assert len(active_keys) == 1
+            self._save_dir = f"{self._save_root}/{self._exp_name}/{active_keys[0]}"
         self._last_time = time.time()
         # Load design and cache
         self._num_load_design = num_load_design
@@ -168,15 +182,13 @@ class ExperimentActiveIRD(object):
         for fn, rng_key_fn in zip(list(self._active_fns.values()), rng_active_keys):
             fn.update_key(rng_key_fn)
 
-    def _get_rng_eval(self):
-        if self._eval_seed is not None:
+    def _get_rng(self, rng_type=None):
+        if rng_type == "eval" and self._eval_seed is not None:
             self._eval_seed, rng_task = random.split(self._eval_seed)
+        elif rng_type == "initial_tasks" and self._initial_tasks_seed is not None:
+            self._initial_tasks_seed, rng_task = random.split(self._initial_tasks_seed)
         else:
             self._rng_key, rng_task = random.split(self._rng_key)
-        return rng_task
-
-    def _get_rng_task(self):
-        self._rng_key, rng_task = random.split(self._rng_key)
         return rng_task
 
     def run_fix(self):
@@ -202,11 +214,11 @@ class ExperimentActiveIRD(object):
         if self._num_eval_tasks > len(eval_env.all_tasks):
             num_eval = -1
         self._eval_tasks = random_choice(
-            self._get_rng_eval(), eval_env.all_tasks, num_eval, replacement=False
+            self._get_rng("eval"), eval_env.all_tasks, num_eval, replacement=False
         )
         self._train_tasks = self._model.env.all_tasks
         prior_tasks = random_choice(
-            self._get_rng_eval(),
+            self._get_rng("eval"),
             self._train_tasks,
             self._num_prior_tasks,
             replacement=False,
@@ -216,18 +228,22 @@ class ExperimentActiveIRD(object):
         ### Initial Design
         active_keys = list(self._active_fns.keys())
         tasks, scores = self._propose_initial_tasks()
-        tasks = onp.array([[-0.3, 0.5, -0.08, -0.9, 0.12, -0.9]]).tolist()
-        ## initial tasks v1
-        # tasks = onp.array([[-0.3 ,  0.5 , -0.08,  -0.9 ,  0.12,  -0.9 ], [0.4 ,  -0.5 , 0.08,  0.5 ,  0.12,  -0.9 ]]).tolist()
-        ## initial tasks v2
-        # tasks = onp.array([[-0.3 ,  0.5 , -0.08,  -0.9 ,  0.12,  -0.9 ], [0.4 ,  -0.5 , 0.08,  -0.5 ,  0.12,  -0.9 ]]).tolist()
+
         if self._joint_mode:
             self._log_time("Initial designer sampling Begin")
             proxies = self._designer_server.designer.simulate(
-                onp.array(tasks), save_name=f"initial_joint_{self._num_initial_tasks}"
+                onp.array(tasks),
+                save_name=f"designer_initial_joint_{self._num_initial_tasks}",
             )
             initial_proxies = [proxies] * self._num_initial_tasks
-            initial_obs = [proxies.subsample(1)] * self._num_initial_tasks
+            if self._obs_true:
+                initial_obs = [
+                    self._designer_server.designer.truth
+                ] * self._num_initial_tasks
+            else:
+                initial_obs = [
+                    proxies.subsample(1) for _ in range(self._num_initial_tasks)
+                ]
         else:
             initial_obs, initial_proxies = [], []
             for idx in range(1, self._num_initial_tasks + 1):
@@ -236,10 +252,13 @@ class ExperimentActiveIRD(object):
                 )
                 proxies = self._designer_server.designer.simulate(
                     onp.array(tasks)[:idx],
-                    save_name=f"initial_independent_{idx}_{self._num_initial_tasks}",
+                    save_name=f"designer_initial_independent_{idx}_{self._num_initial_tasks}",
                 )
                 initial_proxies.append(proxies)
-                initial_obs.append(proxies.subsample(1))
+                if self._obs_true:
+                    initial_obs.append(self._designer_server.designer.truth)
+                else:
+                    initial_obs.append(proxies.subsample(1))
         for key in active_keys:
             self._hist_obs[key] = [ob for ob in initial_obs]
             self._hist_proxies[key] = [proxies for proxies in initial_proxies]
@@ -253,8 +272,15 @@ class ExperimentActiveIRD(object):
             print(f"\nActive IRD ({self._rng_name}) iteration {itr}")
             for key in active_keys:
                 obs = self._hist_obs[key]
+                proxies = self._hist_proxies[key][-1]
                 if self._joint_mode:  # joint design, use same obs
-                    obs = [obs[-1]] * len(obs)
+                    if self._obs_true:
+                        obs = [
+                            self._designer_server.designer.truth
+                            for _ in range(len(obs))
+                        ]
+                    else:
+                        obs = [proxies.subsample(1) for _ in range(len(obs))]
                 belief = self._model.sample(
                     tasks=onp.array(self._hist_tasks[key]),
                     obs=obs,
@@ -271,7 +297,7 @@ class ExperimentActiveIRD(object):
 
             ### Actively Task Proposal
             candidates = random_choice(
-                self._get_rng_task(), self._train_tasks, self._num_active_tasks
+                self._get_rng(), self._train_tasks, self._num_active_tasks
             )
             self._hist_candidates.append(candidates)
             for key in active_keys:
@@ -298,16 +324,27 @@ class ExperimentActiveIRD(object):
             )
             for proxies, key in zip(all_proxies, active_keys):
                 self._hist_proxies[key].append(proxies)
-                self._hist_obs[key].append(proxies.subsample(1))
+                if self._obs_true:
+                    self._hist_obs[key].append(self._designer_server.designer.truth)
+                else:
+                    self._hist_obs[key].append(proxies.subsample(1))
             self._log_time(f"Itr {itr} Designer Simulated")
 
     def _propose_initial_tasks(self):
-        assert self._num_initial_tasks > 0
         if self._initial_tasks is None:
-            tasks = random_choice(
-                self._get_rng_task(), self._train_tasks, self._num_initial_tasks
-            ).tolist()
-            scores = [onp.zeros(self._num_active_tasks)] * self._num_initial_tasks
+            if self._initial_tasks_file is None:
+                tasks = random_choice(
+                    self._get_rng("initial_tasks"),
+                    self._train_tasks,
+                    self._num_initial_tasks,
+                ).tolist()
+                scores = [onp.zeros(self._num_active_tasks)] * self._num_initial_tasks
+            else:
+                filepath = f"{examples_dir()}/tasks/{self._initial_tasks_file}.yaml"
+                tasks = load_params(filepath)["TASKS"]
+                scores = [onp.zeros(self._num_active_tasks)] * self._num_initial_tasks
+            assert self._num_initial_tasks > 0
+            assert len(tasks) == self._num_initial_tasks
             self._initial_tasks = tasks
             self._initial_scores = scores
             return tasks, scores
@@ -320,7 +357,7 @@ class ExperimentActiveIRD(object):
         assert (
             self._num_load_design < 0
         ), "Should not propose random task if user design is provided"
-        task = random_choice(self._get_rng_task(), self._train_tasks, 1)[0]
+        task = random_choice(self._get_rng(), self._train_tasks, 1)[0]
         scores = onp.zeros(self._num_active_tasks)
         return task, scores
 
@@ -351,7 +388,7 @@ class ExperimentActiveIRD(object):
             _, scores = self._propose_random_task()
             task_ids = onp.argsort(self._train_difficulties)[-1000:]
             difficult_tasks = self._train_tasks[task_ids]
-            next_task = random_choice(self._get_rng_task(), difficult_tasks, 1)[0]
+            next_task = random_choice(self._get_rng(), difficult_tasks, 1)[0]
         else:
             # Compute belief features
             active_fn = self._active_fns[fn_key]
@@ -438,13 +475,13 @@ class ExperimentActiveIRD(object):
         )
         for fv in obs_feats_violates[1:]:
             obs_avg_feats_violate += fv * (1 / float(len(self._eval_tasks)))
-        print(f"    Obs Average Violation diff {obs_avg_violate:.2f}")
-        print(f"    Obs Average Violation rel {obs_avg_rel_violate:.2f}")
-        print(f"    Obs Average Performance diff {obs_avg_perform:.2f}")
+        print(f"    Obs Average Violation diff {obs_avg_violate:.4f}")
+        print(f"    Obs Average Violation rel {obs_avg_rel_violate:.4f}")
+        print(f"    Obs Average Performance diff {obs_avg_perform:.4f}")
         print(
-            f"    Obs Average Performance normalized {obs_avg_normalized_perform:.2f}"
+            f"    Obs Average Performance normalized ({fn_key}) {obs_avg_normalized_perform:.4f}"
         )
-        print(f"    Obs Average Performance rel {obs_avg_rel_perform:.2f}")
+        print(f"    Obs Average Performance rel {obs_avg_rel_perform:.4f}")
 
         ## Compute belief features
         if self._eval_method == "mean":
@@ -492,12 +529,14 @@ class ExperimentActiveIRD(object):
             log_prob_true = float(belief.log_prob(target.weights[0]))
         else:
             log_prob_true = 0.0
-        print(f"    Average Violation diff {avg_violate:.2f}")
-        print(f"    Average Violation rel {avg_rel_violate:.2f}")
-        print(f"    Average Performance diff {avg_perform:.2f}")
-        print(f"    Average Performance rel {avg_rel_perform:.2f}")
-        print(f"    Average Performance normalized {avg_normalized_perform:.2f}")
-        print(f"    True Weights Log Prob {log_prob_true:.2f}")
+        print(f"    Average Violation diff {avg_violate:.4f}")
+        print(f"    Average Violation rel {avg_rel_violate:.4f}")
+        print(f"    Average Performance diff {avg_perform:.4f}")
+        print(f"    Average Performance rel {avg_rel_perform:.4f}")
+        print(
+            f"    Average Performance normalized ({fn_key}) {avg_normalized_perform:.4f}"
+        )
+        print(f"    True Weights Log Prob {log_prob_true:.4f}")
 
         info = {
             "violation": avg_violate,
@@ -541,10 +580,10 @@ class ExperimentActiveIRD(object):
         obs_perform = obs_comparisons["rews"]
         obs_violate = obs_comparisons["vios"]
 
-        print(f"    Belief Violation diff {belief_violate.mean():.2f}")
-        print(f"    Belief Performance diff {belief_perform.mean():.2f}")
-        print(f"    Obs Violation diff {obs_violate.mean():.2f}")
-        print(f"    Obs Performance diff {obs_perform.mean():.2f}")
+        print(f"    Belief Violation diff {belief_violate.mean():.4f}")
+        print(f"    Belief Performance diff {belief_perform.mean():.4f}")
+        print(f"    Obs Violation diff {obs_violate.mean():.4f}")
+        print(f"    Obs Performance diff {obs_perform.mean():.4f}")
         info = {
             "belief_perform": belief_perform.tolist(),
             "belief_perform_relative": belief_comparisons["rews_relative"],
@@ -700,12 +739,9 @@ class ExperimentActiveIRD(object):
         self._last_time = time.time()
 
     def _plot_candidate_scores(self, itr, debug_dir=None):
-        if debug_dir is None:
-            debug_dir = self._save_root
-
         offset = itr + self._num_initial_tasks
         hist_scores = self._hist_cand_scores
-        ranking_dir = os.path.join(debug_dir, self._exp_name, "candidates")
+        ranking_dir = os.path.join(self._save_dir, "candidates")
         os.makedirs(ranking_dir, exist_ok=True)
         for fn_key in hist_scores.keys():
             # Check current active function
@@ -813,10 +849,10 @@ class ExperimentActiveIRD(object):
                 )
                 for fv in obs_feats_violates[1:]:
                     obs_avg_feats_violate += fv * (1 / float(len(self._eval_tasks)))
-                print(f"    Obs Average Violation diff {obs_avg_violate:.2f}")
-                print(f"    Obs Average Violation rel {obs_avg_rel_violate:.2f}")
-                print(f"    Obs Average Performance diff {obs_avg_perform:.2f}")
-                print(f"    Obs Average Performance rel {obs_avg_rel_perform:.2f}")
+                print(f"    Obs Average Violation diff {obs_avg_violate:.4f}")
+                print(f"    Obs Average Violation rel {obs_avg_rel_violate:.4f}")
+                print(f"    Obs Average Performance diff {obs_avg_perform:.4f}")
+                print(f"    Obs Average Performance rel {obs_avg_rel_perform:.4f}")
 
                 eval_hist[idx]["obs_normalized_perform"] = (obs_avg_normalized_perform,)
                 eval_hist[idx]["obs_violation"] = obs_avg_violate

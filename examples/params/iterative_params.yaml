@@ -4,7 +4,7 @@ ACTIVE_ARGS:
   - infogain
   - difficult
 DESIGNER_ARGS:
-  beta: 20
+  beta: 10
   num_normalizers: 1000
   proposal_decay: 0.7
   sample_args:
@@ -24,28 +24,32 @@ DESIGNER_CONTROLLER_ARGS:
 ENV_NAME: Week6_03-v1
 EVAL_ARGS:
   max_batch: 500
-  num_active_workers: 2
-  num_eval_workers: 2
+  num_active_workers: 1
+  num_eval_workers: 1
   parallel: true
 EXP_ARGS:
   eval_env_name: Week6_02-v1
-  eval_method: mean
+  eval_method: map
   eval_seed: 0
+  initial_tasks_file: Week6_04_1v2
+  iterations: 5
+  load_previous: false
   num_active_sample: 500
   num_active_tasks: 64
-  num_eval: 512
+  num_eval: 64
   num_eval_tasks: 500
-EXP_NAME: iterative_divide
+  plan_beta: 10
+EXP_NAME: iterative_divide_default_02
 IRD_ARGS:
-  beta: 50
-  proposal_decay: 0.9
+  beta: 1
+  proposal_decay: 0.7
   sample_args:
     num_chains: 3
     num_samples: 8000
     num_warmup: 200
   sample_init_args:
     max_val: 15.0
-    proposal_var: 3
+    proposal_var: 0.5
   sample_method: MH
   task_method: sum
 IRD_CONTROLLER_ARGS:
@@ -55,7 +59,7 @@ IRD_CONTROLLER_ARGS:
   replan: 5
 RANDOM_KEYS:
 - 3
-SAVE_NAME: '200501'
+SAVE_NAME: 200501
 WEIGHT_PARAMS:
   bins: 200
   feature_keys:

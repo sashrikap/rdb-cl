@@ -62,9 +62,7 @@ def build_collision(env):
 
     """
     ncars = len(env.cars)
-    obj_width = env.car_width / 1.5
-    obj_length = env.car_length / 2
-    threshold = 0.5 * np.array([env.car_width + obj_width, env.car_length + obj_length])
+    threshold = np.array([env.car_width, env.car_length])
     vfn = jax.vmap(env.raw_features_dict["dist_cars"])
 
     @jax.jit
@@ -94,7 +92,9 @@ def build_crash_objects(env):
 
     """
     ncars = len(env.cars)
-    threshold = np.array([env.car_width * 0.5, env.car_length * 0.5])
+    obj_width = env.car_width / 1.5
+    obj_length = env.car_length / 2
+    threshold = 0.5 * np.array([env.car_width + obj_width, env.car_length + obj_length])
     vfn = jax.vmap(
         env.raw_features_dict["dist_objects"]
     )  # (T, nbatch, nobjs, obj_xdim)

@@ -306,11 +306,13 @@ class ExperimentInteractiveIRD(object):
 
         ## Eval
         self._log_time(f"Visualize Begin")
-        num_map_visualize = 8
+        num_map_visualize = 2
         runner = self._model._designer._sample_runner
         controller = self._model._designer._sample_controller
         viz_dir = f"{self._save_dir}/visualize"
         os.makedirs(viz_dir, exist_ok=True)
+        cap_dir = f"{self._save_dir}/capture"
+        os.makedirs(cap_dir, exist_ok=True)
 
         num_bs = len(self._ird_beliefs[fn_key])
         for fn_key in self._active_fns.keys():
@@ -324,19 +326,24 @@ class ExperimentInteractiveIRD(object):
             )
             eval_data["proposal_eval"][fn_key] = eval_info
 
-        # for fn_key in self._active_fns.keys():
-        #     belief_map = self._ird_beliefs[fn_key].map_estimate(num_map_visualize)
-        #     for wi, ws in enumerate(belief_map.weights):
-        #         for ti, task in enumerate(exp_data[f"proposal_tasks"][fn_key]):
-        #             self._model.env.set_task(task)
-        #             self._model.env.reset()
-        #             state = self._model.env.state
-        #             actions = controller(state, weights=ws, batch=False)
-        #             viz_path = f"{viz_dir}/rng_{self._rng_name}_method_{fn_key}_task_{ti:02d}_map_{wi:02d}.mp4"
-        #             text = f"Method:{fn_key} prior: {len(training_tasks)}"
-        #             runner.collect_mp4(state, actions, path=viz_path, text=text)
-        #             print(f"Saved to {viz_path}")
-        #     self._log_time(f"Visualize {fn_key} Done")
+        for fn_key in self._active_fns.keys():
+            belief_map = self._ird_beliefs[fn_key].map_estimate(num_map_visualize)
+            for wi, ws in enumerate(belief_map.weights):
+                for ti, task in enumerate(exp_data[f"proposal_tasks"][fn_key]):
+                    self._model.env.set_task(task)
+                    self._model.env.reset()
+                    state = self._model.env.state
+                    actions = controller(state, weights=ws, batch=False)
+                    viz_path = f"{viz_dir}/rng_{self._rng_name}_method_{fn_key}_task_{ti:02d}_map_{wi:02d}.mp4"
+                    cap_path = f"{viz_dir}/rng_{self._rng_name}_method_{fn_key}_task_{ti:02d}_map_{wi:02d}.mp4"
+                    text = f"Method:{fn_key} prior: {len(training_tasks)}"
+                    # runner.collect_mp4(state, actions, path=viz_path, text=text)
+                    # print(f"Saved to {viz_path}")
+                    runner.capture_frames(
+                        state, actions, path=cap_path, text="", width=800, paper=True
+                    )
+                    print(f"Saved to {cap_path}")
+            self._log_time(f"Visualize {fn_key} Done")
 
     def _load_design(self, load_path):
         """
