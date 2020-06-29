@@ -8,8 +8,7 @@ import numpyro
 
 numpyro.set_host_device_count(3)
 
-from rdb.exps.mcmc_convergence import ExperimentTaskBeta
-from rdb.exps.active import ActiveInfoGain, ActiveRatioTest, ActiveRandom
+from rdb.exps.task_beta import ExperimentTaskBeta
 from rdb.distrib.particles import ParticleServer
 from rdb.infer.ird_oc import IRDOptimalControl
 from rdb.optim.mpc import build_mpc
@@ -35,22 +34,40 @@ def main(random_key):
     # Define random key
     rng_key = random.PRNGKey(random_key)
 
-    def env_fn():
+    def env_fn(env_name=None):
         import gym, rdb.envs.drive2d
 
-        env = gym.make(ENV_NAME)
+        if env_name is None:
+            env_name = ENV_NAME
+        env = gym.make(env_name)
         env.reset()
         return env
 
-    def controller_fn(env, name=""):
+    def designer_controller_fn(env, name=""):
         controller, runner = build_mpc(
-            env, env.main_car.cost_runtime, dt=env.dt, name=name, **CONTROLLER_ARGS
+            env,
+            env.main_car.cost_runtime,
+            dt=env.dt,
+            name=name,
+            **DESIGNER_CONTROLLER_ARGS,
         )
         return controller, runner
 
-    design_data = load_params(join(examples_dir(), f"designs/{ENV_NAME}.yaml"))
-    assert design_data["ENV_NAME"] == ENV_NAME, "Environment name mismatch"
+    def ird_controller_fn(env, name=""):
+        controller, runner = build_mpc(
+            env, env.main_car.cost_runtime, dt=env.dt, name=name, **IRD_CONTROLLER_ARGS
+        )
+        return controller, runner
 
+    eval_server = ParticleServer(
+        env_fn,
+        ird_controller_fn,
+        parallel=EVAL_ARGS["parallel"],
+        normalized_key=WEIGHT_PARAMS["normalized_key"],
+        weight_params=WEIGHT_PARAMS,
+        max_batch=EVAL_ARGS["max_batch"],
+    )
+    eval_server.register("Evaluation", EVAL_ARGS["num_eval_workers"])
     ## Prior sampling & likelihood functions for PGM
     def prior_fn(name="", feature_keys=WEIGHT_PARAMS["feature_keys"]):
         return LogUniformPrior(
@@ -60,57 +77,48 @@ def main(random_key):
             name=name,
         )
 
-    ## Evaluation Server
-    # eval_server = ParticleServer(
-    #     env_fn, controller_fn, num_workers=NUM_EVAL_WORKERS, parallel=PARALLEL
-    # )
-    eval_server = None
-    designer = Designer(
-        env_fn=env_fn,
-        controller_fn=controller_fn,
-        prior_fn=prior_fn,
-        weight_params=WEIGHT_PARAMS,
-        normalized_key=WEIGHT_PARAMS["normalized_key"],
-        save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
-        **DESIGNER_ARGS,
-    )
+    def designer_fn():
+        designer = Designer(
+            env_fn=env_fn,
+            controller_fn=designer_controller_fn,
+            prior_fn=prior_fn,
+            weight_params=WEIGHT_PARAMS,
+            normalized_key=WEIGHT_PARAMS["normalized_key"],
+            save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
+            exp_name=EXP_NAME,
+            **DESIGNER_ARGS,
+        )
+        return designer
 
+    designer = designer_fn()
     ird_model = IRDOptimalControl(
         env_id=ENV_NAME,
         env_fn=env_fn,
-        controller_fn=controller_fn,
+        controller_fn=ird_controller_fn,
         designer=designer,
         prior_fn=prior_fn,
         normalized_key=WEIGHT_PARAMS["normalized_key"],
         weight_params=WEIGHT_PARAMS,
         save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
+        exp_name=EXP_NAME,
         **IRD_ARGS,
     )
 
-    ## Task sampling seed
-    if FIXED_TASK_SEED is not None:
-        fixed_task_seed = random.PRNGKey(FIXED_TASK_SEED)
-    else:
-        fixed_task_seed = None
-
-    NUM_DESIGNS = len(design_data["DESIGNS"])
     experiment = ExperimentTaskBeta(
         ird_model,
+        env_fn=env_fn,
+        designer_fn=designer_fn,
+        true_w=TRUE_W,
         eval_server=eval_server,
-        normalized_key=WEIGHT_PARAMS["normalized_key"],
-        fixed_task_seed=fixed_task_seed,
-        design_data=design_data,
         save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
+        exp_name=EXP_NAME,
         exp_params=PARAMS,
-        **EXPERIMENT_ARGS,
+        **EXP_ARGS,
     )
+
     """ Experiment """
-    # with jax.disable_jit():
     experiment.update_key(rng_key)
-    if DESIGNER:
-        experiment.run_designer(DESIGNER_ARGS["exp_name"])
-    elif IRD:
-        experiment.run_ird(IRD_ARGS["exp_name"])
+    experiment.run()
 
 
 if __name__ == "__main__":
@@ -126,13 +134,10 @@ if __name__ == "__main__":
 
     # Load parameters
     if not GCP_MODE:
-        PARAMS = load_params("examples/params/mcmc_template.yaml")
+        PARAMS = load_params("examples/params/task_beta_template.yaml")
     else:
-        PARAMS = load_params("/dar_payload/rdb/examples/params/mcmc_params.yaml")
+        PARAMS = load_params("/dar_payload/rdb/examples/params/task_beta_params.yaml")
     locals().update(PARAMS)
-
-    # max_chains = max([IRD_ARGS["sample_args"]["num_chains"], DESIGNER_ARGS["sample_args"]["num_chains"]])
-    # numpyro.set_host_device_count(max_chains)
 
     for ki in copy.deepcopy(RANDOM_KEYS):
         main(random_key=ki)

@@ -42,17 +42,24 @@ class Runner(object):
         self._dt = env.dt
         self._name = name
         self._T = T
-        # Dynamics function
+        ## Dynamics function
         self._roll_forward = roll_forward
         if roll_forward is None:
             self._roll_forward = env.roll_forward
-        # Define cost function
+        ## Define cost function
         self._roll_costs = roll_costs
         assert roll_costs is not None
         self._roll_features = roll_features
         if roll_features is None:
             self._roll_features = env.roll_features
-        # JIT compile
+
+        ## Define cost hessian, jax.jacfwd(jax.jacrev(f)) => compute hessian
+        roll_cost_sum = lambda *args: self._roll_costs(*args).swapaxes(0, 1).sum(axis=1)
+        self._roll_hess = jax.jit(
+            jax.jacfwd(jax.jacrev(roll_cost_sum, argnums=1), argnums=1)
+        )
+
+        ## JIT compile
         self._a_shape = None
 
     @property
@@ -257,6 +264,46 @@ class Runner(object):
             clear_output()
         # display(Video(mp4_path, width=FRAME_WIDTH))
         display(Image(path))
+
+    def compute_hessian(self, x0, actions, weights, expand_dims=False):
+        """Compute hessians of cost function.
+
+        Args:
+            x0 (ndarray): initial states
+                shape (1, xdim,)
+            actions (ndarray): actions
+                shape (1, T, udim)
+            weights (DictList)
+                shape (1,)
+
+        Return:
+            hessian (ndarray):
+                shape (T, xdim, T, xdim)
+            norm (ndarray): l2 norm
+                shape (,)
+
+        Note:
+            - Because hessian is a costly computation, hessians of individual (xs, as)
+            are not computed in batch, but across `nbatch` dimension in a loop.
+
+        """
+        if expand_dims:
+            x0 = np.array([x0])
+            actions = np.array([actions])
+            weights = DictList([weights])
+
+        assert len(weights) == 1
+        assert len(x0.shape) == 2 and len(x0) == 1
+        assert len(actions.shape) == 3 and len(actions) == 1
+        weights_arr = weights.prepare(self._env.features_keys).numpy_array()
+
+        #  shape (nbatch, T, udim) -> (T, nbatch, udim)
+        actions = actions.swapaxes(0, 1)
+        hessian = self._roll_hess(x0, actions, weights_arr)
+        norm = np.linalg.norm(hessian)
+        T, udim = self._T, self._env.udim
+        assert hessian.shape == (1, T, 1, udim, T, 1, udim)
+        return hessian, norm
 
     def __call__(
         self, x0, actions, weights=None, weights_arr=None, batch=True, jax=False

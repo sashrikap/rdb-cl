@@ -80,6 +80,7 @@ class IRDOptimalControl(object):
         sample_method="MH",
         sample_init_args={},
         sample_args={},  # "num_warmups": xx, "num_samples": xx
+        normalize_by_hessian=False,
         ## Parameter for histogram
         weight_params={},
         interactive_mode=False,
@@ -115,6 +116,7 @@ class IRDOptimalControl(object):
         self._sample_args = sample_args
         self._sample_method = sample_method
         self._sample_init_args = sample_init_args
+        self._normalize_by_hessian = normalize_by_hessian
 
         ## Caching normalizers, samples and features
         self._user_actions = {}
@@ -152,6 +154,10 @@ class IRDOptimalControl(object):
     @property
     def beta(self):
         return self._beta
+
+    @beta.setter
+    def beta(self, beta):
+        self._beta = beta
 
     @property
     def interactive_mode(self):
@@ -225,6 +231,9 @@ class IRDOptimalControl(object):
             .expand_dims(0)
             .numpy_array()
         )
+        if self._normalize_by_hessian:
+            _, obs_hnorm = obs_ps.get_hessians(tasks)
+
         #  shape (ntasks, 1, T, udim)
         # obs_actions = obs_ps.get_actions(tasks)[np.diag_indices(ntasks)][:, None]
         # #  shape (ntasks, dnnorms, T, udim)
@@ -287,7 +296,12 @@ class IRDOptimalControl(object):
             # ## ======= Jit-able cheap alternative ======
             true_feats_sum = obs_feats_sum
             # true_ws = true_ws.numpy_array()
-            true_ws = true_ws.normalize_across_keys().numpy_array()
+            if self._normalize_by_hessian:
+                _, true_hnorm = obs_ps.get_hessians(tasks, true_ws)
+                true_hnorm /= obs_hnorm  # normalize by observation hessian sum
+                true_ws = true_ws.numpy_array() / true_hnorm
+            else:
+                true_ws = true_ws.normalize_across_keys().numpy_array()
             log_prob = _likelihood(true_ws, true_feats_sum)
             numpyro.factor("ird_log_probs", log_prob)
 

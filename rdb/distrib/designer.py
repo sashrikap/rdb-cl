@@ -18,6 +18,7 @@ class DesignerWorkerSingle(object):
         self._true_w = None
         self._rng_name = None
         self._prior_tasks = None
+        self._beta = None
 
     def simulate(self, tasks, save_name, itr, tqdm_position=0):
         samples = self._designer.simulate(
@@ -41,6 +42,13 @@ class DesignerWorkerSingle(object):
 
     def get_true_w(self):
         return self._true_w
+
+    def set_beta(self, beta):
+        self._designer._beta = beta
+        self._beta = beta
+
+    def get_beta(self):
+        return self._beta
 
     def set_prior_tasks(self, tasks):
         self._designer.prior_tasks = tasks
@@ -128,7 +136,7 @@ class DesignerServer(object):
             for mi in range(len(methods)):
                 # Each method
                 samples.append(
-                    self.workers[0].simulate(
+                    self._workers[0].simulate(
                         onp.array(tasks[mi]),
                         save_name=f"designer_method_{methods[mi]}_itr_{itr:02d}",
                     )
@@ -159,7 +167,16 @@ class DesignerServer(object):
             all_keys = random.split(rng_key, 2)
             self._local_designer.update_key(all_keys[0])
             if len(self._workers) > 0:
-                self.workers[0].update_key(all_keys[1])
+                self._workers[0].update_key(all_keys[1])
+
+    def set_betas(self, betas):
+        assert len(betas) == len(self._workers)
+        for wi in range(len(self._workers)):
+            self._workers[wi].set_beta.remote(betas[wi])
+
+        for wi in range(len(self._workers)):
+            beta = ray.get(self._workers[wi].get_beta.remote())
+            assert onp.isclose(beta, betas[wi])
 
     def set_true_w(self, true_w):
         self._local_designer.true_w = true_w
@@ -171,7 +188,7 @@ class DesignerServer(object):
                 ray.get(self._workers[wi].get_true_w.remote())
 
         else:
-            self.workers[0].set_true_w(true_w)
+            self._workers[0].set_true_w(true_w)
 
     def set_prior_tasks(self, tasks):
         self._local_designer.prior_tasks = tasks
@@ -183,7 +200,7 @@ class DesignerServer(object):
                 ray.get(self._workers[wi].get_prior_tasks.remote())
 
         else:
-            self.workers[0].set_prior_tasks(tasks)
+            self._workers[0].set_prior_tasks(tasks)
 
     def set_rng_name(self, rng_name):
         if self._parallel:
@@ -195,4 +212,4 @@ class DesignerServer(object):
                 ray.get(self._workers[wi].get_rng_name.remote())
 
         else:
-            self.workers[0].set_rng_name(rng_name)
+            self._workers[0].set_rng_name(rng_name)

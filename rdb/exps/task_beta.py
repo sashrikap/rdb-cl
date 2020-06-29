@@ -17,6 +17,7 @@ TODO:
 
 """
 
+from rdb.distrib.designer import DesignerServer
 from rdb.infer.particles import Particles
 from rdb.exps.utils import Profiler, save_params
 from numpyro.handlers import seed
@@ -39,228 +40,282 @@ class ExperimentTaskBeta(object):
     def __init__(
         self,
         model,
+        env_fn,
+        designer_fn,
+        true_w,
         eval_server,
+        # Evaluation parameters
         num_eval_tasks=4,
-        num_eval_map=-1,
-        num_visualize_tasks=32,
-        fixed_task_seed=None,
-        normalized_key=None,
-        save_root="data/test",
+        num_eval=-1,
+        eval_env_name=None,
+        eval_method="map",
+        eval_seed=None,
+        # Exp parameters
+        designer_betas=[],
+        ird_betas=[],
+        # Initial tasks
+        initial_tasks_file=None,
+        # Observation model
+        num_prior_tasks=0,  # for designer
+        # Metadata
+        save_root="data/task_beta_exp1",
+        exp_name="task_beta_exp1",
         exp_params={},
-        design_data={},
     ):
         # Inverse Reward Design Model
         self._model = model
+        self._env_fn = env_fn
+        self._true_w = true_w
         self._eval_server = eval_server
+
         # Random key & function
         self._rng_key = None
-        self._normalized_key = normalized_key
-        self._fixed_task_seed = fixed_task_seed
-        # Evaluation & Visualization
-        self._num_eval_map = num_eval_map
+        self._rng_name = None
+        self._eval_seed = random.PRNGKey(eval_seed)
+        self._num_prior_tasks = num_prior_tasks
+
+        # Initial tasks
+        self._initial_tasks_file = initial_tasks_file
+
+        # Beta parameter
+        self._designer_betas = designer_betas
+        self._ird_betas = ird_betas
+
+        # Designer simulation
+        self._designer_server = DesignerServer(designer_fn)
+        self._designer_server.register(len(designer_betas))
+        self._joint_mode = self._designer_server.designer.design_mode == "joint"
+
+        # Evaluation
+        self._num_eval = num_eval
+        self._eval_method = eval_method
+        assert eval_method in {"map", "mean", "post_mean"}
         self._num_eval_tasks = num_eval_tasks
-        self._num_visualize_tasks = num_visualize_tasks
-        # Active Task proposal
+        self._eval_env_name = eval_env_name
+
+        # Save path
         self._exp_params = exp_params
         self._save_root = save_root
+        self._exp_name = exp_name
+        self._save_dir = f"{self._save_root}/{self._exp_name}"
         self._last_time = time.time()
-        # Load design and cache
-        self._design_data = design_data
-        # Designer relevant data
-        self._all_designer_prior_tasks = []
-        self._all_designer_prior_ws = []
-        self._designer = self._model.designer
-        # IRD relevant data
-        self._all_ird_obs_tasks = []
-        self._all_ird_obs_ws = []
-        self._max_ird_obs_num = 10
-        # Test incremental # features
-        self._nfeats_start = 5
-        self._last_time = None
 
-    def _get_rng_task(self):
-        if self._fixed_task_seed is not None:
-            self._fixed_task_seed, rng_task = random.split(self._fixed_task_seed)
+    def _build_cache(self):
+        self._initial_tasks = None
+        self._designer_proxies = {}
+        self._ird_beliefs = {}
+        self._designer_eval_hist = {}
+        self._ird_eval_hist = {}
+
+    def update_key(self, rng_key):
+        self._rng_name = str(rng_key)
+        self._rng_key, rng_designer, rng_model, rng_choice, rng_weight = random.split(
+            rng_key, 5
+        )
+        self._designer_server.update_key(rng_designer)
+        self._designer_server.set_true_w(self._true_w)
+        self._designer_server.set_rng_name(str(rng_key))
+        self._model.rng_name = str(rng_key)
+        self._model.update_key(rng_model)
+
+    def _get_rng(self, rng_type=None):
+        if rng_type == "eval" and self._eval_seed is not None:
+            self._eval_seed, rng_task = random.split(self._eval_seed)
         else:
             self._rng_key, rng_task = random.split(self._rng_key)
         return rng_task
 
-    def _load_design(self, exp_mode):
-        """Different mode of designer experiments.
+    def _propose_initial_tasks(self):
+        filepath = f"{examples_dir()}/tasks/{self._initial_tasks_file}.yaml"
+        tasks = load_params(filepath)["TASKS"]
+        self._initial_tasks = tasks
+        return tasks
 
-        Args:
-            exp_mode (str)
+    def run(self):
+        """Main function: Run experiment."""
+        print(
+            f"\n============= Main Experiment ({self._rng_name}): {self._exp_name} ============="
+        )
+        self._log_time("Begin")
+        self._build_cache()
+        eval_env = self._env_fn(self._eval_env_name)
+        num_eval = self._num_eval_tasks
+        if self._num_eval_tasks > len(eval_env.all_tasks):
+            num_eval = -1
+        self._eval_tasks = random_choice(
+            self._get_rng("eval"), eval_env.all_tasks, num_eval, replacement=False
+        )
+        self._train_tasks = self._model.env.all_tasks
+        prior_tasks = random_choice(
+            self._get_rng("eval"),
+            self._train_tasks,
+            self._num_prior_tasks,
+            replacement=False,
+        )
+        self._designer_server.set_prior_tasks(prior_tasks)
+
+        ## Propose tasks
+        tasks = self._propose_initial_tasks()
+
+        ## Simulate Designer
+        dbetas = self._designer_betas
+        if len(dbetas) > 0:
+            self._designer_server.set_betas(dbetas)
+            self._log_time("Simulate Designer")
+            all_proxies = self._designer_server.simulate(
+                onp.array([tasks] * len(dbetas)),
+                methods=[f"beta_{beta}" for beta in dbetas],
+                itr=0,
+            )
+            self._designer_proxies = dict(zip(dbetas, all_proxies))
+            self._save()
+            self._log_time("Simulate Designer Finished")
+
+            ## Evaluate Designer
+            for dbeta, proxies in self._designer_proxies.items():
+                self._evaluate("designer", dbeta, proxies)
+                self._save()
+        self._log_time("Evaluate Designer Finished")
+
+        ## Simualte IRD (with truth)
+        ibetas = self._ird_betas
+        if len(ibetas) > 0:
+            for ibeta in ibetas:
+                self._model.beta = ibeta
+                obs = [self._designer_server.designer.truth] * len(tasks)
+                belief = self._model.sample(
+                    tasks=tasks, obs=obs, save_name=f"ird_belief_truth_ibeta_{ibeta}"
+                )
+                self._ird_beliefs[ibeta] = belief
+                self._save()
+            self._log_time("Simulate IRD Finished")
+
+            ## Evaluate IRD
+            for ibeta, belief in self._ird_beliefs.items():
+                self._evaluate("ird", ibeta, belief)
+                self._save()
+        self._log_time("Evaluate IRD Finished")
+
+        return
+
+    def _evaluate(self, eval_mode, beta, particles):
+        """Evaluate weight particles on eval task.
+
+        Computation: n_map(~4) * n_eval(5~10k) tasks
+
+        Note:
+            self._num_eval: number of sub samples for evaluation
+            self._eval_method: use mean/mean sample
+
+        Criteria:
+            * Relative Reward.
+            * Violations.
 
         """
-        all_tasks = self._model.env.all_tasks
-        num_designs = len(self._design_data["DESIGNS"])
-        for design in self._design_data["DESIGNS"]:
-            design["WEIGHTS"] = normalize_weights(
-                design["WEIGHTS"], self._normalized_key
-            )
+        assert eval_mode in {"designer", "ird"}
+        target = self._designer_server.designer.truth
 
-        if exp_mode.startswith("ird"):
-            ## Testing IRD convergence, no need of these designs
-            pass
+        ## Compute proxies features
+        if self._eval_method == "mean":
+            particles_sample = particles.subsample(self._num_eval)
+        elif self._eval_method == "map":
+            particles_sample = particles.map_estimate(self._num_eval, log_scale=False)
+        self._eval_server.compute_tasks(
+            "Evaluation", particles_sample, self._eval_tasks, verbose=True
+        )
+        self._eval_server.compute_tasks(
+            "Evaluation", target, self._eval_tasks, verbose=True
+        )
+        all_violates, rel_violates = [], []
+        all_performs, rel_performs = [], []
+        normalized_performs = []
+        feats_violates = []
+        desc = f"Evaluating {eval_mode} beta {beta}"
+        for task in tqdm(self._eval_tasks, desc=desc):
+            comparisons = particles_sample.compare_with(task, target=target)
+            all_performs.append(comparisons["rews"].mean())
+            all_violates.append(comparisons["vios"].mean())  # (nweights,) -> (1,)
+            rel_performs.append(comparisons["rews_relative"].mean())
+            rel_violates.append(comparisons["vios_relative"].mean())
+            feats_violates.append(comparisons["vios_by_name"])
+            normalized_performs.append(comparisons["rews_normalized"].mean())
 
-        elif "designer_convergence_true_w_prior_tasks" in exp_mode:
-            ## Load well-defined Jerry's prior designs
-            ## Test # design tasks vs convergence
-            for d_data in self._design_data["DESIGNS"]:
-                design_task = d_data["TASK"]
-                # Treat final design as true_w
-                true_w = self._design_data["DESIGNS"][-1]["WEIGHTS"]
-                true_w = {
-                    "control": 3.0,
-                    "dist_cars": 0.001,
-                    "dist_fences": 0.001,
-                    "dist_lanes": 1.0,
-                    "dist_objects": 0.001,
-                    "speed": 1.0,
-                    "speed_over": 0.001,
-                }
-                self._all_designer_prior_tasks.append(design_task)
-                self._all_designer_prior_ws.append(true_w)
-
-        elif "designer_convergence_true_w_random_tasks" in exp_mode:
-            ## Use one of Jerry's prior designed w as true w
-            ## Test # random tasks vs convergence
-            rand_tasks = random_choice(self._get_rng_task(), all_tasks, num_designs)
-            self._all_designer_prior_tasks = rand_tasks
-            for d_data in self._design_data["DESIGNS"]:
-                # Treat final design as true_w
-                true_w = self._design_data["DESIGNS"][-1]["WEIGHTS"]
-                self._all_designer_prior_ws.append(true_w)
-
-        elif "designer_convergence_random_w_random_tasks" in exp_mode:
-            ## Use a random w as true w
-            ## Test # random tasks vs convergence
-            rand_tasks = onp.array(
-                random_choice(self._get_rng_task(), all_tasks, num_designs)
-            )
-            self._all_designer_prior_tasks = rand_tasks
-            rand_w = self._make_random_weights(
-                self._design_data["DESIGNS"][-1]["WEIGHTS"].keys()
-            )
-            for d_data in self._design_data["DESIGNS"]:
-                # rand_w = self._make_random_weights(d_data["WEIGHTS"].keys())
-                self._all_designer_prior_ws.append(rand_w)
-
-        elif "designer_convergence_true_w_more_features" in exp_mode:
-            ## Use a true w on random tasks
-            ## The true w has progressively more random features
-            ## Test # features (DOF) vs convergence
-            all_keys = self._model.env.features_keys
-            rand_tasks = random_choice(
-                self._get_rng_task(), self._model.env.all_tasks, num_designs
-            )
-            self._all_designer_prior_tasks = rand_tasks
-            for di, d_data in enumerate(self._design_data["DESIGNS"]):
-                # Start from n_start features
-                n_feats = di + self._nfeats_start
-                rand_w = self._make_random_weights(all_keys)
-                true_w = self._design_data["DESIGNS"][-1]["WEIGHTS"]
-                for key, val in rand_w.items():
-                    if key not in true_w:
-                        true_w[key] = val
-                    if len((true_w.keys())) == n_feats:
-                        break
-                self._all_designer_prior_ws.append(true_w)
-
-        else:
-            raise NotImplementedError
-
-    def run_designer(self, exp_mode):
-        """Simulate designer on new_task. Varying the number of latent
-        tasks as prior
-
-        Args:
-            exp_mode (str): see `self._load_design`
-
-        """
-
-        self._load_design(exp_mode)
-        save_dir = f"{self._save_root}/{exp_mode}"
-        save_params(f"{save_dir}/params_{self._rng_name}.yaml", self._exp_params)
-
-        all_tasks = self._designer.env.all_tasks
-        viz_tasks = random_choice(
-            self._get_rng_task(), all_tasks, self._num_visualize_tasks
+        avg_violate = onp.mean(onp.array(all_violates, dtype=float))
+        avg_perform = onp.mean(onp.array(all_performs, dtype=float))
+        avg_rel_violate = onp.mean(onp.array(rel_violates, dtype=float))
+        avg_rel_perform = onp.mean(onp.array(rel_performs, dtype=float))
+        avg_feats_violate = feats_violates[0] * (1 / float(len(self._eval_tasks)))
+        avg_normalized_perform = onp.mean(onp.array(normalized_performs, dtype=float))
+        for fv in feats_violates[1:]:
+            avg_feats_violate += fv * (1 / float(len(self._eval_tasks)))
+        print(f"\t{eval_mode}({beta:.1f}) Average Violation diff {avg_violate:.4f}")
+        print(f"\t{eval_mode}({beta:.1f}) Average Violation rel {avg_rel_violate:.4f}")
+        print(f"\t{eval_mode}({beta:.1f}) Average Performance diff {avg_perform:.4f}")
+        print(
+            f"\t{eval_mode}({beta:.1f}) Average Performance normalized {avg_normalized_perform:.4f}"
+        )
+        print(
+            f"\t{eval_mode}({beta:.1f}) Average Performance rel {avg_rel_perform:.4f}"
         )
 
-        # new_tasks = random_choice(self._get_rng_task(), all_tasks, 1)
-        filepath = f"{examples_dir()}/tasks/Week6_04_1v2.yaml"
-        initial_task = load_params(filepath)["TASKS"][0]
-        new_tasks = onp.array([initial_task])
-        ## Simulate
-        # for n_prior in range(len(self._all_designer_prior_tasks)):
-        for n_prior in range(0, 6):
+        info = {
+            "violation": avg_violate,
+            "feats_violation": dict(avg_feats_violate),
+            "perform": avg_perform,
+            "rel_violation": avg_rel_violate,
+            "rel_perform": avg_rel_perform,
+            "normalized_perform": avg_normalized_perform,
+        }
+        if eval_mode == "designer":
+            self._designer_eval_hist[beta] = info
+        elif eval_mode == "ird":
+            self._ird_eval_hist[beta] = info
+        else:
+            raise NotImplementedError
+        return info
 
-            self._log_time(f"Designer Prior {n_prior} Begin")
-            print(f"Experiment mode ({self._rng_name}) {exp_mode}")
-            print(f"Prior task number: {n_prior}")
+    def _save(self, skip_weights=False):
+        """Save checkpoint.
 
-            prior_tasks = self._all_designer_prior_tasks[:n_prior]
-            if "designer_convergence_true_w_more_features" in exp_mode:
-                ## Keeps only 2 prior tasks
-                prior_tasks = self._all_designer_prior_tasks[:2]
-            prior_w = self._all_designer_prior_ws[n_prior]
+        Format:
+            * data/save_root/exp_name/{exp_name}_seed.npz
+            * data/save_root/exp_name/save/weights_seed_method_itr.npz
+              - see `rdb.infer.particles.save()`
 
-            ## Set designer data
-            # import pdb; pdb.set_trace()
-            self._designer.prior_tasks = prior_tasks
-            self._designer.true_w = prior_w
+        """
+        print("Saving to:", self._save_dir)
+        os.makedirs(self._save_dir, exist_ok=True)
+        ## Save experiment parameters
+        save_params(f"{self._save_dir}/params_{self._rng_name}.yaml", self._exp_params)
+        data = dict(
+            seed=self._rng_name,
+            exp_params=self._exp_params,
+            env_id=str(self._model.env_id),
+            true_w=self._designer_server.designer.true_w,
+            initial_tasks=self._initial_tasks,
+            designer_eval_hist=self._designer_eval_hist,
+            ird_eval_hist=self._ird_eval_hist,
+            eval_tasks=self._eval_tasks
+            if self._num_eval_tasks > 0
+            else [],  # do not save when eval onall tasks (too large)
+        )
+        npz_path = f"{self._save_dir}/{self._exp_name}_seed_{self._rng_name}.npz"
+        with open(npz_path, "wb+") as f:
+            np.savez(f, **data)
+        ## Save evaluation history to yaml
+        npy_path = (
+            f"{self._save_dir}/{self._exp_name}_designer_seed_{self._rng_name}.npy"
+        )
+        np.save(npy_path, self._designer_eval_hist)
+        npy_path = f"{self._save_dir}/{self._exp_name}_ird_seed_{self._rng_name}.npy"
+        np.save(npy_path, self._ird_eval_hist)
 
-            ## Sample Designer
-            num_samples = self._exp_params["DESIGNER_ARGS"]["sample_args"][
-                "num_samples"
-            ]
-            save_name = f"designer_sample_{num_samples:04d}_prior_{n_prior:02d}"
-            samples = self._designer.simulate(new_tasks, save_name=save_name)
-            import pdb
-
-            pdb.set_trace()
-            ## Visualize performance
-            # obs.visualize_comparisons(
-            #     tasks=viz_tasks,
-            #     target=self._designer.truth,
-            #     fig_name=f"prior_{n_prior:02d}",
-            # )
-
-            ## Reset designer prior tasks
-            self._designer.prior_tasks = all_tasks
-            self._log_time(f"Designer Prior {n_prior} End")
-
-    def run_ird(self, exp_mode):
-        """Run IRD on task, varying the number of past observations."""
-
-        self._load_observations(exp_mode)
-        save_dir = f"{self._save_root}/{exp_mode}"
-        save_params(f"{save_dir}/params_{self._rng_name}.yaml", self._exp_params)
-        all_tasks = self._designer.env.all_tasks
-
-        for num_obs in range(1, 15):
-
-            self._log_time(f"IRD Obs {num_obs} Begin")
-            print(f"Experiment mode ({self._rng_name}): {exp_mode}")
-            print(f"Observation number: {num_obs}")
-
-            ## Simulate
-            obs_tasks = self._all_ird_obs_tasks[:num_obs]
-            obs_ws = self._all_ird_obs_ws[:num_obs]
-            obs_name = f"designer_ird_obs_{num_obs:02d}"
-            obs = [
-                self._designer.create_particles([w], save_name=obs_name) for w in obs_ws
-            ]
-            num_samples = self._exp_params["IRD_ARGS"]["sample_args"]["num_samples"]
-            belief_name = f"ird_sample_{num_samples:04d}_obs_{num_obs:02d}"
-            belief = self._model.sample(tasks=obs_tasks, obs=obs, save_name=belief_name)
-            belief.save()
-            # import pdb; pdb.set_trace()
-
-            ## Reset designer prior tasks
-            self._designer.prior_tasks = all_tasks
-            self._log_time(f"IRD Obs {num_obs} End")
+        if not skip_weights:
+            for dbeta, proxies in self._designer_proxies.items():
+                proxies.save()
+            for ibeta, belief in self._ird_beliefs.items():
+                belief.save()
+        print("Saving done")
 
     def _log_time(self, caption=""):
         if self._last_time is not None:
@@ -270,14 +325,3 @@ class ExperimentTaskBeta(object):
             s = secs - (h * 60 * 60) - (m * 60)
             print(f">>> Active IRD {caption} Time: {int(h)}h {int(m)}m {s:.2f}s")
         self._last_time = time.time()
-
-    def update_key(self, rng_key):
-        self._rng_name = str(rng_key)
-        self._rng_key, rng_designer, rng_model, rng_choice, rng_weight = random.split(
-            rng_key, 5
-        )
-
-        self._designer.rng_name = str(rng_key)
-        self._designer.update_key(rng_designer)
-        self._model.rng_name = str(rng_key)
-        self._model.update_key(rng_model)

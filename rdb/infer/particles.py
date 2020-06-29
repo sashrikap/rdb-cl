@@ -16,6 +16,7 @@ import jax.numpy as np
 import numpy as onp
 import copy
 import math
+import time
 import os
 
 
@@ -78,7 +79,7 @@ class Particles(object):
             os.makedirs(save_dir, exist_ok=True)
         ## Cache data
         self.build_cache()
-        ## Sampling function
+        self._hessian_computed = False
 
     def update_key(self, rng_key):
         self._rng_key, rng_choice = random.split(rng_key)
@@ -318,6 +319,37 @@ class Particles(object):
             #  shape nfeats * (nparticles)
             all_feats_sum.append(feats_sum)
         return DictList(all_feats_sum)
+
+    def get_hessians(self, tasks, weights=None):
+        """Compute Hessian information for features.
+
+        Note:
+            - Weird API (for convenience): can use other weights
+        """
+        if not self._hessian_computed:
+            hessian_start = time.time()
+            print("First time computing hessian")
+        states = self._env.get_init_states(onp.array(tasks))
+        T, udim = self._controller.T, self._controller.udim
+        batch_us = self.get_actions(tasks).reshape((-1, T, udim))
+        if weights is None:
+            weights = self.weights
+        batch_states, batch_weights = cross_product(
+            states, self.weights, onp.array, partial(DictList, jax=jax)
+        )
+        all_hessians, all_hess_sum = [], []
+        for state, us, weights in zip(batch_states, batch_us, batch_weights):
+            hess, hess_sum = self._runner.compute_hessian(
+                state, us, weights, expand_dims=True
+            )
+            all_hessians.append(hess)
+            all_hess_sum.append(hess_sum)
+        if not self._hessian_computed:
+            self._hessian_computed = True
+            print(
+                f"First time computing hessian finished: {(time.time() - hessian_start):.2f}"
+            )
+        return np.array(all_hessians), np.array(all_hess_sum)
 
     def get_costs(self, tasks, lower=False, desc=None):
         """Compute expected feature sums for sample weights on task.

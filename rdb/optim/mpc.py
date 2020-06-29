@@ -176,6 +176,7 @@ def build_mpc(
         * The following functions are moved outside of Optimizer class definition as standalone functions to speed up jax complication
 
     """
+    assert f_cost is not None, "Need to initialize environment and cost function."
 
     ## Forward dynamics
     f_dyn = env.dynamics_fn

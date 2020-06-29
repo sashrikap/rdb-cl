@@ -79,6 +79,7 @@ def plot_iterative_eval():
     ax.spines["right"].set_visible(False)
     ax.spines["top"].set_visible(False)
     plt.legend(loc="upper center", ncol=3)
+    ax.get_legend().remove()
     plt.xlabel("Iteration")
     plt.ylabel("Violation")
     plt.title("Posterior Violation")

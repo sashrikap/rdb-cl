@@ -187,7 +187,7 @@ def plot_box_proposal_ratio():
     for data in all_training_data:
         prop_data = data["training_eval"]
         if methods is None:
-            methods = list(prop_data.keys())
+            methods = sorted(list(prop_data.keys()))
         else:
             assert set(methods) == set(list(prop_data.keys()))
     # Gather eval output for each active function
@@ -227,12 +227,16 @@ def plot_box_proposal_ratio():
     #     bottom=False,      # ticks along the bottom edge are off
     #     top=False,         # ticks along the top edge are off
     #     labelbottom=False) # labels along the bottom edge are off
-    plt.xticks(np.arange(2), ("", "", ""))
+    # plt.xticks(np.arange(2), ("", "", ""))
     ax.tick_params(axis="both", which="both", length=0)
-    plt.title("Violation on Proposed Task (Higher is better)")
-    plt.xlabel("Method")
-    plt.ylabel("Relative Violation")
+    x = onp.arange(len(methods)) + 1
+    ax.set_xticks(x)
+    ax.set_xticklabels(methods)
+    ax.set_title("Violation on Proposed Task (Higher is better)")
+    ax.set_xlabel("Method")
+    ax.set_ylabel("Relative Violation")
     plt.legend(loc="upper left")
+    # ax.get_legend().remove()
     plt.savefig(os.path.join(exp_dir, exp_name, f"next_ratio.png"))
     plt.show()
 
