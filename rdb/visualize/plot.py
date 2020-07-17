@@ -41,6 +41,7 @@ def plot_weights(
     max_weights=8.0,
     bins=100,
     log_scale=True,
+    viz_normalized_key=None,
     **kwargs,
 ):
     """Plot weights for visualizing.
@@ -59,6 +60,8 @@ def plot_weights(
     weights_dicts = weights_dicts.log() if not log_scale else weights_dicts
     for i, key in enumerate(sorted(list(weights_dicts[0].keys()))):
         values = weights_dicts[key]
+        if viz_normalized_key is not None and viz_normalized_key in weights_dicts:
+            values /= weights_dicts[viz_normalized_key]
         n, bins, patches = axs[i].hist(
             values,
             bins,
@@ -124,16 +127,16 @@ def plot_weights_2d(
     # fig, axs = plt.subplots(1, figsize=(8, 8), dpi=80)
     nkeys = len(keys)
     # For higher quality, choose dpi>=80
-    fig, axs = plt.subplots(nkeys, nkeys, figsize=(4 * nkeys, 4 * nkeys), dpi=20)
+    fig, axs = plt.subplots(nkeys, nkeys, figsize=(6 * nkeys, 6 * nkeys), dpi=30)
 
     weights_dicts = weights_dicts.log() if not log_scale else weights_dicts
 
     for i, key_i in enumerate(keys):
         for j, key_j in enumerate(keys):
             if i == nkeys - 1:
-                axs[i, j].set_xlabel(key_i)
+                axs[i, j].set_xlabel(key_j, fontsize=18)
             if j == 0:
-                axs[i, j].set_ylabel(key_j)
+                axs[i, j].set_ylabel(key_i, fontsize=18)
 
             if i == j:
                 axs[i, j].set_yticklabels([])

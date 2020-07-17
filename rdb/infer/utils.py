@@ -414,7 +414,8 @@ def visualize_mcmc_pairs(chains, fig_dir, title, normalized_key="", **kwargs):
 
     # Copy
     chains = DictList(chains)
-    del chains[normalized_key]
+    if normalized_key in chains:
+        del chains[normalized_key]
     feat_keys = list(chains.keys())
 
     # colors = cm.Spectral(np.linspace(0, 1, len(chains) + 1))

@@ -140,15 +140,26 @@ for num_weights in [1, 5, 10, 20]:
 #     assert actions.shape == (1, num_weights, T, udim)
 
 
+# @pytest.mark.parametrize("num_weights", [1, 5])
+# def test_costs(num_weights):
+#     ps = all_particles[num_weights]
+#     tasks = [env.all_tasks[0]]
+#     nfeats = len(env.features_keys)
+#     costs = ps.get_costs(tasks)
+#     assert costs.shape == (1, num_weights)
+#     costs = ps.get_costs(tasks, lower=True)
+#     assert costs.shape == (1, num_weights)
+
+
 @pytest.mark.parametrize("num_weights", [1, 5])
-def test_costs(num_weights):
+def test_offset(num_weights):
+    ps_obs = all_particles[1]
+    tasks = env.all_tasks[:5]
+    feats_keys = env.features_keys
+    feats_obs = ps_obs.get_features_sum(tasks).prepare(feats_keys).numpy_array()
     ps = all_particles[num_weights]
-    tasks = [env.all_tasks[0]]
-    nfeats = len(env.features_keys)
-    costs = ps.get_costs(tasks)
-    assert costs.shape == (1, num_weights)
-    costs = ps.get_costs(tasks, lower=True)
-    assert costs.shape == (1, num_weights)
+    offsets = ps.get_offset_by_features_sum(tasks, feats_obs)
+    assert offsets.shape == (num_weights,)
 
 
 # @pytest.mark.parametrize("num_weights", [1, 5])

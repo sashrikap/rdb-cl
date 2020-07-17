@@ -80,7 +80,7 @@ class IRDOptimalControl(object):
         sample_method="MH",
         sample_init_args={},
         sample_args={},  # "num_warmups": xx, "num_samples": xx
-        normalize_by_hessian=False,
+        mcmc_normalize=None,
         ## Parameter for histogram
         weight_params={},
         interactive_mode=False,
@@ -116,7 +116,7 @@ class IRDOptimalControl(object):
         self._sample_args = sample_args
         self._sample_method = sample_method
         self._sample_init_args = sample_init_args
-        self._normalize_by_hessian = normalize_by_hessian
+        self._mcmc_normalize = mcmc_normalize
 
         ## Caching normalizers, samples and features
         self._user_actions = {}
@@ -231,7 +231,7 @@ class IRDOptimalControl(object):
             .expand_dims(0)
             .numpy_array()
         )
-        if self._normalize_by_hessian:
+        if self._mcmc_normalize == "hessian":
             _, obs_hnorm = obs_ps.get_hessians(tasks)
 
         #  shape (ntasks, 1, T, udim)
@@ -250,6 +250,15 @@ class IRDOptimalControl(object):
         designer_normal_fsum = designer_normal_fsum.prepare(feats_keys).numpy_array()
         #  shape (nfeats, 1, ntasks, d_nnorms)
         designer_normal_fsum = designer_normal_fsum[:, None]
+        #  shape (d_nnorms,)
+        designer_normal_offset = self._designer.normalizer.get_offset_by_features_sum(
+            tasks, obs_feats_sum
+        )
+        #  shape (nfeats, d_nnorms)
+        designer_normal_ws = self._designer.normalizer.weights.prepare(
+            feats_keys
+        ).numpy_array()
+
         #  shape (1, ntasks, task_dim)
         obs_tasks = tasks[None, :]
 
@@ -282,6 +291,7 @@ class IRDOptimalControl(object):
             nonlocal ntasks
             nonlocal obs_feats_sum
             nonlocal designer_ll
+            nonlocal designer_normal_ws  # shape (nfeats, d_nnorms)
             nonlocal designer_normal_fsum
             true_ws = self._prior(1).prepare(feats_keys)
 
@@ -296,17 +306,31 @@ class IRDOptimalControl(object):
             # ## ======= Jit-able cheap alternative ======
             true_feats_sum = obs_feats_sum
             # true_ws = true_ws.numpy_array()
-            if self._normalize_by_hessian:
+
+            ## Weight offset, only used when normalize mode is `offset`
+            true_offset = np.zeros(1)
+
+            if self._mcmc_normalize == "hessian":
                 _, true_hnorm = obs_ps.get_hessians(tasks, true_ws)
                 true_hnorm /= obs_hnorm  # normalize by observation hessian sum
                 true_ws = true_ws.numpy_array() / true_hnorm
-            else:
+            elif self._mcmc_normalize == "magnitude":
                 true_ws = true_ws.normalize_across_keys().numpy_array()
-            log_prob = _likelihood(true_ws, true_feats_sum)
+            elif self._mcmc_normalize == "offset":
+                true_ws = true_ws.numpy_array()  # shape (nfeats, 1)
+                true_offset = -(true_ws * obs_feats_sum[:, :, -1]).sum(
+                    axis=0
+                )  # shape (1,)
+            elif self._mcmc_normalize is None:
+                true_ws = true_ws.numpy_array()
+            else:
+                raise NotImplementedError
+
+            log_prob = _likelihood(true_ws, true_feats_sum, true_offset)
             numpyro.factor("ird_log_probs", log_prob)
 
         @jax.jit
-        def _likelihood(ird_true_ws, ird_true_feats_sum):
+        def _likelihood(ird_true_ws, ird_true_feats_sum, true_offset):
             """
             Forward likelihood `p(w_obs | w_true)` for observed data, used as MCMC kernel.
 
@@ -315,8 +339,8 @@ class IRDOptimalControl(object):
                     shape: (nfeats, 1)
                 ird_true_feats_sum (ndarray): features of sampled weights on tasks
                     shape: (nfeats, 1, ntasks)
-                ird_normal_feats_sum (ndarray): features of normal weights on tasks
-                    shape: (nnorms_1, nfeats, 1, ntasks)
+                true_offset (ndarray): offset for sampled weights
+                    shape: (1,)
 
             Output:
                 log_probs (ndarray): log probability of ird_true_ws (1, )
@@ -325,13 +349,18 @@ class IRDOptimalControl(object):
                 * Dynamically changing feature counts
 
             """
+            nonlocal obs_feats_sum
+            nonlocal designer_normal_fsum
             ## ===============================================
             ## ======= Computing Numerator: sample_xxx =======
             #  shape (nfeats, ntasks)
             ird_true_ws_n = np.repeat(ird_true_ws, ntasks, axis=1)
             #  shape (ntasks,), designer nbatch = ntasks
+
+            ird_true_probs = self._beta * designer_ll(
+                true_ws=ird_true_ws_n, true_offset=true_offset
+            )
             # ird_true_probs = designer_ll(ird_true_ws_n, ird_true_feats_sum)
-            ird_true_probs = designer_ll(ird_true_ws_n) * self._beta
             assert ird_true_probs.shape == (ntasks,)
 
             ## ==================================================
@@ -379,7 +408,8 @@ class IRDOptimalControl(object):
         if num_chains > 1:
             #  shape nfeats * (nchains, 1)
             init_params = init_params.expand_dims(0).repeat(num_chains, axis=0)
-        del init_params[self._normalized_key]
+        if self._normalized_key in init_params:
+            del init_params[self._normalized_key]
 
         sampler = get_ird_sampler(self._sample_method, ird_model, init_args, samp_args)
         # sampler = get_designer_sampler(self._sample_method, ird_model, init_args, samp_args)
@@ -387,12 +417,12 @@ class IRDOptimalControl(object):
         self._rng_key, rng_sampler = random.split(self._rng_key, 2)
         print(f"Sampling IRD (obs={len(obs)}): {save_name}, chains={num_chains}")
         t1 = time()
-        with jax.disable_jit():
-            sampler.run(
-                rng_sampler,
-                init_params=dict(init_params),
-                extra_fields=["mean_accept_prob"],
-            )
+        # with jax.disable_jit():
+        sampler.run(
+            rng_sampler,
+            init_params=dict(init_params),
+            extra_fields=["mean_accept_prob"],
+        )
 
         ## ==============================================================
         ## ====================== Analyze Samples =======================
@@ -402,7 +432,8 @@ class IRDOptimalControl(object):
         print(f"Sample time {time() - t1}")
 
         assert self._normalized_key not in sample_ws.keys()
-        sample_ws[self._normalized_key] = np.zeros(sample_ws.shape)
+        if self._normalized_key in init_params:
+            sample_ws[self._normalized_key] = np.zeros(sample_ws.shape)
         sample_info = sampler.get_extra_fields(group_by_chain=True)
         sample_rates = sample_info["mean_accept_prob"][:, -1]
         num_samples = sample_ws.shape[1]

@@ -267,7 +267,8 @@ class Designer(object):
         if num_chains > 1:
             #  shape nfeats * (nchains, 1)
             init_params = init_params.expand_dims(0).repeat(num_chains, axis=0)
-        del init_params[self._normalized_key]
+        if self._normalized_key in init_params:
+            del init_params[self._normalized_key]
 
         model = self._build_model(tasks)
         sampler = get_designer_sampler(self._sample_method, model, init_args, samp_args)
@@ -286,7 +287,8 @@ class Designer(object):
         #  shape nfeats * (nchains, nsample, 1) -> nfeats * (nchains, nsample)
         sample_ws = DictList(sample_ws).squeeze(axis=2)
         assert self._normalized_key not in sample_ws.keys()
-        sample_ws[self._normalized_key] = np.zeros(sample_ws.shape)
+        if self._normalized_key in sample_ws:
+            sample_ws[self._normalized_key] = np.zeros(sample_ws.shape)
         sample_info = sampler.get_extra_fields(group_by_chain=True)
         sample_rates = sample_info["mean_accept_prob"][:, -1]
         num_samples = sample_ws.shape[1]
@@ -338,8 +340,8 @@ class Designer(object):
         true_ws = self._truth.weights.prepare(feats_keys).numpy_array()
         ## ============= Pre-empt optimiations =============
         #  shape (nfeats, ntasks, 1)
-        true_feats_sum = self._truth.get_features_sum(tasks).prepare(feats_keys)
-        true_feats_sum = true_feats_sum.numpy_array()
+        true_fsum = self._truth.get_features_sum(tasks).prepare(feats_keys)
+        true_fsum = true_fsum.numpy_array()
 
         assert true_ws.shape == (nfeats, 1)
         ## Operation over tasks
@@ -367,12 +369,13 @@ class Designer(object):
             sample_feats_sum = sample_ps.get_features_sum(tasks).prepare(feats_keys)
             sample_feats_sum = sample_feats_sum.numpy_array()
             assert sample_feats_sum.shape == (nfeats, ntasks, 1)
-            #  shape (ntasks, nbatch,)
+            #  shape (nbatch=1,)
+            true_offset = np.zeros(1)
+            #  shape (ntasks, nbatch=1,)
             log_probs = self._likelihood(
-                true_ws, sample_ws, sample_feats_sum, tasks, self.beta
+                true_ws, true_offset, sample_ws, sample_feats_sum, tasks, self.beta
             )
-            # print(log_probs)
-            #  shape (nbatch,)
+            #  shape (nbatch=1,)
             log_prob = task_method(log_probs)
             numpyro.factor("designer_log_prob", log_prob)
 
@@ -391,7 +394,7 @@ class Designer(object):
             raise NotImplementedError
 
         @jax.jit
-        def _likelihood(true_ws, sample_ws, sample_feats_sum, tasks, beta):
+        def _likelihood(true_ws, true_offset, sample_ws, sample_feats_sum, tasks, beta):
             """
             Forward likelihood function (Unnormalized). Used in Designer sampling.
             Computes something proportional to p(design_w | true_w).
@@ -399,6 +402,8 @@ class Designer(object):
             Args:
                 true_ws (ndarray): designer's true w in mind
                     shape: (nfeats, nbatch)
+                true_offset (ndarray): sample offset
+                    shape: (nbatch,)
                 tasks (ndarray): prior tasks
                     shape: (ntasks, nbatch, task_dim)
                 sample_ws (ndarray): current sampled w, batched
@@ -433,8 +438,9 @@ class Designer(object):
             #  shape (nfeats, ntasks, nbatch)
             sample_costs = true_ws * sample_feats_sum
             #  shape (nfeats, ntasks, nbatch) -> (ntasks, nbatch, ), sum across features
-            # sample_rews = -beta * sample_costs.mean(axis=0)
-            sample_rews = -beta * sample_costs.sum(axis=0)
+            sample_costs = sample_costs.sum(axis=0) + true_offset
+            sample_rews = -beta * sample_costs
+            # sample_costs = sample_costs.mean(axis=0)
 
             assert sample_rews.shape == (ntasks, nbatch)
             #  shape (ntasks, nbatch,)
@@ -443,6 +449,7 @@ class Designer(object):
 
         def _normalized_likelihood(
             true_ws,
+            true_offset,
             # true_feats_sum,
             sample_ws,
             sample_feats_sum,
@@ -455,6 +462,8 @@ class Designer(object):
             Approximates p(design_w | true_w).
 
             Args:
+                true_offset (ndarray): true ws offset
+                    shape: (nbatch,)
                 normal_feats_sum (ndarray): normalizer features
                     shape: (nfeats, ntasks, nbatch, nnorms)
                 true_feats_sum (ndarray): true ws features
@@ -479,38 +488,36 @@ class Designer(object):
             nbatch = sample_ws.shape[1]
             ntasks = len(tasks)
             nnorms = normal_feats_sum.shape[3]
-            assert true_ws.shape == (nfeats, nbatch)
+            assert true_ws.shape == (nfeats, nbatch)  # same, repeated `nbatch` times
             assert sample_ws.shape == (nfeats, nbatch)
             assert sample_feats_sum.shape == (nfeats, ntasks, nbatch)
             assert normal_feats_sum.shape == (nfeats, ntasks, nbatch, nnorms)
 
             #  shape (ntasks, nbatch)
-            sample_rews = _likelihood(true_ws, sample_ws, sample_feats_sum, tasks, beta)
+            sample_rews = _likelihood(
+                true_ws, true_offset, sample_ws, sample_feats_sum, tasks, beta
+            )
 
             ## =================================================
             ## ======= Computing Denominator: normal_xxx =======
             #  shape (nfeats, 1, nbatch, 1)
             normal_truth = np.expand_dims(np.expand_dims(true_ws, axis=1), 3)
-            #  shape (nfeats, ntasks, nbatch, nnorms + 2)
-            normal_feats_sum_2 = np.concatenate(
-                [
-                    normal_feats_sum,
-                    # np.expand_dims(true_feats_sum, axis=3),
-                    np.expand_dims(sample_feats_sum, axis=3),
-                ],
-                axis=3,
+            #  shape (nfeats, ntasks, nbatch, nnorms + 1)
+            normal_feats_sum = np.concatenate(
+                [normal_feats_sum, np.expand_dims(sample_feats_sum, axis=3)], axis=3
             )
-            #  shape (nfeats, ntasks, nbatch, nnorms + 2)
-            normal_costs = normal_truth * normal_feats_sum_2
-            #  shape (ntasks, nbatch, nnorms + 2)
+            #  shape (nfeats, ntasks, nbatch, nnorms + 1)
+            normal_costs = normal_truth * normal_feats_sum
+            #  shape (ntasks, nbatch, nnorms + 1)
+            normal_costs = normal_costs.sum(axis=0) + true_offset
+            normal_rews = -beta * normal_costs
             # normal_rews = -beta * normal_costs.mean(axis=0)
-            normal_rews = -beta * normal_costs.sum(axis=0)
 
-            # Normalize by tasks
+            ## Normalize by tasks
             # normal_rews -= np.expand_dims(sample_rews, axis=2)
             # sample_rews = np.zeros_like(sample_rews)
 
-            #  shape (nbatch, nnorms + 2)
+            #  shape (nbatch, nnorms + 1)
             normal_rews = task_method(normal_rews)
             #  shape (nbatch,)
             sample_rews = task_method(sample_rews)

@@ -259,11 +259,27 @@ class DictList(dict):
         else:
             return data
 
+    # def normalize_by_feat_vec(self, vec, option=""):
+    #     """Options:
+    #     1. Initial state feat vec
+    #     2. Expected features from demonstration
+
+    #     Note:
+    #     1. Do right thing wrong > do wrong thing (dhm)
+    #     """
+    #     pass
+
     def normalize_by_key(self, key):
         """Normalize all values based on key.
+
+        TODO:
+
         """
         data = OrderedDict()
-        norm_val = self[key]
+        if key in self:
+            norm_val = self[key]
+        else:
+            norm_val = 1.0
         for key, val in self.items():
             data[key] = val / norm_val
         return DictList(data, jax=self._jax)

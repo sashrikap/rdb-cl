@@ -265,7 +265,7 @@ class Runner(object):
         # display(Video(mp4_path, width=FRAME_WIDTH))
         display(Image(path))
 
-    def compute_hessian(self, x0, actions, weights, expand_dims=False):
+    def compute_hessian(self, x0, actions, weights, expand_dims=False, output="det"):
         """Compute hessians of cost function.
 
         Args:
@@ -300,9 +300,16 @@ class Runner(object):
         #  shape (nbatch, T, udim) -> (T, nbatch, udim)
         actions = actions.swapaxes(0, 1)
         hessian = self._roll_hess(x0, actions, weights_arr)
-        norm = np.linalg.norm(hessian)
+        # print(f"Norm", norm)
         T, udim = self._T, self._env.udim
         assert hessian.shape == (1, T, 1, udim, T, 1, udim)
+
+        assert output in {"l2", "det"}
+        if output == "det":
+            hessian_mat = hessian.reshape((T * udim, T * udim))
+            norm = np.linalg.norm(hessian_mat)
+        else:
+            norm = np.sqrt(np.linalg.det(hessian))
         return hessian, norm
 
     def __call__(

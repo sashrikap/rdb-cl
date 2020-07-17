@@ -320,6 +320,36 @@ class Particles(object):
             all_feats_sum.append(feats_sum)
         return DictList(all_feats_sum)
 
+    def get_offset_by_features_sum(self, tasks, feats_sum, task_idx=-1):
+        """Compute the feature offsets of current particle, based on sum of feature counts.
+
+        Args:
+            tasks
+            feats_sum (DictList): (nfeats, n_tasks, nparticles)
+
+        Note:
+            * Only select the last task in feats_sum: feats_sum[:, :, -1]
+
+        Return:
+            offset (ndarray): (nparticles,)
+
+        """
+        feats_keys = self._env.features_keys
+        assert len(feats_sum) == len(feats_keys)
+        #  shape (nfeats, n_tasks, nparticles)
+        this_feats_sum = self.get_features_sum(tasks).prepare(feats_keys).numpy_array()
+        #  shape (nfeats, 1, 1)
+        that_feats_sum = feats_sum[:, task_idx][:, None]
+        #  shape (nfeats, 1, nparticles)
+        weights = self._weights.prepare(feats_keys).numpy_array()[:, None]
+        #  shape (nparticles,)
+        this_rews = (weights * this_feats_sum).sum(axis=(0, 1))
+        #  shape (nparticles,)
+        that_rews = (weights * that_feats_sum).sum(axis=(0, 1))
+        #  shape (nparticles,)
+        offset = that_rews - this_rews
+        return offset
+
     def get_hessians(self, tasks, weights=None):
         """Compute Hessian information for features.
 
@@ -794,7 +824,8 @@ class Particles(object):
         delta = (ranges[1] - ranges[0]) / bins
         data = self.weights.copy()
         # Omit normalized weight
-        del data[self._normalized_key]
+        if self._normalized_key in data:
+            del data[self._normalized_key]
         #  shape (nfeats - 1, nbatch)
         data = data.onp_array()
         if not log_scale:
@@ -917,7 +948,8 @@ class Particles(object):
         """
         data = self.weights.copy()
         # Omit first weight
-        del data[self._normalized_key]
+        if self._normalized_key in data:
+            del data[self._normalized_key]
         #  shape (nfeats - 1, nbatch)
         data = data.onp_array()
         if not log_scale:

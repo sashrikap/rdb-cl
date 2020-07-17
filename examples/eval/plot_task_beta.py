@@ -58,13 +58,15 @@ def plot_perform(
     plt.xticks(range(1, 1 + len(perf[0])))
     ax.spines["right"].set_visible(False)
     ax.spines["top"].set_visible(False)
-    plt.legend(loc="upper center", ncol=3, bbox_to_anchor=(1, 1.2))
+    # plt.legend(loc="upper center", ncol=3, bbox_to_anchor=(1, 1.2))
+    plt.legend(loc="upper right")
     plt.xlabel("Betas")
     plt.ylabel("Regret")
     # import pdb; pdb.set_trace()
     plt.title(f"Posterior Regret")
     plt.savefig(os.path.join(data_dir, exp_name, "performance.png"))
     plt.tight_layout()
+    plt.ylim([0, 0.5])
     plt.show()
 
 
@@ -173,90 +175,6 @@ def load_data():
     return designer_data, ird_data
 
 
-# def load_separate_data():
-#     data = {}
-#     if os.path.isdir(os.path.join(exp_dir, exp_name)):
-#         for folder in sorted(os.listdir(os.path.join(exp_dir, exp_name))):
-#             print(folder)
-#             if folder not in use_methods:
-#                 continue
-#             npypaths = []
-#             npydata = []
-#             for file in sorted(os.listdir(os.path.join(exp_dir, exp_name, folder))):
-#                 if "npy" in file and "map_seed" not in file and file.endswith("npy"):
-#                     exp_path = os.path.join(exp_dir, exp_name, folder, file)
-#                     # print(exp_path)
-#                     if os.path.isfile(exp_path):
-#                         use_bools = [str(s) in exp_path for s in use_seeds]
-#                         not_bools = [str(s) in exp_path for s in not_seeds]
-#                         print(file, use_bools, not_bools)
-#                         if onp.any(use_bools) and not onp.any(not_bools):
-#                             npypaths.append(exp_path)
-
-#             for exp_path in npypaths:
-#                 npydata.append(read_seed(exp_path))
-#             for idx, (npy_data, npy_path) in enumerate(zip(npydata, npypaths)):
-#                 for method, yhist in npy_data.items():
-#                     if method in not_methods:
-#                         continue
-#                     if method not in data.keys():
-#                         data[method] = {
-#                             "perform": [],
-#                             "rel_perform": [],
-#                             "normalized_perform": [],
-#                             "obs_perform_normalized": [],
-#                             "log_prob_true": [],
-#                             "violation": [],
-#                             "rel_violation": [],
-#                             "feats_violation": [],
-#                         }
-#                     data[method]["perform"].append([])
-#                     data[method]["rel_perform"].append([])
-#                     data[method]["normalized_perform"].append([])
-#                     data[method]["log_prob_true"].append([])
-#                     data[method]["violation"].append([])
-#                     data[method]["obs_perform_normalized"].append([])
-#                     data[method]["rel_violation"].append([])
-#                     data[method]["feats_violation"].append([])
-#                     for yh in yhist:
-#                         data[method]["perform"][-1].append(yh["perform"])
-#                         data[method]["rel_perform"][-1].append(yh["rel_perform"])
-#                         data[method]["normalized_perform"][-1].append(
-#                             yh["normalized_perform"]
-#                         )
-#                         data[method]["violation"][-1].append(yh["violation"])
-#                         data[method]["rel_violation"][-1].append(yh["rel_violation"])
-#                         data[method]["log_prob_true"][-1].append(yh["log_prob_true"])
-#                         data[method]["feats_violation"][-1].append(
-#                             yh["feats_violation"]
-#                         )
-#                         if plot_obs:
-#                             # length 1 array
-#                             data[method]["obs_perform_normalized"][-1].append(
-#                                 yh["obs_normalized_perform"]
-#                             )
-#             for method, mdict in data.items():
-#                 if "random" in method:
-#                     max_len = MAX_RANDOM_LEN
-#                 else:
-#                     max_len = MAX_LEN
-#                 mdict["perform"] = cleanup(mdict["perform"], max_len)
-#                 mdict["rel_perform"] = cleanup(mdict["rel_perform"], max_len)
-#                 mdict["normalized_perform"] = cleanup(
-#                     mdict["normalized_perform"], max_len
-#                 )
-#                 mdict["violation"] = cleanup(mdict["violation"], max_len)
-#                 mdict["rel_violation"] = cleanup(mdict["rel_violation"], max_len)
-#                 mdict["log_prob_true"] = cleanup(mdict["log_prob_true"], max_len)
-#                 mdict["feats_violation"] = cleanup(mdict["feats_violation"], max_len)
-#                 if plot_obs:
-#                     mdict["obs_perform_normalized"] = cleanup(
-#                         mdict["obs_perform_normalized"], max_len
-#                     )
-#                 print(method, mdict["perform"].shape)
-#     return data
-
-
 def plot_data():
     designer_data, ird_data = load_data()
     # data = load_separate_data()
@@ -276,6 +194,6 @@ if __name__ == "__main__":
     not_seeds = [str(random.PRNGKey(si)) for si in not_seeds]
     plot_obs = True
 
-    exp_dir = "data/200621"
-    exp_name = "task_beta_simplified_joint_init4v1"
+    exp_dir = "data/200705"
+    exp_name = "task_beta_simplified_joint_init1v1_dethess"
     plot_data()

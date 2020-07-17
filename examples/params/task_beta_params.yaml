@@ -41,9 +41,10 @@ EXP_ARGS:
   num_eval: 64
   num_eval_tasks: 500
   num_prior_tasks: 0
-EXP_NAME: task_beta_simplified_joint_init1v1
+EXP_NAME: task_beta_simplified_joint_init1v1_dethess
 IRD_ARGS:
   beta: 6
+  normalize_by_hessian: true
   proposal_decay: 0.7
   sample_args:
     num_chains: 3
@@ -61,7 +62,7 @@ IRD_CONTROLLER_ARGS:
   replan: 5
 RANDOM_KEYS:
 - 3
-SAVE_NAME: 200621
+SAVE_NAME: 200705
 TRUE_W:
   control: 2.0
   dist_cars: 1.0
@@ -80,3 +81,4 @@ WEIGHT_PARAMS:
   - control
   max_weights: 15.0
   normalized_key: dist_cars
+  viz_normalized_key: dist_cars

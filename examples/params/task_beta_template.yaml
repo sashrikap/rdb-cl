@@ -17,9 +17,9 @@ DESIGNER_CONTROLLER_ARGS:
 
 ## Saving
 # Full sampling
-SAVE_NAME: 200628
+SAVE_NAME: 200713
 # EXP_NAME: task_beta_simplified_joint_init4v1
-EXP_NAME: task_beta_simplified_joint_init1v1_normhess
+EXP_NAME: task_beta_simplified_joint_init1v1_offset
 
 
 EXP_ARGS:
@@ -32,9 +32,9 @@ EXP_ARGS:
   # initial_tasks_file: Week6_04_4v1
   initial_tasks_file: Week6_04_1v1
   # designer_betas: [0.1, 0.5, 1, 5]
-  # ird_betas: [1, 5, 10, 50]
+  ird_betas: [1, 5, 10, 50]
   designer_betas: []
-  ird_betas: [1, 5]
+  # ird_betas: [1, 5, 10, 50]
 ## Designer Settigns
 DESIGNER_ARGS:
   task_method: mean
@@ -66,7 +66,8 @@ IRD_ARGS:
     max_val: 15.0
   proposal_decay: 0.7
   beta: 6
-  normalize_by_hessian: True
+  # mcmc_normalize: "hessian"
+  mcmc_normalize: "offset"
   sample_args:
     num_warmup: 200
     num_samples: 20000
@@ -128,6 +129,7 @@ EVAL_ARGS:
 ## Plotting & weight scaling
 WEIGHT_PARAMS:
   normalized_key: dist_cars
+  viz_normalized_key: dist_cars
   max_weights: 15.0
   bins: 200
   feature_keys:

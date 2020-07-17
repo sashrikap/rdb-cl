@@ -26,13 +26,13 @@ filedir="200410"
 gsutil -o 'GSUtil:parallel_process_count=1' -o 'GSUtil:parallel_thread_count=16' -m cp -r "gs://active-ird-experiments/rss-logs/logs/output/$filedir/*" "data/$filedir/"
 
 
-filedir="200621"
+filedir="200705"
 gsutil -o 'GSUtil:parallel_process_count=1' -o 'GSUtil:parallel_thread_count=16' -m cp -r "gs://active-ird-experiments/rss-logs/logs/output/$filedir/*" "data/$filedir/"
 
 expdir="active_ird_ibeta_50_w1_joint_dbeta_1_dvar_1_prior_0_eval_mean_128_seed_0_603_adam"
-filedir="200604"
+filedir="200705"
 gsutil -o 'GSUtil:parallel_process_count=1' -o 'GSUtil:parallel_thread_count=16' -m cp -r "gs://active-ird-experiments/rss-logs/logs/output/$filedir/$expdir*" "data/$filedir/"
 
 
-filedir="200621"
+filedir="200705"
 gsutil -o 'GSUtil:parallel_process_count=1' -o 'GSUtil:parallel_thread_count=16' -m cp -r "gs://active-ird-experiments/rss-logs/logs/output/$filedir/iterative_divide/*.npy" "data/$filedir/iterative_divide/"
