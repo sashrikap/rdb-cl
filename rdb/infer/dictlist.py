@@ -394,16 +394,6 @@ class DictList(dict):
                 out[key] = self[key]
         return DictList(out, jax=self._jax)
 
-    def numpy_array(self):
-        """Return stacked values in jax.numpy
-
-        Output:
-            out (ndarray): (num_feats, n_batch)
-
-        """
-        # return np.array(list(self.values()))
-        return self._np.array(list(self.values()))
-
     def clone(self, jax=False):
         """Return jax.numpy.
 
@@ -413,6 +403,16 @@ class DictList(dict):
         """
         # return np.array(list(self.values()))
         return DictList(self, jax=jax)
+
+    def numpy_array(self):
+        """Return stacked values in jax.numpy
+
+        Output:
+            out (ndarray): (num_feats, n_batch)
+
+        """
+        # return np.array(list(self.values()))
+        return self._np.array(list(self.values()))
 
     def onp_array(self):
         """Return stacked values
@@ -429,6 +429,28 @@ class DictList(dict):
         assert len(this_keys) == self.num_keys
         for i in range(len(this_keys)):
             self[this_keys[i]] = array[i]
+
+    def add_key(self, key, value):
+        """Add one additional key and set its value.
+
+        Args:
+            key (str): keyword
+            value (ndarray/numerical): if int, expand to self.shape,
+                if ndarray, use directly.
+
+        Note:
+            - If key already exists, does nothing
+
+        """
+        shape = self.shape
+        if key in self:
+            return
+        if isinstance(value, list) or isinstance(value, self._np.ndarray):
+            value = self._np.array(value)
+            assert value.shape == shape
+            self[key] = value
+        else:
+            self[key] = self._np.ones(shape) * value
 
     def __iter__(self):
         """Iterator to do `for d in dictlist`"""

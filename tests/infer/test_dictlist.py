@@ -359,3 +359,20 @@ def test_normalize_across_keys():
         ],
     }
     assert_equal(dict_, results)
+
+
+def test_add_key():
+    dict_ = DictList({"a": [1, 2], "b": [1, 3]}, jax=False)
+    dict_.add_key("c", [1, 2])
+    results = {"a": [1, 2], "b": [1, 3], "c": [1, 2]}
+    assert_equal(dict_, results)
+
+    dict_ = DictList({"a": [1, 2], "b": [1, 3]}, jax=False)
+    dict_.add_key("c", 1)
+    results = {"a": [1, 2], "b": [1, 3], "c": [1, 1]}
+    assert_equal(dict_, results)
+
+    dict_ = DictList({"a": [1, 2], "b": [1, 3]}, jax=False)
+    dict_.add_key("b", 1)
+    results = {"a": [1, 2], "b": [1, 3]}
+    assert_equal(dict_, results)

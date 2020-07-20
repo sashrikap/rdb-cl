@@ -170,7 +170,15 @@ class DriveWorld(RenderEnv):
 
     @property
     def features_fn(self):
-        """Nonlinear dictionary features function."""
+        """Nonlinear dictionary features function.
+
+        Args:
+            state
+            action
+        Output:
+            dict (str): feature vector
+
+        """
         return self._features_fn
 
     @property

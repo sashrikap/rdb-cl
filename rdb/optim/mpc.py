@@ -88,10 +88,10 @@ def build_costs(udim, horizon, roll_forward, f_cost):
         Args:
             x (ndarray): (nbatch, xdim,)
             us (ndarray): (horizon, nbatch, xdim)
-            weights (ndarray): (weight_dim, nbatch)
+            weights (ndarray): (nfeats, nbatch)
 
         Output:
-            cost (ndarray): (nbatch, 1)
+            cost (ndarray): (horizon, nbatch)
 
         """
         vf_cost = jax.vmap(partial(f_cost, weights=weights))
@@ -158,9 +158,11 @@ def build_mpc(
     method="lbfgs",
     name="",
     test_mode=False,
-    **kwargs
+    build_costs=build_costs,
+    cost_args={},
 ):
-    """Create MPC controller.
+    """Create MPC controller based on enviroment dynamics, feature
+    and a cost function provided as argument.
 
     Args:
         env (object): has `env.dynamics_fn`
@@ -185,7 +187,7 @@ def build_mpc(
 
     """Forward/cost/grad functions for Horizon, used in optimizer"""
     h_traj = build_forward(f_dyn, xdim, udim, horizon, dt)
-    h_costs = build_costs(udim, horizon, h_traj, f_cost)
+    h_costs = build_costs(udim, horizon, h_traj, f_cost, **cost_args)
     h_csum = jax.jit(lambda x0, us, weights: np.sum(h_costs(x0, us, weights)))
 
     # Gradient w.r.t. x and u
