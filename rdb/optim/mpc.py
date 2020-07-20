@@ -102,7 +102,7 @@ def build_costs(udim, horizon, roll_forward, f_cost):
     return roll_costs
 
 
-def build_features(udim, horizon, roll_forward, f_feat):
+def build_features(udim, horizon, roll_forward, f_feat, add_bias=True):
     """Collect trajectory features
 
     Args:
@@ -122,6 +122,13 @@ def build_features(udim, horizon, roll_forward, f_feat):
 
     """
 
+    # _no_bias_fn = lambda feats: feats
+    # _add_bias_fn = lambda feats: feats.add_key("bias", 1.)
+    # if add_bias:
+    #     _bias_fn  = _add_bias_fn
+    # else:
+    #     _bias_fn = _no_bias_fn
+
     @jax.jit
     def roll_features(x, us):
         """Calculate trajectory features
@@ -131,7 +138,7 @@ def build_features(udim, horizon, roll_forward, f_feat):
             us (ndarray): (horizon, nbatch, xdim)
 
         Output:
-            feats (OrderedDict): nfeats * (horizon, nbatch)
+            feats (DictList): nfeats * (horizon, nbatch)
 
         Note:
             * leverages `jax.vmap`'s awesome ability to map & concat dictionaries
@@ -142,6 +149,7 @@ def build_features(udim, horizon, roll_forward, f_feat):
         feats = []
         vf_feat = jax.vmap(f_feat)
         feats = vf_feat(xs, us)
+        # return _bias_fn(feats)
         return feats
 
     return roll_features
@@ -158,6 +166,7 @@ def build_mpc(
     method="lbfgs",
     name="",
     test_mode=False,
+    add_bias=True,
     build_costs=build_costs,
     cost_args={},
 ):
@@ -206,7 +215,7 @@ def build_mpc(
 
     # Rollout for t steps, optimzed every h (h <= t)
     t_csum = lambda x0, us, weights: np.sum(t_costs(x0, us, weights))
-    t_feats = build_features(udim, horizon, t_traj, f_feat)
+    t_feats = build_features(udim, horizon, t_traj, f_feat, add_bias=add_bias)
 
     # Create optimizer & runner
     if engine == "scipy":

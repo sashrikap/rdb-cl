@@ -67,7 +67,7 @@ class OptimizerMPC(object):
         """
         self._xdim = xdim
         self._udim = udim
-        self._features_keys = features_keys
+        self._features_keys = list(features_keys) + ["bias"]
         self._replan = replan
         self._horizon = horizon
         self._T = T

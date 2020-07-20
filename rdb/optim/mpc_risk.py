@@ -120,6 +120,7 @@ def build_risk_averse_mpc(
     method="lbfgs",
     name="",
     test_mode=False,
+    add_bias=True,
     cost_args={},
 ):
     return build_mpc(
@@ -133,6 +134,7 @@ def build_risk_averse_mpc(
         method=method,
         name=name,
         test_mode=test_mode,
+        add_bias=add_bias,
         build_costs=build_multi_costs,
         cost_args=cost_args,
     )

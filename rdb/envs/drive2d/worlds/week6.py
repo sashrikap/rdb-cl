@@ -220,6 +220,10 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
             partial(less_than, y=self._goal_speed),
         )
         max_feats_dict["speed_under"] = np.sum(quadratic_feat(ones * max_dspeed))
+
+        nlr_feats_dict["bias"] = identity_feat
+        max_feats_dict["bias"] = ones
+
         nlr_feats_dict = chain_dict_funcs(nlr_feats_dict, feats_dict)
 
         ## JAX compile

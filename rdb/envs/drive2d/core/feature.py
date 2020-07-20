@@ -35,6 +35,21 @@ def make_batch(x):
 
 
 @jax.jit
+def ones(x):
+    """Feature with all ones (e.g. used as bias term).
+
+    Args:
+        x (ndarray): batched 2D state
+
+    Output:
+        out (ndarray): np.ones(nbatch,)
+
+    """
+    nbatch = len(x)
+    return np.ones((nbatch,))
+
+
+@jax.jit
 def dist_to(x, y):
     """L2-norm distance dist(x, y).
 
@@ -292,6 +307,11 @@ def is_item_state(data):
 def is_numeric(data):
     """Whether data is numerical value, e.g. float"""
     return len(np.array(data).shape) == 0
+
+
+@jax.jit
+def identity_feat(data):
+    return data
 
 
 @jax.jit

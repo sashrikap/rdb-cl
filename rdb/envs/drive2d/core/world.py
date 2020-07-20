@@ -372,6 +372,9 @@ class DriveWorld(RenderEnv):
         def control_turn_fn(state, actions):
             return feature.control_turn(actions)
 
+        def bias_fn(state, actions):
+            return feature.ones(state[..., np.arange(*main_idx)])
+
         feats_dict["dist_cars"] = stack_funcs(car_fns, axis=1)
         feats_dict["dist_lanes"] = stack_funcs(lane_fns, axis=1)
         feats_dict["dist_objects"] = stack_funcs(obj_fns, axis=1)
@@ -382,6 +385,7 @@ class DriveWorld(RenderEnv):
         feats_dict["control_throttle"] = control_throttle_fn
         feats_dict["control_brake"] = control_brake_fn
         feats_dict["control_turn"] = control_turn_fn
+        feats_dict["bias"] = bias_fn
 
         return feats_dict
 
