@@ -18,23 +18,13 @@ DESIGNER_CONTROLLER_ARGS:
 ## Saving
 # Full sampling
 SAVE_NAME: 200729
-# EXP_NAME: task_beta_simplified_joint_init4v1
-EXP_NAME: task_beta_simplified_joint_init1v1_hessian_nonorm
+EXP_NAME: proxy_ird_simplified_joint_dbeta_0.2_init1v1_offset
 
 
 EXP_ARGS:
-  eval_method: map
-  num_eval: 64
-  num_eval_tasks: 500
-  eval_env_name: Week6_02-v1
-  eval_seed: 0
   num_prior_tasks: 0
-  # initial_tasks_file: Week6_04_4v1
   initial_tasks_file: Week6_04_1v1
-  # designer_betas: [0.1, 0.5, 1, 5]
-  ird_betas: [1, 5, 10, 50]
-  designer_betas: []
-  # ird_betas: [1, 5, 10, 50]
+  num_proxies: 20
 ## Designer Settigns
 DESIGNER_ARGS:
   task_method: mean
@@ -43,6 +33,7 @@ DESIGNER_ARGS:
   # design_mode: independent
   design_mode: joint
   select_mode: mean
+  use_true_w: False
   sample_init_args:
     # proposal_var: 0.1
     proposal_var: 0.3 # beta = 1
@@ -55,7 +46,7 @@ DESIGNER_ARGS:
     num_samples: 250
     num_warmup: 25
     num_chains: 1
-  beta: 0.02
+  beta: 0.2
 ## IRD Settings
 IRD_ARGS:
   task_method: sum
@@ -65,38 +56,29 @@ IRD_ARGS:
     proposal_var: 1
     max_val: 15.0
   proposal_decay: 0.7
-  beta: 6
-  mcmc_normalize: "hessian"
-  # mcmc_normalize: "offset"
+  beta: 20
+  # mcmc_normalize: "hessian"
+  mcmc_normalize: "offset"
   sample_args:
     num_warmup: 200
     num_samples: 20000
     num_chains: 3
-EVAL_ARGS:
-  parallel: True
-  num_eval_workers: 4
-  max_batch: 500
 
 
 
 # ## Testing
 # ## Saving
-# SAVE_NAME: 200621
-# EXP_NAME: test
+# SAVE_NAME: 200729
+# EXP_NAME: test_proxy_ird
 # EXP_ARGS:
-#   num_eval: 2
-#   num_eval_tasks: 40
-#   eval_method: mean
-#   eval_seed: 0
-#   initial_tasks_file: Week6_04_4v1
+#   initial_tasks_file: Week6_04_1v1
 #   num_prior_tasks: 0
-#   eval_env_name: Week6_02-v1
-#   designer_betas: [0.1, 0.5, 1, 5]
-#   ird_betas: [1, 5, 10, 50]
+#   num_proxies: 5
 # DESIGNER_ARGS:
 #   task_method: sum
-#   num_normalizers: 10
+#   num_normalizers: 500
 #   sample_method: MH
+#   use_true_w: True
 #   # design_mode: independent
 #   design_mode: joint
 #   select_mode: mean
@@ -104,13 +86,14 @@ EVAL_ARGS:
 #     proposal_var: 0.3
 #     max_val: 15.0
 #   sample_args:
-#     num_samples: 10
+#     num_samples: 5
 #     num_warmup: 2
 #     num_chains: 1
 #   beta: 1
 # IRD_ARGS:
 #   sample_method: MH
 #   task_method: sum
+#   mcmc_normalize: "offset"
 #   sample_init_args:
 #     proposal_var: 2
 #     max_val: 15.0
@@ -119,17 +102,13 @@ EVAL_ARGS:
 #     num_samples: 30
 #     num_chains: 3
 #   beta: 1
-# EVAL_ARGS:
-#   parallel: True
-#   num_eval_workers: 4
-#   max_batch: 10
 
 
 
 ## Plotting & weight scaling
 WEIGHT_PARAMS:
   normalized_key: __dummy__
-  viz_normalized_key: dist_cars
+  viz_normalized_key: __dummy__
   max_weights: 15.0
   bins: 200
   feature_keys:

@@ -308,6 +308,13 @@ class DictList(dict):
             out[key] = val / self._np.sum(val)
         return DictList(out, jax=self._jax)
 
+    def dot(self, data, axis=0):
+        """Multiply and sum across a given dimension
+        Returns ndarray.
+        """
+        len(self) == len(data)
+        return (self * data).numpy_array().sum(axis)
+
     def __mul__(self, data):
         """Multiply with another dictlist.
         """
@@ -443,14 +450,16 @@ class DictList(dict):
 
         """
         shape = self.shape
+        new_data = self.copy()
         if key in self:
-            return
+            return self
         if isinstance(value, list) or isinstance(value, self._np.ndarray):
-            value = self._np.array(value)
+            value = new_data._np.array(value)
             assert value.shape == shape
-            self[key] = value
+            new_data[key] = value
         else:
-            self[key] = self._np.ones(shape) * value
+            new_data[key] = new_data._np.ones(shape) * value
+        return new_data
 
     def __iter__(self):
         """Iterator to do `for d in dictlist`"""

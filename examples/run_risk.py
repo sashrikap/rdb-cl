@@ -14,11 +14,11 @@ from rdb.infer import *
 from rdb.visualize.render import render_env
 from rdb.visualize.preprocess import normalize_features
 
-DUMMY_ACTION = False
-DRAW_HEAT = False
-REPLAN = 5
-ENGINE = "scipy"
-METHOD = "lbfgs"
+REPLAN = -1
+# ENGINE = "scipy"
+# METHOD = "lbfgs"
+ENGINE = "jax"
+METHOD = "adam"
 ENV_NAME = "Week6_02-v1"  # Two Blockway
 TASK = (-0.7, -0.7, 0.13, 0.4, -0.13, 0.4)
 
@@ -29,12 +29,12 @@ horizon = 10
 T = 10
 weights1 = {
     "control": 0.1,
-    "dist_cars": 1.0,
+    "dist_cars": 0.1,
     "dist_fences": 2.675,
     "dist_lanes": 1.25,
     "dist_objects": 1.125,
     "speed": 2.5,
-    "speed_over": 40.0,
+    # "speed_over": 40.0,
 }
 weights2 = {
     "control": 0.1,
@@ -43,7 +43,7 @@ weights2 = {
     "dist_lanes": 1.25,
     "dist_objects": 1.125,
     "speed": 2.5,
-    "speed_over": 40.0,
+    # "speed_over": 40.0,
 }
 obs_weights = weights2
 true_weights = {
@@ -53,6 +53,7 @@ true_weights = {
     "dist_objects": 1.125,
     "speed": 2.5,
     "control": 2.0,
+    # "speed_over": 40.0,
 }
 
 
@@ -95,7 +96,7 @@ optimizer, _ = build_mpc(
 state = copy.deepcopy(env.state)
 test_state = env.get_init_state([0.5, 0.5, -0.12, 0.6, 0.8, 1.1])
 
-w_list = DictList([weights1, weights2])
+w_list = DictList([weights1, weights2, true_weights])
 actions_true = optimizer(test_state, weights=true_weights, batch=False)
 _, cost_true, info_true = runner(
     test_state, actions_true, weights=true_weights, batch=False
@@ -111,7 +112,7 @@ print("Cost risk (no offset)", cost_risk - cost_true)
 
 ## Populate offset and compare two types of planning
 
-offset = [None, None]
+offset = [None, None, None]
 offset[0] = (
     -1
     * (
@@ -126,7 +127,14 @@ offset[1] = (
         * info_true["feats_sum"].numpy_array()
     ).sum()
 )
-w_list.add_key("bias", offset)
+offset[2] = (
+    -1
+    * (
+        DictList([true_weights]).prepare(env.features_keys).numpy_array()
+        * info_true["feats_sum"].numpy_array()
+    ).sum()
+)
+w_list = w_list.add_key("bias", offset)
 actions_risk_step = optimizer_risk_step(test_state, weights=w_list)
 _, cost_risk_step, _ = runner(
     test_state, actions_risk_step, weights=true_weights, batch=False

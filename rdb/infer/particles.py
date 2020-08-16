@@ -64,7 +64,10 @@ class Particles(object):
         self._weight_params = weight_params
         self._normalized_key = normalized_key
         if weights is not None:
-            assert isinstance(weights, DictList)
+            # print(type(weights))
+            # print(type(weights) == rdb.infer.dictlist.DictList)
+            # print(type(weights) == DictList)
+            # assert type(weights) == rdb.infer.dictlist.DictList or type(weights) == DictList
             self._weights = weights.normalize_by_key(self._normalized_key)
         else:
             self._weights = None
@@ -320,35 +323,29 @@ class Particles(object):
             all_feats_sum.append(feats_sum)
         return DictList(all_feats_sum)
 
-    def get_offset_by_features_sum(self, tasks, feats_sum, task_idx=-1):
+    def get_offset_by_features_sum(self, feats_dict, task_idx=-1):
         """Compute the feature offsets of current particle, based on sum of feature counts.
 
         Args:
-            tasks
             feats_sum (DictList): (nfeats, n_tasks, nparticles)
-
         Note:
-            * Only select the last task in feats_sum: feats_sum[:, :, -1]
+            * Only select the last task in feats_sum: feats_sum[:, -1]
 
         Return:
             offset (ndarray): (nparticles,)
 
         """
         feats_keys = self._env.features_keys
+        #  shape (nfeats, nparticles, 1)
+        feats_sum = feats_dict.prepare(feats_keys).numpy_array()
         assert len(feats_sum) == len(feats_keys)
-        #  shape (nfeats, n_tasks, nparticles)
-        this_feats_sum = self.get_features_sum(tasks).prepare(feats_keys).numpy_array()
-        #  shape (nfeats, 1, 1)
-        that_feats_sum = feats_sum[:, task_idx][:, None]
-        #  shape (nfeats, 1, nparticles)
-        weights = self._weights.prepare(feats_keys).numpy_array()[:, None]
+        #  shape (nfeats, 1)
+        that_feats_sum = feats_sum[:, task_idx]
+        #  shape (nfeats, nparticles)
+        weights = self._weights.prepare(feats_keys).numpy_array()
         #  shape (nparticles,)
-        this_rews = (weights * this_feats_sum).sum(axis=(0, 1))
-        #  shape (nparticles,)
-        that_rews = (weights * that_feats_sum).sum(axis=(0, 1))
-        #  shape (nparticles,)
-        offset = that_rews - this_rews
-        return offset
+        that_rews = (weights * that_feats_sum).sum(axis=0)
+        return -1 * that_rews
 
     def get_hessians(self, tasks, weights=None):
         """Compute Hessian information for features.
@@ -435,7 +432,7 @@ class Particles(object):
         return onp.array(acs)
 
     def compute_tasks(
-        self, tasks, us0=None, vectorize=True, desc=None, max_batch=-1, jax=False
+        self, tasks, us0=None, vectorize=True, desc=None, max_batch=500, jax=False
     ):
         """Compute multiple tasks at once.
 
@@ -990,6 +987,11 @@ class Particles(object):
 
     def load(self):
         path = f"{self._save_dir}/{self._expanded_name}.npz"
+        assert os.path.isfile(path)
+        load_data = np.load(path, allow_pickle=True)
+        self._weights = DictList(load_data["weights"].item())
+
+    def load_from_path(self, path):
         assert os.path.isfile(path)
         load_data = np.load(path, allow_pickle=True)
         self._weights = DictList(load_data["weights"].item())

@@ -225,6 +225,7 @@ class IRDOptimalControl(object):
         obs_ws = obs_ws.prepare(feats_keys).normalize_across_keys().numpy_array()
         # obs_ws = obs_ws.prepare(feats_keys).numpy_array()
         #  shape (nfeats, 1, ntasks)
+        obs_feats_dict = obs_ps.get_features_sum(tasks)
         obs_feats_sum = (
             obs_ps.get_features_sum(tasks)
             .prepare(feats_keys)[np.diag_indices(ntasks)]
@@ -252,7 +253,7 @@ class IRDOptimalControl(object):
         designer_normal_fsum = designer_normal_fsum[:, None]
         #  shape (d_nnorms,)
         designer_normal_offset = self._designer.normalizer.get_offset_by_features_sum(
-            tasks, obs_feats_sum
+            obs_feats_dict
         )
         #  shape (nfeats, d_nnorms)
         designer_normal_ws = self._designer.normalizer.weights.prepare(
@@ -317,15 +318,14 @@ class IRDOptimalControl(object):
             elif self._mcmc_normalize == "magnitude":
                 true_ws = true_ws.normalize_across_keys().numpy_array()
             elif self._mcmc_normalize == "offset":
-                true_ws = true_ws.numpy_array()  # shape (nfeats, 1)
-                true_offset = -(true_ws * obs_feats_sum[:, :, -1]).sum(
-                    axis=0
-                )  # shape (1,)
+                # shape (1,)
+                # true_ws = true_ws.normalize_across_keys().numpy_array()
+                true_ws = true_ws.numpy_array()
+                true_offset = -(true_ws * obs_feats_sum[:, :, -1]).sum(axis=0)
             elif self._mcmc_normalize is None:
                 true_ws = true_ws.numpy_array()
             else:
                 raise NotImplementedError
-
             log_prob = _likelihood(true_ws, true_feats_sum, true_offset)
             numpyro.factor("ird_log_probs", log_prob)
 

@@ -123,6 +123,14 @@ def build_risk_averse_mpc(
     add_bias=True,
     cost_args={},
 ):
+    """Create Risk Averse MPC
+
+    Usage:
+        ```
+        optimizer, runner = build_risk_averse_mpc(...)
+        actions = optimizer(state, weights=all_weights)
+        ```
+    """
     return build_mpc(
         env=env,
         f_cost=f_cost,

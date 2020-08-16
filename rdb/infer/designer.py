@@ -233,7 +233,7 @@ class Designer(object):
         print(f"Sampling Designer (prior={len(self._prior_tasks)}): {save_name}")
         if self._use_true_w:
             particles = self.create_particles(
-                [self.true_w],
+                [self.true_w] * self._sample_args["num_samples"],
                 controller=self._one_controller,
                 runner=self._one_runner,
                 save_name=save_name,
@@ -427,6 +427,7 @@ class Designer(object):
             nbatch = sample_ws.shape[1]
             ntasks = len(tasks)
             assert true_ws.shape == (nfeats, nbatch)
+            assert true_offset.shape == (nbatch,)
             assert sample_ws.shape == (nfeats, nbatch)
             assert sample_feats_sum.shape == (nfeats, ntasks, nbatch)
 
@@ -441,7 +442,6 @@ class Designer(object):
             sample_costs = sample_costs.sum(axis=0) + true_offset
             sample_rews = -beta * sample_costs
             # sample_costs = sample_costs.mean(axis=0)
-
             assert sample_rews.shape == (ntasks, nbatch)
             #  shape (ntasks, nbatch,)
             log_probs = sample_rews

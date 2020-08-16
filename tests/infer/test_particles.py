@@ -156,9 +156,9 @@ def test_offset(num_weights):
     ps_obs = all_particles[1]
     tasks = env.all_tasks[:5]
     feats_keys = env.features_keys
-    feats_obs = ps_obs.get_features_sum(tasks).prepare(feats_keys).numpy_array()
+    feats_dict = ps_obs.get_features_sum(tasks)
     ps = all_particles[num_weights]
-    offsets = ps.get_offset_by_features_sum(tasks, feats_obs)
+    offsets = ps.get_offset_by_features_sum(feats_dict)
     assert offsets.shape == (num_weights,)
 
 
