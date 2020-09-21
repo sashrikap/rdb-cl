@@ -15,8 +15,8 @@ from rdb.visualize.preprocess import normalize_features
 DUMMY_ACTION = False
 REPLAN = False
 BENCHMARK = 500
-BENCHMARK_SINGLE = False
-BENCHMARK_BATCH = True
+BENCHMARK_SINGLE = True
+BENCHMARK_BATCH = False
 # ENGINE = "scipy"
 # METHOD = "lbfgs"
 ENGINE = "jax"
@@ -61,12 +61,12 @@ optimizer, runner = build_mpc(
     method=METHOD,
 )
 state = copy.deepcopy(env.state)
-t1 = time()
+t1 = time.time()
 actions = optimizer(state, weights=weights, batch=False)
 traj, cost, info = runner(state, actions, weights=weights, batch=False)
 print(f"Engine {ENGINE}, method {METHOD}")
 if BENCHMARK > 0:
-    t_compile = time() - t1
+    t_compile = time.time() - t1
     print(f"Compile time {t_compile:.3f}")
     print(f"Total cost {cost}")
     for k, v in info["violations"].items():
@@ -77,36 +77,36 @@ if BENCHMARK > 0:
     N = BENCHMARK
 
     if BENCHMARK_SINGLE:
-        t1 = time()
+        t1 = time.time()
         for _ in tqdm(range(N), total=N):
             env.reset()
             acs_ = optimizer(state, weights=weights, batch=False)
-        t_opt = time() - t1
+        t_opt = time.time() - t1
         print(f"Optimizer fps {N/t_opt:.3f}")
 
-        t1 = time()
+        t1 = time.time()
         for _ in tqdm(range(N), total=N):
             env.reset()
             runner(state, acs_, weights=weights, batch=False)
-        t_run = time() - t1
+        t_run = time.time() - t1
         print(f"Runner fps {N/t_run:.3f}")
 
-        t1 = time()
+        t1 = time.time()
         for _ in tqdm(range(N), total=N):
             env.reset()
             for key in weights.keys():
                 weights[key] = onp.random.random()
             acs_ = optimizer(state, weights=weights, batch=False)
-        t_opt = time() - t1
+        t_opt = time.time() - t1
         print(f"Optimizer (Changing weights) fps {N/t_opt:.3f}")
 
-        t1 = time()
+        t1 = time.time()
         for _ in tqdm(range(N), total=N):
             env.reset()
             for key in weights.keys():
                 weights[key] = onp.random.random()
             runner(state, acs_, weights=weights, batch=False)
-        t_run = time() - t1
+        t_run = time.time() - t1
         print(f"Runner (Changing weights) fps {N/t_run:.3f}")
 
     if BENCHMARK_BATCH:
@@ -129,18 +129,18 @@ if BENCHMARK > 0:
         state_N = state.repeat(N, axis=0)
         acs = optimizer2(state_N, weights=ws)
         runner2(state_N, acs, weights=ws)
-        t1 = time()
+        t1 = time.time()
         for _ in trange(N_batch):
             acs = optimizer2(state_N, weights=ws)
-        t_opt = time() - t1
+        t_opt = time.time() - t1
         print(f"Optimizer (batch) fps {N_batch * N/t_opt:.3f}")
-        t1 = time()
+        t1 = time.time()
         for _ in trange(N_batch):
             runner2(state_N, acs, weights=ws)
-        t_run = time() - t1
+        t_run = time.time() - t1
         print(f"Runner (batch) fps {N * N_batch/t_run:.3f}")
 
-        t1 = time()
+        t1 = time.time()
         all_weights = []
         for _ in range(N // 2):
             all_weights.append(weights)

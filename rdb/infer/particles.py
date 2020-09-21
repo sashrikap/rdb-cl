@@ -33,8 +33,8 @@ class Particles(object):
 
     Note:
         * Supports caching. E.g.
-        >>> particles.get_feats(tasks) # first time slow
-        >>> particles.get_feats(tasks) # second time cached
+        >>> particles.get_features_sum(tasks) # first time slow
+        >>> particles.get_features_sum(tasks) # second time cached
 
     """
 
@@ -52,11 +52,15 @@ class Particles(object):
         fig_dir=None,
         save_dir=None,
         env=None,
+        risk_averse=False,
     ):
         self._env_fn = env_fn
         self._env = env
         self._controller = controller
         self._runner = runner
+
+        ## Risk averse property
+        self._risk_averse = risk_averse
 
         ## Sample weights
         self._rng_key = rng_key
@@ -119,6 +123,15 @@ class Particles(object):
         for key, val in dict_.items():
             out[key] = val[idx]
         return out
+
+    @property
+    def risk_averse(self):
+        return self._risk_averse
+
+    @risk_averse.setter
+    def risk_averse(self, risk_averse):
+        self.build_cache()
+        self._risk_averse = risk_averse
 
     @property
     def rng_key(self):
@@ -461,11 +474,19 @@ class Particles(object):
                 return
             #  shape (ntasks, state_dim)
             states = self._env.get_init_states(onp.array(tasks))
-            #  batch_states (ntasks * nweights, state_dim)
-            #  batch_weights nfeats * (ntasks * nweights)
-            batch_states, batch_weights = cross_product(
-                states, self.weights, onp.array, partial(DictList, jax=jax)
-            )
+            if self._risk_averse:
+                ## Risk averse planning
+                #  - batch_states (ntasks, state_dim)
+                #  - batch_weights nfeats * (ntasks * nweights)
+                batch_states = states
+                batch_weights = self.weights.expand_dims(0).repeat(ntasks, axis=0)
+            else:
+                ## Batch planning
+                #  - batch_states (ntasks * nweights, state_dim)
+                #  - batch_weights nfeats * (ntasks * nweights)
+                batch_states, batch_weights = cross_product(
+                    states, self.weights, onp.array, partial(DictList, jax=jax)
+                )
             #  shape (ntasks * nweights, T, udim)
             batch_us0 = None
             if us0 is not None:
@@ -488,6 +509,22 @@ class Particles(object):
                 jax=jax,
                 max_batch=max_batch,
             )
+            if self._risk_averse:
+                batch_trajs["actions"] = np.repeat(
+                    batch_trajs["actions"].expand_dims(1), nweights
+                )
+                batch_trajs["costs"] = np.repeat(
+                    batch_trajs["costs"].expand_dims(1), nweights
+                )
+                batch_trajs["feats"] = np.repeat(
+                    batch_trajs["feats"].expand_dims(1), nweights
+                )
+                batch_trajs["feats_sum"] = np.repeat(
+                    batch_trajs["feats_sum"].expand_dims(1), nweights
+                )
+                batch_trajs["violations"] = np.repeat(
+                    batch_trajs["violations"].expand_dims(1), nweights
+                )
             #  shape (ntasks, nweights, T, acs_dim)
             all_actions = batch_trajs["actions"].reshape((ntasks, nweights, T, udim))
             #  shape (ntasks, nweights)
@@ -504,6 +541,7 @@ class Particles(object):
             low_vios = lower_trajs["violations"].reshape((ntasks, nweights, T))
         else:
             ## Rollout (nweights,) iteratively for each task in (ntasks,)
+            assert not self._risk_averse
             all_actions, all_vios, all_costs = [], [], []
             low_actions, low_vios, low_costs = [], [], []
             all_feats, all_feats_sum = [], []
@@ -696,13 +734,15 @@ class Particles(object):
                     ti
                 ]
 
-    def compare_with(self, task, target, relative=False, normalized=False):
+    def compare_with(
+        self, task, target, relative=False, normalized=False, risk_averse=False
+    ):
         """Compare with a set of target weights (usually true weights).
 
         Returns:
             (1) reward (if target w = None)
             (2) regret measured by target w (if target w specified)
-            (3) relative regret measured by target w (if target w specified, relative=True)
+            (3) nromalized regret measured by target w (if target w specified, normalized=True)
                 relative = (rew - rew_{u_0}) / (rew_{u_target} - rew_{u_0}), where
                 u_0 is all zero action, u_target is optimal action under target w
 
@@ -714,6 +754,8 @@ class Particles(object):
 
         Args:
             target (Particles): target to compare against; if None, no target
+            relative (bool):
+            normalized (bool):
 
         Output - dict with following keys:
             rews (ndarray): (nbatch,)
@@ -726,13 +768,16 @@ class Particles(object):
         """
         eps = 1e-8
         nbatch = len(self.weights)
+        if risk_averse:
+            nbatch = 1
+        feats_keys = self._env.features_keys
         #  shape nfeats * (nbatch, )
         this_fsums = self.get_features_sum([task])[0]
         #  shape nvios * (nbatch,)
         this_vios = self.get_violations([task])[0]
         if target is not None:
             #  shape nfeats * (nbatch, )
-            target_ws = target.weights.tile(nbatch, axis=0)
+            target_ws = target.weights.prepare(feats_keys).tile(nbatch, axis=0)
             target_ws = target_ws.normalize_by_key(self._normalized_key)
             assert len(target.weights) == 1, "Can only compare with 1 target weights."
             that_fsums = target.get_features_sum([task])[0]

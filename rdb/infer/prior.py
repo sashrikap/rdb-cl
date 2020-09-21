@@ -91,16 +91,18 @@ class LogUniformPrior(Prior):
     Args:
         log_max (float): log range (-log_max, log_max)
         feature_keys (list): initial list of features
+        default_w (dict): supply default values (not sampled)
 
     Out:
         out (DictList): (nkeys, num_samples)
 
     """
 
-    def __init__(self, normalized_key, feature_keys, log_max, name=""):
+    def __init__(self, normalized_key, feature_keys, log_max, default=None, name=""):
         self._name = name
         self._log_max = log_max
         self._normalized_key = normalized_key
+        self._default = default
         self._initial_keys = copy.deepcopy(feature_keys)
         self._feature_keys = copy.deepcopy(feature_keys)
 
@@ -125,5 +127,9 @@ class LogUniformPrior(Prior):
                     key, dist.Uniform(-max_val, max_val), sample_shape=(num_samples,)
                 )
             output[key] = np.exp(val)
+        if self._default is not None:
+            for key, val in self._default.items():
+                if key not in output:
+                    output[key] = np.ones((num_samples,)) * val
         output = DictList(output, jax=jax)
         return output

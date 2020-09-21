@@ -1,5 +1,5 @@
 RANDOM_KEYS: [0]
-ENV_NAME: Week6_04-v1
+ENV_NAME: Week6_02-v1
 
 ## MPC Specific
 IRD_CONTROLLER_ARGS:
@@ -17,13 +17,16 @@ DESIGNER_CONTROLLER_ARGS:
 
 ## Saving
 # Full sampling
-SAVE_NAME: 200816
-# EXP_NAME: task_beta_simplified_joint_init4v1
-EXP_NAME: task_beta_simplified_joint_init1v1_offset_nonorm_eval_risk
+SAVE_NAME: 200905
+# EXP_NAME: universal_simplified_joint_init1v1_2000
+# EXP_NAME: universal_simplified_joint_init1v1_2000_eval_risk
+# EXP_NAME: universal_simplified_joint_init1v1_2000_old_eval_mean
+EXP_NAME: universal_simplified_joint_init1v1_2000_uni_eval_mean
+# EXP_NAME: universal_simplified_joint_init1v1_no
 
 
 EXP_ARGS:
-  eval_method: map
+  eval_method: mean
   num_eval: 64
   num_eval_tasks: 500
   eval_env_name: Week6_02-v1
@@ -32,10 +35,14 @@ EXP_ARGS:
   # initial_tasks_file: Week6_04_4v1
   initial_tasks_file: Week6_04_1v1
   # designer_betas: [0.1, 0.5, 1, 5]
-  ird_betas: [1, 5, 10, 50]
+  #ird_betas: [1, 5, 10, 50]
+  ird_betas: [1]
   designer_betas: []
   # ird_betas: [1, 5, 10, 50]
-  universal_model: model_v00/model_v00_00900.npz
+  universal_model: model_v01/model_v01_02000.npz
+  # universal_model: null
+  # risk_averse: True
+  risk_averse: False
 ## Designer Settigns
 DESIGNER_ARGS:
   task_method: mean
@@ -67,7 +74,6 @@ IRD_ARGS:
     max_val: 15.0
   proposal_decay: 0.7
   beta: 6
-  # mcmc_normalize: "hessian"
   mcmc_normalize: null
   sample_args:
     num_warmup: 200
@@ -77,53 +83,6 @@ EVAL_ARGS:
   parallel: True
   num_eval_workers: 4
   max_batch: 500
-
-
-
-# ## Testing
-# ## Saving
-# SAVE_NAME: 200621
-# EXP_NAME: test
-# EXP_ARGS:
-#   num_eval: 2
-#   num_eval_tasks: 40
-#   eval_method: mean
-#   eval_seed: 0
-#   initial_tasks_file: Week6_04_4v1
-#   num_prior_tasks: 0
-#   eval_env_name: Week6_02-v1
-#   designer_betas: [0.1, 0.5, 1, 5]
-#   ird_betas: [1, 5, 10, 50]
-# DESIGNER_ARGS:
-#   task_method: sum
-#   num_normalizers: 10
-#   sample_method: MH
-#   # design_mode: independent
-#   design_mode: joint
-#   select_mode: mean
-#   sample_init_args:
-#     proposal_var: 0.3
-#     max_val: 15.0
-#   sample_args:
-#     num_samples: 10
-#     num_warmup: 2
-#     num_chains: 1
-#   beta: 1
-# IRD_ARGS:
-#   sample_method: MH
-#   task_method: sum
-#   sample_init_args:
-#     proposal_var: 2
-#     max_val: 15.0
-#   sample_args:
-#     num_warmup: 20
-#     num_samples: 30
-#     num_chains: 3
-#   beta: 1
-# EVAL_ARGS:
-#   parallel: True
-#   num_eval_workers: 4
-#   max_batch: 10
 
 
 

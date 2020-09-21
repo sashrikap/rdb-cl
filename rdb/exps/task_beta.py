@@ -20,6 +20,7 @@ TODO:
 from rdb.distrib.designer import DesignerServer
 from rdb.infer.particles import Particles
 from rdb.exps.utils import Profiler, save_params
+from rdb.infer.universal import *
 from numpyro.handlers import seed
 from functools import partial
 from tqdm.auto import tqdm
@@ -50,14 +51,17 @@ class ExperimentTaskBeta(object):
         eval_env_name=None,
         eval_method="map",
         eval_seed=None,
+        universal_model=None,
         # Exp parameters
         designer_betas=[],
         ird_betas=[],
+        risk_averse=False,
         # Initial tasks
         initial_tasks_file=None,
         # Observation model
         num_prior_tasks=0,  # for designer
         # Metadata
+        model_dir="data/universal",
         save_root="data/task_beta_exp1",
         exp_name="task_beta_exp1",
         exp_params={},
@@ -77,9 +81,21 @@ class ExperimentTaskBeta(object):
         # Initial tasks
         self._initial_tasks_file = initial_tasks_file
 
-        # Beta parameter
+        # Universal model
+        self._universal_model = None
+        if universal_model is not None:
+            data = np.load(os.path.join(model_dir, universal_model), allow_pickle=True)
+            _, predict = create_model(
+                data["input_dim"].item(), data["output_dim"].item(), mode="test"
+            )
+            self._universal_model = lambda weights: predict(
+                list(data["params"]), weights
+            )
+
+        # Exp parameter
         self._designer_betas = designer_betas
         self._ird_betas = ird_betas
+        self._risk_averse = risk_averse
 
         # Designer simulation
         self._designer_server = DesignerServer(designer_fn)
@@ -184,7 +200,10 @@ class ExperimentTaskBeta(object):
                 self._model.beta = ibeta
                 obs = [self._designer_server.designer.truth] * len(tasks)
                 belief = self._model.sample(
-                    tasks=tasks, obs=obs, save_name=f"ird_belief_truth_ibeta_{ibeta}"
+                    tasks=tasks,
+                    obs=obs,
+                    save_name=f"ird_belief_truth_ibeta_{ibeta}",
+                    universal_model=self._universal_model,
                 )
                 self._ird_beliefs[ibeta] = belief
                 self._save()
@@ -220,6 +239,13 @@ class ExperimentTaskBeta(object):
             particles_sample = particles.subsample(self._num_eval)
         elif self._eval_method == "map":
             particles_sample = particles.map_estimate(self._num_eval, log_scale=False)
+
+        ## Set risk averse parameter
+        print(f"Risk averse mode {self._risk_averse}")
+        particles_sample.risk_averse = self._risk_averse
+
+        # import pdb; pdb.set_trace()
+        particles_sample.compute_tasks(self._eval_tasks)
         self._eval_server.compute_tasks(
             "Evaluation", particles_sample, self._eval_tasks, verbose=True
         )

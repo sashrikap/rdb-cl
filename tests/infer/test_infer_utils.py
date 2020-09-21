@@ -9,6 +9,7 @@ from rdb.infer.utils import *
 from rdb.optim.utils import *
 from rdb.exps.utils import Profiler
 from rdb.optim.mpc import build_mpc
+from rdb.optim.mpc_risk import build_risk_averse_mpc
 from rdb.optim.runner import Runner
 
 
@@ -129,9 +130,76 @@ optimizer, runner = build_mpc(
     # test_mode=True,
 )
 
+optimizer_risk, _ = build_risk_averse_mpc(
+    env,
+    main_car.cost_runtime,
+    T,
+    env.dt,
+    replan=False,
+    T=10,
+    engine="jax",
+    method="adam",
+    # test_mode=True,
+)
+
 
 @pytest.mark.parametrize("num_weights", [5, 1, 10, 20])
-def test_collect_trajs(num_weights):
+def ttest_collect_trajs(num_weights):
+    key = random.PRNGKey(0)
+    tasks = random_choice(key, env.all_tasks, num_weights)
+    states = env.get_init_states(tasks)
+
+    weights = []
+    for _ in range(num_weights):
+        w = {}
+        for key in env.features_keys:
+            w[key] = onp.random.random()
+        weights.append(w)
+    weights = DictList(weights)
+
+    nfeatures = len(env.features_keys)
+    nvios = len(env.constraints_keys)
+    weights_arr = weights.prepare(env.features_keys).numpy_array()
+
+    import pdb
+
+    pdb.set_trace()
+    last_actions, last_costs, last_feats, last_feats_sum, last_vios = (
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+
+    for max_batch in [1, 2, 8]:
+        trajs = collect_trajs(
+            weights_arr, states, optimizer, runner, max_batch=max_batch
+        )
+        udim = 2
+        assert trajs["actions"].shape == (num_weights, T, udim)
+        assert trajs["costs"].shape == (num_weights,)
+        assert trajs["feats"].shape == (num_weights, T)
+        assert trajs["feats"].num_keys == nfeatures
+        assert trajs["feats_sum"].shape == (num_weights,)
+        assert trajs["feats_sum"].num_keys == nfeatures
+        assert trajs["violations"].shape == (num_weights, T)
+        assert trajs["violations"].num_keys == nvios
+        if last_actions is not None:
+            assert np.allclose(trajs["actions"], last_actions)
+            assert np.allclose(trajs["costs"], last_costs)
+            assert_equal(trajs["feats"], last_feats)
+            assert_equal(trajs["feats_sum"], last_feats_sum)
+            assert_equal(trajs["violations"], last_vios)
+        last_actions = trajs["actions"]
+        last_costs = trajs["costs"]
+        last_feats = trajs["feats"]
+        last_feats_sum = trajs["feats_sum"]
+        last_vios = trajs["violations"]
+
+
+@pytest.mark.parametrize("num_weights", [5, 1, 10, 20])
+def test_collect_trajs_risk(num_weights):
     key = random.PRNGKey(0)
     tasks = random_choice(key, env.all_tasks, num_weights)
     states = env.get_init_states(tasks)
@@ -156,9 +224,9 @@ def test_collect_trajs(num_weights):
         None,
     )
 
-    for max_batch in [1, 2, 8]:
+    for max_batch in [2, 1, 8]:
         trajs = collect_trajs(
-            weights_arr, states, optimizer, runner, max_batch=max_batch
+            weights_arr, states, optimizer_risk, runner, max_batch=max_batch
         )
         udim = 2
         assert trajs["actions"].shape == (num_weights, T, udim)

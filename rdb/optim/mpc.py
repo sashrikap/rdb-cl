@@ -167,6 +167,7 @@ def build_mpc(
     name="",
     test_mode=False,
     add_bias=True,
+    support_batch=True,
     build_costs=build_costs,
     cost_args={},
 ):
@@ -237,6 +238,7 @@ def build_mpc(
         replan=replan,
         T=T,
         features_keys=env.features_keys,
+        support_batch=support_batch,
         method=method,
         name=name,
         test_mode=test_mode,

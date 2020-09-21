@@ -21,10 +21,12 @@ class ParticleWorkerSingle(object):
         self._env = env_fn()
         self._controller, self._runner = controller_fn(self._env, "Eval Worker")
         self._compute_result = None
-        self._initialized = False
+        self._initialized = True
         self._max_batch = max_batch
 
     def initialize(self):
+        if self._initialized:
+            return
         self._env.reset()
         temp_w = dict()
         for key in self._env.features_keys:

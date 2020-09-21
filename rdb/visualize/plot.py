@@ -131,8 +131,8 @@ def plot_weights_2d(
 
     weights_dicts = weights_dicts.log() if not log_scale else weights_dicts
 
-    for i, key_i in enumerate(keys):
-        for j, key_j in enumerate(keys):
+    for i, key_i in enumerate(keys):  # row
+        for j, key_j in enumerate(keys):  # col
             if i == nkeys - 1:
                 axs[i, j].set_xlabel(key_j, fontsize=18)
             if j == 0:
@@ -146,8 +146,8 @@ def plot_weights_2d(
             values_i = weights_dicts[key_i]
             values_j = weights_dicts[key_j]
             axs[i, j].plot(
-                values_i,
                 values_j,
+                values_i,
                 "^",
                 # color=weights_color,
                 # facecolor=color,

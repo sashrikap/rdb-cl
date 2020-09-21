@@ -38,6 +38,7 @@ class OptimizerMPC(object):
         method="lbfgs",
         name="",
         test_mode=False,
+        support_batch=True,
     ):
         """Construct Optimizer.
 
@@ -53,6 +54,7 @@ class OptimizerMPC(object):
                 input us flatten by scipy
             replan (int): replan interval, < 0 if no replan
             T (int): only in replan mode, plan for longer length than horizon
+            support_batch (bool): optimizer supports batch optimization
 
         Example:
             >>> # No initialization
@@ -70,6 +72,8 @@ class OptimizerMPC(object):
         self._features_keys = list(features_keys) + ["bias"]
         self._replan = replan
         self._horizon = horizon
+        self._support_batch = support_batch
+
         self._T = T
         self._name = name
         self._method = method
@@ -167,7 +171,9 @@ class OptimizerMPC(object):
             x0 (ndarray), initial state
                 shape (nbatch, xdim)
             weights (dict/DictList), weights
-                shape nfeats * (nbatch,)
+                shape nfeats * (nbatch,, ...)
+            weights_arr (ndarray)
+                shape (nfeats, nbatch)
             us0 (ndarray), initial actions
                 shape (nbatch, T, xdim)
             batch (bool), batch mode. If `true`, weights and output are batched
@@ -178,76 +184,95 @@ class OptimizerMPC(object):
 
         """
         if weights_arr is None:
+            ## Regular planning (nfeats, nbatch)
+            ## Risk-averse planning (nfeats, nbatch, nweights)
             weights_arr = (
                 DictList(weights, expand_dims=not batch, jax=jax)
                 .prepare(self._features_keys)
                 .numpy_array()
             )
-        assert len(weights_arr.shape) == 2
+        assert (
+            len(weights_arr.shape) == 2 or len(weights_arr.shape) == 3
+        ), f"Got shape {weights_arr.shape}"
         assert len(x0.shape) == 2
         n_batch = len(x0)
-
-        # Track JIT recompile
-        t_compile = None
-        u_shape = (n_batch, self._horizon, self._udim)
-        if self._u_shape is None:
-            print(f"JIT - Controller <{self._name}>")
-            print(f"JIT - Controller first compile: u0 {u_shape}")
-            self._u_shape = u_shape
-            t_compile = time.time()
-        elif u_shape != self._u_shape:
-            print(f"JIT - Controller <{self._name}>")
-            print(
-                f"JIT - Controller recompile: u0 {u_shape}, previously {self._u_shape}"
-            )
-            self._u_shape = u_shape
-            t_compile = time.time()
-
-        # Initial guess
-        if us0 is None:
-            if init == "zeros":
-                us0 = np.zeros(u_shape)
-            else:
-                raise NotImplementedError(f"Initialization undefined for '{init}'")
 
         # Pytest mode
         if self._test_mode:
             return us0
-
-        # Reshape to T-first
-        us0 = us0.swapaxes(0, 1)  # (nbatch, T, u_dim) -> (T, nbatch, u_dim)
-
-        # Optimal Control
-        opt_us, xs, grad_us = [], [], []
-        x_t = x0  # initial state (nbatch, xdim)
-        for t in range(self._T):
-            if t == 0 or (self._replan > 0 and t % self._replan == 0):
-                csum_us_xt = lambda us: self.h_csum(x_t, us, weights_arr)
-                grad_us_xt = lambda us: self.h_grad_u(x_t, us, weights_arr)
-                res = self._minimize(csum_us_xt, grad_us_xt, us0)
-                # opt_us_t (T, nbatch, u_dim)
-                opt_us_t, cmin_t, grad_us_t = res["us"], res["cost"], res["grad"]
-                # xs_t (T, nbatch, x_dim)
-                xs_t = self.h_traj(x_t, opt_us_t)
-
-            if t == 0 and t_compile is not None:
-                print(
-                    f"JIT - Controller finish compile in {time.time() - t_compile:.3f}s: u0 {self._u_shape}"
+        # Non-batch mode
+        elif n_batch > 1 and not self._support_batch:
+            all_acs = []
+            for bi in range(n_batch):
+                acs = self.__call__(
+                    x0=x0[bi : bi + 1],
+                    weights=None,
+                    batch=batch,
+                    us0=us0,
+                    weights_arr=weights_arr[:, bi],
+                    init=init,
+                    jax=jax,
                 )
-            ## Forward 1 timestep, record 1st action
-            opt_us.append(opt_us_t[0])
-            x_t = xs_t[0]
-            xs.append(x_t)
-            # grad_us.append(grad_us_t[:, 0])
+                all_acs.append(acs)
+            return np.concatenate(all_acs, axis=0)
+        else:
+            # Track JIT recompile
+            t_compile = None
+            u_shape = (n_batch, self._horizon, self._udim)
+            if self._u_shape is None:
+                print(f"JIT - Controller <{self._name}>")
+                print(f"JIT - Controller first compile: u0 {u_shape}")
+                self._u_shape = u_shape
+                t_compile = time.time()
+            elif u_shape != self._u_shape:
+                print(f"JIT - Controller <{self._name}>")
+                print(
+                    f"JIT - Controller recompile: u0 {u_shape}, previously {self._u_shape}"
+                )
+                self._u_shape = u_shape
+                t_compile = time.time()
 
-            ## Pop first timestep
-            opt_us_t = opt_us_t[1:]
-            xs_t = xs_t[1:]
-            # grad_us_t = np.delete(grad_us_t, 1, 1)
+            # Initial guess
+            if us0 is None:
+                if init == "zeros":
+                    us0 = np.zeros(u_shape)
+                else:
+                    raise NotImplementedError(f"Initialization undefined for '{init}'")
 
-        opt_us = np.stack(opt_us, axis=1)
-        # u_info = {"du": grad_us, "xs": xs, "costs": costs}
-        return opt_us
+            # Reshape to T-first
+            us0 = us0.swapaxes(0, 1)  # (nbatch, T, u_dim) -> (T, nbatch, u_dim)
+
+            # Optimal Control
+            opt_us, xs, grad_us = [], [], []
+            x_t = x0  # initial state (nbatch, xdim)
+            for t in range(self._T):
+                if t == 0 or (self._replan > 0 and t % self._replan == 0):
+                    csum_us_xt = lambda us: self.h_csum(x_t, us, weights_arr)
+                    grad_us_xt = lambda us: self.h_grad_u(x_t, us, weights_arr)
+                    res = self._minimize(csum_us_xt, grad_us_xt, us0)
+                    # opt_us_t (T, nbatch, u_dim)
+                    opt_us_t, cmin_t, grad_us_t = res["us"], res["cost"], res["grad"]
+                    # xs_t (T, nbatch, x_dim)
+                    xs_t = self.h_traj(x_t, opt_us_t)
+
+                if t == 0 and t_compile is not None:
+                    print(
+                        f"JIT - Controller finish compile in {time.time() - t_compile:.3f}s: u0 {self._u_shape}"
+                    )
+                ## Forward 1 timestep, record 1st action
+                opt_us.append(opt_us_t[0])
+                x_t = xs_t[0]
+                xs.append(x_t)
+                # grad_us.append(grad_us_t[:, 0])
+
+                ## Pop first timestep
+                opt_us_t = opt_us_t[1:]
+                xs_t = xs_t[1:]
+                # grad_us_t = np.delete(grad_us_t, 1, 1)
+
+            opt_us = np.stack(opt_us, axis=1)
+            # u_info = {"du": grad_us, "xs": xs, "costs": costs}
+            return opt_us
 
 
 class OptimizerScipy(OptimizerMPC):
@@ -275,6 +300,7 @@ class OptimizerScipy(OptimizerMPC):
         method="lbfgs",
         name="",
         test_mode=False,
+        support_batch=True,
     ):
         """Construct Optimizer.
 
@@ -316,6 +342,7 @@ class OptimizerScipy(OptimizerMPC):
             method=method,
             name=name,
             test_mode=test_mode,
+            support_batch=support_batch,
         )
         ## Rollout functions
         self.h_traj = self._scipy_wrapper(h_traj)
@@ -444,6 +471,7 @@ class OptimizerJax(OptimizerMPC):
         method="adam",
         name="",
         test_mode=False,
+        support_batch=True,
     ):
         super().__init__(
             h_traj,
@@ -458,6 +486,7 @@ class OptimizerJax(OptimizerMPC):
             method=method,
             name=name,
             test_mode=test_mode,
+            support_batch=support_batch,
         )
 
     def _minimize(self, fn, grad_fn, us0):

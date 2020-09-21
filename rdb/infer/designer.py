@@ -41,6 +41,7 @@ class Designer(object):
         num_normalizers,
         proposal_decay=1.0,
         ## Sampling
+        prior_keys=None,
         use_true_w=False,
         design_mode="independent",
         select_mode="mean",
@@ -82,6 +83,7 @@ class Designer(object):
 
         ## Sampling Prior and kernel
         self._prior_fn = prior_fn
+        self._prior_keys = prior_keys
         self._prior = None
         self._model = None
         self._task_method = task_method
@@ -218,7 +220,7 @@ class Designer(object):
                 controller=self._norm_controller,
             )
 
-    def simulate(self, tasks, save_name, tqdm_position=0):
+    def simulate(self, tasks, save_name, tqdm_position=0, universal_model=None):
         """Sample 1 set of weights from b(design_w) given true_w and prior tasks.
 
         Example:
@@ -228,6 +230,7 @@ class Designer(object):
             tasks: new environment task
                 shape (n, task_dim)
             save_name (save_name): name for saving parameters and visualizations
+            universal_model: trained network to predict expected feature counts
 
         """
         print(f"Sampling Designer (prior={len(self._prior_tasks)}): {save_name}")
@@ -270,7 +273,7 @@ class Designer(object):
         if self._normalized_key in init_params:
             del init_params[self._normalized_key]
 
-        model = self._build_model(tasks)
+        model = self._build_model(tasks, universal_model=universal_model)
         sampler = get_designer_sampler(self._sample_method, model, init_args, samp_args)
 
         self._rng_key, rng_sampler = random.split(self._rng_key, 2)
@@ -324,7 +327,7 @@ class Designer(object):
         #     raise NotImplementedError
         return particles
 
-    def _build_model(self, tasks):
+    def _build_model(self, tasks, universal_model=None):
         """Build Designer PGM model."""
 
         ## Fill in unused feature keys
@@ -335,14 +338,14 @@ class Designer(object):
         nfeats = len(feats_keys)
         nnorms = len(self._normalizer.weights)
         ntasks = len(tasks)
-        self.update_prior(self._truth.weights.keys())
+        prior_keys = (
+            self._prior_keys
+            if self._prior_keys is not None
+            else list(self._truth.weights.keys())
+        )
+        self.update_prior(prior_keys)
         #  shape (nfeats, 1)
         true_ws = self._truth.weights.prepare(feats_keys).numpy_array()
-        ## ============= Pre-empt optimiations =============
-        #  shape (nfeats, ntasks, 1)
-        true_fsum = self._truth.get_features_sum(tasks).prepare(feats_keys)
-        true_fsum = true_fsum.numpy_array()
-
         assert true_ws.shape == (nfeats, 1)
         ## Operation over tasks
         task_method = None
@@ -353,33 +356,68 @@ class Designer(object):
         else:
             raise NotImplementedError
 
-        def _model():
-            #  shape nfeats * (1,)
-            new_ws = self._prior(1).prepare(feats_keys).normalize_across_keys()
-            sample_ws = new_ws.numpy_array()
-            ## ======= Not jit-able optimization: requires scipy/jax optimizer ======
-            sample_ps = self.create_particles(
-                new_ws,
-                controller=self._sample_controller,
-                runner=self._sample_runner,
-                jax=True,
-            )
-            sample_ps.compute_tasks(tasks, jax=True)
+        if universal_model is None:
+            ## ============= Pre-empt optimiations =============
             #  shape (nfeats, ntasks, 1)
-            sample_feats_sum = sample_ps.get_features_sum(tasks).prepare(feats_keys)
-            sample_feats_sum = sample_feats_sum.numpy_array()
-            assert sample_feats_sum.shape == (nfeats, ntasks, 1)
-            #  shape (nbatch=1,)
-            true_offset = np.zeros(1)
-            #  shape (ntasks, nbatch=1,)
-            log_probs = self._likelihood(
-                true_ws, true_offset, sample_ws, sample_feats_sum, tasks, self.beta
-            )
-            #  shape (nbatch=1,)
-            log_prob = task_method(log_probs)
-            numpyro.factor("designer_log_prob", log_prob)
+            true_fsum = self._truth.get_features_sum(tasks).prepare(feats_keys)
+            true_fsum = true_fsum.numpy_array()
 
-        return _model
+            def _model():
+                #  shape nfeats * (1,)
+                new_ws = self._prior(1).prepare(feats_keys).normalize_across_keys()
+                sample_ws = new_ws.numpy_array()
+                ## ======= Not jit-able optimization: requires scipy/jax optimizer ======
+                sample_ps = self.create_particles(
+                    new_ws,
+                    controller=self._sample_controller,
+                    runner=self._sample_runner,
+                    jax=True,
+                )
+                sample_ps.compute_tasks(tasks, jax=True)
+                #  shape (nfeats, ntasks, 1)
+                sample_feats_sum = sample_ps.get_features_sum(tasks).prepare(feats_keys)
+                sample_feats_sum = sample_feats_sum.numpy_array()
+                assert sample_feats_sum.shape == (nfeats, ntasks, 1)
+                #  shape (nbatch=1,)
+                true_offset = np.zeros(1)
+                #  shape (ntasks, nbatch=1,)
+                log_probs = self._likelihood(
+                    true_ws, true_offset, sample_ws, sample_feats_sum, tasks, self.beta
+                )
+                #  shape (nbatch=1,)
+                log_prob = task_method(log_probs)
+                numpyro.factor("designer_log_prob", log_prob)
+
+            return _model
+        else:
+            import torch
+
+            def _model():
+                #  shape nfeats * (1,)
+                new_ws = self._prior(1)
+                sample_ws = new_ws.prepare(feats_keys).onp_array()
+                #  shape (1, prior nfeats)
+                sample_input = (
+                    torch.from_numpy(new_ws.onp_array()).float().permute(1, 0)
+                )
+                # TODO: currently only solves for one task
+                #  shape (1, nfeats)
+                sample_feats_sum = universal_model(sample_input)
+                sample_feats_sum = np.array(sample_feats_sum.detach().numpy()).swapaxes(
+                    1, 0
+                )[:, None]
+                assert sample_feats_sum.shape == (nfeats, ntasks, 1)
+                #  shape (nbatch=1,)
+                true_offset = np.zeros(1)
+                #  shape (ntasks, nbatch=1,)
+                log_probs = self._likelihood(
+                    true_ws, true_offset, sample_ws, sample_feats_sum, tasks, self.beta
+                )
+                #  shape (nbatch=1,)
+                log_prob = task_method(log_probs)
+                numpyro.factor("designer_log_prob", log_prob)
+
+            return _model
 
     def _build_likelihood(self):
         """Build likelihood kernel."""

@@ -178,7 +178,9 @@ def collect_trajs(
     """Utility for collecting features.
 
     Args:
-        weights_arr (ndarray): (nfeats, nbatch)
+        weights_arr (ndarray):
+            (nfeats, nbatch): regular planning
+            (nfeats, nbatch, nrisk) risk-averse plannign
         states (ndarray): initial state for the task
             shape (nbatch, xdim)
         us0 (ndarray) initial action
@@ -239,7 +241,8 @@ def collect_trajs(
                 num_pad = num_iterations * max_batch - nbatch
                 states_pad = np.zeros((num_pad, xdim))
                 states_i = np.concatenate([states_i, states_pad], axis=0)
-                weights_pad = np.ones((nfeats, num_pad))
+                # weights_pad = np.ones((nfeats, num_pad))
+                weights_pad = np.ones(weights_arr.shape[:-1] + (num_pad,))
                 weights_arr_i = np.concatenate([weights_arr_i, weights_pad], axis=1)
                 if us0_i:
                     us0_pad = np.zeros((num_pad, us0_i.shape[1]))

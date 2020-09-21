@@ -183,7 +183,7 @@ class IRDOptimalControl(object):
             if key != self._normalized_key:
                 self._prior.add_feature(key)
 
-    def _build_model(self, obs, tasks):
+    def _build_model(self, obs, tasks, universal_model=False):
         """Build IRD PGM model.
 
         Args:
@@ -210,58 +210,112 @@ class IRDOptimalControl(object):
             self.update_prior(ob.weights.keys())
             self._designer.update_prior(ob.weights.keys())
 
-        ## ==========================================
-        ## ======= Pre-empt heavy optimiations ======
-        #  shape nfeats * (ntasks,)
-        obs_ws = DictList(
-            [ob.weights.prepare(feats_keys) for ob in obs], jax=True
-        ).squeeze(1)
-        obs_ps = self.create_particles(
-            weights=obs_ws,
-            controller=self._sample_controller,
-            runner=self._sample_runner,
-        )
-        #  shape (nfeats, ntasks)
-        obs_ws = obs_ws.prepare(feats_keys).normalize_across_keys().numpy_array()
-        # obs_ws = obs_ws.prepare(feats_keys).numpy_array()
-        #  shape (nfeats, 1, ntasks)
-        obs_feats_dict = obs_ps.get_features_sum(tasks)
-        obs_feats_sum = (
-            obs_ps.get_features_sum(tasks)
-            .prepare(feats_keys)[np.diag_indices(ntasks)]
-            .expand_dims(0)
-            .numpy_array()
-        )
-        if self._mcmc_normalize == "hessian":
-            _, obs_hnorm = obs_ps.get_hessians(tasks)
+        if universal_model is None:
+            ## ==========================================
+            ## ======= Pre-empt heavy optimiations ======
+            #  shape nfeats * (ntasks,)
+            obs_ws = DictList(
+                [ob.weights.prepare(feats_keys) for ob in obs], jax=True
+            ).squeeze(1)
+            obs_ps = self.create_particles(
+                weights=obs_ws,
+                controller=self._sample_controller,
+                runner=self._sample_runner,
+            )
+            #  shape (nfeats, ntasks)
+            obs_ws = obs_ws.prepare(feats_keys).normalize_across_keys().numpy_array()
+            # obs_ws = obs_ws.prepare(feats_keys).numpy_array()
+            #  shape (nfeats, 1, ntasks)
+            obs_feats_dict = obs_ps.get_features_sum(tasks)
+            obs_feats_sum = (
+                obs_ps.get_features_sum(tasks)
+                .prepare(feats_keys)[np.diag_indices(ntasks)]
+                .expand_dims(0)
+                .numpy_array()
+            )
+            if self._mcmc_normalize == "hessian":
+                _, obs_hnorm = obs_ps.get_hessians(tasks)
 
-        #  shape (ntasks, 1, T, udim)
-        # obs_actions = obs_ps.get_actions(tasks)[np.diag_indices(ntasks)][:, None]
-        # #  shape (ntasks, dnnorms, T, udim)
-        # obs_actions_dnorm = np.repeat(obs_actions, dnnorms, axis=0)
+            #  shape (ntasks, 1, T, udim)
+            # obs_actions = obs_ps.get_actions(tasks)[np.diag_indices(ntasks)][:, None]
+            # #  shape (ntasks, dnnorms, T, udim)
+            # obs_actions_dnorm = np.repeat(obs_actions, dnnorms, axis=0)
 
-        ## ================= Prepare Designer Normalizer ================
-        # self._designer.normalizer.compute_tasks(tasks, us0=obs_actions_dnorm)
-        print(f"Computing designer normalizers: {self._designer.num_normalizers}")
-        t1 = time()
-        self._designer.normalizer.compute_tasks(tasks, max_batch=500)
-        print(f"Computing designer normalizers time {time() - t1}")
-        #  shape (nfeats, ntasks, d_nnorms)
-        designer_normal_fsum = self._designer.normalizer.get_features_sum(tasks)
-        designer_normal_fsum = designer_normal_fsum.prepare(feats_keys).numpy_array()
-        #  shape (nfeats, 1, ntasks, d_nnorms)
-        designer_normal_fsum = designer_normal_fsum[:, None]
-        #  shape (d_nnorms,)
-        designer_normal_offset = self._designer.normalizer.get_offset_by_features_sum(
-            obs_feats_dict
-        )
-        #  shape (nfeats, d_nnorms)
-        designer_normal_ws = self._designer.normalizer.weights.prepare(
-            feats_keys
-        ).numpy_array()
+            ## ================= Prepare Designer Normalizer ================
+            # self._designer.normalizer.compute_tasks(tasks, us0=obs_actions_dnorm)
+            print(f"Computing designer normalizers: {self._designer.num_normalizers}")
+            t1 = time()
+            self._designer.normalizer.compute_tasks(tasks, max_batch=500)
+            print(f"Computing designer normalizers time {time() - t1}")
+            #  shape (nfeats, ntasks, d_nnorms)
+            designer_normal_fsum = self._designer.normalizer.get_features_sum(tasks)
+            designer_normal_fsum = designer_normal_fsum.prepare(
+                feats_keys
+            ).numpy_array()
+            #  shape (nfeats, 1, ntasks, d_nnorms)
+            designer_normal_fsum = designer_normal_fsum[:, None]
+            #  shape (d_nnorms,)
+            designer_normal_offset = self._designer.normalizer.get_offset_by_features_sum(
+                obs_feats_dict
+            )
+            #  shape (nfeats, d_nnorms)
+            designer_normal_ws = self._designer.normalizer.weights.prepare(
+                feats_keys
+            ).numpy_array()
 
-        #  shape (1, ntasks, task_dim)
-        obs_tasks = tasks[None, :]
+            #  shape (1, ntasks, task_dim)
+            obs_tasks = tasks[None, :]
+        else:
+            ## ==========================================
+            ## ======= Pre-empt heavy optimiations ======
+            #  shape nfeats * (ntasks,)
+            obs_ws = DictList(
+                [ob.weights.prepare(feats_keys) for ob in obs], jax=True
+            ).squeeze(1)
+            # obs_ps = self.create_particles(
+            #     weights=obs_ws,
+            #     controller=self._sample_controller,
+            #     runner=self._sample_runner,
+            # )
+            #  shape (nfeats, ntasks)
+            obs_ws = obs_ws.prepare(feats_keys).normalize_across_keys().numpy_array()
+            #  shape (1, ws_dim)
+            obs_ws_arr = np.array(list(ob.weights.values())).T
+            #  shape (nfeats, 1, ntasks)
+            obs_feats_sum = universal_model(obs_ws_arr).T[:, None, :]
+            # obs_feats_sum = (
+            #     obs_ps.get_features_sum(tasks)
+            #     .prepare(feats_keys)[np.diag_indices(ntasks)]
+            #     .expand_dims(0)
+            #     .numpy_array()
+            # )
+            #  shape nfeats * (1, ntasks)
+            obs_feats_dict = DictList(ob.weights)
+            obs_feats_dict.from_array(obs_feats_sum)
+
+            print(f"Computing designer normalizers: {self._designer.num_normalizers}")
+            t1 = time()
+            #  shape (n_norm, ws_dim)
+            norm_ws_arr = np.array(list(self._designer.normalizer.weights.values())).T
+            ## TODO: only 1 task supported
+            norm_feats_sum = universal_model(norm_ws_arr).T[:, None, :]
+            print(f"Computing designer normalizers time {time() - t1}")
+
+            #  shape (nfeats, ntasks, d_nnorms)
+            designer_normal_fsum = norm_feats_sum
+            #  shape (nfeats, 1, ntasks, d_nnorms)
+            designer_normal_fsum = designer_normal_fsum[:, None]
+            #  shape (d_nnorms,)
+            designer_normal_offset = self._designer.normalizer.get_offset_by_features_sum(
+                obs_feats_dict
+            )
+            #  shape (nfeats, d_nnorms)
+            designer_normal_ws = self._designer.normalizer.weights.prepare(
+                feats_keys
+            ).numpy_array()
+
+            #  shape (1, ntasks, task_dim)
+            obs_tasks = tasks[None, :]
 
         assert obs_ws.shape == (nfeats, ntasks)
         assert obs_feats_sum.shape == (nfeats, 1, ntasks)
@@ -286,48 +340,72 @@ class IRDOptimalControl(object):
         else:
             raise NotImplementedError
 
-        def _model():
-            #  shape (nfeats, 1)
-            nonlocal tasks
-            nonlocal ntasks
-            nonlocal obs_feats_sum
-            nonlocal designer_ll
-            nonlocal designer_normal_ws  # shape (nfeats, d_nnorms)
-            nonlocal designer_normal_fsum
-            true_ws = self._prior(1).prepare(feats_keys)
+        if universal_model is None:
 
-            ## ======= Not jit-able optimization: requires scipy/jax optimizer ======
-            # true_ps = self.create_particles(true_ws, controller=self._sample_controller, runner=self._sample_runner)
-            # true_ps.compute_tasks(tasks, jax=True)
-            # #  shape (nfeats, ntasks, 1)
-            # true_feats_sum = true_ps.get_features_sum(tasks).prepare(feats_keys)
-            # #  shape (nfeats, 1, ntasks)
-            # true_feats_sum = true_feats_sum.numpy_array().swapaxes(1, 2)
+            def _model():
+                #  shape (nfeats, 1)
+                nonlocal tasks
+                nonlocal ntasks
+                nonlocal obs_feats_sum
+                nonlocal designer_ll
+                nonlocal designer_normal_ws  # shape (nfeats, d_nnorms)
+                nonlocal designer_normal_fsum
+                true_ws = self._prior(1).prepare(feats_keys)
 
-            # ## ======= Jit-able cheap alternative ======
-            true_feats_sum = obs_feats_sum
-            # true_ws = true_ws.numpy_array()
+                ## ======= Not jit-able optimization: requires scipy/jax optimizer ======
+                # true_ps = self.create_particles(true_ws, controller=self._sample_controller, runner=self._sample_runner)
+                # true_ps.compute_tasks(tasks, jax=True)
+                # #  shape (nfeats, ntasks, 1)
+                # true_feats_sum = true_ps.get_features_sum(tasks).prepare(feats_keys)
+                # #  shape (nfeats, 1, ntasks)
+                # true_feats_sum = true_feats_sum.numpy_array().swapaxes(1, 2)
 
-            ## Weight offset, only used when normalize mode is `offset`
-            true_offset = np.zeros(1)
+                # ## ======= Jit-able cheap alternative ======
+                true_feats_sum = obs_feats_sum
+                # true_ws = true_ws.numpy_array()
 
-            if self._mcmc_normalize == "hessian":
-                _, true_hnorm = obs_ps.get_hessians(tasks, true_ws)
-                true_hnorm /= obs_hnorm  # normalize by observation hessian sum
-                true_ws = true_ws.numpy_array() / true_hnorm
-            elif self._mcmc_normalize == "magnitude":
-                true_ws = true_ws.normalize_across_keys().numpy_array()
-            elif self._mcmc_normalize == "offset":
-                # shape (1,)
-                # true_ws = true_ws.normalize_across_keys().numpy_array()
-                true_ws = true_ws.numpy_array()
-                true_offset = -(true_ws * obs_feats_sum[:, :, -1]).sum(axis=0)
-            elif self._mcmc_normalize is None:
-                true_ws = true_ws.numpy_array()
-            else:
-                raise NotImplementedError
-            log_prob = _likelihood(true_ws, true_feats_sum, true_offset)
-            numpyro.factor("ird_log_probs", log_prob)
+                ## Weight offset, only used when normalize mode is `offset`
+                true_offset = np.zeros(1)
+
+                if self._mcmc_normalize == "hessian":
+                    _, true_hnorm = obs_ps.get_hessians(tasks, true_ws)
+                    true_hnorm /= obs_hnorm  # normalize by observation hessian sum
+                    true_ws = true_ws.numpy_array() / true_hnorm
+                elif self._mcmc_normalize == "magnitude":
+                    true_ws = true_ws.normalize_across_keys().numpy_array()
+                elif self._mcmc_normalize == "offset":
+                    # shape (1,)
+                    # true_ws = true_ws.normalize_across_keys().numpy_array()
+                    true_ws = true_ws.numpy_array()
+                    true_offset = -(true_ws * obs_feats_sum[:, :, -1]).sum(axis=0)
+                elif self._mcmc_normalize is None:
+                    true_ws = true_ws.numpy_array()
+                else:
+                    raise NotImplementedError
+                log_prob = _likelihood(true_ws, true_feats_sum, true_offset)
+                numpyro.factor("ird_log_probs", log_prob)
+
+        else:
+
+            def _model():
+                #  shape (nfeats, 1)
+                nonlocal tasks
+                nonlocal ntasks
+                nonlocal obs_feats_sum
+                nonlocal designer_ll
+                nonlocal designer_normal_ws  # shape (nfeats, d_nnorms)
+                nonlocal designer_normal_fsum
+                true_ws = self._prior(1)
+                sample_input = true_ws.numpy_array().T
+
+                # ## ======= Jit-able cheap alternative ======
+                true_feats_sum = universal_model(sample_input)
+
+                ## Weight offset, only used when normalize mode is `offset`
+                true_offset = np.zeros(1)
+                true_ws = true_ws.prepare(feats_keys).numpy_array()
+                log_prob = _likelihood(true_ws, true_feats_sum, true_offset)
+                numpyro.factor("ird_log_probs", log_prob)
 
         @jax.jit
         def _likelihood(ird_true_ws, ird_true_feats_sum, true_offset):
@@ -371,7 +449,7 @@ class IRDOptimalControl(object):
 
         return _model
 
-    def sample(self, tasks, obs, save_name, verbose=True):
+    def sample(self, tasks, obs, save_name, verbose=True, universal_model=None):
         """Sample b(w) for true weights given obs.weights.
 
         Args:
@@ -397,7 +475,7 @@ class IRDOptimalControl(object):
         samp_args = copy.deepcopy(self._sample_args)
         decay = self._proposal_decay ** (ntasks - 1)
         init_args["proposal_var"] = init_args["proposal_var"] * decay
-        ird_model = self._build_model(obs, tasks)
+        ird_model = self._build_model(obs, tasks, universal_model=universal_model)
 
         num_chains = self._sample_args["num_chains"]
         num_keys = len(self._prior.feature_keys)
@@ -432,7 +510,7 @@ class IRDOptimalControl(object):
         print(f"Sample time {time() - t1}")
 
         assert self._normalized_key not in sample_ws.keys()
-        if self._normalized_key in init_params:
+        if self._normalized_key in self._prior.feature_keys:
             sample_ws[self._normalized_key] = np.zeros(sample_ws.shape)
         sample_info = sampler.get_extra_fields(group_by_chain=True)
         sample_rates = sample_info["mean_accept_prob"][:, -1]

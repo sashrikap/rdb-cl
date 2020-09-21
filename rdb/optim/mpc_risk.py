@@ -70,7 +70,7 @@ def build_multi_costs(
         proll_cost = partial(roll_cost, x=x, us=us)
         #  shape (nweights, horizon, 1)
         all_weights = all_weights.swapaxes(0, 1)[:, :, None]
-        proll_cost(weights=all_weights[0])
+        # proll_cost(weights=all_weights[0])
         #  shape (nweights, horizon, 1)
         costs = np.array(jmap(proll_cost, all_weights))
         assert len(costs.shape) == 3
@@ -90,7 +90,7 @@ def build_multi_costs(
             cost (ndarray): (horizon, nbatch)
 
         """
-        assert len(all_weights.shape) == 2
+        assert len(all_weights.shape) == 2, f"Got shape {all_weights.shape}"
         proll_cost = partial(roll_cost, x=x, us=us)
         #  shape: (nweights, horizon, 1)
         all_weights = all_weights.swapaxes(0, 1)[:, :, None]
@@ -130,8 +130,9 @@ def build_risk_averse_mpc(
         optimizer, runner = build_risk_averse_mpc(...)
         actions = optimizer(state, weights=all_weights)
         ```
+
     """
-    return build_mpc(
+    optimizer, runner = build_mpc(
         env=env,
         f_cost=f_cost,
         horizon=horizon,
@@ -145,4 +146,7 @@ def build_risk_averse_mpc(
         add_bias=add_bias,
         build_costs=build_multi_costs,
         cost_args=cost_args,
+        support_batch=False,
     )
+
+    return optimizer, runner
