@@ -180,7 +180,7 @@ def collect_trajs(
     Args:
         weights_arr (ndarray):
             (nfeats, nbatch): regular planning
-            (nfeats, nbatch, nrisk) risk-averse plannign
+            (nfeats, nbatch, nrisk) risk-averse planning
         states (ndarray): initial state for the task
             shape (nbatch, xdim)
         us0 (ndarray) initial action
@@ -208,6 +208,8 @@ def collect_trajs(
         else:
             us0 = onp.array(us0)
         assert len(us0.shape) == 3 and len(us0) == nbatch
+
+    # import pdb; pdb.set_trace()
 
     if max_batch == -1:
         ## acs (nbatch, T, udim)
@@ -242,7 +244,10 @@ def collect_trajs(
                 states_pad = np.zeros((num_pad, xdim))
                 states_i = np.concatenate([states_i, states_pad], axis=0)
                 # weights_pad = np.ones((nfeats, num_pad))
-                weights_pad = np.ones(weights_arr.shape[:-1] + (num_pad,))
+                # shape (nfeats, nbatch, nrisk)
+                weights_pad = np.ones(
+                    weights_arr.shape[:1] + (num_pad,) + weights_arr.shape[2:]
+                )
                 weights_arr_i = np.concatenate([weights_arr_i, weights_pad], axis=1)
                 if us0_i:
                     us0_pad = np.zeros((num_pad, us0_i.shape[1]))
@@ -329,7 +334,10 @@ def collect_lowerbound_trajs(
                 num_pad = num_iterations * max_batch - nbatch
                 states_pad = np.zeros((num_pad, xdim))
                 states_i = np.concatenate([states_i, states_pad], axis=0)
-                weights_pad = np.ones((nfeats, num_pad))
+                # weights_pad = np.ones((nfeats, num_pad))
+                weights_pad = np.ones(
+                    weights_arr.shape[:1] + (num_pad,) + weights_arr.shape[2:]
+                )
                 weights_arr_i = np.concatenate([weights_arr_i, weights_pad], axis=1)
             actions_i = None
             ## xs (T, nbatch, xdim), costs (nbatch)

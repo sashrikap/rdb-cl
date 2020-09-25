@@ -54,7 +54,7 @@ def main(random_key):
         )
         return controller, runner
 
-    def ird_controller_fn(env, name=""):
+    def risk_controller_fn(env, name=""):
         if EXP_ARGS["risk_averse"]:
             controller, runner = build_risk_averse_mpc(
                 env,
@@ -74,9 +74,15 @@ def main(random_key):
             )
         return controller, runner
 
+    def ird_controller_fn(env, name=""):
+        controller, runner = build_mpc(
+            env, env.main_car.cost_runtime, dt=env.dt, name=name, **IRD_CONTROLLER_ARGS
+        )
+        return controller, runner
+
     eval_server = ParticleServer(
         env_fn,
-        ird_controller_fn,
+        risk_controller_fn,
         parallel=EVAL_ARGS["parallel"],
         normalized_key=WEIGHT_PARAMS["normalized_key"],
         weight_params=WEIGHT_PARAMS,

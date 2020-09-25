@@ -69,7 +69,7 @@ class OptimizerMPC(object):
         """
         self._xdim = xdim
         self._udim = udim
-        self._features_keys = list(features_keys) + ["bias"]
+        self._features_keys = list(features_keys)
         self._replan = replan
         self._horizon = horizon
         self._support_batch = support_batch
@@ -171,7 +171,8 @@ class OptimizerMPC(object):
             x0 (ndarray), initial state
                 shape (nbatch, xdim)
             weights (dict/DictList), weights
-                shape nfeats * (nbatch,, ...)
+                shape nfeats * (nbatch,): regular
+                shape nfeats * (nbatch, nrisk): risk averse
             weights_arr (ndarray)
                 shape (nfeats, nbatch)
             us0 (ndarray), initial actions
@@ -222,6 +223,7 @@ class OptimizerMPC(object):
             if self._u_shape is None:
                 print(f"JIT - Controller <{self._name}>")
                 print(f"JIT - Controller first compile: u0 {u_shape}")
+                print(f"JIT - Controller first compile: weights {weights_arr.shape}")
                 self._u_shape = u_shape
                 t_compile = time.time()
             elif u_shape != self._u_shape:

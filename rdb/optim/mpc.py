@@ -96,6 +96,7 @@ def build_costs(udim, horizon, roll_forward, f_cost):
         """
         vf_cost = jax.vmap(partial(f_cost, weights=weights))
         xs = roll_forward(x, us)
+        # shape (horizon, nbatch)
         costs = vf_cost(xs, us)
         return np.array(costs)
 
@@ -173,6 +174,13 @@ def build_mpc(
 ):
     """Create MPC controller based on enviroment dynamics, feature
     and a cost function provided as argument.
+
+    Usage:
+        ```
+        optimizer, runner = build_mpc(...)
+        # weights.shape nfeats * (nbatch,)
+        actions = optimizer(state, weights=weights)
+        ```
 
     Args:
         env (object): has `env.dynamics_fn`

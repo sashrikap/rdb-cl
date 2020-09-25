@@ -200,6 +200,7 @@ def ttest_collect_trajs(num_weights):
 
 @pytest.mark.parametrize("num_weights", [5, 1, 10, 20])
 def test_collect_trajs_risk(num_weights):
+    num_risks = 7
     key = random.PRNGKey(0)
     tasks = random_choice(key, env.all_tasks, num_weights)
     states = env.get_init_states(tasks)
@@ -208,7 +209,7 @@ def test_collect_trajs_risk(num_weights):
     for _ in range(num_weights):
         w = {}
         for key in env.features_keys:
-            w[key] = onp.random.random()
+            w[key] = onp.random.rand(num_risks)
         weights.append(w)
     weights = DictList(weights)
 
@@ -230,7 +231,7 @@ def test_collect_trajs_risk(num_weights):
         )
         udim = 2
         assert trajs["actions"].shape == (num_weights, T, udim)
-        assert trajs["costs"].shape == (num_weights,)
+        assert trajs["costs"].shape == (num_weights, num_risks)
         assert trajs["feats"].shape == (num_weights, T)
         assert trajs["feats"].num_keys == nfeatures
         assert trajs["feats_sum"].shape == (num_weights,)

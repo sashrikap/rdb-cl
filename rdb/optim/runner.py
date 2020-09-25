@@ -324,6 +324,9 @@ class Runner(object):
                 shape (nbatch, T, udim)
             batch (bool), batch mode. If `true`, weights are batched
                 If `false`, weights are not batched
+            weights (DictList):
+                shape: nfeats * (nbatch), regular
+                shape: nfeats * (nbatch, nrisk), risk averse
 
         Return:
             xs (ndarray): all trajectory states
@@ -381,12 +384,34 @@ class Runner(object):
 
         costs, cost_sum = None, None
         if weights_arr is not None:
+            # if len(weights_arr.shape) == 2:
+            ## Regular
             #  shape (T, nbatch,)
             costs = self._roll_costs(x0, actions, weights_arr)
             #  shape (nbatch, T,)
             costs = costs.swapaxes(0, 1)
             #  shape (nbatch, )
             cost_sum = costs.sum(axis=1)
+            # elif len(weights_arr.shape) == 3:
+            #     ## TODO: JIT speed-up
+            #     costs, cost_sum = [], []
+            #     import pdb; pdb.set_trace()
+            #     for wi in range(weights_arr.shape[2]):
+            #         weights_arr_i = weights_arr[:, :, wi]
+            #         #  shape (T, nbatch,)
+            #         costs_i = self._roll_costs(x0, actions, weights_arr_i)
+            #         #  shape (nbatch, T,)
+            #         costs_i = costs_i.swapaxes(0, 1)
+            #         #  shape (nbatch, )
+            #         cost_sum_i = costs_i.sum(axis=1)
+            #         costs.append(costs_i)
+            #         cost_sum.append(cost_sum_i)
+            #     #  shape (nbatch, nweights, T)
+            #     costs = np.array(costs).swapaxes(0, 1)
+            #     #  shape (nbatch, nweights)
+            #     cost_sum = np.array(cost_sum).swapaxes(0, 1)
+            # else:
+            #     raise NotImplementedError
 
         #  shape nfeats * (T, nbatch)
         feats = DictList(self._roll_features(x0, actions), jax=jax).prepare(

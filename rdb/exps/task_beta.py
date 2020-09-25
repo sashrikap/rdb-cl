@@ -120,6 +120,7 @@ class ExperimentTaskBeta(object):
         self._initial_tasks = None
         self._designer_proxies = {}
         self._ird_beliefs = {}
+        self._ird_obs = {}
         self._designer_eval_hist = {}
         self._ird_eval_hist = {}
 
@@ -206,6 +207,8 @@ class ExperimentTaskBeta(object):
                     universal_model=self._universal_model,
                 )
                 self._ird_beliefs[ibeta] = belief
+                self._ird_obs[ibeta] = obs
+                self._normalize_by_obs(belief, tasks, obs)
                 self._save()
             self._log_time("Simulate IRD Finished")
 
@@ -216,6 +219,27 @@ class ExperimentTaskBeta(object):
         self._log_time("Evaluate IRD Finished")
 
         return
+
+    def _normalize_by_obs(self, particles, tasks, norm_particles, method="first"):
+        """Normalize particles based on target particles.
+        Target particles are typically observations.
+
+        Args:
+            particles: Particles
+            norm_particles: list(Particles) to normalize against
+
+        """
+
+        if method == "first":
+            target_tasks = np.array([tasks[0]])
+            targets = norm_particles[0]
+            target_feats = targets.get_features_sum(target_tasks)
+            offset = particles.get_offset_by_features_sum(target_feats)
+            particles.weights = particles.weights.add_key(
+                "bias", offset
+            )  # nfeats * (nrisk, )
+        else:
+            raise NotImplementedError
 
     def _evaluate(self, eval_mode, beta, particles):
         """Evaluate weight particles on eval task.
@@ -233,6 +257,7 @@ class ExperimentTaskBeta(object):
         """
         assert eval_mode in {"designer", "ird"}
         target = self._designer_server.designer.truth
+        target.risk_averse = self._risk_averse
 
         ## Compute proxies features
         if self._eval_method == "mean":
@@ -241,11 +266,12 @@ class ExperimentTaskBeta(object):
             particles_sample = particles.map_estimate(self._num_eval, log_scale=False)
 
         ## Set risk averse parameter
-        print(f"Risk averse mode {self._risk_averse}")
+        print(f"Eval Risk averse mode {self._risk_averse}")
         particles_sample.risk_averse = self._risk_averse
 
         # import pdb; pdb.set_trace()
-        particles_sample.compute_tasks(self._eval_tasks)
+        ## TODO: bug
+        # particles_sample.compute_tasks(self._eval_tasks)
         self._eval_server.compute_tasks(
             "Evaluation", particles_sample, self._eval_tasks, verbose=True
         )

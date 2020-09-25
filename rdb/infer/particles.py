@@ -477,7 +477,7 @@ class Particles(object):
             if self._risk_averse:
                 ## Risk averse planning
                 #  - batch_states (ntasks, state_dim)
-                #  - batch_weights nfeats * (ntasks * nweights)
+                #  - batch_weights nfeats * (ntasks, nweights)
                 batch_states = states
                 batch_weights = self.weights.expand_dims(0).repeat(ntasks, axis=0)
             else:
@@ -491,6 +491,7 @@ class Particles(object):
             batch_us0 = None
             if us0 is not None:
                 batch_us0 = us0.reshape((-1, T, udim))
+
             batch_weights_arr = batch_weights.prepare(feats_keys).numpy_array()
             batch_trajs = collect_trajs(
                 batch_weights_arr,
@@ -511,19 +512,31 @@ class Particles(object):
             )
             if self._risk_averse:
                 batch_trajs["actions"] = np.repeat(
-                    batch_trajs["actions"].expand_dims(1), nweights
+                    np.expand_dims(batch_trajs["actions"], 1), nweights, axis=1
                 )
                 batch_trajs["costs"] = np.repeat(
-                    batch_trajs["costs"].expand_dims(1), nweights
+                    np.expand_dims(batch_trajs["costs"], 1), nweights, axis=1
                 )
-                batch_trajs["feats"] = np.repeat(
-                    batch_trajs["feats"].expand_dims(1), nweights
+                lower_trajs["costs"] = np.repeat(
+                    np.expand_dims(lower_trajs["costs"], 1), nweights, axis=1
                 )
-                batch_trajs["feats_sum"] = np.repeat(
-                    batch_trajs["feats_sum"].expand_dims(1), nweights
+                batch_trajs["feats"] = (
+                    batch_trajs["feats"].expand_dims(1).repeat(nweights, axis=1)
                 )
-                batch_trajs["violations"] = np.repeat(
-                    batch_trajs["violations"].expand_dims(1), nweights
+                lower_trajs["feats"] = (
+                    lower_trajs["feats"].expand_dims(1).repeat(nweights, axis=1)
+                )
+                batch_trajs["feats_sum"] = (
+                    batch_trajs["feats_sum"].expand_dims(1).repeat(nweights, axis=1)
+                )
+                lower_trajs["feats_sum"] = (
+                    lower_trajs["feats_sum"].expand_dims(1).repeat(nweights, axis=1)
+                )
+                batch_trajs["violations"] = (
+                    batch_trajs["violations"].expand_dims(1).repeat(nweights, axis=1)
+                )
+                lower_trajs["violations"] = (
+                    lower_trajs["violations"].expand_dims(1).repeat(nweights, axis=1)
                 )
             #  shape (ntasks, nweights, T, acs_dim)
             all_actions = batch_trajs["actions"].reshape((ntasks, nweights, T, udim))

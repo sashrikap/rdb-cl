@@ -176,11 +176,18 @@ class ParticleServer(object):
         nfeats = len(self._env.features_keys)
         task_dim = tasks.shape[1]
         state_dim = states.shape[1]
-        #  batch_states: (ntasks * nweights, state_dim)
-        #  batch_weights: nfeats * (ntasks * nweights)
-        batch_states, batch_weights = cross_product(
-            states, particles.weights, onp.array, DictList
-        )
+
+        if particles.risk_averse:
+            #  batch_states: (ntasks, state_dim)
+            #  batch_weights: nfeats * (ntasks, nweights)
+            batch_states = states
+            batch_weights = particles.weights.expand_dims(0).repeat(ntasks, axis=0)
+        else:
+            #  batch_states: (ntasks * nweights, state_dim)
+            #  batch_weights: nfeats * (ntasks * nweights)
+            batch_states, batch_weights = cross_product(
+                states, particles.weights, onp.array, DictList
+            )
         batch_weights = batch_weights.prepare(self._env.features_keys)
 
         t_start = time.time()
@@ -220,6 +227,11 @@ class ParticleServer(object):
         for key, val in result.items():
             val_shape = val.shape
             #   shape (ntasks, nweights, ...)
+            if particles.risk_averse:
+                if type(val) == DictList:
+                    val = val.expand_dims(1).repeat(nweights, axis=1)
+                else:
+                    val = np.repeat(np.expand_dims(val, axis=1), nweights, axis=1)
             result[key] = val.reshape((ntasks, nweights) + val_shape[1:])
         particles.merge_bulk_tasks(tasks, result)
 
