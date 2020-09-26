@@ -83,11 +83,12 @@ class DictList(dict):
                 self._jax = data._jax
             # Ensure every value is stored as array
             new_data = OrderedDict()
-            if expand_dims:
-                data = self._expand_dict(data)
             for key, val in data.items():
-                val = self._np.array(val)
-                assert len(val.shape) > 0
+                if expand_dims:
+                    val = self._np.array([val])
+                else:
+                    val = self._np.array(val)
+                assert len(val.shape) > 0, f"Invalid val {val}"
                 new_data[key] = val
             super().__init__(new_data)
         elif (
@@ -96,10 +97,13 @@ class DictList(dict):
             or isinstance(data, onp.ndarray)
             or isinstance(data, np.ndarray)
         ):
-            if expand_dims:
-                data = [self._expand_dict(d) for d in data]
             data = self._stack_dict_by_keys(data)
-            super().__init__(data)
+            new_data = OrderedDict()
+            for key, val in data.items():
+                if expand_dims:
+                    val = self._np.array([val])
+                new_data[key] = val
+            super().__init__(new_data)
         else:
             raise NotImplementedError
         self._assert_shape()
@@ -108,20 +112,21 @@ class DictList(dict):
         """Utility function."""
         if len(dicts) == 0:
             return OrderedDict()
-        else:
-            assert all([isinstance(d, dict) for d in dicts])
+        elif all([isinstance(d, dict) for d in dicts]):
             keys = dicts[0].keys()
             out = OrderedDict()
             for key in keys:
                 out[key] = self._np.stack([d[key] for d in dicts])
             return out
+        else:
+            return DictList([DictList(d) for d in dicts])
 
-    def _expand_dict(self, dict_):
-        """Utility function."""
-        out = OrderedDict()
-        for key, val in dict_.items():
-            out[key] = self._np.array([val])
-        return out
+    # def _expand_dict(self, dict_):
+    #     """Utility function."""
+    #     out = OrderedDict()
+    #     for key, val in dict_.items():
+    #         out[key] = self._np.array([val])
+    #     return out
 
     def __len__(self):
         lens = onp.array([len(val) for val in self.values()])
@@ -446,13 +451,13 @@ class DictList(dict):
                 if ndarray, use directly.
 
         Note:
-            - If key already exists, does nothing
+            - If key already exists, overrides
 
         """
         shape = self.shape
         new_data = self.copy()
-        if key in self:
-            return self
+        # if key in self:
+        #     return self
         if isinstance(value, list) or isinstance(value, self._np.ndarray):
             value = new_data._np.array(value)
             assert value.shape == shape

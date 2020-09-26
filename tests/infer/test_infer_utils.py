@@ -130,7 +130,7 @@ optimizer, runner = build_mpc(
     # test_mode=True,
 )
 
-optimizer_risk, _ = build_risk_averse_mpc(
+optimizer_risk, runner_risk = build_risk_averse_mpc(
     env,
     main_car.cost_runtime,
     T,
@@ -161,9 +161,6 @@ def ttest_collect_trajs(num_weights):
     nvios = len(env.constraints_keys)
     weights_arr = weights.prepare(env.features_keys).numpy_array()
 
-    import pdb
-
-    pdb.set_trace()
     last_actions, last_costs, last_feats, last_feats_sum, last_vios = (
         None,
         None,
@@ -199,8 +196,8 @@ def ttest_collect_trajs(num_weights):
 
 
 @pytest.mark.parametrize("num_weights", [5, 1, 10, 20])
-def test_collect_trajs_risk(num_weights):
-    num_risks = 7
+@pytest.mark.parametrize("num_risks", [7, 1])
+def test_collect_trajs_risk(num_weights, num_risks):
     key = random.PRNGKey(0)
     tasks = random_choice(key, env.all_tasks, num_weights)
     states = env.get_init_states(tasks)
@@ -217,6 +214,8 @@ def test_collect_trajs_risk(num_weights):
     nvios = len(env.constraints_keys)
     weights_arr = weights.prepare(env.features_keys).numpy_array()
 
+    assert weights_arr.shape == (nfeatures, num_weights, num_risks)
+
     last_actions, last_costs, last_feats, last_feats_sum, last_vios = (
         None,
         None,
@@ -227,7 +226,7 @@ def test_collect_trajs_risk(num_weights):
 
     for max_batch in [2, 1, 8]:
         trajs = collect_trajs(
-            weights_arr, states, optimizer_risk, runner, max_batch=max_batch
+            weights_arr, states, optimizer_risk, runner_risk, max_batch=max_batch
         )
         udim = 2
         assert trajs["actions"].shape == (num_weights, T, udim)

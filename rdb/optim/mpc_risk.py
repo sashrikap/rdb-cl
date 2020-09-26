@@ -13,7 +13,69 @@ import jax.numpy as np
 from jax.lax import map as jmap
 from jax.scipy.special import logsumexp
 from functools import partial
-from rdb.optim.mpc import build_mpc
+from rdb.infer import *
+from rdb.optim.mpc import FiniteHorizonMPC, build_mpc
+
+
+# =====================================================
+# ===================== MPC Class =====================
+# =====================================================
+
+
+class RiskAverseMPC(FiniteHorizonMPC):
+    def __call__(
+        self,
+        x0,
+        weights,
+        us0=None,
+        batch=True,
+        weights_arr=None,
+        init="zeros",
+        jax=False,
+    ):
+        """Run Optimizer.
+
+        Args:
+            x0 (ndarray), initial state
+                shape (nbatch, xdim)
+            weights (dict/DictList), weights
+                shape nfeats * (nrisk): non-batch, risk averse
+                shape nfeats * (nbatch, nrisk): batch risk averse
+            weights_arr (ndarray)
+                shape (nfeats, nbatch, nrisk): risk averse
+            us0 (ndarray), initial actions
+                shape (nbatch, T, xdim)
+            output are batched
+
+        Output:
+            acs (ndarray): actions
+                shape (nbatch, T, udim)
+
+        """
+        if weights_arr is None:
+            ## Risk-averse planning (nfeats, nbatch, nweights)
+            weights_arr = (
+                DictList(weights, expand_dims=not batch, jax=jax)
+                .prepare(self._features_keys)
+                .numpy_array()
+            )
+        assert len(weights_arr.shape) == 3, f"Got shape {weights_arr.shape}"
+
+        # Initial guess
+        n_batch = len(x0)
+        u_shape = (n_batch, self._horizon, self._udim)
+        if us0 is None:
+            if init == "zeros":
+                us0 = np.zeros(u_shape)
+            else:
+                raise NotImplementedError(f"Initialization undefined for '{init}'")
+        us_opt = self._plan(x0, us0, weights_arr)
+        return us_opt
+
+
+# =====================================================
+# =========== Utility functions for rollout ===========
+# =====================================================
 
 
 def build_multi_costs(
@@ -126,6 +188,11 @@ def build_multi_costs(
         raise NotImplementedError
 
 
+# =====================================================
+# =================== Build Function ==================
+# =====================================================
+
+
 def build_risk_averse_mpc(
     env,
     f_cost,
@@ -138,19 +205,20 @@ def build_risk_averse_mpc(
     name="",
     test_mode=False,
     add_bias=True,
+    mpc_cls=RiskAverseMPC,
     cost_args={},
 ):
     """Create Risk Averse MPC
 
     Usage:
         ```
-        optimizer, runner = build_risk_averse_mpc(...)
+        controller, runner = build_risk_averse_mpc(...)
         # weights.shape nfeats * (nbatch, nrisk)
-        actions = optimizer(state, weights=all_weights)
+        actions = controller(state, weights=all_weights)
         ```
 
     """
-    optimizer, runner = build_mpc(
+    controller, runner = build_mpc(
         env=env,
         f_cost=f_cost,
         horizon=horizon,
@@ -163,8 +231,9 @@ def build_risk_averse_mpc(
         test_mode=test_mode,
         add_bias=add_bias,
         build_costs=build_multi_costs,
+        mpc_cls=mpc_cls,
         cost_args=cost_args,
         support_batch=True,
     )
 
-    return optimizer, runner
+    return controller, runner

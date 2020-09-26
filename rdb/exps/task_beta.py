@@ -233,8 +233,8 @@ class ExperimentTaskBeta(object):
         if method == "first":
             target_tasks = np.array([tasks[0]])
             targets = norm_particles[0]
-            target_feats = targets.get_features_sum(target_tasks)
-            offset = particles.get_offset_by_features_sum(target_feats)
+            target_feats = targets.get_features(target_tasks)
+            offset = particles.get_offset_by_features(target_feats)
             particles.weights = particles.weights.add_key(
                 "bias", offset
             )  # nfeats * (nrisk, )

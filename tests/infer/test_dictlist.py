@@ -1,5 +1,6 @@
 from rdb.infer.dictlist import *
 from collections import OrderedDict
+import pytest
 import numpy as onp
 import jax.numpy as np
 
@@ -7,6 +8,28 @@ import jax.numpy as np
 def assert_equal(dicta, dictb):
     for key in dicta.keys():
         assert np.allclose(dicta[key], dictb[key])
+
+
+@pytest.mark.parametrize("d1", [1, 4, 5])
+@pytest.mark.parametrize("d2", [2, 3, 4])
+def test_multi_list_init(d1, d2):
+    ## Multiple list
+    data = [{"a": 1, "b": 1}] * d1
+    # w = DictList([data] * d2)
+    # assert w.shape == (d2, d1)
+    # assert w.num_keys == 2
+
+    w = DictList([data] * d2, expand_dims=True)
+    assert w.shape == (1, d2, d1)
+    assert w.num_keys == 2
+
+
+def test_single_list_init():
+    ## Single list
+    data = [{"a": 1, "b": 1}, {"a": 1, "b": 2}]
+    w = DictList(data)
+    assert w.shape == (2,)
+    assert w.num_keys == 2
 
 
 def test_dict_init():
@@ -374,16 +397,14 @@ def test_dot_product():
 
 def test_add_key():
     dict_ = DictList({"a": [1, 2], "b": [1, 3]}, jax=False)
-    dict_ = dict_.add_key("c", [1, 2])
+    new_dict = dict_.add_key("c", [1, 2])
     results = {"a": [1, 2], "b": [1, 3], "c": [1, 2]}
-    assert_equal(dict_, results)
+    assert_equal(new_dict, results)
 
-    dict_ = DictList({"a": [1, 2], "b": [1, 3]}, jax=False)
-    dict_ = dict_.add_key("c", 1)
+    new_dict = dict_.add_key("c", 1)
     results = {"a": [1, 2], "b": [1, 3], "c": [1, 1]}
-    assert_equal(dict_, results)
+    assert_equal(new_dict, results)
 
-    dict_ = DictList({"a": [1, 2], "b": [1, 3]}, jax=False)
-    dict_ = dict_.add_key("b", 1)
-    results = {"a": [1, 2], "b": [1, 3]}
-    assert_equal(dict_, results)
+    new_dict = dict_.add_key("b", 1)
+    results = {"a": [1, 2], "b": [1, 1]}
+    assert_equal(new_dict, results)

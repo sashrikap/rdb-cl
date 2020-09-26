@@ -336,28 +336,31 @@ class Particles(object):
             all_feats_sum.append(feats_sum)
         return DictList(all_feats_sum)
 
-    def get_offset_by_features_sum(self, feats_dict, task_idx=-1):
-        """Compute the feature offsets of current particle, based on sum of feature counts.
+    def get_offset_by_features(self, feats_dict, task_idx=-1):
+        """Compute the feature offsets of current particle, based on step-wise feature counts.
 
         Args:
-            feats_sum (DictList): (nfeats, n_tasks, nparticles)
+            feats_dict (DictList): (nfeats, ntasks, nparticles, T)
         Note:
-            * Only select the last task in feats_sum: feats_sum[:, -1]
+            * Only select the last task in feats_dict: feats_dict[:, -1]
 
         Return:
             offset (ndarray): (nparticles,)
 
         """
         feats_keys = self._env.features_keys
-        #  shape (nfeats, nparticles, 1)
-        feats_sum = feats_dict.prepare(feats_keys).numpy_array()
-        assert len(feats_sum) == len(feats_keys)
-        #  shape (nfeats, 1)
-        that_feats_sum = feats_sum[:, task_idx]
-        #  shape (nfeats, nparticles)
-        weights = self._weights.prepare(feats_keys).numpy_array()
-        #  shape (nparticles,)
-        that_rews = (weights * that_feats_sum).sum(axis=0)
+        #  shape (nfeats, ntasks, nparticles, T)
+        feats_arr = feats_dict.prepare(feats_keys).numpy_array()
+        assert len(feats_arr) == len(feats_keys)
+
+        #  shape (nfeats, 1, T)
+        that_feats_arr = feats_arr[:, task_idx]
+        T = that_feats_arr.shape[-1]
+
+        #  shape nfeats * (nparticles, T)
+        weights = self._weights.prepare(feats_keys).expand_dims(1).repeat(T, axis=1)
+        #  shape (nparticles, 1), avg across timestep
+        that_rews = (weights.numpy_array() * that_feats_arr).sum(axis=0).mean(axis=1)
         return -1 * that_rews
 
     def get_hessians(self, tasks, weights=None):
@@ -1102,7 +1105,7 @@ class Particles(object):
             comparisons = self.compare_with(task, target)
             diff_rews.append(comparisons["rews"])
             diff_vios.append(comparisons["vios"])
-        # Dims: (n_tasks, nbatch,) -> (n_tasks,)
+        # Dims: (ntasks, nbatch,) -> (ntasks,)
         diff_rews = onp.array(diff_rews).mean(axis=1)
         diff_vios = onp.array(diff_vios).mean(axis=1)
         # Ranking violations and performance (based on violation)

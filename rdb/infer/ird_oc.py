@@ -254,10 +254,6 @@ class IRDOptimalControl(object):
             ).numpy_array()
             #  shape (nfeats, 1, ntasks, d_nnorms)
             designer_normal_fsum = designer_normal_fsum[:, None]
-            #  shape (d_nnorms,)
-            designer_normal_offset = self._designer.normalizer.get_offset_by_features_sum(
-                obs_feats_dict
-            )
             #  shape (nfeats, d_nnorms)
             designer_normal_ws = self._designer.normalizer.weights.prepare(
                 feats_keys
@@ -305,10 +301,6 @@ class IRDOptimalControl(object):
             designer_normal_fsum = norm_feats_sum
             #  shape (nfeats, 1, ntasks, d_nnorms)
             designer_normal_fsum = designer_normal_fsum[:, None]
-            #  shape (d_nnorms,)
-            designer_normal_offset = self._designer.normalizer.get_offset_by_features_sum(
-                obs_feats_dict
-            )
             #  shape (nfeats, d_nnorms)
             designer_normal_ws = self._designer.normalizer.weights.prepare(
                 feats_keys

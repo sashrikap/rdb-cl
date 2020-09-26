@@ -20,10 +20,10 @@ DESIGNER_CONTROLLER_ARGS:
 SAVE_NAME: 200905
 # EXP_NAME: universal_simplified_joint_init1v1_2000
 # EXP_NAME: universal_simplified_joint_init1v1_2000_eval_risk
-# EXP_NAME: universal_simplified_joint_init1v1_2000_old_eval_mean
+EXP_NAME: universal_simplified_joint_init1v1_2000_old_eval_mean
 # EXP_NAME: universal_simplified_joint_init1v1_2000_uni_eval_mean
 # EXP_NAME: universal_simplified_joint_init1v1_2000_old_eval_risk
-EXP_NAME: universal_simplified_joint_init1v1_2000_uni_eval_risk
+# EXP_NAME: universal_simplified_joint_init1v1_2000_uni_eval_risk
 # EXP_NAME: universal_simplified_joint_init1v1_no
 
 
@@ -41,10 +41,10 @@ EXP_ARGS:
   designer_betas: []
   # ird_betas: [1]
   ird_betas: [1, 5, 10, 50]
-  universal_model: model_v01/model_v01_02000.npz
-  # universal_model: null
-  risk_averse: True
-  # risk_averse: False
+  # universal_model: model_v01/model_v01_02000.npz
+  universal_model: null
+  # risk_averse: True
+  risk_averse: False
 ## Designer Settigns
 DESIGNER_ARGS:
   task_method: mean

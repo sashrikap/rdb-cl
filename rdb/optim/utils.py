@@ -139,12 +139,9 @@ def weigh_funcs_runtime(funcs_dict):
         output = 0.0
         for fn, w in zip(funcs_list, weights):
             val = fn(*args)
-            try:
-                assert w.shape == val.shape, "Weight shape mismatches value shape"
-            except:
-                import pdb
-
-                pdb.set_trace()
+            assert (
+                w.shape == val.shape
+            ), f"Weight shape mismatches value shape: {w.shape}, {val.shape}"
             output += w * val
         return output
 

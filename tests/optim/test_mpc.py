@@ -26,7 +26,7 @@ weights = {
     "speed": 0.05,
     "control": 0.1,
 }
-optimizer, runner = build_mpc(
+controller, runner = build_mpc(
     env,
     main_car.cost_runtime,
     horizon,
@@ -36,7 +36,7 @@ optimizer, runner = build_mpc(
     engine="scipy",
     method="lbfgs",
 )
-adam_optimizer, _ = build_mpc(
+adam_controller, _ = build_mpc(
     env,
     main_car.cost_runtime,
     horizon,
@@ -46,7 +46,7 @@ adam_optimizer, _ = build_mpc(
     engine="jax",
     method="adam",
 )
-momt_optimizer, _ = build_mpc(
+momt_controller, _ = build_mpc(
     env,
     main_car.cost_runtime,
     horizon,
@@ -65,20 +65,20 @@ def get_init_states(nbatch):
     return states
 
 
-def run_single(states, optimizer, weights):
+def run_single(states, controller, weights):
     costs_single = []
     for state_i in states:
         state_i = state_i[None, :]
-        acs_i = optimizer(state_i, weights=weights, batch=False)
+        acs_i = controller(state_i, weights=weights, batch=False)
         traj_i, cost_i, info_i = runner(state_i, acs_i, weights=weights, batch=False)
         costs_single.append(cost_i)
     costs_single = onp.concatenate(costs_single)
     return costs_single
 
 
-def run_batch(states, optimizer, weights):
+def run_batch(states, controller, weights):
     weights_all = [weights] * len(states)
-    acs_all = optimizer(states, weights=weights_all)
+    acs_all = controller(states, weights=weights_all)
     traj_all, costs_all, info_all = runner(
         states, acs_all, weights=weights_all, batch=True
     )
@@ -89,9 +89,9 @@ def run_batch(states, optimizer, weights):
 def test_lbfgs_lbfgs(nbatch):
     states = get_init_states(nbatch)
     ## Single
-    costs_single = run_single(states, optimizer, weights)
+    costs_single = run_single(states, controller, weights)
     ## Batch
-    costs_batch = run_batch(states, optimizer, weights)
+    costs_batch = run_batch(states, controller, weights)
     print(f"Nbatch {nbatch}")
     ## Only check if batch is worse than single
     abs_diff = onp.maximum(costs_batch - costs_single, 0)
@@ -107,9 +107,9 @@ def test_lbfgs_lbfgs(nbatch):
 def test_adam_lbfgs(nbatch):
     states = get_init_states(nbatch)
     ## Single
-    costs_single = run_single(states, optimizer, weights)
+    costs_single = run_single(states, controller, weights)
     ## Batch
-    costs_batch = run_batch(states, adam_optimizer, weights)
+    costs_batch = run_batch(states, adam_controller, weights)
     print(f"Nbatch {nbatch}")
     ## Only check if batch is worse than single
     abs_diff = onp.maximum(costs_batch - costs_single, 0)
@@ -122,12 +122,12 @@ def test_adam_lbfgs(nbatch):
 
 
 @pytest.mark.parametrize("nbatch", [1, 2, 5])
-def ttest_adam_adam(nbatch):
+def test_adam_adam(nbatch):
     states = get_init_states(nbatch)
     ## Single
-    costs_single = run_single(states, adam_optimizer, weights)
+    costs_single = run_single(states, adam_controller, weights)
     ## Batch
-    costs_batch = run_batch(states, adam_optimizer, weights)
+    costs_batch = run_batch(states, adam_controller, weights)
     print(f"Nbatch {nbatch}")
     ## Only check if batch is worse than single
     abs_diff = onp.maximum(costs_batch - costs_single, 0)
@@ -143,9 +143,9 @@ def ttest_adam_adam(nbatch):
 def test_momentum_lbfgs(nbatch):
     states = get_init_states(nbatch)
     ## Single
-    costs_single = run_single(states, optimizer, weights)
+    costs_single = run_single(states, controller, weights)
     ## Batch
-    costs_batch = run_batch(states, momt_optimizer, weights)
+    costs_batch = run_batch(states, momt_controller, weights)
     print(f"Nbatch {nbatch}")
     ## Only check if batch is worse than single
     abs_diff = onp.maximum(costs_batch - costs_single, 0)
@@ -161,7 +161,7 @@ def test_momentum_lbfgs(nbatch):
 def test_scipy_mpc(nbatch):
     states = get_init_states(nbatch)
     weights_all = [weights] * nbatch
-    acs_all = optimizer(states, weights=weights_all)
+    acs_all = controller(states, weights=weights_all)
     traj_all, costs_all, info_all = runner(
         states, acs_all, weights=weights_all, batch=True
     )
