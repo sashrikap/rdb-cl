@@ -4,7 +4,7 @@ Drive into a parking area, with other cars passing.
 
 
 import jax
-import jax.numpy as np
+import jax.numpy as jnp
 from rdb.optim.utils import *
 from rdb.envs.drive2d.core.car import *
 from rdb.envs.drive2d.core.constraints import *
@@ -29,7 +29,7 @@ class EntranceDriveWorld_Week4(EntranceDriveWorld):
     ):
         cars = []
         for state, speed in zip(car_states, car_speeds):
-            cars.append(FixSpeedCar(self, np.array(state), speed))
+            cars.append(FixSpeedCar(self, jnp.array(state), speed))
         main_car = OptimalControlCar(self, main_state, horizon)
         self.goal_speed = goal_speed
         self.goal_lane = goal_lane
@@ -54,35 +54,35 @@ class EntranceDriveWorld_Week4(EntranceDriveWorld):
 
         """
         nlr_feats_dict = OrderedDict()
-        sum_keep = partial(np.sum, keepdims=True)
+        sum_keep = partial(jnp.sum, keepdims=True)
         # Gaussian
         ncars = len(self._cars)
         nlr_feats_dict["dist_cars"] = compose(
-            np.sum,
+            jnp.sum,
             partial(
-                gaussian_feat, sigma=np.array([self._car_width / 2, self._car_length])
+                gaussian_feat, sigma=jnp.array([self._car_width / 2, self._car_length])
             ),
         )
         # Gaussian
         nlr_feats_dict["dist_lanes"] = compose(
-            np.sum,
+            jnp.sum,
             neg_feat,
             partial(gaussian_feat, sigma=self._car_length),
             partial(item_index_feat, index=self.goal_lane),
         )
         nlr_feats_dict["dist_fences"] = compose(
-            np.sum,
+            jnp.sum,
             quadratic_feat,
             neg_relu_feat,
             lambda dist: dist - (self._lane_width + self._car_length) / 2,
         )
         bound = self._control_bound
-        nlr_feats_dict["control"] = compose(np.sum, quadratic_feat)
+        nlr_feats_dict["control"] = compose(jnp.sum, quadratic_feat)
         nlr_feats_dict["speed"] = compose(
-            np.sum, partial(quadratic_feat, goal=self.goal_speed)
+            jnp.sum, partial(quadratic_feat, goal=self.goal_speed)
         )
-        nlr_feats_dict["dist_entrance"] = compose(np.sum, quadratic_feat)
-        nlr_feats_dict["dist_garage"] = compose(np.sum, quadratic_feat)
+        nlr_feats_dict["dist_entrance"] = compose(jnp.sum, quadratic_feat)
+        nlr_feats_dict["dist_garage"] = compose(jnp.sum, quadratic_feat)
         nlr_feats_dict = chain_dict_funcs(nlr_feats_dict, feats_dict)
 
         # Speed up
@@ -122,12 +122,12 @@ class Week4_01(EntranceDriveWorld_Week4):
         dt = 0.25
         control_bound = [0.5, 1.0]
         lane_width = 0.13
-        main_state = np.array([lane_width / 2, 0, np.pi / 2, main_speed])
+        main_state = jnp.array([lane_width / 2, 0, jnp.pi / 2, main_speed])
         driveway_dist = 0.8
-        car1 = np.array([-lane_width / 2, 0.3, np.pi / 2, 0])
-        car2 = np.array([-lane_width / 2, -0.3, np.pi / 2, 0])
-        car_states = np.array([car1, car2])
-        car_speeds = np.array([car_speed, car_speed])
+        car1 = jnp.array([-lane_width / 2, 0.3, jnp.pi / 2, 0])
+        car2 = jnp.array([-lane_width / 2, -0.3, jnp.pi / 2, 0])
+        car_states = jnp.array([car1, car2])
+        car_speeds = jnp.array([car_speed, car_speed])
         super().__init__(
             main_state,
             goal_speed,

@@ -33,7 +33,7 @@ from rdb.infer.utils import *
 from rdb.exps.utils import *
 from tqdm.auto import tqdm
 from jax import random
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import time
 import copy
@@ -214,14 +214,14 @@ class ExperimentActiveIRD(object):
         if self._num_eval_tasks > len(eval_env.all_tasks):
             num_eval = -1
         self._eval_tasks = random_choice(
-            self._get_rng("eval"), eval_env.all_tasks, num_eval, replacement=False
+            self._get_rng("eval"), eval_env.all_tasks, (num_eval,), replace=False
         )
         self._train_tasks = self._model.env.all_tasks
         prior_tasks = random_choice(
             self._get_rng("eval"),
             self._train_tasks,
-            self._num_prior_tasks,
-            replacement=False,
+            (self._num_prior_tasks,),
+            replace=False,
         )
         self._designer_server.set_prior_tasks(prior_tasks)
 
@@ -297,7 +297,7 @@ class ExperimentActiveIRD(object):
 
             ### Actively Task Proposal
             candidates = random_choice(
-                self._get_rng(), self._train_tasks, self._num_active_tasks
+                self._get_rng(), self._train_tasks, (self._num_active_tasks,)
             )
             self._hist_candidates.append(candidates)
             for key in active_keys:
@@ -336,7 +336,7 @@ class ExperimentActiveIRD(object):
                 tasks = random_choice(
                     self._get_rng("initial_tasks"),
                     self._train_tasks,
-                    self._num_initial_tasks,
+                    (self._num_initial_tasks,),
                 ).tolist()
                 scores = [onp.zeros(self._num_active_tasks)] * self._num_initial_tasks
             else:
@@ -357,7 +357,7 @@ class ExperimentActiveIRD(object):
         assert (
             self._num_load_design < 0
         ), "Should not propose random task if user design is provided"
-        task = random_choice(self._get_rng(), self._train_tasks, 1)[0]
+        task = random_choice(self._get_rng(), self._train_tasks, (1,))[0]
         scores = onp.zeros(self._num_active_tasks)
         return task, scores
 
@@ -388,7 +388,7 @@ class ExperimentActiveIRD(object):
             _, scores = self._propose_random_task()
             task_ids = onp.argsort(self._train_difficulties)[-1000:]
             difficult_tasks = self._train_tasks[task_ids]
-            next_task = random_choice(self._get_rng(), difficult_tasks, 1)[0]
+            next_task = random_choice(self._get_rng(), difficult_tasks, (1,))[0]
         else:
             # Compute belief features
             active_fn = self._active_fns[fn_key]
@@ -707,13 +707,13 @@ class ExperimentActiveIRD(object):
         )
         npz_path = f"{self._save_dir}/{self._exp_name}_seed_{self._rng_name}.npz"
         with open(npz_path, "wb+") as f:
-            np.savez(f, **data)
+            jnp.savez(f, **data)
         ## Save evaluation history to yaml
         npy_path = f"{self._save_dir}/{self._exp_name}_seed_{self._rng_name}.npy"
-        np.save(npy_path, self._active_eval_hist)
+        jnp.save(npy_path, self._active_eval_hist)
         ## Save active comparison to yaml
         npy_path = f"{self._save_dir}/{self._exp_name}_map_seed_{self._rng_name}.npy"
-        np.save(npy_path, self._active_map_vs_obs_hist)
+        jnp.save(npy_path, self._active_map_vs_obs_hist)
 
         if fn_key is not None:
             ## Save belief sample information
@@ -787,9 +787,9 @@ class ExperimentActiveIRD(object):
 
     def _add_evaluate_obs_to_hist(self):
         npy_path = f"{self._save_dir}/{self._exp_name}_seed_{self._rng_name}.npy"
-        self._active_eval_hist = np.load(npy_path, allow_pickle=True).item()
+        self._active_eval_hist = jnp.load(npy_path, allow_pickle=True).item()
         npz_path = f"{self._save_dir}/{self._exp_name}_seed_{self._rng_name}.npz"
-        data = np.load(npz_path, allow_pickle=True)
+        data = jnp.load(npz_path, allow_pickle=True)
         np_obs = data["curr_obs"].item()
         for key in np_obs.keys():
             self._hist_obs[key] = []
@@ -860,4 +860,4 @@ class ExperimentActiveIRD(object):
                 eval_hist[idx]["obs_perform"] = obs_avg_perform
                 eval_hist[idx]["obs_rel_violation"] = obs_avg_rel_violate
                 eval_hist[idx]["obs_rel_perform"] = obs_avg_rel_perform
-        np.save(npy_path, self._active_eval_hist)
+        jnp.save(npy_path, self._active_eval_hist)

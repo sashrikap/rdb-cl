@@ -1,4 +1,4 @@
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 from jax import random
 from tqdm import trange
@@ -44,8 +44,8 @@ def test_map(num_runs=10):
         ps.update_key(sample_key)
         ws_unif = ps.subsample(N_map).weights
         unif_means.append(ws_unif["test_map"].mean())
-    map_means = np.array(map_means)
-    unif_means = np.array(unif_means)
+    map_means = jnp.array(map_means)
+    unif_means = jnp.array(unif_means)
     print(f"Map means {map_means.mean():.3f} map std {map_means.std():.3f}")
     print(f"Uniform means {unif_means.mean():.3f} map std {unif_means.std():.3f}")
 

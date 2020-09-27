@@ -17,7 +17,7 @@ Credits:
 """
 
 import numpyro.distributions as dist
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import numpyro
 import copy
@@ -42,7 +42,6 @@ from numpyro.util import (
     not_jax_tracer,
     while_loop,
     cond,
-    copy_docs_from,
     fori_loop,
     identity,
     not_jax_tracer,
@@ -86,13 +85,13 @@ def mh_draws(state, proposal_var, rng_key=None):
     rng_key = random.PRNGKey(0) if rng_key is None else rng_key
 
     sample_val = (
-        lambda mean: random.normal(rng_key, mean.shape) * np.sqrt(proposal_var) + mean
+        lambda mean: random.normal(rng_key, mean.shape) * jnp.sqrt(proposal_var) + mean
     )
 
     return sample_val(state)
 
 
-def mh(model, proposal_var, max_val, jit=True):
+def mh(model, proposal_var, jit=True):
     r"""
     Metropolis Hasting inference.
 
@@ -162,7 +161,7 @@ def mh(model, proposal_var, max_val, jit=True):
         def _cond_fn(val):
             """while _cond_fn()."""
             (_, _, accept, _, _) = val
-            return np.logical_not(accept)
+            return jnp.logical_not(accept)
 
         def _step_mh(rng_key):
             nonlocal curr_flat
@@ -181,13 +180,10 @@ def mh(model, proposal_var, max_val, jit=True):
             next_flat, next_log_prob = _step_mh(rng_mh_step)
             # Forward logit minus last logit
             accept_log_prob = next_log_prob - curr_log_prob
-            coin_flip_prob = np.log(
+            coin_flip_prob = jnp.log(
                 random.uniform(rng_mh_sample, accept_log_prob.shape)
             )
-            feasible = np.all(
-                np.logical_and(next_flat < max_val, next_flat > -1 * max_val)
-            )
-            accept = np.logical_and(coin_flip_prob < accept_log_prob, feasible)
+            accept = coin_flip_prob < accept_log_prob
             # print("curr", curr_log_prob, "next", next_log_prob, "accept", accept_log_prob, accept)
             # import pdb; pdb.set_trace()
             return (next_flat, next_log_prob, accept, n + 1.0, rng_key)
@@ -227,7 +223,7 @@ def mh(model, proposal_var, max_val, jit=True):
         )
 
         itr = mh_state.i + 1
-        n = np.where(mh_state.i < wa_steps, itr, itr - wa_steps)
+        n = jnp.where(mh_state.i < wa_steps, itr, itr - wa_steps)
         mean_accept_prob = (
             mh_state.mean_accept_prob + (accept_prob - mh_state.mean_accept_prob) / n
         )
@@ -257,16 +253,10 @@ class MH(MCMCKernel):
     """
 
     def __init__(
-        self,
-        model=None,
-        proposal_var=None,
-        max_val=np.inf,
-        init_strategy=init_to_uniform(),
-        jit=True,
+        self, model=None, proposal_var=None, init_strategy=init_to_uniform(), jit=True
     ):
         self._model = model
         self._proposal_var = proposal_var
-        self._max_val = max_val
         self._algo = "MH"
         # Set on first call to init
         self._postprocess_fn = None
@@ -278,17 +268,17 @@ class MH(MCMCKernel):
 
     def _init_state(self, rng_key, model_args, model_kwargs):
         self._init_fn, self._sample_fn = mh(
-            self._model,
-            proposal_var=self._proposal_var,
-            max_val=self._max_val,
-            jit=self._jit,
+            self._model, proposal_var=self._proposal_var, jit=self._jit
         )
+
+    @property
+    def sample_field(self):
+        return "z"
 
     @property
     def model(self):
         return self._model
 
-    @copy_docs_from(MCMCKernel.init)
     def init(self, rng_key, num_warmup, init_params, model_args=(), model_kwargs={}):
         assert init_params, "Must provide initial parameters"
         # non-vectorized
@@ -296,7 +286,9 @@ class MH(MCMCKernel):
             rng_key, rng_key_init_model = random.split(rng_key)
         # vectorized
         else:
-            rng_key, rng_key_init_model = np.swapaxes(vmap(random.split)(rng_key), 0, 1)
+            rng_key, rng_key_init_model = jnp.swapaxes(
+                vmap(random.split)(rng_key), 0, 1
+            )
             # we need only a single key for initializing PE / constraints fn
             rng_key_init_model = rng_key_init_model[0]
         if not self._init_fn:
@@ -335,7 +327,6 @@ class MH(MCMCKernel):
             self._sample_fn = sample_fn
         return init_state
 
-    @copy_docs_from(MCMCKernel.postprocess_fn)
     def postprocess_fn(self, args, kwargs):
         if self._postprocess_fn is None:
             return identity

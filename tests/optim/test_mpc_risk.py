@@ -145,9 +145,8 @@ def test_scipy_mpc(nbatch, nweights):
     risk_weights = [[weights] * nweights] * nbatch
 
     states = get_init_states(nbatch)
-    weights_all = [risk_weights] * nbatch
-    acs_all = controller(states, weights=weights_all)
-    traj_all, costs_all, info_all = runner(states, acs_all, weights=weights_all)
+    acs_all = controller(states, weights=risk_weights)
+    traj_all, costs_all, info_all = runner(states, acs_all, weights=risk_weights)
     assert acs_all.shape == (nbatch, horizon, udim)
     assert traj_all.shape == (nbatch, horizon, xdim)
     assert info_all["costs"].shape == (nbatch, nweights, horizon)

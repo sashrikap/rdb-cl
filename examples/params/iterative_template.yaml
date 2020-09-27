@@ -43,8 +43,8 @@ IRD_ARGS:
   sample_method: MH
   sample_init_args:
     proposal_var: 0.5
-    max_val: 15.0
   proposal_decay: 0.7
+  max_val: 15.0
   beta: 1
   sample_args:
     num_warmup: 200

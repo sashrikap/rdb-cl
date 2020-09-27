@@ -1,7 +1,7 @@
 import gym
 import jax
 import copy
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import rdb.envs.drive2d
 
@@ -173,7 +173,7 @@ if not DUMMY_ACTION:
             runner2(state_N, acs, weights=ws)
 
 else:
-    actions = np.zeros((1, T, env.udim))
+    actions = jnp.zeros((1, T, env.udim))
 
 env.reset()
 env.render("human", draw_heat=DRAW_HEAT, weights=weights)

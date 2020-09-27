@@ -12,7 +12,7 @@ Credits:
 """
 
 from jax.lax import map as jmap
-import jax.numpy as np
+import jax.numpy as jnp
 import jax
 
 XDIM = 4
@@ -23,10 +23,10 @@ POSDIM = 2  # (x, y) coordinate
 @jax.jit
 def make_batch(x):
     if type(x) == list:
-        x = np.asarray(x)
+        x = jnp.asarray(x)
     if len(x.shape) == 1:
-        x = np.expand_dims(x, 0)
-    return np.asarray(x)
+        x = jnp.expand_dims(x, 0)
+    return jnp.asarray(x)
 
 
 # ====================================================
@@ -42,11 +42,11 @@ def ones(x):
         x (ndarray): batched 2D state
 
     Output:
-        out (ndarray): np.ones(nbatch,)
+        out (ndarray): jnp.ones(nbatch,)
 
     """
     nbatch = len(x)
-    return np.ones((nbatch,))
+    return jnp.ones((nbatch,))
 
 
 @jax.jit
@@ -64,8 +64,8 @@ def dist_to(x, y):
     assert len(x.shape) == 2 and x.shape[1] == XDIM
     assert y.shape[-1] == POSDIM or y.shape[-1] == XDIM
 
-    diff = np.array(x[:, :2]) - np.array(y[..., :2])
-    return np.linalg.norm(diff, axis=1, keepdims=True)
+    diff = jnp.array(x[:, :2]) - jnp.array(y[..., :2])
+    return jnp.linalg.norm(diff, axis=1, keepdims=True)
 
 
 @jax.jit
@@ -88,11 +88,11 @@ def dist_to_segment(x, pt1, pt2):
     pt1 = pt1[..., :2]
     pt2 = pt2[..., :2]
     delta = pt2 - pt1
-    sum_sqr = np.sum(np.square(delta))
-    ui = np.sum(delta * (x - pt1) / (sum_sqr + 1e-8), axis=-1, keepdims=True)
-    ui = np.clip(ui, 0, 1.0)
+    sum_sqr = jnp.sum(jnp.square(delta))
+    ui = jnp.sum(delta * (x - pt1) / (sum_sqr + 1e-8), axis=-1, keepdims=True)
+    ui = jnp.clip(ui, 0, 1.0)
     dx = pt1 + ui * delta - x
-    return np.linalg.norm(dx, axis=-1, keepdims=True)
+    return jnp.linalg.norm(dx, axis=-1, keepdims=True)
 
 
 @jax.jit
@@ -106,7 +106,7 @@ def diff_to(x, y):
     assert len(x.shape) == 2 and x.shape[1] == XDIM
     assert y.shape[-1] == POSDIM or y.shape[-1] == XDIM
 
-    diff = np.array(x[:, :2]) - np.array(y[..., :2])
+    diff = jnp.array(x[:, :2]) - jnp.array(y[..., :2])
     return diff
 
 
@@ -126,8 +126,8 @@ def dist_to_lane(x, center, normal):
     assert center.shape[-1] == POSDIM
     assert normal.shape[-1] == POSDIM
 
-    diff = np.array(center) - np.array(x[:, :2])
-    return np.abs(np.sum(normal * diff, axis=-1, keepdims=True))
+    diff = jnp.array(center) - jnp.array(x[:, :2])
+    return jnp.abs(jnp.sum(normal * diff, axis=-1, keepdims=True))
 
 
 @jax.jit
@@ -144,8 +144,8 @@ def dist_inside_fence(x, center, normal):
     assert len(center.shape) == 1 and center.shape[-1] == POSDIM
     assert len(normal.shape) == 1 and normal.shape[-1] == POSDIM
 
-    diff = np.array(x[:, :2]) - np.array(center)
-    return np.sum(normal * diff, axis=-1, keepdims=True)
+    diff = jnp.array(x[:, :2]) - jnp.array(center)
+    return jnp.sum(normal * diff, axis=-1, keepdims=True)
 
 
 @jax.jit
@@ -161,7 +161,7 @@ def dist_outside_fence(x, center, normal):
     assert len(x.shape) == 2 and x.shape[1] == XDIM
     assert len(center.shape) == 1 and center.shape[-1] == POSDIM
     assert len(normal.shape) == 1 and normal.shape[-1] == POSDIM
-    return np.maximum(-1 * dist_inside_fence(x, center, normal), 0)
+    return jnp.maximum(-1 * dist_inside_fence(x, center, normal), 0)
 
 
 @jax.jit
@@ -173,7 +173,7 @@ def speed_forward(x):
 
     """
     assert len(x.shape) == 2 and x.shape[1] == UDIM
-    return x[:, 3, None] * np.sin(x[:, 2, None])
+    return x[:, 3, None] * jnp.sin(x[:, 2, None])
 
 
 @jax.jit
@@ -203,7 +203,7 @@ def control_magnitude(u):
 
     """
     assert len(u.shape) == 2 and u.shape[1] == UDIM
-    return np.linalg.norm(u, axis=1, keepdims=True)
+    return jnp.linalg.norm(u, axis=1, keepdims=True)
 
 
 @jax.jit
@@ -218,8 +218,8 @@ def control_throttle(u):
 
     """
     assert len(u.shape) == 2 and u.shape[1] == UDIM
-    throttle = np.maximum(u * np.array([0, 1]), 0)
-    return np.sum(throttle, axis=1, keepdims=True)
+    throttle = jnp.maximum(u * jnp.array([0, 1]), 0)
+    return jnp.sum(throttle, axis=1, keepdims=True)
 
 
 @jax.jit
@@ -234,8 +234,8 @@ def control_brake(u):
 
     """
     assert len(u.shape) == 2 and u.shape[1] == UDIM
-    brake = np.minimum(u * np.array([0, 1]), 0)
-    return np.sum(brake, axis=1, keepdims=True)
+    brake = jnp.minimum(u * jnp.array([0, 1]), 0)
+    return jnp.sum(brake, axis=1, keepdims=True)
 
 
 @jax.jit
@@ -250,8 +250,8 @@ def control_turn(u):
 
     """
     assert len(u.shape) == 2 and u.shape[1] == UDIM
-    turn = np.abs(u * np.array([1, 0]))
-    return np.sum(u, axis=1, keepdims=True)
+    turn = jnp.abs(u * jnp.array([1, 0]))
+    return jnp.sum(u, axis=1, keepdims=True)
 
 
 # ====================================================
@@ -269,9 +269,9 @@ def more_than(x, y):
 
     """
     assert len(x.shape) == 2
-    y = np.array(y)
+    y = jnp.array(y)
     assert len(y.shape) == 0 or y.shape[-1] == x.shape[1]
-    return np.maximum(x - y, 0)
+    return jnp.maximum(x - y, 0)
 
 
 @jax.jit
@@ -284,9 +284,9 @@ def less_than(x, y):
 
     """
     assert len(x.shape) == 2
-    y = np.array(y)
+    y = jnp.array(y)
     assert len(y.shape) == 0 or y.shape[-1] == x.shape[1]
-    return np.maximum(y - x, 0)
+    return jnp.maximum(y - x, 0)
 
 
 ##==================================================
@@ -306,7 +306,7 @@ def is_item_state(data):
 
 def is_numeric(data):
     """Whether data is numerical value, e.g. float"""
-    return len(np.array(data).shape) == 0
+    return len(jnp.array(data).shape) == 0
 
 
 @jax.jit
@@ -332,7 +332,7 @@ def item_index_feat(data, index):
 
 
 @jax.jit
-def quadratic_feat(data, goal=None, max_val=np.inf):
+def quadratic_feat(data, goal=None, max_val=jnp.inf):
     """Compute square(data - goal).
 
     Args:
@@ -342,10 +342,10 @@ def quadratic_feat(data, goal=None, max_val=np.inf):
     """
     assert is_state(data) or is_item_state(data)
     if goal is None:
-        goal = np.zeros_like(data)
+        goal = jnp.zeros_like(data)
     diff_val = data - goal
-    diff_val = np.minimum(diff_val, max_val)
-    return np.square(diff_val)
+    diff_val = jnp.minimum(diff_val, max_val)
+    return jnp.square(diff_val)
 
 
 @jax.jit
@@ -359,8 +359,8 @@ def abs_feat(data, goal=None):
     """
     assert is_state(data) or is_item_state(data)
     if goal is None:
-        goal = np.zeros_like(data)
-    return np.abs(data - goal)
+        goal = jnp.zeros_like(data)
+    return jnp.abs(data - goal)
 
 
 @jax.jit
@@ -384,11 +384,11 @@ def positive_const_feat(data):
 
     """
     assert is_state(data) or is_item_state(data)
-    return np.where(data > 0, np.ones_like(data), np.zeros_like(data))
+    return jnp.where(data > 0, jnp.ones_like(data), jnp.zeros_like(data))
 
 
 @jax.jit
-def relu_feat(data, max_val=np.inf):
+def relu_feat(data, max_val=jnp.inf):
     """Compute f(x) = x if x >= 0; 0 otherwise.
 
     Args:
@@ -396,8 +396,8 @@ def relu_feat(data, max_val=np.inf):
 
     """
     assert is_state(data) or is_item_state(data)
-    val = np.maximum(data, 0)
-    return np.minimum(val, max_val)
+    val = jnp.maximum(data, 0)
+    return jnp.minimum(val, max_val)
 
 
 @jax.jit
@@ -409,7 +409,7 @@ def neg_relu_feat(data):
 
     """
     assert is_state(data) or is_item_state(data)
-    return np.minimum(data, 0)
+    return jnp.minimum(data, 0)
 
 
 @jax.jit
@@ -422,9 +422,9 @@ def sigmoid_feat(data, mu=1.0):
 
     """
     assert is_state(data) or is_item_state(data)
-    mu = np.array(mu)
+    mu = jnp.array(mu)
     assert len(mu.shape) == 0 or len(mu.shape) == 1 and mu.shape[0] == data.shape[1]
-    return 0.5 * (np.tanh(data / (2.0 * mu)) + 1)
+    return 0.5 * (jnp.tanh(data / (2.0 * mu)) + 1)
 
 
 @jax.jit
@@ -437,9 +437,9 @@ def neg_exp_feat(data, mu):
 
     """
     assert is_state(data) or is_item_state(data)
-    mu = np.array(mu)
+    mu = jnp.array(mu)
     assert len(mu.shape) == 0 or len(mu.shape) == 1 and mu.shape[0] == data.shape[1]
-    return np.exp(-data / mu)
+    return jnp.exp(-data / mu)
 
 
 @jax.jit
@@ -459,20 +459,20 @@ def gaussian_feat(data, sigma=None, mu=0.0):
 
     """
     assert is_item_state(data)
-    mu = np.array(mu)
+    mu = jnp.array(mu)
     assert len(mu.shape) == 0 or len(mu.shape) == 1 and mu.shape[0] == data.shape[2]
     # Make sigma diagonalized vector
     dim = data.shape[2]
     if sigma is None:
-        sigma_arr = np.eye(dim)
+        sigma_arr = jnp.eye(dim)
     else:
-        sigma_arr = np.array(sigma)
+        sigma_arr = jnp.array(sigma)
         assert (
             len(sigma_arr.shape) == 0
             or len(sigma_arr.shape) == 1
             and sigma_arr.shape[0] == data.shape[2]
         )
-        sigma_arr = np.atleast_1d(sigma_arr) ** 2
+        sigma_arr = jnp.atleast_1d(sigma_arr) ** 2
 
     # Collapse n_data (dimension 1)
     data_shape = data.shape
@@ -482,13 +482,13 @@ def gaussian_feat(data, sigma=None, mu=0.0):
 
     def dim_i_gaussian(diff_i):
         assert len(diff_i.shape) == 1
-        exp = np.exp(-0.5 * diff_i @ np.diag(1 / sigma_arr) @ diff_i.T)
-        gaus = exp / (np.sqrt((2 * np.pi) ** dim * np.prod(sigma_arr)))
-        gaus = np.sum(gaus)
+        exp = jnp.exp(-0.5 * diff_i @ jnp.diag(1 / sigma_arr) @ diff_i.T)
+        gaus = exp / (jnp.sqrt((2 * jnp.pi) ** dim * jnp.prod(sigma_arr)))
+        gaus = jnp.sum(gaus)
         return gaus
 
     # pad one dimension to output (nbatch, 1)
-    feats = np.array(jmap(dim_i_gaussian, diff))[:, None]
+    feats = jnp.array(jmap(dim_i_gaussian, diff))[:, None]
     # Recover n_data (dimension 1)
     feats = feats.reshape((data_shape[0], data_shape[1], 1))
     return feats
@@ -505,8 +505,8 @@ def exp_bounded_feat(data, lower, upper, width):
 
     """
     assert is_state(data)
-    lower = np.array(lower)
-    upper = np.array(upper)
+    lower = jnp.array(lower)
+    upper = jnp.array(upper)
     assert (
         len(lower.shape) == 0
         or len(lower.shape) == 1
@@ -518,6 +518,6 @@ def exp_bounded_feat(data, lower, upper, width):
         and upper.shape[0] == data.shape[1]
     )
 
-    low = np.exp((lower - data) / width)
-    high = np.exp((data - upper) / width)
+    low = jnp.exp((lower - data) / width)
+    high = jnp.exp((data - upper) / width)
     return low + high

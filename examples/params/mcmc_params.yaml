@@ -11,9 +11,9 @@ DESIGNER_ARGS:
     num_samples: 1000
     num_warmup: 100
   sample_init_args:
-    max_val: 15.0
     proposal_var: 0.5
   sample_method: MH
+  max_val: 15.0
   true_w: null
 ENV_NAME: Week6_01-v1
 EXPERIMENT_ARGS:
@@ -26,12 +26,12 @@ GCP_LABEL: ird_sample_1000_norm_200
 IRD_ARGS:
   exp_name: ird_convergence_true_w_prior_tasks_norm_200_beta_50_var_2
   num_normalizers: 200
+  max_val: 15.0
   sample_args:
     num_chains: 2
     num_samples: 4000
     num_warmup: 300
   sample_init_args:
-    max_val: 15.0
     proposal_var: 2
   sample_method: MH
 NUM_EVAL_MAP: 2

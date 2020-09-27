@@ -1,6 +1,6 @@
 from jax import random
 import os
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -10,13 +10,13 @@ sns.set()
 
 def read_seed(path):
     # print(path)
-    data = np.load(path, allow_pickle=True)["eval_hist"].item()
+    data = jnp.load(path, allow_pickle=True)["eval_hist"].item()
     return data
 
 
 def cleanup(arr, max_len):
     if len(arr) == 1:
-        return np.array(arr)
+        return jnp.array(arr)
     else:
         # print([len(a) for a in arr])
         # print(f"{len(arr)} seeds")
@@ -28,15 +28,15 @@ def cleanup(arr, max_len):
                 arrs.append(a[PADDING : PADDING + max_len])
                 # arrs.append(a[:3])
         # return arrs[:2]
-        # print(np.array(arrs))
-        return np.array(arrs)[:, :]
+        # print(jnp.array(arrs))
+        return jnp.array(arrs)[:, :]
 
 
 def plot_perform(data_dir, data):
     sns.set_palette("husl")
     colors = "gbkr"
     for i, (method, mdict) in enumerate(data.items()):
-        perf = np.array(mdict["perform"])
+        perf = jnp.array(mdict["perform"])
         sns.tsplot(
             time=range(len(perf[0])), color=colors[i], data=perf, condition=method
         )

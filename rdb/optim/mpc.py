@@ -18,7 +18,7 @@ from rdb.exps.utils import Profiler
 from jax.lax import fori_loop, scan
 from jax.ops import index_update
 import jax.random as random
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import time
 import jax
@@ -200,7 +200,7 @@ class FiniteHorizonMPC(object):
         #             weights_arr=weights_arr[:, bi],
         #         )
         #         all_acs.append(acs)
-        #     return np.concatenate(all_acs, axis=0)
+        #     return jnp.concatenate(all_acs, axis=0)
         else:
             # Track JIT recompile
             t_compile = None
@@ -247,9 +247,9 @@ class FiniteHorizonMPC(object):
                 ## Pop first timestep
                 opt_us_t = opt_us_t[1:]
                 xs_t = xs_t[1:]
-                # grad_us_t = np.delete(grad_us_t, 1, 1)
+                # grad_us_t = jnp.delete(grad_us_t, 1, 1)
 
-            opt_us = np.stack(opt_us, axis=1)
+            opt_us = jnp.stack(opt_us, axis=1)
             # u_info = {"du": grad_us, "xs": xs, "costs": costs}
             return opt_us
 
@@ -300,7 +300,7 @@ class FiniteHorizonMPC(object):
         u_shape = (n_batch, self._horizon, self._udim)
         if us0 is None:
             if init == "zeros":
-                us0 = np.zeros(u_shape)
+                us0 = jnp.ones(u_shape) * 1e-5
             else:
                 raise NotImplementedError(f"Initialization undefined for '{init}'")
 
@@ -380,7 +380,7 @@ def build_costs(udim, horizon, roll_forward, f_cost):
         xs = roll_forward(x, us)
         # shape (horizon, nbatch)
         costs = vf_cost(xs, us)
-        return np.array(costs)
+        return jnp.array(costs)
 
     return roll_costs
 
@@ -494,7 +494,7 @@ def build_mpc(
     """Forward/cost/grad functions for Horizon, used in optimizer"""
     h_traj = build_forward(f_dyn, xdim, udim, horizon, dt)
     h_costs = build_costs(udim, horizon, h_traj, f_cost, **cost_args)
-    h_csum = jax.jit(lambda x0, us, weights: np.sum(h_costs(x0, us, weights)))
+    h_csum = jax.jit(lambda x0, us, weights: jnp.sum(h_costs(x0, us, weights)))
 
     # Gradient w.r.t. x and u
     h_grad = jax.jit(jax.grad(h_csum, argnums=(0, 1)))
@@ -511,7 +511,7 @@ def build_mpc(
         t_costs = build_costs(udim, horizon, t_traj, f_cost)
 
     # Rollout for t steps, optimzed every h (h <= t)
-    t_csum = lambda x0, us, weights: np.sum(t_costs(x0, us, weights))
+    t_csum = lambda x0, us, weights: jnp.sum(t_costs(x0, us, weights))
     t_feats = build_features(udim, horizon, t_traj, f_feat, add_bias=add_bias)
 
     # Create controller & runner

@@ -1,7 +1,7 @@
 import gym
 import copy
 import pytest
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import rdb.envs.drive2d
 from time import time
@@ -97,7 +97,7 @@ def tune_method(nbatch, engine, method, engine_gt="scipy", method_gt="lbfgs"):
     max_idx = abs_ratio.argmax()
     max_ratio = abs_ratio[max_idx]
     mean_ratio = abs_ratio.mean()
-    median_ratio = np.median(abs_ratio)
+    median_ratio = jnp.median(abs_ratio)
     print(
         f"Batch {method} x {nbatch} vs single {method_gt} diff max ratio: {max_ratio:.3f} median: {median_ratio:.3f} mean: {mean_ratio:.3f}"
     )

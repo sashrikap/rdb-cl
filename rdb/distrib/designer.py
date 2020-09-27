@@ -5,7 +5,7 @@
 import ray
 import math
 import numpy as onp
-import jax.numpy as np
+import jax.numpy as jnp
 from time import time
 from jax import random
 
@@ -104,7 +104,7 @@ class DesignerServer(object):
                 parallel = False - (n_tasks, task_dim)
 
         """
-        tasks = np.array(tasks)
+        tasks = jnp.array(tasks)
         assert len(tasks.shape) == 3
         if self._parallel:
             assert len(tasks) == len(self._workers)

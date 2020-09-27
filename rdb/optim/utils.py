@@ -9,7 +9,7 @@ Includes:
 
 
 import numpy as onp
-import jax.numpy as np
+import jax.numpy as jnp
 import functools, itertools
 from collections import OrderedDict
 from functools import partial, reduce
@@ -134,7 +134,7 @@ def weigh_funcs_runtime(funcs_dict):
             fn(*args): output (nbatch, )
 
         """
-        assert isinstance(weights, list) or isinstance(weights, np.ndarray)
+        assert isinstance(weights, list) or isinstance(weights, jnp.ndarray)
         assert len(funcs_list) == len(weights)
         output = 0.0
         for fn, w in zip(funcs_list, weights):
@@ -196,7 +196,7 @@ def concat_funcs(funcs, axis=-1):
         * Useful for Dynamics function
 
     """
-    concat = partial(np.concatenate, axis=axis)
+    concat = partial(jnp.concatenate, axis=axis)
     return compose(concat, juxt(funcs))
 
 
@@ -209,7 +209,7 @@ def stack_funcs(funcs, axis=0):
         * Useful for Dynamics function
 
     """
-    stack = partial(np.stack, axis=axis)
+    stack = partial(jnp.stack, axis=axis)
     return compose(stack, juxt(funcs))
 
 
@@ -220,7 +220,7 @@ def combine_funcs(funcs):
         >>> [output1, output2] = f(data)
 
     """
-    return compose(np.asarray, juxt(funcs))
+    return compose(jnp.asarray, juxt(funcs))
 
 
 def index_func(fn, idx_pair=(0, -1)):
@@ -230,14 +230,14 @@ def index_func(fn, idx_pair=(0, -1)):
         function
 
     Example:
-        >>> fn = make_func(np.sum, (1, 3))
-        >>> fn([1, 2, 2, 3]) = 4
+        >>> fn = make_func(jnp.sum, (1, 3))
+        >>> fn([1, 2, 2, 3]) = 5
 
     """
     assert type(idx_pair) == tuple and len(idx_pair) == 2
 
     def _func(data, *kargs):
-        return fn(np.array(data)[..., np.arange(*idx_pair)], *kargs)
+        return fn(jnp.array(data)[..., jnp.arange(*idx_pair)], *kargs)
 
     return _func
 

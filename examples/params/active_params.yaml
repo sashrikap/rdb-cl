@@ -5,12 +5,12 @@ DESIGNER_ARGS:
   design_mode: independent
   num_normalizers: 1000
   proposal_decay: 0.7
+  max_val: 15.0
   sample_args:
     num_chains: 1
     num_samples: 250
     num_warmup: 25
   sample_init_args:
-    max_val: 15.0
     proposal_var: 2
   sample_method: MH
   select_mode: mean
@@ -47,12 +47,12 @@ EXP_NAME: active_ird_simplified_indep_init_4v1_ibeta_6_obs_true_dbeta_0.02
 IRD_ARGS:
   beta: 6
   proposal_decay: 0.7
+  max_val: 15.0
   sample_args:
     num_chains: 3
     num_samples: 40000
     num_warmup: 200
   sample_init_args:
-    max_val: 15.0
     proposal_var: 3
   sample_method: MH
   task_method: sum

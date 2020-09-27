@@ -1,7 +1,7 @@
 """Universal framework for different symbolic equations.
 
 """
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import itertools
 import numpyro
@@ -54,7 +54,7 @@ def train_model(data, log=True):
     def loss(params, batch):
         inputs, targets = batch
         preds = predict(params, inputs)
-        return np.mean(np.sum(np.square(preds - targets), axis=1))
+        return jnp.mean(np.sum(np.square(preds - targets), axis=1))
 
     @jax.jit
     def update(i, opt_state, batch):
@@ -93,12 +93,12 @@ def compare_inference(nn_model, forward_fn, example_type):
     if example_type == "parabola_sol":
         """ p(a, b) = [argmin_x (ax^2 + bx)]^2 """
         prior_params = OrderedDict({"a": (0.5, 1.0), "b": (-1.0, 1.0)})
-        log_prob_fn = lambda sol: np.log(sol ** 2)
+        log_prob_fn = lambda sol: jnp.log(sol ** 2)
         xlim, ylim = (0.5, 1), (-1, 1)
     elif example_type == "parabola_val":
         """ p(a, b) = [0.5 + min_x (ax^2 + bx)]^2 """
         prior_params = OrderedDict({"a": (0.5, 1.0), "b": (-1.0, 1.0)})
-        log_prob_fn = lambda sol: np.log((0.5 + sol) ** 2)
+        log_prob_fn = lambda sol: jnp.log((0.5 + sol) ** 2)
         xlim, ylim = (0.5, 1), (-1, 1)
 
     def universal_model():
@@ -204,11 +204,11 @@ def build_function(example_type):
             a = onp.random.uniform(0.5, 1, (num_train, 1))
             b = onp.random.uniform(-1, 1, (num_train, 1))
             train_x = onp.concatenate([a, b], axis=1)  # (a, b)
-            train_y = (-0.25 * np.square(train_x[:, 1]) / train_x[:, 0])[:, None]
+            train_y = (-0.25 * jnp.square(train_x[:, 1]) / train_x[:, 0])[:, None]
             a = onp.random.uniform(0.5, 1, (num_test, 1))
             b = onp.random.uniform(-1, 1, (num_test, 1))
             test_x = onp.concatenate([a, b], axis=1)  # (a, b)
-            test_y = (-0.25 * np.square(test_x[:, 1]) / test_x[:, 0])[:, None]
+            test_y = (-0.25 * jnp.square(test_x[:, 1]) / test_x[:, 0])[:, None]
             return dict(train_x=train_x, train_y=train_y, test_x=test_x, test_y=test_y)
 
         def _forward_fn(x):

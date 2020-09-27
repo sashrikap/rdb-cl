@@ -9,7 +9,7 @@ from numpyro.handlers import seed
 from rdb.optim.utils import *
 from rdb.exps.utils import Profiler
 import numpyro.distributions as dist
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import numpyro
 import copy
@@ -73,14 +73,14 @@ class LogNormalPrior(Prior):
         output = OrderedDict()
         for key in self._feature_keys:
             if key == self._normalized_key:
-                val = np.zeros((num_samples,))
+                val = jnp.zeros((num_samples,))
             else:
                 val = numpyro.sample(
                     key,
                     dist.Normal(loc=0.0, scale=self._std),
                     sample_shape=(num_samples,),
                 )
-            output[key] = np.exp(val)
+            output[key] = jnp.exp(val)
         output = DictList(output, jax=jax)
         return output
 
@@ -120,16 +120,16 @@ class LogUniformPrior(Prior):
         output = OrderedDict()
         for key in self._feature_keys:
             if key == self._normalized_key:
-                val = np.zeros((num_samples,))
+                val = jnp.zeros((num_samples,))
             else:
                 max_val = self._log_max
                 val = numpyro.sample(
                     key, dist.Uniform(-max_val, max_val), sample_shape=(num_samples,)
                 )
-            output[key] = np.exp(val)
+            output[key] = jnp.exp(val)
         if self._default is not None:
             for key, val in self._default.items():
                 if key not in output:
-                    output[key] = np.ones((num_samples,)) * val
+                    output[key] = jnp.ones((num_samples,)) * val
         output = DictList(output, jax=jax)
         return output

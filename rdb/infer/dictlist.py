@@ -9,7 +9,7 @@ Used for representing list of dictionaries (nbatch, dict)
 
 from rdb.optim.utils import *
 from rdb.infer.utils import *
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import copy
 
@@ -76,7 +76,7 @@ class DictList(dict):
     """
 
     def __init__(self, data, expand_dims=False, jax=False):
-        self._np = np if jax else onp
+        self._np = jnp if jax else onp
         self._jax = jax
         if isinstance(data, dict):
             if isinstance(data, DictList):
@@ -95,7 +95,7 @@ class DictList(dict):
             isinstance(data, list)
             or isinstance(data, tuple)
             or isinstance(data, onp.ndarray)
-            or isinstance(data, np.ndarray)
+            or isinstance(data, jnp.ndarray)
         ):
             data = self._stack_dict_by_keys(data)
             new_data = OrderedDict()
@@ -294,7 +294,7 @@ class DictList(dict):
         """
         data = OrderedDict()
         this_array = self.numpy_array()
-        norm = np.sqrt(np.sum(this_array ** 2, axis=0))
+        norm = jnp.sqrt(jnp.sum(this_array ** 2, axis=0))
         for key, val in self.items():
             data[key] = val / norm
         return DictList(data, jax=self._jax)
@@ -413,7 +413,7 @@ class DictList(dict):
             out (ndarray): (num_feats, n_batch)
 
         """
-        # return np.array(list(self.values()))
+        # return jnp.array(list(self.values()))
         return DictList(self, jax=jax)
 
     def numpy_array(self):
@@ -423,7 +423,7 @@ class DictList(dict):
             out (ndarray): (num_feats, n_batch)
 
         """
-        # return np.array(list(self.values()))
+        # return jnp.array(list(self.values()))
         return self._np.array(list(self.values()))
 
     def onp_array(self):
@@ -488,7 +488,7 @@ class DictList(dict):
         elif (
             isinstance(key, int)
             or isinstance(key, self._np.ndarray)
-            or isinstance(key, np.ndarray)
+            or isinstance(key, jnp.ndarray)
             or isinstance(key, list)
             or isinstance(key, tuple)
             or isinstance(key, slice)

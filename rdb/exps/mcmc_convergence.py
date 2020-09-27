@@ -20,7 +20,7 @@ from functools import partial
 from tqdm.auto import tqdm
 from rdb.infer import *
 from jax import random
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import time
 import copy
@@ -121,7 +121,7 @@ class ExperimentMCMC(object):
         elif "designer_convergence_true_w_random_tasks" in exp_mode:
             ## Use one of Jerry's prior designed w as true w
             ## Test # random tasks vs convergence
-            rand_tasks = random_choice(self._get_rng_task(), all_tasks, num_designs)
+            rand_tasks = random_choice(self._get_rng_task(), all_tasks, (num_designs,))
             self._all_designer_prior_tasks = rand_tasks
             for d_data in self._design_data["DESIGNS"]:
                 # Treat final design as true_w
@@ -132,7 +132,7 @@ class ExperimentMCMC(object):
             ## Use a random w as true w
             ## Test # random tasks vs convergence
             rand_tasks = onp.array(
-                random_choice(self._get_rng_task(), all_tasks, num_designs)
+                random_choice(self._get_rng_task(), all_tasks, (num_designs,))
             )
             self._all_designer_prior_tasks = rand_tasks
             rand_w = self._make_random_weights(
@@ -148,7 +148,7 @@ class ExperimentMCMC(object):
             ## Test # features (DOF) vs convergence
             all_keys = self._model.env.features_keys
             rand_tasks = random_choice(
-                self._get_rng_task(), self._model.env.all_tasks, num_designs
+                self._get_rng_task(), self._model.env.all_tasks, (num_designs,)
             )
             self._all_designer_prior_tasks = rand_tasks
             for di, d_data in enumerate(self._design_data["DESIGNS"]):
@@ -181,7 +181,7 @@ class ExperimentMCMC(object):
                 design["WEIGHTS"], self._normalized_key
             )
         rand_tasks = onp.array(
-            random_choice(self._get_rng_task(), all_tasks, num_tasks)
+            random_choice(self._get_rng_task(), all_tasks, (num_tasks,))
         )
 
         if exp_mode.startswith("designer"):
@@ -252,8 +252,8 @@ class ExperimentMCMC(object):
             else:
                 max_val = self._exp_params["WEIGHT_PARAMS"]["max_weights"]
                 self._rng_key, rng_weights = random.split(self._rng_key)
-                weights[key] = np.exp(
-                    random_uniform(rng_weights, low=-max_val, high=max_val)
+                weights[key] = jnp.exp(
+                    random.uniform(rng_weights, minval=-max_val, maxval=max_val)
                 )
         return weights
 
@@ -272,7 +272,7 @@ class ExperimentMCMC(object):
 
         all_tasks = self._designer.env.all_tasks
         viz_tasks = random_choice(
-            self._get_rng_task(), all_tasks, self._num_visualize_tasks
+            self._get_rng_task(), all_tasks, (self._num_visualize_tasks,)
         )
 
         # new_tasks = random_choice(self._get_rng_task(), all_tasks, 1)

@@ -12,7 +12,7 @@ from rdb.visualize.plot import *
 from rdb.infer.utils import *
 from rdb.exps.utils import *
 from tqdm.auto import tqdm
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import time
 import copy
@@ -176,8 +176,8 @@ class ExperimentInteractiveIRD(object):
         self._eval_tasks = random_choice(
             self._get_rng_eval(),
             eval_env.all_tasks,
-            self._num_eval_tasks,
-            replacement=False,
+            (self._num_eval_tasks,),
+            replace=False,
         )
         self._train_tasks = self._model.env.all_tasks
         self._log_time(f"Eval Begin")
@@ -194,7 +194,7 @@ class ExperimentInteractiveIRD(object):
 
         ## Propose
         candidates = random_choice(
-            self._get_rng_task(), self._train_tasks, self._num_active_tasks
+            self._get_rng_task(), self._train_tasks, (self._num_active_tasks,)
         )
         candidate_scores = {}
         self._log_time(f"Propose Begin")
@@ -210,8 +210,8 @@ class ExperimentInteractiveIRD(object):
                 next_ids = random_choice(
                     self._get_rng_task(),
                     onp.arange(N_top),
-                    self._num_propose,
-                    replacement=False,
+                    (self._num_propose,),
+                    replace=False,
                 )
                 next_tasks = difficult_tasks[next_ids]
             else:
@@ -258,7 +258,7 @@ class ExperimentInteractiveIRD(object):
         ## Eval
         eval_env = self._env_fn(self._eval_env_name)
         self._eval_tasks = random_choice(
-            self._get_rng_eval(), eval_env.all_tasks, self._num_eval, replacement=False
+            self._get_rng_eval(), eval_env.all_tasks, (self._num_eval,), replace=False
         )
         self._log_time(f"Eval Begin")
         for fn_key in self._active_fns.keys():
@@ -387,7 +387,7 @@ class ExperimentInteractiveIRD(object):
         """
         Save evaluation npy data.
         """
-        np.save(save_path, data)
+        jnp.save(save_path, data)
         print(f"Saved evaluation results to {save_path}")
 
     def _evaluate(self, fn_key, belief, eval_tasks, method, num_samples):
@@ -443,10 +443,10 @@ class ExperimentInteractiveIRD(object):
             fn_key (str): acquisition function key
 
         Return:
-            next_tasks (np.array): list of tasks
-            next_scores (np.array): list of scores
-            next_idxs (np.array): list of indices
-            scores (np.array): all candidate scores
+            next_tasks (jnp.array): list of tasks
+            next_scores (jnp.array): list of scores
+            next_idxs (jnp.array): list of indices
+            scores (jnp.array): all candidate scores
 
         """
 

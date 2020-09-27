@@ -15,7 +15,7 @@ Credits:
 """
 
 
-import jax.numpy as np
+import jax.numpy as jnp
 import jax
 import abc
 
@@ -40,10 +40,10 @@ def build_car_dynamics(friction, xdim=4, udim=2):
     def delta_x(x, u):
         assert len(x.shape) == 2 and x.shape[1] == xdim
         assert len(u.shape) == 2 and u.shape[1] == udim
-        dx = np.stack(
+        dx = jnp.stack(
             [
-                x[:, 3] * np.cos(x[:, 2]),
-                x[:, 3] * np.sin(x[:, 2]),
+                x[:, 3] * jnp.cos(x[:, 2]),
+                x[:, 3] * jnp.sin(x[:, 2]),
                 u[:, 0] * x[:, 3],
                 u[:, 1] - x[:, 3] * friction,
             ],
@@ -74,7 +74,7 @@ def build_speed_dynamics(xdim=4, udim=2):
         assert len(x.shape) == 2 and x.shape[1] == xdim
         assert len(u.shape) == 2 and u.shape[1] == udim
         diff_u = u - x[:, 2:]
-        dx = np.concatenate([u, diff_u], axis=1)
+        dx = jnp.concatenate([u, diff_u], axis=1)
         return dx
 
     return delta_x
@@ -93,7 +93,7 @@ def build_identity_dynamics(xdim=4, udim=2):
     def delta_x(x, u):
         assert len(x.shape) == 2 and x.shape[1] == xdim
         assert len(u.shape) == 2 and u.shape[1] == udim
-        dx = np.zeros_like(x)
+        dx = jnp.zeros_like(x)
         return dx
 
     return delta_x
@@ -114,9 +114,9 @@ def build_fixspeed_dynamics(speed, xdim=4, udim=2):
         assert len(x.shape) == 2 and x.shape[1] == xdim
         assert len(u.shape) == 2 and u.shape[1] == udim
 
-        diff_x = speed * np.stack([np.cos(x[:, 2]), np.sin(x[:, 2])], axis=1)
-        diff_u = np.zeros_like(diff_x)
-        dx = np.concatenate([diff_x, diff_u], axis=1)
+        diff_x = speed * jnp.stack([jnp.cos(x[:, 2]), jnp.sin(x[:, 2])], axis=1)
+        diff_u = jnp.zeros_like(diff_x)
+        dx = jnp.concatenate([diff_x, diff_u], axis=1)
         return dx
 
     return delta_x

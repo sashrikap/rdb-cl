@@ -129,8 +129,8 @@ def test_control_magnitude():
     run_one_act_feature(control_magnitude, u0)
 
 
-def test_control_thrust():
-    run_one_act_feature(control_thrust, u0)
+def test_control_throttle():
+    run_one_act_feature(control_throttle, u0)
 
 
 def test_control_brake():

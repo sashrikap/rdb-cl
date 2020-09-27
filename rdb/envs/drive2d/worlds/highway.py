@@ -1,6 +1,6 @@
 import gym
 import jax
-import jax.numpy as np
+import jax.numpy as jnp
 from rdb.envs.drive2d.core.world import DriveWorld
 from rdb.envs.drive2d.core import lane, feature
 from rdb.optim.utils import *
@@ -41,7 +41,7 @@ class HighwayDriveWorld(DriveWorld):
     def build_lanes(self, num_lanes, lane_width):
         min_shift = -(num_lanes - 1) / 2.0
         max_shift = (num_lanes - 1) / 2.0 + 0.001
-        lane_shifts = np.arange(min_shift, max_shift, 1.0)
+        lane_shifts = jnp.arange(min_shift, max_shift, 1.0)
         clane = lane.StraightLane([0.0, -1.0], [0.0, 1.0], lane_width)
         # clane = lane.StraightLane([0.0, -.1], [0.0, .1], lane_width)
         lanes = [clane.shifted(s) for s in lane_shifts]
@@ -57,16 +57,16 @@ class HighwayDriveWorld(DriveWorld):
 
         ## Distance to fences
         fence_fns = [None] * len(self._fences)
-        normals = np.array([[1.0, 0.0], [-1.0, 0.0]])
+        normals = jnp.array([[1.0, 0.0], [-1.0, 0.0]])
         # print("car width", self._car_width, "lane width", self._lane_width)
         for f_i, (fence, normal) in enumerate(zip(self._fences, normals)):
             main_idx = self._indices["main_car"]
 
             def fence_dist_fn(state, actions, fence=fence, normal=normal):
-                main_pos = state[..., np.arange(*main_idx)]
+                main_pos = state[..., jnp.arange(*main_idx)]
                 fence_center = fence.center
                 safe_margin = self._lane_width / 8
-                crash_center = fence_center + normal * np.array(
+                crash_center = fence_center + normal * jnp.array(
                     [(self._lane_width + self._car_width) / 2 + safe_margin, 0]
                 )
                 return feature.dist_outside_fence(main_pos, crash_center, normal)

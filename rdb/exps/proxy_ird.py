@@ -8,7 +8,7 @@ from functools import partial
 from tqdm.auto import tqdm
 from rdb.infer import *
 from jax import random
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import time
 import copy
@@ -96,8 +96,8 @@ class ExperimentProxyIRD(object):
         prior_tasks = random_choice(
             self._get_rng("prior"),
             self._train_tasks,
-            self._num_prior_tasks,
-            replacement=False,
+            (self._num_prior_tasks,),
+            replace=False,
         )
         self._designer.prior_tasks = prior_tasks
 

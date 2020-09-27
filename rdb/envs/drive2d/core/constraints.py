@@ -14,7 +14,7 @@ TODO:
 
 from rdb.envs.drive2d.core.feature import make_batch
 import jax
-import jax.numpy as np
+import jax.numpy as jnp
 
 
 def build_offtrack(env):
@@ -42,7 +42,7 @@ def build_offtrack(env):
         # feats (T, nbatch, nfence, 1)
         feats = vfn(states, actions)
         assert len(feats.shape) == 4
-        return np.any(np.abs(feats) > threshold, axis=(2, 3))
+        return jnp.any(jnp.abs(feats) > threshold, axis=(2, 3))
 
     return func
 
@@ -62,7 +62,7 @@ def build_collision(env):
 
     """
     ncars = len(env.cars)
-    threshold = np.array([env.car_width, env.car_length])
+    threshold = jnp.array([env.car_width, env.car_length])
     vfn = jax.vmap(env.raw_features_dict["dist_cars"])
 
     @jax.jit
@@ -72,7 +72,7 @@ def build_collision(env):
         # feats: (T, nbatch, ncars, 2)
         feats = vfn(states, actions)
         assert len(feats.shape) == 4
-        return np.any(np.all(np.abs(feats) < threshold, axis=3), axis=2)
+        return jnp.any(jnp.all(jnp.abs(feats) < threshold, axis=3), axis=2)
 
     return func
 
@@ -94,7 +94,9 @@ def build_crash_objects(env):
     ncars = len(env.cars)
     obj_width = env.car_width / 1.5
     obj_length = env.car_length / 2
-    threshold = 0.5 * np.array([env.car_width + obj_width, env.car_length + obj_length])
+    threshold = 0.5 * jnp.array(
+        [env.car_width + obj_width, env.car_length + obj_length]
+    )
     vfn = jax.vmap(
         env.raw_features_dict["dist_objects"]
     )  # (T, nbatch, nobjs, obj_xdim)
@@ -106,7 +108,7 @@ def build_crash_objects(env):
         # feats: (T, nbatch, ncars, 2)
         feats = vfn(states, actions)
         assert len(feats.shape) == 4
-        return np.any(np.all(np.abs(feats) < threshold, axis=3), axis=2)
+        return jnp.any(jnp.all(jnp.abs(feats) < threshold, axis=3), axis=2)
 
     return func
 
@@ -127,7 +129,7 @@ def build_uncomfortable(env, max_throttle, max_brake, max_steer):
     def func(states, actions):
         assert len(states.shape) == 3
         assert len(actions.shape) == 3
-        uncomfortable = np.stack(
+        uncomfortable = jnp.stack(
             [
                 actions[:, :, 1] > max_throttle,
                 actions[:, :, 1] < -1 * max_brake,
@@ -136,7 +138,7 @@ def build_uncomfortable(env, max_throttle, max_brake, max_steer):
             ],
             axis=2,
         )
-        return np.any(uncomfortable, axis=2)
+        return jnp.any(uncomfortable, axis=2)
 
     return func
 
@@ -161,7 +163,7 @@ def build_overspeed(env, max_speed):
         # feats (T, nbatch, 1)
         feats = vfn(states, actions)
         assert len(feats.shape) == 3
-        return np.any(feats > max_speed, axis=2)
+        return jnp.any(feats > max_speed, axis=2)
 
     return func
 
@@ -186,7 +188,7 @@ def build_underspeed(env, min_speed):
         # feats (T, nbatch, 1)
         feats = vfn(states, actions)
         assert len(feats.shape) == 3
-        return np.any(feats < min_speed, axis=2)
+        return jnp.any(feats < min_speed, axis=2)
 
     return func
 
@@ -215,7 +217,7 @@ def build_wronglane(env, lane_idx):
         # feats (T, nbatch, nlanes, 1)
         feats = vfn(states, actions)
         assert len(feats.shape) == 4
-        return np.any(feats[:, :, lane_idx, None, :] < env.lane_width / 2, axis=(2, 3))
+        return jnp.any(feats[:, :, lane_idx, None, :] < env.lane_width / 2, axis=(2, 3))
 
     return func
 
@@ -247,6 +249,6 @@ def build_overtake(env, car_idx):
         # feats (T, nbatch, 1)
         feats = vfn(states, actions)
         assert len(feats.shape) == 3
-        return np.any(feats, axis=2)
+        return jnp.any(feats, axis=2)
 
     return func

@@ -4,7 +4,7 @@ TODO:
 [1] run by batch dist2
 """
 
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 from rdb.envs.drive2d.core import feature
 from pyglet import gl, graphics
@@ -26,13 +26,13 @@ class StraightLane(object):
     """
 
     def __init__(self, pt1, pt2, width):
-        self.pt1 = np.asarray(pt1)
-        self.pt2 = np.asarray(pt2)
+        self.pt1 = jnp.asarray(pt1)
+        self.pt2 = jnp.asarray(pt2)
         self.center = (self.pt1 + self.pt2) / 2
         self.width = width
-        dist = np.linalg.norm(self.pt1 - self.pt2)
+        dist = jnp.linalg.norm(self.pt1 - self.pt2)
         self.forward = (self.pt1 - self.pt2) / dist
-        self.normal = np.array([-self.forward[1], self.forward[0]])
+        self.normal = jnp.array([-self.forward[1], self.forward[0]])
 
     def shifted(self, num):
         """Shift in normal direction by num lanes.

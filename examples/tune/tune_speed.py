@@ -1,6 +1,6 @@
 import gym
 import copy
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import rdb.envs.drive2d
 

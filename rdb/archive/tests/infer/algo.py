@@ -2,7 +2,7 @@ import numpyro
 import numpyro.distributions as dist
 import numpy as onp
 import copy
-import jax.numpy as np
+import jax.numpy as jnp
 from rdb.infer import *
 from rdb.exps.utils import Profiler
 from jax import random, vmap
@@ -26,10 +26,10 @@ class TestPrior(object):
 
     def log_prob(self, state):
         """ Uniformly 0 to 10, vectorized."""
-        return np.where(
-            np.logical_or(state < 0, state > 10.0),
-            -np.ones_like(state) * np.inf,
-            np.zeros_like(state),
+        return jnp.where(
+            jnp.logical_or(state < 0, state > 10.0),
+            -np.ones_like(state) * jnp.inf,
+            jnp.zeros_like(state),
         )
 
     def _build_function(self):
@@ -54,7 +54,7 @@ class TestProposal(object):
         std = 0.05
 
         def proposal_fn(state):
-            std = np.ones_like(state)
+            std = jnp.ones_like(state)
             return numpyro.sample("next_state", dist.Normal(state, std))
 
         return seed(proposal_fn, self._rng_key)
@@ -80,7 +80,7 @@ def test_mh_single():
     )
     sampler.update_key(key)
     samples = sampler.sample(obs=1.0, init_state=5.0, verbose=True)
-    print(f"mean {np.mean(np.array(samples))}")
+    print(f"mean {np.mean(jnp.array(samples))}")
 
 
 def test_mh_2_chainz():
@@ -105,7 +105,7 @@ def test_mh_2_chainz():
     )
     sampler.update_key(key)
     samples = sampler.sample(obs=1.0, init_state=5.0, verbose=True)
-    print(f"mean {np.mean(np.array(samples))}")
+    print(f"mean {np.mean(jnp.array(samples))}")
 
 
 def test_mh_3_chainz():
@@ -135,4 +135,4 @@ def test_mh_3_chainz():
     )
     sampler.update_key(key)
     samples = sampler.sample(obs=1.0, init_state=5.0, verbose=True)
-    print(f"mean {np.mean(np.array(samples))}")
+    print(f"mean {np.mean(jnp.array(samples))}")

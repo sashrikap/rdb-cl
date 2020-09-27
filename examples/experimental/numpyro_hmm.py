@@ -6,7 +6,7 @@ import numpy as onp
 from scipy.stats import gaussian_kde
 
 from jax import lax, random
-import jax.numpy as np
+import jax.numpy as jnp
 from jax.scipy.special import logsumexp
 
 import numpyro
@@ -19,8 +19,8 @@ def simulate_data(
 ):
     rng_key, rng_key_transition, rng_key_emission = random.split(rng_key, 3)
 
-    transition_prior = np.ones(num_categories)
-    emission_prior = np.repeat(0.1, num_words)
+    transition_prior = jnp.ones(num_categories)
+    emission_prior = jnp.repeat(0.1, num_words)
 
     transition_prob = dist.Dirichlet(transition_prior).sample(
         key=rng_key_transition, sample_shape=(num_categories,)
@@ -29,7 +29,7 @@ def simulate_data(
         key=rng_key_emission, sample_shape=(num_categories,)
     )
 
-    start_prob = np.repeat(1.0 / num_categories, num_categories)
+    start_prob = jnp.repeat(1.0 / num_categories, num_categories)
     categories, words = [], []
     for t in range(num_supervised_data + num_unsupervised_data):
         rng_key, rng_key_transition, rng_key_emission = random.split(rng_key, 3)
@@ -44,7 +44,7 @@ def simulate_data(
         words.append(word)
 
     # split into supervised data and unsupervised data
-    categories, words = np.stack(categories), np.stack(words)
+    categories, words = jnp.stack(categories), jnp.stack(words)
     supervised_categories = categories[:num_supervised_data]
     supervised_words = words[:num_supervised_data]
     unsupervised_words = words[num_supervised_data:]
@@ -60,7 +60,7 @@ def simulate_data(
 
 
 def forward_one_step(prev_log_prob, curr_word, transition_log_prob, emission_log_prob):
-    log_prob_tmp = np.expand_dims(prev_log_prob, axis=1) + transition_log_prob
+    log_prob_tmp = jnp.expand_dims(prev_log_prob, axis=1) + transition_log_prob
     log_prob = log_prob_tmp + emission_log_prob[:, curr_word]
     return logsumexp(log_prob, axis=0)
 
@@ -75,7 +75,7 @@ def forward_log_prob(init_log_prob, words, transition_log_prob, emission_log_pro
     def scan_fn(log_prob, word):
         return (
             forward_one_step(log_prob, word, transition_log_prob, emission_log_prob),
-            np.zeros((0,)),
+            jnp.zeros((0,)),
         )
 
     log_prob, _ = lax.scan(scan_fn, init_log_prob, words)
@@ -93,7 +93,7 @@ def semi_supervised_hmm(
     transition_prob = numpyro.sample(
         "transition_prob",
         dist.Dirichlet(
-            np.broadcast_to(transition_prior, (num_categories, num_categories))
+            jnp.broadcast_to(transition_prior, (num_categories, num_categories))
         ),
     )
     emission_prob = numpyro.sample(
@@ -116,8 +116,8 @@ def semi_supervised_hmm(
     )
 
     # computes log prob of unsupervised data
-    transition_log_prob = np.log(transition_prob)
-    emission_log_prob = np.log(emission_prob)
+    transition_log_prob = jnp.log(transition_prob)
+    emission_log_prob = jnp.log(emission_prob)
     init_log_prob = emission_log_prob[:, unsupervised_words[0]]
     log_prob = forward_log_prob(
         init_log_prob, unsupervised_words[1:], transition_log_prob, emission_log_prob

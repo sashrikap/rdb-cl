@@ -48,8 +48,8 @@ DESIGNER_ARGS:
   sample_init_args:
     proposal_var: 0.2  # week6_02
     # proposal_var: 0.5  # week6_01
-    max_val: 15.0
   proposal_decay: 0.7
+  max_val: 15.0
   sample_args:
     num_samples: 500
     num_warmup: 100

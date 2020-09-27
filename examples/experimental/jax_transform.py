@@ -1,5 +1,5 @@
 import jax
-import jax.numpy as np
+import jax.numpy as onp
 import numpy as onp
 
 
@@ -17,7 +17,7 @@ def potential_fn(x):
 
 def test_potential():
     grad_potential = jax.grad(potential_fn)
-    x = np.ones((10, 10))
+    x = jnp.ones((10, 10))
     print(grad_potential(x))
     print(jax.jit(f)(x))
 

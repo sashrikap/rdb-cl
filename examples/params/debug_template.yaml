@@ -42,8 +42,8 @@ DESIGNER_ARGS:
   sample_method: MH
   sample_init_args:
     proposal_var: 0.2
-    max_val: 15.0
   proposal_decay: 0.7
+  max_val: 15.0
   sample_args:
     num_samples: 500
     num_warmup: 100
@@ -60,8 +60,8 @@ IRD_ARGS:
   sample_method: MH
   sample_init_args:
     proposal_var: 3
-    max_val: 15.0
   proposal_decay: 0.9
+  max_val: 15.0
   sample_args:
     num_warmup: 200
     num_samples: 4000

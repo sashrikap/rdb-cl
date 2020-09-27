@@ -1,6 +1,6 @@
 import gym
 import jax
-import jax.numpy as np
+import jax.numpy as jnp
 from rdb.envs.drive2d.core.world import DriveWorld
 from rdb.envs.drive2d.core import lane, feature, objects
 from rdb.optim.utils import *
@@ -36,7 +36,7 @@ class EntranceDriveWorld(DriveWorld):
         self._lanes = self.build_lanes(lane_width)
         self._fences = self.build_fences(self._lanes)
         self._lane_width = lane_width
-        driveway_state = [-self._lane_width, driveway_dist, np.pi / 2, 0]
+        driveway_state = [-self._lane_width, driveway_dist, jnp.pi / 2, 0]
         driveway_pt1 = [0.5, 1.0]
         driveway_pt2 = [-2.5, 1.0]
         # driveway_pt1 = [0., -1.0]
@@ -63,7 +63,7 @@ class EntranceDriveWorld(DriveWorld):
     def build_lanes(self, lane_width):
         min_shift = -(self.NUM_LANES - 1) / 2.0
         max_shift = (self.NUM_LANES - 1) / 2.0 + 0.001
-        lane_shifts = np.arange(min_shift, max_shift, 1.0)
+        lane_shifts = jnp.arange(min_shift, max_shift, 1.0)
         clane = lane.StraightLane([0.0, -1.0], [0.0, 1.0], lane_width)
         lanes = [clane.shifted(s) for s in lane_shifts]
         return lanes
@@ -87,11 +87,11 @@ class EntranceDriveWorld(DriveWorld):
 
         # Fence distance feature
         fence_fns = [None] * len(self._fences)
-        normals = np.array([[1.0, 0.0], [-1.0, 0.0]])
+        normals = jnp.array([[1.0, 0.0], [-1.0, 0.0]])
         for f_i, (fence, normal) in enumerate(zip(self._fences, normals)):
 
             def fence_dist_fn(state, actions, fence=fence, normal=normal):
-                main_pos = state[..., np.arange(*main_idx)]
+                main_pos = state[..., jnp.arange(*main_idx)]
                 return feature.dist_inside_fence(main_pos, fence.center, normal)
                 # return feature.diff_to_fence(fence.center, normal, main_pos)
 
@@ -101,14 +101,14 @@ class EntranceDriveWorld(DriveWorld):
 
         # Entrance driveway distance feature
         def entrance_dist_fn(state, actions, ent=entrance):
-            main_pos = state[..., np.arange(*main_idx)]
+            main_pos = state[..., jnp.arange(*main_idx)]
             return feature.dist_to_segment(main_pos, ent.start, ent.end)
 
         feats_dict["dist_entrance"] = jax.jit(entrance_dist_fn)
 
         # Garage distance feature
         def garage_dist_fn(state, actions, garage=garage):
-            main_pos = state[..., np.arange(*main_idx)]
+            main_pos = state[..., jnp.arange(*main_idx)]
             return feature.dist_to(main_pos, garage.state)
 
         feats_dict["dist_garage"] = jax.jit(garage_dist_fn)

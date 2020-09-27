@@ -1,5 +1,5 @@
 import os
-import jax.numpy as np
+import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import gym, rdb.envs.drive2d
 from rdb.optim.mpc import shooting_method
@@ -9,7 +9,7 @@ def read_tasks(path):
     # print(path)
     idx = path.index("seed_")
     seed = path.replace(".npz", "")[idx + len("seed_") :]
-    tasks = np.load(path, allow_pickle=True)["curr_tasks"].item()
+    tasks = jnp.load(path, allow_pickle=True)["curr_tasks"].item()
     return seed, tasks
 
 
@@ -40,7 +40,7 @@ def plot_tasks(path):
                 state = env.state
                 path = f"{data_path}/tasks/tasks_seeds_{seed}_method_{method}_itr_{itr:02d}.png"
                 runner.collect_thumbnail(
-                    state, np.zeros((env.udim, HORIZON)), path=path
+                    state, jnp.zeros((env.udim, HORIZON)), path=path
                 )
 
 

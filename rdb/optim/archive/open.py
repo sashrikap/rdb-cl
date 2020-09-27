@@ -6,12 +6,12 @@ def dict_to_vec(dict_var):
     curr_dim = 0
     next_dim = curr_dim
     for key, val in dict_var.items():
-        next_dim += np.prod(val.shape)
+        next_dim += jnp.prod(val.shape)
         dims[key] = (curr_dim, next_dim)
         shapes[key] = val.shape
         vec.append(val.flatten())
         curr_dim = next_dim
-    vec = np.concatenate(vec)
+    vec = jnp.concatenate(vec)
     return vec, dims, shapes
 
 
@@ -79,7 +79,7 @@ class LocalOptimizer(OpenLoopOptimizer):
 
     def concate_xu(self, x, u):
         """ Computational graph input: x, u => [x, u.flatten()] """
-        xu = np.concatenate([x, u.flatten()])
+        xu = jnp.concatenate([x, u.flatten()])
         return xu
 
     def divide_xu(self, xu):
@@ -98,12 +98,12 @@ class LocalOptimizer(OpenLoopOptimizer):
         curr_dim = 0
         next_dim = curr_dim
         for key, val in dict_var.items():
-            next_dim += np.prod(val.shape)
+            next_dim += jnp.prod(val.shape)
             dims[key] = (curr_dim, next_dim)
             shapes[key] = val.shape
             vec.append(val.flatten())
             curr_dim = next_dim
-        vec = np.concatenate(vec)
+        vec = jnp.concatenate(vec)
         return vec, dims, shapes
 
     def vec_to_dict(self, vec):
@@ -153,7 +153,7 @@ class LocalOptimizer(OpenLoopOptimizer):
             xu = self.concate_xu(x, umax)
             _gxu = self.grad_xu(xu)
             _gx = _gxu[: -self.udim]
-            _gu = np.expand_dims(_gxu[-self.udim :], 0)
+            _gu = jnp.expand_dims(_gxu[-self.udim :], 0)
             _hu = self.hessian_xu(xu)[-self.udim :, -self.udim :]
             _jux = self.jacobian_xu(xu)[-self.udim :, : -self.udim]
             gx = _gx + _gu.dot(-np.linalg.solve(_hu + eps, _jux))

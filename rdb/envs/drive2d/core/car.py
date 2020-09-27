@@ -1,4 +1,4 @@
-import jax.numpy as np
+import jax.numpy as jnp
 import jax
 import pyglet
 import numpy as onp
@@ -174,7 +174,7 @@ class FixSpeedCar(Car):
     def control(self, dt):
         self.state = (
             self.state
-            + self.dynamics_fn(self._state, np.zeros((len(self._state), self.udim)))
+            + self.dynamics_fn(self._state, jnp.zeros((len(self._state), self.udim)))
             * dt
         )
         self._curr_control = onp.zeros((1, 2))

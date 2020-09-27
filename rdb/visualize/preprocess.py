@@ -1,4 +1,4 @@
-import numpy as np
+import numpy as onp
 from collections import OrderedDict
 from copy import deepcopy
 
@@ -23,8 +23,8 @@ def normalize_features(features, eps=1e-8):
 
     normalized_features = deepcopy(features)
     for key in features.keys():
-        mean = np.mean(features[key])
-        std = np.std(features[key])
+        mean = onp.mean(features[key])
+        std = onp.std(features[key])
         info["std"][key] = std
         info["mean"][key] = mean
         features[key] = (features[key] - mean) / (std + eps)

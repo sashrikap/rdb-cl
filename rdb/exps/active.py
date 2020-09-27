@@ -11,7 +11,7 @@ Credits:
 
 """
 
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import time
 import math
@@ -64,7 +64,7 @@ class ActiveInfoGain(object):
             #  shape (nweights,)
             new_rews = -1 * self._beta * new_costs
             #  shape (nweights, 1)
-            ratio = np.exp(new_rews - logsumexp(new_rews))[:, None]
+            ratio = jnp.exp(new_rews - logsumexp(new_rews))[:, None]
             max_weights = self._weight_params["max_weights"]
             bins = self._weight_params["bins"]
             delta = 2 * max_weights / bins
@@ -76,12 +76,12 @@ class ActiveInfoGain(object):
             next_densities = next_probs * (1 / delta)
             ent = 0.0
             for density in next_densities:
-                # assert np.all(density >= 0)
+                # assert jnp.all(density >= 0)
                 abs_nonzero = density > 0
-                # Trick by setting 0-density to 1, which passes np.log
+                # Trick by setting 0-density to 1, which passes jnp.log
                 density += 1 - abs_nonzero
                 # (density * onp.ma.log(abs_density) * delta).sum()
-                ent += -(density * np.log(density) * delta).sum()
+                ent += -(density * jnp.log(density) * delta).sum()
             return ent
 
         return _fn
@@ -103,7 +103,7 @@ class ActiveInfoGain(object):
                 idx_start, idx_end = bi * batch_size, (bi + 1) * batch_size
                 next_ents = entropy_vfn(all_weights_arr[:, idx_start:idx_end])
                 entropies.append(next_ents)
-            return np.concatenate(entropies, axis=0)
+            return jnp.concatenate(entropies, axis=0)
 
     def __call__(self, next_task, belief, all_obs, feats_keys, verbose=True):
         """Information gain (negative entropy) criteria. Higher score the better.
@@ -145,8 +145,8 @@ class ActiveInfoGain(object):
             all_weights_arr[:, 0], next_feats_sum=next_feats_sum, which_bins=which_bins
         )
         entropies = self._batch_compute_entropy(entropy_vfn, all_weights_arr)
-        infogain = -1 * np.mean(entropies)
-        assert not np.isnan(infogain)
+        infogain = -1 * jnp.mean(entropies)
+        assert not jnp.isnan(infogain)
 
         if self._debug:
             print(f"Active method {self._method}")
@@ -202,7 +202,7 @@ class ActiveRatioTest(ActiveInfoGain):
         user_rews = -1 * user_costs
         ratios = self._beta * (user_rews - next_rews) / next_rews
         if self._debug:
-            min_idx = np.argmin(ratios)
+            min_idx = jnp.argmin(ratios)
             print(f"Active method {self._method}")
             print(f"\tMin weight")
             for key, val in belief.weights[min_idx].items():
@@ -210,9 +210,9 @@ class ActiveRatioTest(ActiveInfoGain):
             print(f"\tRatios mean {np.mean(ratios):.3f} std {np.std(ratios):.3f}")
 
         if self._method == "mean":
-            return -1 * np.mean(ratios)
+            return -1 * jnp.mean(ratios)
         elif self._method == "min":
-            return -1 * np.min(ratios)
+            return -1 * jnp.min(ratios)
         else:
             raise NotImplementedError
 
@@ -236,4 +236,4 @@ class ActiveRandom(ActiveInfoGain):
 
         """
         self._rng_key, rng_random = random.split(self._rng_key)
-        return random_uniform(rng_random)
+        return random.uniform(rng_random)

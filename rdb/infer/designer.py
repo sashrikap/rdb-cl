@@ -5,7 +5,7 @@ import json
 import time
 import pprint
 import numpy as onp
-import jax.numpy as np
+import jax.numpy as jnp
 import numpyro, itertools
 from jax import random
 from os.path import join
@@ -40,6 +40,7 @@ class Designer(object):
         normalized_key,
         num_normalizers,
         proposal_decay=1.0,
+        max_val=15.0,
         ## Sampling
         prior_keys=None,
         use_true_w=False,
@@ -73,6 +74,7 @@ class Designer(object):
         self._normalizer = None
         self._norm_prior = None
         self._proposal_decay = proposal_decay
+        self._max_val = max_val
 
         ## Designer model
         self._use_true_w = use_true_w
@@ -220,7 +222,17 @@ class Designer(object):
                 controller=self._norm_controller,
             )
 
-    def simulate(self, tasks, save_name, tqdm_position=0, universal_model=None):
+    def simulate(
+        self, tasks, save_name, tqdm_position=0, universal_model=None, mode="importance"
+    ):
+        if mode == "mcmc":
+            return self.simulate_mcmc(tasks, save_name, tqdm_position, universal_model)
+        elif mode == "importance":
+            return self.simulate_impt(tasks, save_name, tqdm_position, universal_model)
+        else:
+            raise NotImplementedError
+
+    def simulate_mcmc(self, tasks, save_name, tqdm_position=0, universal_model=None):
         """Sample 1 set of weights from b(design_w) given true_w and prior tasks.
 
         Example:
@@ -265,7 +277,7 @@ class Designer(object):
         num_chains = self._sample_args["num_chains"]
         num_keys = len(self._prior.feature_keys)
         init_params = DictList(
-            dict(zip(self._prior.feature_keys, np.zeros((num_keys, 1))))
+            dict(zip(self._prior.feature_keys, jnp.zeros((num_keys, 1))))
         )
         if num_chains > 1:
             #  shape nfeats * (nchains, 1)
@@ -291,7 +303,7 @@ class Designer(object):
         sample_ws = DictList(sample_ws).squeeze(axis=2)
         assert self._normalized_key not in sample_ws.keys()
         if self._normalized_key in sample_ws:
-            sample_ws[self._normalized_key] = np.zeros(sample_ws.shape)
+            sample_ws[self._normalized_key] = jnp.zeros(sample_ws.shape)
         sample_info = sampler.get_extra_fields(group_by_chain=True)
         sample_rates = sample_info["mean_accept_prob"][:, -1]
         num_samples = sample_ws.shape[1]
@@ -350,9 +362,9 @@ class Designer(object):
         ## Operation over tasks
         task_method = None
         if self._task_method == "sum":
-            task_method = partial(np.sum, axis=0)
+            task_method = partial(jnp.sum, axis=0)
         elif self._task_method == "mean":
-            task_method = partial(np.mean, axis=0)
+            task_method = partial(jnp.mean, axis=0)
         else:
             raise NotImplementedError
 
@@ -364,7 +376,14 @@ class Designer(object):
 
             def _model():
                 #  shape nfeats * (1,)
-                new_ws = self._prior(1).prepare(feats_keys).normalize_across_keys()
+                new_ws = self._prior(1)
+                log_prior = jnp.log(new_ws.numpy_array())
+                infeasible = jnp.logical_or(
+                    jnp.any(log_prior < -1 * self._max_val),
+                    jnp.any(log_prior > self._max_val),
+                )
+
+                new_ws = new_ws.prepare(feats_keys).normalize_across_keys()
                 sample_ws = new_ws.numpy_array()
                 ## ======= Not jit-able optimization: requires scipy/jax optimizer ======
                 sample_ps = self.create_particles(
@@ -379,13 +398,13 @@ class Designer(object):
                 sample_feats_sum = sample_feats_sum.numpy_array()
                 assert sample_feats_sum.shape == (nfeats, ntasks, 1)
                 #  shape (nbatch=1,)
-                true_offset = np.zeros(1)
+                true_offset = jnp.zeros(1)
                 #  shape (ntasks, nbatch=1,)
                 log_probs = self._likelihood(
                     true_ws, true_offset, sample_ws, sample_feats_sum, tasks, self.beta
                 )
                 #  shape (nbatch=1,)
-                log_prob = task_method(log_probs)
+                log_prob = jnp.where(infeasible, -1e10, task_method(log_probs))
                 numpyro.factor("designer_log_prob", log_prob)
 
             return _model
@@ -403,12 +422,12 @@ class Designer(object):
                 # TODO: currently only solves for one task
                 #  shape (1, nfeats)
                 sample_feats_sum = universal_model(sample_input)
-                sample_feats_sum = np.array(sample_feats_sum.detach().numpy()).swapaxes(
-                    1, 0
-                )[:, None]
+                sample_feats_sum = jnp.array(
+                    sample_feats_sum.detach().numpy()
+                ).swapaxes(1, 0)[:, None]
                 assert sample_feats_sum.shape == (nfeats, ntasks, 1)
                 #  shape (nbatch=1,)
-                true_offset = np.zeros(1)
+                true_offset = jnp.zeros(1)
                 #  shape (ntasks, nbatch=1,)
                 log_probs = self._likelihood(
                     true_ws, true_offset, sample_ws, sample_feats_sum, tasks, self.beta
@@ -425,9 +444,9 @@ class Designer(object):
         ## Operation over tasks
         task_method = None
         if self._task_method == "sum":
-            task_method = partial(np.sum, axis=0)
+            task_method = partial(jnp.sum, axis=0)
         elif self._task_method == "mean":
-            task_method = partial(np.mean, axis=0)
+            task_method = partial(jnp.mean, axis=0)
         else:
             raise NotImplementedError
 
@@ -470,7 +489,7 @@ class Designer(object):
             assert sample_feats_sum.shape == (nfeats, ntasks, nbatch)
 
             #  shape (nfeats, 1, nbatch)
-            true_ws = np.expand_dims(true_ws, axis=1)
+            true_ws = jnp.expand_dims(true_ws, axis=1)
 
             ## ===============================================
             ## ======= Computing Numerator: sample_xxx =======
@@ -539,10 +558,10 @@ class Designer(object):
             ## =================================================
             ## ======= Computing Denominator: normal_xxx =======
             #  shape (nfeats, 1, nbatch, 1)
-            normal_truth = np.expand_dims(np.expand_dims(true_ws, axis=1), 3)
+            normal_truth = jnp.expand_dims(jnp.expand_dims(true_ws, axis=1), 3)
             #  shape (nfeats, ntasks, nbatch, nnorms + 1)
-            normal_feats_sum = np.concatenate(
-                [normal_feats_sum, np.expand_dims(sample_feats_sum, axis=3)], axis=3
+            normal_feats_sum = jnp.concatenate(
+                [normal_feats_sum, jnp.expand_dims(sample_feats_sum, axis=3)], axis=3
             )
             #  shape (nfeats, ntasks, nbatch, nnorms + 1)
             normal_costs = normal_truth * normal_feats_sum
@@ -552,15 +571,15 @@ class Designer(object):
             # normal_rews = -beta * normal_costs.mean(axis=0)
 
             ## Normalize by tasks
-            # normal_rews -= np.expand_dims(sample_rews, axis=2)
-            # sample_rews = np.zeros_like(sample_rews)
+            # normal_rews -= jnp.expand_dims(sample_rews, axis=2)
+            # sample_rews = jnp.zeros_like(sample_rews)
 
             #  shape (nbatch, nnorms + 1)
             normal_rews = task_method(normal_rews)
             #  shape (nbatch,)
             sample_rews = task_method(sample_rews)
             #  shape (nbatch,)
-            normal_rews = logsumexp(normal_rews, axis=1) - np.log(nnorms + 1)
+            normal_rews = logsumexp(normal_rews, axis=1) - jnp.log(nnorms + 1)
             assert normal_rews.shape == (nbatch,)
 
             ## =================================================

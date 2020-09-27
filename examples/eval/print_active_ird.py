@@ -1,5 +1,5 @@
 import os
-import jax.numpy as np
+import jax.numpy as jnp
 from jax import random
 from rdb.infer.particles import Particles
 
@@ -59,5 +59,5 @@ print(f"\nIRD Observation")
 print(f"Method {method} seed {seed}")
 SAVEPATH = "data/191231_test/active_ird_exp1"
 obs_path = f"{SAVEPATH}_seed_{seed}.npz"
-obs_data = np.load(obs_path, allow_pickle=True)
+obs_data = jnp.load(obs_path, allow_pickle=True)
 print(f"Obs {obs_data['curr_obs']}")

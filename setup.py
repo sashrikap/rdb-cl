@@ -10,13 +10,16 @@ setup(
     install_requires=[
         "numpy",
         "pillow",
-        "scipy==1.1.0",
+        "scipy",
+        "scikit-image",
+        # "scipy==1.1.0",
         "pyglet==1.3.2",
         "matplotlib",
         "gym",
-        "numpyro @ https://github.com/hzyjerry/numpyro/tarball/master#egg=numpyro"
-        "jax==0.1.54",
-        "jaxlib==0.1.38",  # numpyro installs the correct version
+        "flax",
+        # "numpyro @ https://github.com/hzyjerry/numpyro/tarball/master#egg=numpyro"
+        # "jax==0.1.54",
+        # "jaxlib==0.1.38",  # numpyro installs the correct version
         "moviepy",
         "fast-histogram",
         "pygame",
@@ -31,5 +34,6 @@ setup(
         "ipywidgets",
         "flask",
         "imageio-ffmpeg",
+        "tensorboardX",
     ],
 )

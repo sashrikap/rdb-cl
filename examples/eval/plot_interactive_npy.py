@@ -1,7 +1,7 @@
 from jax import random
 import os
 import yaml
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -31,7 +31,7 @@ def plot_proposal_eval():
         file_name = f"proposal_rng_{seed:02d}.npy"
         file_path = f"{exp_dir}/{exp_name}/{file_name}"
         if os.path.isfile(file_path):
-            all_data.append(np.load(file_path, allow_pickle=True).item())
+            all_data.append(jnp.load(file_path, allow_pickle=True).item())
 
     # Gather active function names
     for data in all_data:
@@ -48,9 +48,9 @@ def plot_proposal_eval():
                 [d["violation"] for d in data["proposal_eval"][fn_key]]
             )
     fig, ax = plt.subplots()
-    xs = np.arange(len(methods))
-    ys = [np.mean(np.array(all_eval[fn_key])) for fn_key in methods]
-    yerr = [np.std(np.array(all_eval[fn_key])) for fn_key in methods]
+    xs = jnp.arange(len(methods))
+    ys = [np.mean(jnp.array(all_eval[fn_key])) for fn_key in methods]
+    yerr = [np.std(jnp.array(all_eval[fn_key])) for fn_key in methods]
     plt.bar(xs, ys, yerr=yerr)
     plt.xticks(xs, methods)
     plt.show()
@@ -78,13 +78,13 @@ def plot_training_proposal_eval(mode="bar"):
         proposal_file_path = f"{exp_dir}/{exp_name}/{proposal_file_name}"
         if os.path.isfile(proposal_file_path):
             all_proposal_data.append(
-                np.load(proposal_file_path, allow_pickle=True).item()
+                jnp.load(proposal_file_path, allow_pickle=True).item()
             )
         training_file_name = f"training_rng_{seed:02d}.npy"
         training_file_path = f"{exp_dir}/{exp_name}/{training_file_name}"
         if os.path.isfile(training_file_path):
             all_training_data.append(
-                np.load(training_file_path, allow_pickle=True).item()
+                jnp.load(training_file_path, allow_pickle=True).item()
             )
 
     # Gather active function names
@@ -110,7 +110,7 @@ def plot_training_proposal_eval(mode="bar"):
         fig, ax = plt.subplots(figsize=(8, 8))
         for fn_key in methods:
             xs = [d for d in all_training_eval[fn_key]]
-            ys = [np.mean(np.array(d)) for d in all_proposal_eval[fn_key]]
+            ys = [np.mean(jnp.array(d)) for d in all_proposal_eval[fn_key]]
             # print(fn_key, xs)
             # xs, ys = [], []
             # for rand_idx, d in enumerate(all_proposal_eval[fn_key]):
@@ -141,10 +141,10 @@ def plot_training_proposal_eval(mode="bar"):
         for fi, fn_key in enumerate(methods):
             bars_before[fn_key] = [d for d in all_training_eval[fn_key]]
             bars_after[fn_key] = [
-                np.mean(np.array(d)) for d in all_proposal_eval[fn_key]
+                jnp.mean(jnp.array(d)) for d in all_proposal_eval[fn_key]
             ]
             bars_after_err[fn_key] = [
-                np.std(np.array(d)) for d in all_proposal_eval[fn_key]
+                jnp.std(jnp.array(d)) for d in all_proposal_eval[fn_key]
             ]
             offset = -width * (float(len(methods)) - 1) / 2 + fi * width
             x = onp.arange(len(bars_before[fn_key])) * width * 4
@@ -174,13 +174,13 @@ def plot_box_proposal_ratio():
         training_file_path = f"{exp_dir}/{exp_name}/{training_file_name}"
         if os.path.isfile(training_file_path):
             all_training_data.append(
-                np.load(training_file_path, allow_pickle=True).item()
+                jnp.load(training_file_path, allow_pickle=True).item()
             )
         visualize_file_name = f"visualize_rng_{seed:02d}.npy"
         visualize_file_path = f"{exp_dir}/{exp_name}/{visualize_file_name}"
         if os.path.isfile(visualize_file_path):
             all_visualize_data.append(
-                np.load(visualize_file_path, allow_pickle=True).item()
+                jnp.load(visualize_file_path, allow_pickle=True).item()
             )
 
     # Gather active function names
@@ -208,8 +208,8 @@ def plot_box_proposal_ratio():
         num_propose = int(
             len(all_visualize_eval[fn_key]) / len(all_training_eval[fn_key])
         )
-        ys = np.array(all_visualize_eval[fn_key])
-        xs = np.array(all_training_eval[fn_key]).repeat(num_propose)
+        ys = jnp.array(all_visualize_eval[fn_key])
+        xs = jnp.array(all_training_eval[fn_key]).repeat(num_propose)
         ratios.append(ys / xs)
     rects = ax.boxplot(
         ratios, showfliers=False, patch_artist=True, medianprops=medianprops
@@ -227,7 +227,7 @@ def plot_box_proposal_ratio():
     #     bottom=False,      # ticks along the bottom edge are off
     #     top=False,         # ticks along the top edge are off
     #     labelbottom=False) # labels along the bottom edge are off
-    # plt.xticks(np.arange(2), ("", "", ""))
+    # plt.xticks(jnp.arange(2), ("", "", ""))
     ax.tick_params(axis="both", which="both", length=0)
     x = onp.arange(len(methods)) + 1
     ax.set_xticks(x)

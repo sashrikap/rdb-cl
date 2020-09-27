@@ -11,6 +11,7 @@ General workflow:
 import ray
 import math
 import time
+import jax.numpy as jnp
 from rdb.infer import *
 from tqdm.auto import tqdm
 
@@ -85,7 +86,7 @@ def merge_result(result, new_result):
             if isinstance(val, DictList):
                 result[key] = val.concat(new_result[key], axis=0)
             else:
-                result[key] = np.concatenate([val, new_result[key]], axis=0)
+                result[key] = jnp.concatenate([val, new_result[key]], axis=0)
         return result
 
 
@@ -231,7 +232,7 @@ class ParticleServer(object):
                 if type(val) == DictList:
                     val = val.expand_dims(1).repeat(nweights, axis=1)
                 else:
-                    val = np.repeat(np.expand_dims(val, axis=1), nweights, axis=1)
+                    val = jnp.repeat(jnp.expand_dims(val, axis=1), nweights, axis=1)
             result[key] = val.reshape((ntasks, nweights) + val_shape[1:])
         particles.merge_bulk_tasks(tasks, result)
 

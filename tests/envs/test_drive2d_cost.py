@@ -9,7 +9,7 @@ import numpy as onp
 import pytest
 
 
-features_keys = ["dist_cars", "dist_lanes", "speed", "control", "control_thrust"]
+features_keys = ["dist_cars", "dist_lanes", "speed", "control", "control_throttle"]
 
 
 def build_dynamics(n_cars):
@@ -51,13 +51,13 @@ def build_features(dyn_fn, n_cars):
 
     speed_fn = lambda state, actions: feature.speed_size(state[..., 0:4])
     control_mag = lambda state, actions: feature.control_magnitude(actions)
-    control_thrust = lambda state, actions: feature.control_thrust(actions)
+    control_throttle = lambda state, actions: feature.control_throttle(actions)
     merged_dict = dict(
         dist_cars=car_fn,
         dist_lanes=lane_fn,
         speed=speed_fn,
         control=control_mag,
-        control_thrust=control_thrust,
+        control_throttle=control_throttle,
     )
     merged_fn = merge_dict_funcs(merged_dict)
     return merged_dict, merged_fn
@@ -79,7 +79,7 @@ def build_nonlinear(feats_dict, n_cars):
         partial(np.sum, axis=1), partial(feature.quadratic_feat, goal=2)
     )
     nlr_feats_dict["control"] = compose(partial(np.sum, axis=1), feature.quadratic_feat)
-    nlr_feats_dict["control_thrust"] = compose(
+    nlr_feats_dict["control_throttle"] = compose(
         partial(np.sum, axis=1), feature.quadratic_feat
     )
     nlr_feats_dict = sort_dict_by_keys(nlr_feats_dict, feats_dict.keys())
@@ -100,6 +100,7 @@ def test_combined_full(batch, n_cars):
     ucar = np.array([0, 1]).tile((batch, 1))
     xn = np.tile(xcar, (1, n_cars))
     out = dyn_fn(xn, ucar)
+    assert not np.any(np.isnan(out))
     assert out.shape == (batch, 4 * n_cars + 3)
 
 
@@ -111,8 +112,10 @@ def test_raw_features_full(batch, n_cars):
     ucar = np.array([0, 1]).tile((batch, 1))
     xn = np.tile(xcar, (1, n_cars))
     out = feats_fn(xn, ucar)
+
     for key, val in out.items():
         assert val.shape[0] == batch
+        assert not np.any(np.isnan(val))
         if key == "dist_cars":
             assert val.shape == (batch, n_cars, 2)
         elif key == "dist_lanes":
@@ -131,6 +134,7 @@ def test_nonlinear_features_full(batch, n_cars):
     xn = np.tile(xcar, (1, n_cars))
     out = nlr_fn(xn, ucar)
     for key, val in out.items():
+        assert not np.any(np.isnan(val))
         assert val.shape[0] == batch
         assert len(val.shape) == 1
 
@@ -150,5 +154,6 @@ def test_nonlinear_features_cost(batch, n_cars):
     weights_arr = DictList(weights).prepare(features_keys).numpy_array()
     cost_fn = build_cost(nlr_dict)
     out = cost_fn(xn, ucar, weights=weights_arr)
+    assert not np.any(np.isnan(out))
     assert out.shape[0] == batch
     assert len(out.shape) == 1

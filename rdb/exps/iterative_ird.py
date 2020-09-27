@@ -17,7 +17,7 @@ from rdb.exps.utils import *
 from tqdm.auto import tqdm
 from rdb.infer import *
 from jax import random
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import time
 import copy
@@ -233,13 +233,13 @@ class ExperimentIterativeIRD(object):
             next_id = random_choice(
                 self._get_rng_task(),
                 onp.arange(N_top),
-                self._num_propose,
-                replacement=False,
+                (self._num_propose,),
+                replace=False,
             )[0]
             next_task = difficult_tasks[next_id]
         elif method == "random":
             next_task = random_choice(
-                self._get_rng_task(), candidates, self._num_propose, replacement=False
+                self._get_rng_task(), candidates, (self._num_propose,), replace=False
             )[0]
         else:
             ## Pre-empt heavy computations
@@ -312,8 +312,8 @@ class ExperimentIterativeIRD(object):
         self._eval_tasks = random_choice(
             self._get_rng_eval(),
             eval_env.all_tasks,
-            self._num_eval_tasks,
-            replacement=False,
+            (self._num_eval_tasks,),
+            replace=False,
         )
         print(f"============== Iterative Evaluation {self._rng_name} ===============")
         # Load belief
@@ -423,7 +423,7 @@ class ExperimentIterativeIRD(object):
         )
         npz_path = f"{self._save_dir}/{self._exp_name}_seed_{self._rng_name}.npz"
         with open(npz_path, "wb+") as f:
-            np.savez(f, **data)
+            jnp.savez(f, **data)
 
         ## Save user input yaml
         yaml_save = f"{self._save_dir}/yaml/rng_{self._rng_name}_designs.yaml"
@@ -443,19 +443,19 @@ class ExperimentIterativeIRD(object):
     def _save_eval(self, eval_info):
         npy_path = f"{self._save_dir}/{self._exp_name}_eval_seed_{self._rng_name}.npy"
         data = dict(eval_info=eval_info, eval_tasks=self._eval_tasks)
-        np.save(npy_path, eval_info)
+        jnp.save(npy_path, eval_info)
 
     def add_evaluate_obs(self):
         self.reset()
         npy_path = f"{self._save_dir}/{self._exp_name}_eval_seed_{self._rng_name}.npy"
-        eval_info = np.load(npy_path, allow_pickle=True).item()
+        eval_info = jnp.load(npy_path, allow_pickle=True).item()
 
         eval_env = self._env_fn(self._eval_env_name)
         self._eval_tasks = random_choice(
             self._get_rng_eval(),
             eval_env.all_tasks,
-            self._num_eval_tasks,
-            replacement=False,
+            (self._num_eval_tasks,),
+            replace=False,
         )
         # Load belief
         # npz_path = f"{self._save_dir}/{self._exp_name}_seed_{self._rng_name}.npz"

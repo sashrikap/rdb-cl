@@ -9,7 +9,7 @@ import numpyro.optim as np_optimizers
 from scipy.optimize import minimize, basinhopping
 from rdb.optim.utils import *
 from rdb.infer import *
-import jax.numpy as np
+import jax.numpy as jnp
 import time
 import jax
 
@@ -94,7 +94,7 @@ class OptimizerScipy(Optimizer):
                 us (ndarray): actions (horizon, nbatch, udim)
 
             """
-            us = np.reshape(us, (self._horizon, -1, self._udim))
+            us = jnp.reshape(us, (self._horizon, -1, self._udim))
             out = onp.array(jit_fn(us, *args))
             if flatten_out:
                 out = out.flatten()
@@ -256,7 +256,7 @@ class OptimizerNumPyro(Optimizer):
         opt_init = lambda params: optim.init(params)
 
         # Define a compiled update step
-        # @jax.jit
+        @jax.jit
         def step(opt_state):
             us = get_params(opt_state)
             g = grad_fn(us)

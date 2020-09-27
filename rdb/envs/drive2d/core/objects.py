@@ -8,7 +8,7 @@ Includes:
 
 """
 
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import pyglet
 
@@ -113,11 +113,11 @@ class Garage(Object):
 
     def render_floor(self):
         gl.glColor3f(0.4, 0.4, 0.4)
-        dx = np.array([1.0, 0.0])
-        dy = np.array([0.0, 1.0])
+        dx = jnp.array([1.0, 0.0])
+        dy = jnp.array([0.0, 1.0])
         xlen = self._sprite.width
         ylen = self._sprite.height
-        pos = np.array(self.state[:2])
+        pos = jnp.array(self.state[:2])
         quad_strip = onp.hstack(
             [
                 pos - dx * 0.5 * xlen - dy * 0.5 * ylen,
@@ -168,7 +168,7 @@ class Entrance(Driveway):
 
         """
         super().__init__(state, self.NAME, pt1, pt2, width, length)
-        self._start = np.array(self.state[:2])
+        self._start = jnp.array(self.state[:2])
         self._end = self._start - self.forward * self._length
 
     @property

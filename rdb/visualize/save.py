@@ -1,4 +1,4 @@
-import numpy as np
+import numpy as onp
 
 """
 Basic savers & loaders for trajectories
@@ -6,4 +6,4 @@ Basic savers & loaders for trajectories
 
 
 def save_rewards(xs, ys, rews, path="data.npz"):
-    np.savez(path, xs, ys, rews)
+    onp.savez(path, xs, ys, rews)

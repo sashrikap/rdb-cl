@@ -1,5 +1,5 @@
 import jax
-import jax.numpy as np
+import jax.numpy as jnp
 from jax import lax, random
 import numpy as onp
 import numpyro
@@ -14,7 +14,7 @@ def experimental_fn(x):
     data = onp.random.random((2, 2))
     # data = onp.array(x)
     print("data", data)
-    result = np.sum(x * data)
+    result = jnp.sum(x * data)
     return result
 
 
@@ -65,7 +65,7 @@ def experimental_two(x):
 
 def test_two():
     grad_experimental_fn = jax.grad(experimental_two)
-    x = np.ones(5) * 5
+    x = jnp.ones(5) * 5
     print(experimental_two(x))
     print(jax.jit(experimental_two)(x))
     g2 = grad_experimental_fn(x)
@@ -75,11 +75,11 @@ def test_two():
 def test_kernel():
     # with jax.disable_jit(), control_flow_prims_disabled():
     dist_cars = numpyro.sample("prior_data", dist.Uniform(-10, 10), sample_shape=(2, 2))
-    # rand = onp.random.random((2, 2)) + np.array(dist_cars)
-    rand = np.array(dist_cars)
+    # rand = onp.random.random((2, 2)) + jnp.array(dist_cars)
+    rand = jnp.array(dist_cars)
     # rand = untraceable_primitive(dist_cars)
     print("rand", rand)
-    log_prob = np.sum(rand * dist_cars)
+    log_prob = jnp.sum(rand * dist_cars)
     numpyro.factor("forward_log_prob", log_prob)
 
 

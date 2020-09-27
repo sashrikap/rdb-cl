@@ -1,5 +1,5 @@
 import os
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import seaborn as sns
 
@@ -10,7 +10,7 @@ from jax import random
 
 def read_seed(path):
     # print(path)
-    data = np.load(path, allow_pickle=True)["eval_hist"].item()
+    data = jnp.load(path, allow_pickle=True)["eval_hist"].item()
     # keys = list(data.keys())
     # assert len(keys) == 1
     # values = [d["violation"] for d in data[keys[0]]]
@@ -38,7 +38,7 @@ def plot_vio(data_dir, data):
     sns.set_palette("husl")
     colors = "gbkr"
     for i, (method, mdict) in enumerate(data.items()):
-        vio = np.array(mdict["violation"])
+        vio = jnp.array(mdict["violation"])
         sns.tsplot(time=range(len(vio[0])), color=colors[i], data=vio, condition=method)
     # import
     # plt.xticks(range(len(vio[0])))

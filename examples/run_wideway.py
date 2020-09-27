@@ -1,6 +1,6 @@
 import gym
 import time, copy
-import jax.numpy as np
+import jax.numpy as jnp
 import rdb.envs.drive2d
 
 from rdb.optim.runner import Runner
@@ -38,7 +38,7 @@ if not DUMMY_ACTION:
     if COLLECT_MP4:
         runner.collect_mp4(env.state, actions, path="data/driveway_sanity.mp4")
 else:
-    actions = np.zeros((T, env.udim))
+    actions = jnp.zeros((T, env.udim))
 
 env.render("human", draw_heat=DRAW_HEAT)
 for t in range(T):

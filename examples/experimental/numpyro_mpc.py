@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-import jax.numpy as np
+import jax.numpy as jnp
 import numpyro.distributions as dist
 import rdb.envs.drive2d
 import numpy as onp
@@ -47,40 +47,40 @@ controller, runner = build_mpc(
 
 def ird_experimental(feats_sum):
     t1 = time()
-    dist_cars = np.exp(
+    dist_cars = jnp.exp(
         numpyro.sample("dist_cars", dist.Uniform(-10, 10), sample_shape=(nbatch,))
     )
-    dist_lanes = np.exp(
+    dist_lanes = jnp.exp(
         numpyro.sample("dist_lanes", dist.Uniform(-10, 10), sample_shape=(nbatch,))
     )
-    dist_objects = np.exp(
+    dist_objects = jnp.exp(
         numpyro.sample("dist_objects", dist.Uniform(-10, 10), sample_shape=(nbatch,))
     )
-    speed = np.exp(
+    speed = jnp.exp(
         numpyro.sample("speed", dist.Uniform(-10, 10), sample_shape=(nbatch,))
     )
-    speed_over = np.exp(
+    speed_over = jnp.exp(
         numpyro.sample("speed_over", dist.Uniform(-10, 10), sample_shape=(nbatch,))
     )
-    speed_under = np.exp(
+    speed_under = jnp.exp(
         numpyro.sample("speed_under", dist.Uniform(-10, 10), sample_shape=(nbatch,))
     )
-    control = np.exp(
+    control = jnp.exp(
         numpyro.sample("control", dist.Uniform(-10, 10), sample_shape=(nbatch,))
     )
-    control_thrust = np.exp(
+    control_thrust = jnp.exp(
         numpyro.sample("control_thrust", dist.Uniform(-10, 10), sample_shape=(nbatch,))
     )
-    control_brake = np.exp(
+    control_brake = jnp.exp(
         numpyro.sample("control_brake", dist.Uniform(-10, 10), sample_shape=(nbatch,))
     )
-    control_turn = np.exp(
+    control_turn = jnp.exp(
         numpyro.sample("control_turn", dist.Uniform(-10, 10), sample_shape=(nbatch,))
     )
-    dist_fences = np.exp(
+    dist_fences = jnp.exp(
         numpyro.sample("dist_fences", dist.Uniform(-10, 10), sample_shape=(nbatch,))
     )
-    weights_arr = np.array(
+    weights_arr = jnp.array(
         [
             dist_cars,
             dist_lanes,
@@ -120,7 +120,7 @@ def ird_experimental(feats_sum):
 
 
 def warmup():
-    state = np.repeat(env.state, nbatch, axis=0)
+    state = jnp.repeat(env.state, nbatch, axis=0)
     controller(state, weights=None, weights_arr=np.zeros((11, nbatch)))
 
 

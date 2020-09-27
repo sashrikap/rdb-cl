@@ -36,9 +36,9 @@ GCP_LABEL: ird_sample_1000_norm_200
 IRD_ARGS:
   task_method: sum
   sample_method: MH
+  max_val: 15.0
   sample_init_args:
     proposal_var: 3
-    max_val: 15.0
   proposal_decay: 0.9
   # sample_method: HMC
   # sample_method: NUTS
@@ -57,10 +57,10 @@ DESIGNER_ARGS:
   task_method: sum
   sample_method: MH
   num_normalizers: 1000
+  max_val: 15.0
   sample_init_args:
     proposal_var: 0.001 # week6_02
     # proposal_var: 0.5  # week6_01
-    max_val: 15.0
   proposal_decay: 0.7
   sample_args:
     num_samples: 300

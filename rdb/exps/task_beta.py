@@ -26,7 +26,7 @@ from functools import partial
 from tqdm.auto import tqdm
 from rdb.infer import *
 from jax import random
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import time
 import copy
@@ -84,7 +84,7 @@ class ExperimentTaskBeta(object):
         # Universal model
         self._universal_model = None
         if universal_model is not None:
-            data = np.load(os.path.join(model_dir, universal_model), allow_pickle=True)
+            data = jnp.load(os.path.join(model_dir, universal_model), allow_pickle=True)
             _, predict = create_model(
                 data["input_dim"].item(), data["output_dim"].item(), mode="test"
             )
@@ -160,14 +160,14 @@ class ExperimentTaskBeta(object):
         if self._num_eval_tasks > len(eval_env.all_tasks):
             num_eval = -1
         self._eval_tasks = random_choice(
-            self._get_rng("eval"), eval_env.all_tasks, num_eval, replacement=False
+            self._get_rng("eval"), eval_env.all_tasks, (num_eval,), replace=False
         )
         self._train_tasks = self._model.env.all_tasks
         prior_tasks = random_choice(
             self._get_rng("eval"),
             self._train_tasks,
-            self._num_prior_tasks,
-            replacement=False,
+            (self._num_prior_tasks,),
+            replace=False,
         )
         self._designer_server.set_prior_tasks(prior_tasks)
 
@@ -231,7 +231,7 @@ class ExperimentTaskBeta(object):
         """
 
         if method == "first":
-            target_tasks = np.array([tasks[0]])
+            target_tasks = jnp.array([tasks[0]])
             targets = norm_particles[0]
             target_feats = targets.get_features(target_tasks)
             offset = particles.get_offset_by_features(target_feats)
@@ -285,6 +285,9 @@ class ExperimentTaskBeta(object):
         desc = f"Evaluating {eval_mode} beta {beta}"
         for task in tqdm(self._eval_tasks, desc=desc):
             comparisons = particles_sample.compare_with(task, target=target)
+            import pdb
+
+            pdb.set_trace()
             all_performs.append(comparisons["rews"].mean())
             all_violates.append(comparisons["vios"].mean())  # (nweights,) -> (1,)
             rel_performs.append(comparisons["rews_relative"].mean())
@@ -353,14 +356,14 @@ class ExperimentTaskBeta(object):
         )
         npz_path = f"{self._save_dir}/{self._exp_name}_seed_{self._rng_name}.npz"
         with open(npz_path, "wb+") as f:
-            np.savez(f, **data)
+            jnp.savez(f, **data)
         ## Save evaluation history to yaml
         npy_path = (
             f"{self._save_dir}/{self._exp_name}_designer_seed_{self._rng_name}.npy"
         )
-        np.save(npy_path, self._designer_eval_hist)
+        jnp.save(npy_path, self._designer_eval_hist)
         npy_path = f"{self._save_dir}/{self._exp_name}_ird_seed_{self._rng_name}.npy"
-        np.save(npy_path, self._ird_eval_hist)
+        jnp.save(npy_path, self._ird_eval_hist)
 
         if not skip_weights:
             for dbeta, proxies in self._designer_proxies.items():

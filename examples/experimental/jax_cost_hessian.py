@@ -8,7 +8,7 @@ from rdb.infer import *
 from jax.lax import fori_loop, scan
 from jax.ops import index_update
 import jax.random as random
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import time
 import jax
@@ -51,7 +51,7 @@ def test_hessian():
     xdim, udim = env.xdim, env.udim
     h_traj = build_forward(f_dyn, xdim, udim, horizon, dt)
     h_costs = build_costs(udim, horizon, h_traj, f_cost)
-    h_csum = lambda x0, us, weights: np.sum(h_costs(x0, us, weights))
+    h_csum = lambda x0, us, weights: jnp.sum(h_costs(x0, us, weights))
 
     # Gradient w.r.t. x and u
     h_grad = jax.jit(jax.grad(h_csum, argnums=(0, 1)))
@@ -66,22 +66,22 @@ def test_hessian():
     h_hess = jax.jit(jacfwd(jacrev(h_csum, argnums=1), argnums=1))
     h_hess2 = jacfwd(jacrev(h_csum, argnums=1), argnums=1)
     x0 = env.state
-    us = np.zeros((1, horizon, env.udim))
+    us = jnp.zeros((1, horizon, env.udim))
     import pdb
 
     pdb.set_trace()
     h_costs(x0, us.swapaxes(0, 1), weights)
     H = h_hess(x0, us.swapaxes(0, 1), weights)
-    h_hess(x0, np.ones((1, horizon, env.udim)).swapaxes(0, 1), weights)
+    h_hess(x0, jnp.ones((1, horizon, env.udim)).swapaxes(0, 1), weights)
     print(f"Hessian with shape", H.shape)
 
 
 def exp_hessian():
     def predict(params, inputs):
-        return np.sum(params["W"].dot(inputs) + params["b"])
+        return jnp.sum(params["W"].dot(inputs) + params["b"])
 
     params = dict(W=np.ones((5, 2)), b=np.ones((5, 3)))
-    data = np.ones((2, 3))
+    data = jnp.ones((2, 3))
     J_dict = jacrev(predict)(params, data)
     for k, v in J_dict.items():
         print("Jacobian from {} to logits is".format(k))

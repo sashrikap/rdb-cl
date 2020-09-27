@@ -7,7 +7,7 @@ This script samples different weights, and compare the resulting trajectory agai
 import gym
 import copy
 import pytest
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import rdb.envs.drive2d
 from time import time
@@ -111,7 +111,7 @@ def tune_normal_cost(nbatch):
     print(
         f"Ratios mean {np.mean(ratios):.02f} std {np.std(ratios):.02f} max {np.max(ratios):.02f} min {np.min(ratios):.02f}"
     )
-    if np.max(ratios) > 1:
+    if jnp.max(ratios) > 1:
         import pdb
 
         pdb.set_trace()

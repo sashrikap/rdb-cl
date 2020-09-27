@@ -11,7 +11,7 @@ from rdb.infer.particles import Particles
 from rdb.exps.utils import Profiler
 from numpyro.handlers import seed
 from tqdm.auto import tqdm
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import time
 import copy
@@ -77,7 +77,7 @@ class ExperimentDesignerPrior(object):
         if self._num_eval_tasks > len(self._designer.env.all_tasks):
             num_eval = -1
         all_tasks = self._random_task_choice(
-            self._designer.env.all_tasks, num_eval, replacement=False
+            self._designer.env.all_tasks, num_eval, replace=False
         )
         all_names = [f"eval_{task}" for task in all_tasks]
 

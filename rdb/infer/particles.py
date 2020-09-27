@@ -12,7 +12,7 @@ from scipy.stats import gaussian_kde
 from rdb.exps.utils import Profiler
 from functools import partial
 from jax import random
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import copy
 import math
@@ -282,7 +282,7 @@ class Particles(object):
             # ), f"Not enough samples for {num_samples}."
             self._rng_key, rng_random = random.split(self._rng_key)
             weights = random_choice(
-                rng_random, self._weights, num_samples, replacement=True
+                rng_random, self._weights, (num_samples,), replace=True
             )
             weights = DictList(weights)
             return self._clone(weights)
@@ -392,7 +392,7 @@ class Particles(object):
             print(
                 f"First time computing hessian finished: {(time.time() - hessian_start):.2f}"
             )
-        return np.array(all_hessians), np.array(all_hess_sum)
+        return jnp.array(all_hessians), jnp.array(all_hess_sum)
 
     def get_costs(self, tasks, lower=False, desc=None):
         """Compute expected feature sums for sample weights on task.
@@ -411,7 +411,7 @@ class Particles(object):
             else:
                 all_costs.append(self._cache_costs[task_name])
             #  shape nfeats * (nparticles)
-        return np.array(all_costs)
+        return jnp.array(all_costs)
 
     def get_violations(self, tasks, lower=False, desc=None):
         """Compute violations sum (cached) for sample weights on task.
@@ -470,7 +470,6 @@ class Particles(object):
         new_tasks = [
             task for task in tasks if self.get_task_name(task) not in self.cached_names
         ]
-
         if vectorize:
             ## Rollout (nweights * ntasks) in one expanded vector
             if len(new_tasks) == 0:
@@ -514,14 +513,14 @@ class Particles(object):
                 max_batch=max_batch,
             )
             if self._risk_averse:
-                batch_trajs["actions"] = np.repeat(
-                    np.expand_dims(batch_trajs["actions"], 1), nweights, axis=1
+                batch_trajs["actions"] = jnp.repeat(
+                    jnp.expand_dims(batch_trajs["actions"], 1), nweights, axis=1
                 )
-                batch_trajs["costs"] = np.repeat(
-                    np.expand_dims(batch_trajs["costs"], 1), nweights, axis=1
+                batch_trajs["costs"] = jnp.repeat(
+                    jnp.expand_dims(batch_trajs["costs"], 1), nweights, axis=1
                 )
-                lower_trajs["costs"] = np.repeat(
-                    np.expand_dims(lower_trajs["costs"], 1), nweights, axis=1
+                lower_trajs["costs"] = jnp.repeat(
+                    jnp.expand_dims(lower_trajs["costs"], 1), nweights, axis=1
                 )
                 batch_trajs["feats"] = (
                     batch_trajs["feats"].expand_dims(1).repeat(nweights, axis=1)
@@ -576,7 +575,7 @@ class Particles(object):
                     #  shape (1, task_dim)
                     state_i = self._env.get_init_states([task_i])
                     #  shape (nweights, task_dim)
-                    batch_states = np.tile(state_i, (nweights, 1))
+                    batch_states = jnp.tile(state_i, (nweights, 1))
                     us0_i = batch_us0[ti]
                     trajs = collect_trajs(
                         weights_arr,
@@ -633,7 +632,7 @@ class Particles(object):
         if (
             isinstance(key, int)
             or isinstance(key, onp.ndarray)
-            or isinstance(key, np.ndarray)
+            or isinstance(key, jnp.ndarray)
             or isinstance(key, list)
         ):
             # index
@@ -826,8 +825,8 @@ class Particles(object):
                 rews_normalized=diff_rews / (worst_diff_rews + eps),
             )
         else:
-            this_costs = np.zeros(nbatch)
-            this_rews = np.zeros(nbatch)
+            this_costs = jnp.zeros(nbatch)
+            this_rews = jnp.zeros(nbatch)
             this_vios_sum = this_vios.onp_array().sum(axis=0)
             return dict(
                 rews=this_rews,
@@ -843,11 +842,7 @@ class Particles(object):
         assert len(probs) == len(self.weights)
         self._rng_key, rng_random = random.split(self._rng_key)
         new_weights = random_choice(
-            rng_random,
-            self.weights,
-            num=len(self.weights),
-            probs=probs,
-            replacement=True,
+            rng_random, self.weights, (len(self.weights),), p=probs, replace=True
         )
         new_weights = DictList(new_weights)
         new_ps = self._clone(new_weights)
@@ -918,7 +913,7 @@ class Particles(object):
             row = self.weights[key]
             ## Fast histogram
             if not log_scale:
-                row = np.log(row)
+                row = jnp.log(row)
             hist_count = histogram1d(row, bins=bins, range=ranges)
             hist_prob = hist_count / len(row)
 
@@ -980,8 +975,8 @@ class Particles(object):
             row = self.weights[key]
             val = weights[key]
             if not log_scale:
-                row = np.log(row)
-                val = np.log(val)
+                row = jnp.log(row)
+                val = jnp.log(val)
             unique_vals, indices, counts = onp.unique(
                 onp.digitize(row, m_bins, right=True),
                 return_index=True,
@@ -993,7 +988,7 @@ class Particles(object):
             ct = onp.sum(hist_count * all_counts)
             prob_ct = float(ct) / len(row)
             eps = 1e-8
-            log_prob += np.log(prob_ct + eps)
+            log_prob += jnp.log(prob_ct + eps)
         return log_prob
 
     def map_estimate(self, num_map, method="histogram", log_scale=False):
@@ -1030,7 +1025,7 @@ class Particles(object):
                 for val, ct in zip(unique_vals, counts):
                     val_bins_idx = which_bins == val
                     prob_ct = float(ct) / len(row)
-                    probs[val_bins_idx] += np.log(prob_ct)
+                    probs[val_bins_idx] += jnp.log(prob_ct)
             map_idxs = onp.argsort(-1 * probs)[:num_map]
             map_weights = self.weights[map_idxs]
             # MAP esimate usually used for evaluation; thread-safe to provide self._env
@@ -1044,17 +1039,17 @@ class Particles(object):
         assert self._save_dir is not None, "Need to specify save directory."
         path = f"{self._save_dir}/{self._expanded_name}.npz"
         with open(path, "wb+") as f:
-            np.savez(f, weights=dict(self.weights))
+            jnp.savez(f, weights=dict(self.weights))
 
     def load(self):
         path = f"{self._save_dir}/{self._expanded_name}.npz"
         assert os.path.isfile(path)
-        load_data = np.load(path, allow_pickle=True)
+        load_data = jnp.load(path, allow_pickle=True)
         self._weights = DictList(load_data["weights"].item())
 
     def load_from_path(self, path):
         assert os.path.isfile(path)
-        load_data = np.load(path, allow_pickle=True)
+        load_data = jnp.load(path, allow_pickle=True)
         self._weights = DictList(load_data["weights"].item())
 
     def visualize(self, true_w=None, obs_w=None, log_scale=False, **kwargs):

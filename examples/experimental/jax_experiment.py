@@ -6,7 +6,7 @@ import numpy as onp
 from scipy.stats import gaussian_kde
 import jax
 from jax import lax, random
-import jax.numpy as np
+import jax.numpy as jnp
 from jax.scipy.special import logsumexp
 import numpy as onp
 import gym
@@ -36,49 +36,49 @@ optimizer, runner = build_mpc(
 
 
 def forward_one_step(prev_log_prob, curr_word, transition_log_prob, emission_log_prob):
-    log_prob_tmp = np.expand_dims(prev_log_prob, axis=1) + transition_log_prob
+    log_prob_tmp = jnp.expand_dims(prev_log_prob, axis=1) + transition_log_prob
     log_prob = log_prob_tmp + emission_log_prob[:, curr_word]
     return logsumexp(log_prob, axis=0)
 
 
 @jax.jit
 def jax_sum(weights_arr, feats_arr):
-    return np.mean(weights_arr * feats_arr)
+    return jnp.mean(weights_arr * feats_arr)
 
 
 def ird_experimental():
-    dist_cars = np.exp(
+    dist_cars = jnp.exp(
         numpyro.sample("dist_cars", dist.Uniform(-10, 10), sample_shape=(5,))
     )
-    dist_lanes = np.exp(
+    dist_lanes = jnp.exp(
         numpyro.sample("dist_lanes", dist.Uniform(-10, 10), sample_shape=(5,))
     )
-    dist_objects = np.exp(
+    dist_objects = jnp.exp(
         numpyro.sample("dist_objects", dist.Uniform(-10, 10), sample_shape=(5,))
     )
-    speed = np.exp(numpyro.sample("speed", dist.Uniform(-10, 10), sample_shape=(5,)))
-    speed_over = np.exp(
+    speed = jnp.exp(numpyro.sample("speed", dist.Uniform(-10, 10), sample_shape=(5,)))
+    speed_over = jnp.exp(
         numpyro.sample("speed_over", dist.Uniform(-10, 10), sample_shape=(5,))
     )
-    speed_under = np.exp(
+    speed_under = jnp.exp(
         numpyro.sample("speed_under", dist.Uniform(-10, 10), sample_shape=(5,))
     )
-    control = np.exp(
+    control = jnp.exp(
         numpyro.sample("control", dist.Uniform(-10, 10), sample_shape=(5,))
     )
-    control_thrust = np.exp(
+    control_thrust = jnp.exp(
         numpyro.sample("control_thrust", dist.Uniform(-10, 10), sample_shape=(5,))
     )
-    control_brake = np.exp(
+    control_brake = jnp.exp(
         numpyro.sample("control_brake", dist.Uniform(-10, 10), sample_shape=(5,))
     )
-    control_turn = np.exp(
+    control_turn = jnp.exp(
         numpyro.sample("control_turn", dist.Uniform(-10, 10), sample_shape=(5,))
     )
-    dist_fences = np.exp(
+    dist_fences = jnp.exp(
         numpyro.sample("dist_fences", dist.Uniform(-10, 10), sample_shape=(5,))
     )
-    weights_arr = np.array(
+    weights_arr = jnp.array(
         [
             dist_cars,
             dist_lanes,
@@ -109,7 +109,7 @@ def ird_experimental():
 
     # weights_onp = {"dist_cars": onp.array(dist_cars)}
 
-    state = np.repeat(env.state, 5, axis=0)
+    state = jnp.repeat(env.state, 5, axis=0)
 
     # dummy compilation
     # optimizer(onp.zeros(state.shape), weights=None, weights_arr=, batch=False)
@@ -130,9 +130,9 @@ def ird_experimental():
     feats_sum = info["feats_sum"].numpy_array()
     # cost = DictList([weights], jax=True).numpy_array() * info["feats_sum"].numpy_array()
     # cost = dist_cars * info["feats_sum"].onp_array()
-    # cost = dist_cars * np.ones((1, 4))
-    # cost = DictList([weights], jax=True).numpy_array() * np.array([[10]])
-    # cost = dist_cars * np.array([[10]])
+    # cost = dist_cars * jnp.ones((1, 4))
+    # cost = DictList([weights], jax=True).numpy_array() * jnp.array([[10]])
+    # cost = dist_cars * jnp.array([[10]])
     cost = cost.mean(axis=0)
     cost = jax_sum(weights_arr, feats_sum)
     beta = 5

@@ -9,7 +9,7 @@ Includes:
 
 """
 import jax
-import jax.numpy as np
+import jax.numpy as jnp
 from jax.lax import map as jmap
 from jax.scipy.special import logsumexp
 from functools import partial
@@ -66,7 +66,7 @@ class RiskAverseMPC(FiniteHorizonMPC):
         u_shape = (n_batch, self._horizon, self._udim)
         if us0 is None:
             if init == "zeros":
-                us0 = np.zeros(u_shape)
+                us0 = jnp.zeros(u_shape)
             else:
                 raise NotImplementedError(f"Initialization undefined for '{init}'")
         us_opt = self._plan(x0, us0, weights_arr)
@@ -93,13 +93,13 @@ def build_multi_costs(
     assert mode in {"stepwise", "trajwise"}
 
     def _soft_max_ratio(costs, axis=None):
-        costs = np.array(costs)
-        return np.exp(costs - logsumexp(costs, axis=axis))
+        costs = jnp.array(costs)
+        return jnp.exp(costs - logsumexp(costs, axis=axis))
 
     def _hard_max_ratio(costs, axis=None):
-        costs = np.array(costs)
-        idx = np.argmax(costs, axis=axis)
-        ratio = np.zeros_like(costs)
+        costs = jnp.array(costs)
+        idx = jnp.argmax(costs, axis=axis)
+        ratio = jnp.zeros_like(costs)
         ratio[idx] = 1.0
         return ratio
 
@@ -124,7 +124,7 @@ def build_multi_costs(
         xs = roll_forward(x, us)
         # shape (horizon, nbatch)
         costs = vf_cost(xs, us)
-        return np.array(costs)
+        return jnp.array(costs)
 
     @jax.jit
     def roll_stepwise_costs(x, us, all_weights):
@@ -143,14 +143,14 @@ def build_multi_costs(
         #  shape: (nweights, horizon, nbatch)
         proll_cost = partial(roll_cost, x=x, us=us)
         #  shape (nweights, nfeats, nbatch)
-        # all_weights = np.rollaxis(all_weights, 2, 0)
-        all_weights = np.swapaxes(all_weights, 0, 2)
-        all_weights = np.swapaxes(all_weights, 1, 2)
+        # all_weights = jnp.rollaxis(all_weights, 2, 0)
+        all_weights = jnp.swapaxes(all_weights, 0, 2)
+        all_weights = jnp.swapaxes(all_weights, 1, 2)
         #  shape (nweights, horizon, nbatch)
-        costs = np.array(jmap(proll_cost, all_weights))
+        costs = jnp.array(jmap(proll_cost, all_weights))
         assert len(costs.shape) == 3
         ratio = _max_ratio(costs, axis=0)
-        return np.sum(ratio * costs, axis=0)
+        return jnp.sum(ratio * costs, axis=0)
 
     @jax.jit
     def roll_trajwise_costs(x, us, all_weights):
@@ -168,17 +168,17 @@ def build_multi_costs(
         assert len(all_weights.shape) == 3, f"Got shape {all_weights.shape}"
         proll_cost = partial(roll_cost, x=x, us=us)
         #  shape: (nweights, horizon, nbatch)
-        # all_weights = np.rollaxis(all_weights, 2, 0)
-        all_weights = np.swapaxes(all_weights, 0, 2)
-        all_weights = np.swapaxes(all_weights, 1, 2)
+        # all_weights = jnp.rollaxis(all_weights, 2, 0)
+        all_weights = jnp.swapaxes(all_weights, 0, 2)
+        all_weights = jnp.swapaxes(all_weights, 1, 2)
         #  shape (nweights, horizon, nbatch)
-        costs = np.array(jmap(proll_cost, all_weights))
+        costs = jnp.array(jmap(proll_cost, all_weights))
         assert len(costs.shape) == 3
-        csums = np.sum(costs, axis=(1, 2))
+        csums = jnp.sum(costs, axis=(1, 2))
         ratio = _max_ratio(csums, axis=0)
         #   shape (nweights, 1, 1)
-        ratio = np.expand_dims(np.expand_dims(ratio, 1), 2)
-        return np.sum(ratio * costs, axis=0)
+        ratio = jnp.expand_dims(jnp.expand_dims(ratio, 1), 2)
+        return jnp.sum(ratio * costs, axis=0)
 
     if mode == "stepwise":
         return roll_stepwise_costs

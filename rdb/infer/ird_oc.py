@@ -18,7 +18,7 @@ import copy
 import json
 import os
 import jax
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 from rdb.infer.designer import Designer, DesignerInteractive
 from rdb.infer.particles import Particles
@@ -75,6 +75,7 @@ class IRDOptimalControl(object):
         ## Weight parameters
         normalized_key,
         proposal_decay=1.0,
+        max_val=15.0,
         ## Sampling
         task_method="sum",
         sample_method="MH",
@@ -102,6 +103,7 @@ class IRDOptimalControl(object):
         self._designer = designer
         self._beta = beta
         self._proposal_decay = proposal_decay
+        self._max_val = max_val
 
         # Normalizer
         self._normalized_key = normalized_key
@@ -229,7 +231,7 @@ class IRDOptimalControl(object):
             obs_feats_dict = obs_ps.get_features_sum(tasks)
             obs_feats_sum = (
                 obs_ps.get_features_sum(tasks)
-                .prepare(feats_keys)[np.diag_indices(ntasks)]
+                .prepare(feats_keys)[jnp.diag_indices(ntasks)]
                 .expand_dims(0)
                 .numpy_array()
             )
@@ -237,9 +239,9 @@ class IRDOptimalControl(object):
                 _, obs_hnorm = obs_ps.get_hessians(tasks)
 
             #  shape (ntasks, 1, T, udim)
-            # obs_actions = obs_ps.get_actions(tasks)[np.diag_indices(ntasks)][:, None]
+            # obs_actions = obs_ps.get_actions(tasks)[jnp.diag_indices(ntasks)][:, None]
             # #  shape (ntasks, dnnorms, T, udim)
-            # obs_actions_dnorm = np.repeat(obs_actions, dnnorms, axis=0)
+            # obs_actions_dnorm = jnp.repeat(obs_actions, dnnorms, axis=0)
 
             ## ================= Prepare Designer Normalizer ================
             # self._designer.normalizer.compute_tasks(tasks, us0=obs_actions_dnorm)
@@ -276,12 +278,12 @@ class IRDOptimalControl(object):
             #  shape (nfeats, ntasks)
             obs_ws = obs_ws.prepare(feats_keys).normalize_across_keys().numpy_array()
             #  shape (1, ws_dim)
-            obs_ws_arr = np.array(list(ob.weights.values())).T
+            obs_ws_arr = jnp.array(list(ob.weights.values())).T
             #  shape (nfeats, 1, ntasks)
             obs_feats_sum = universal_model(obs_ws_arr).T[:, None, :]
             # obs_feats_sum = (
             #     obs_ps.get_features_sum(tasks)
-            #     .prepare(feats_keys)[np.diag_indices(ntasks)]
+            #     .prepare(feats_keys)[jnp.diag_indices(ntasks)]
             #     .expand_dims(0)
             #     .numpy_array()
             # )
@@ -292,7 +294,7 @@ class IRDOptimalControl(object):
             print(f"Computing designer normalizers: {self._designer.num_normalizers}")
             t1 = time()
             #  shape (n_norm, ws_dim)
-            norm_ws_arr = np.array(list(self._designer.normalizer.weights.values())).T
+            norm_ws_arr = jnp.array(list(self._designer.normalizer.weights.values())).T
             ## TODO: only 1 task supported
             norm_feats_sum = universal_model(norm_ws_arr).T[:, None, :]
             print(f"Computing designer normalizers time {time() - t1}")
@@ -326,9 +328,9 @@ class IRDOptimalControl(object):
         ## Operation over tasks
         task_method = None
         if self._task_method == "sum":
-            task_method = np.sum
+            task_method = jnp.sum
         elif self._task_method == "mean":
-            task_method = np.mean
+            task_method = jnp.mean
         else:
             raise NotImplementedError
 
@@ -343,6 +345,11 @@ class IRDOptimalControl(object):
                 nonlocal designer_normal_ws  # shape (nfeats, d_nnorms)
                 nonlocal designer_normal_fsum
                 true_ws = self._prior(1).prepare(feats_keys)
+                log_prior = jnp.log(true_ws.numpy_array())
+                infeasible = jnp.logical_or(
+                    jnp.any(log_prior < -1 * self._max_val),
+                    jnp.any(log_prior > self._max_val),
+                )
 
                 ## ======= Not jit-able optimization: requires scipy/jax optimizer ======
                 # true_ps = self.create_particles(true_ws, controller=self._sample_controller, runner=self._sample_runner)
@@ -357,7 +364,7 @@ class IRDOptimalControl(object):
                 # true_ws = true_ws.numpy_array()
 
                 ## Weight offset, only used when normalize mode is `offset`
-                true_offset = np.zeros(1)
+                true_offset = jnp.zeros(1)
 
                 if self._mcmc_normalize == "hessian":
                     _, true_hnorm = obs_ps.get_hessians(tasks, true_ws)
@@ -374,7 +381,10 @@ class IRDOptimalControl(object):
                     true_ws = true_ws.numpy_array()
                 else:
                     raise NotImplementedError
-                log_prob = _likelihood(true_ws, true_feats_sum, true_offset)
+                log_prob = jnp.where(
+                    infeasible, -1e10, _likelihood(true_ws, true_feats_sum, true_offset)
+                )
+
                 numpyro.factor("ird_log_probs", log_prob)
 
         else:
@@ -394,7 +404,7 @@ class IRDOptimalControl(object):
                 true_feats_sum = universal_model(sample_input)
 
                 ## Weight offset, only used when normalize mode is `offset`
-                true_offset = np.zeros(1)
+                true_offset = jnp.zeros(1)
                 true_ws = true_ws.prepare(feats_keys).numpy_array()
                 log_prob = _likelihood(true_ws, true_feats_sum, true_offset)
                 numpyro.factor("ird_log_probs", log_prob)
@@ -424,7 +434,7 @@ class IRDOptimalControl(object):
             ## ===============================================
             ## ======= Computing Numerator: sample_xxx =======
             #  shape (nfeats, ntasks)
-            ird_true_ws_n = np.repeat(ird_true_ws, ntasks, axis=1)
+            ird_true_ws_n = jnp.repeat(ird_true_ws, ntasks, axis=1)
             #  shape (ntasks,), designer nbatch = ntasks
 
             ird_true_probs = self._beta * designer_ll(
@@ -472,7 +482,7 @@ class IRDOptimalControl(object):
         num_chains = self._sample_args["num_chains"]
         num_keys = len(self._prior.feature_keys)
         init_params = DictList(
-            dict(zip(self._prior.feature_keys, np.zeros((num_keys, 1))))
+            dict(zip(self._prior.feature_keys, jnp.zeros((num_keys, 1))))
         )
         # init_params = obs[-1].weights.log()
         if num_chains > 1:
@@ -503,7 +513,7 @@ class IRDOptimalControl(object):
 
         assert self._normalized_key not in sample_ws.keys()
         if self._normalized_key in self._prior.feature_keys:
-            sample_ws[self._normalized_key] = np.zeros(sample_ws.shape)
+            sample_ws[self._normalized_key] = jnp.zeros(sample_ws.shape)
         sample_info = sampler.get_extra_fields(group_by_chain=True)
         sample_rates = sample_info["mean_accept_prob"][:, -1]
         num_samples = sample_ws.shape[1]

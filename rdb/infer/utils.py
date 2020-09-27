@@ -1,7 +1,7 @@
 """Utility Functions for Inference.
 """
 import numpy as onp
-import jax.numpy as np
+import jax.numpy as jnp
 import jax
 import math
 import copy, os
@@ -19,7 +19,6 @@ from scipy.stats import gaussian_kde
 from numpyro.infer import HMC, MCMC, NUTS, SA
 from rdb.visualize.plot import plot_weights_hist, plot_weights_2d
 
-# from rdb.infer.mcmc import MH as RDB_MH
 
 # ========================================================
 # ============= Sampling Interface Tools =================
@@ -84,60 +83,10 @@ def get_designer_sampler(
 # ========================================================
 
 
-def random_choice(rng_key, items, num, probs=None, replacement=True, complement=False):
-    """Randomly sample from items.
-
-    Usage:
-        * Select all: num=-1
-        * Sample without replacement: must satisfy num <= len(items)
-        * Sample with replacement
-
-    """
-    if num < 0 or num > len(items):
-        if complement:
-            return items, []
-        else:
-            return items
-
-    if not replacement:
-        # no replacement
-        assert probs is None, "Cannot use probs without replacement"
-        assert num <= len(items), f"Only has {len(items)} items"
-        arr = random.uniform(rng_key, shape=(len(items),))
-        arr = onp.array(arr)
-        idxs = onp.argsort(arr)[:num]
-        items_selected = [items[idx] for idx in idxs]
-        if complement:
-            idxs_complement = onp.argsort(arr)[num:]
-            items_complement = [items[idx] for idx in idxs_complement]
-            return onp.array(items_selected), onp.array(items_complement)
-        else:
-            return onp.array(items_selected)
-    else:
-        # with replacement
-        if probs is None:
-            probs = onp.ones(len(items)) / len(items)
-        else:
-            assert len(probs) == len(items)
-            probs = probs / onp.sum(probs)
-        probs = onp.cumsum(probs)
-        arr = onp.array(random.uniform(rng_key, shape=(num,)))
-        items_selected = []
-        idxs_selected = []
-        for i in range(num):
-            diff = onp.minimum(arr[i] - probs, 0)
-            first_neg = onp.argmax(diff < 0)
-            idx = int(first_neg)
-            items_selected.append(items[idx])
-            idxs_selected.append(idx)
-        if complement:
-            ones_complement = onp.ones(len(items), dtype=bool)
-            ones_complement[idxs_selected] = False
-            idxs_complement = onp.where(ones_complement)[0]
-            items_complement = [items[idx] for idx in idxs_complement]
-            return onp.array(items_selected), onp.array(items_complement)
-        else:
-            return onp.array(items_selected)
+def random_choice(key, a, shape=(), replace=True, p=None):
+    idxs = jnp.arange(len(a))
+    idxs = random.choice(key, idxs, shape=shape, replace=replace, p=p)
+    return a[idxs.tolist()]
 
 
 def random_uniform(rng_key, low=0.0, high=1.0):
@@ -204,12 +153,10 @@ def collect_trajs(
     assert len(states.shape) == 2 and len(states) == nbatch
     if us0 is not None:
         if jax:
-            us0 = np.array(us0)
+            us0 = jnp.array(us0)
         else:
             us0 = onp.array(us0)
         assert len(us0.shape) == 3 and len(us0) == nbatch
-
-    # import pdb; pdb.set_trace()
 
     if max_batch == -1:
         ## acs (nbatch, T, udim)
@@ -241,17 +188,18 @@ def collect_trajs(
                 # Pad state/weight pairs with 0 (valid=False)
                 valid_i[it_end - it_begin :] = False
                 num_pad = num_iterations * max_batch - nbatch
-                states_pad = np.zeros((num_pad, xdim))
-                states_i = np.concatenate([states_i, states_pad], axis=0)
-                # weights_pad = np.ones((nfeats, num_pad))
+                states_pad = jnp.zeros((num_pad, xdim))
+                states_i = jnp.concatenate([states_i, states_pad], axis=0)
+                # weights_pad = jnp.ones((nfeats, num_pad))
                 # shape (nfeats, nbatch, nrisk)
-                weights_pad = np.ones(
+                weights_pad = jnp.ones(
                     weights_arr.shape[:1] + (num_pad,) + weights_arr.shape[2:]
                 )
-                weights_arr_i = np.concatenate([weights_arr_i, weights_pad], axis=1)
+                weights_arr_i = jnp.concatenate([weights_arr_i, weights_pad], axis=1)
                 if us0_i:
-                    us0_pad = np.zeros((num_pad, us0_i.shape[1]))
-                    us0_i = np.concatenate([us0_i, us0_pad], axis=0)
+                    us0_pad = jnp.zeros((num_pad, us0_i.shape[1]))
+                    us0_i = jnp.concatenate([us0_i, us0_pad], axis=0)
+            # import pdb; pdb.set_trace()
             actions_i = controller(
                 states_i, us0=us0_i, weights=None, weights_arr=weights_arr_i, jax=jax
             )
@@ -268,8 +216,8 @@ def collect_trajs(
                 feats_sum = feats_sum_i[list(valid_i)]
                 violations = violations_i[list(valid_i)]
             else:
-                actions = np.concatenate([actions, actions_i[list(valid_i)]], axis=0)
-                costs = np.concatenate([costs, costs_i[list(valid_i)]], axis=0)
+                actions = jnp.concatenate([actions, actions_i[list(valid_i)]], axis=0)
+                costs = jnp.concatenate([costs, costs_i[list(valid_i)]], axis=0)
                 feats = feats.concat(feats_i[list(valid_i)], axis=0)
                 feats_sum = feats_sum.concat(feats_sum_i[list(valid_i)], axis=0)
                 violations = violations.concat(violations_i[list(valid_i)], axis=0)
@@ -332,13 +280,13 @@ def collect_lowerbound_trajs(
                 # Pad state/weight pairs with 0 (valid=False)
                 valid_i[it_end - it_begin :] = False
                 num_pad = num_iterations * max_batch - nbatch
-                states_pad = np.zeros((num_pad, xdim))
-                states_i = np.concatenate([states_i, states_pad], axis=0)
-                # weights_pad = np.ones((nfeats, num_pad))
-                weights_pad = np.ones(
+                states_pad = jnp.zeros((num_pad, xdim))
+                states_i = jnp.concatenate([states_i, states_pad], axis=0)
+                # weights_pad = jnp.ones((nfeats, num_pad))
+                weights_pad = jnp.ones(
                     weights_arr.shape[:1] + (num_pad,) + weights_arr.shape[2:]
                 )
-                weights_arr_i = np.concatenate([weights_arr_i, weights_pad], axis=1)
+                weights_arr_i = jnp.concatenate([weights_arr_i, weights_pad], axis=1)
             actions_i = None
             ## xs (T, nbatch, xdim), costs (nbatch)
             xs_i, costs_i, info_i = runner(
@@ -352,7 +300,7 @@ def collect_lowerbound_trajs(
                 feats_sum = feats_sum_i[list(valid_i)]
                 violations = violations_i[list(valid_i)]
             else:
-                costs = np.concatenate([costs, costs_i[list(valid_i)]], axis=0)
+                costs = jnp.concatenate([costs, costs_i[list(valid_i)]], axis=0)
                 feats = feats.concat(feats_i[list(valid_i)], axis=0)
                 feats_sum = feats_sum.concat(feats_sum_i[list(valid_i)], axis=0)
                 violations = violations.concat(violations_i[list(valid_i)], axis=0)
@@ -391,7 +339,7 @@ def visualize_mcmc_feature(chains, rates, fig_dir, title, **kwargs):
     import matplotlib.cm as cm
 
     assert len(chains) == len(rates)
-    colors = cm.Spectral(np.linspace(0, 1, len(chains)))
+    colors = cm.Spectral(jnp.linspace(0, 1, len(chains)))
     os.makedirs(fig_dir, exist_ok=True)
     all_weights = []
     all_colors = []
@@ -429,7 +377,7 @@ def visualize_mcmc_pairs(chains, fig_dir, title, normalized_key="", **kwargs):
         del chains[normalized_key]
     feat_keys = list(chains.keys())
 
-    # colors = cm.Spectral(np.linspace(0, 1, len(chains) + 1))
+    # colors = cm.Spectral(jnp.linspace(0, 1, len(chains) + 1))
     os.makedirs(fig_dir, exist_ok=True)
     for ci, chain in enumerate(chains):
         if ci > 0:
@@ -444,3 +392,59 @@ def visualize_mcmc_pairs(chains, fig_dir, title, normalized_key="", **kwargs):
             title=f"{title} Chain {ci}",
             **kwargs,
         )
+
+
+# def random_choice(rng_key, items, num, probs=None, replacement=True, complement=False):
+#     """Randomly sample from items.
+
+#     Usage:
+#         * Select all: num=-1
+#         * Sample without replacement: must satisfy num <= len(items)
+#         * Sample with replacement
+
+#     """
+#     if num < 0 or num > len(items):
+#         if complement:
+#             return items, []
+#         else:
+#             return items
+
+#     if not replacement:
+#         # no replacement
+#         assert probs is None, "Cannot use probs without replacement"
+#         assert num <= len(items), f"Only has {len(items)} items"
+#         arr = random.uniform(rng_key, shape=(len(items),))
+#         arr = onp.array(arr)
+#         idxs = onp.argsort(arr)[:num]
+#         items_selected = [items[idx] for idx in idxs]
+#         if complement:
+#             idxs_complement = onp.argsort(arr)[num:]
+#             items_complement = [items[idx] for idx in idxs_complement]
+#             return onp.array(items_selected), onp.array(items_complement)
+#         else:
+#             return onp.array(items_selected)
+#     else:
+#         # with replacement
+#         if probs is None:
+#             probs = onp.ones(len(items)) / len(items)
+#         else:
+#             assert len(probs) == len(items)
+#             probs = probs / onp.sum(probs)
+#         probs = onp.cumsum(probs)
+#         arr = onp.array(random.uniform(rng_key, shape=(num,)))
+#         items_selected = []
+#         idxs_selected = []
+#         for i in range(num):
+#             diff = onp.minimum(arr[i] - probs, 0)
+#             first_neg = onp.argmax(diff < 0)
+#             idx = int(first_neg)
+#             items_selected.append(items[idx])
+#             idxs_selected.append(idx)
+#         if complement:
+#             ones_complement = onp.ones(len(items), dtype=bool)
+#             ones_complement[idxs_selected] = False
+#             idxs_complement = onp.where(ones_complement)[0]
+#             items_complement = [items[idx] for idx in idxs_complement]
+#             return onp.array(items_selected), onp.array(items_complement)
+#         else:
+#             return onp.array(items_selected)

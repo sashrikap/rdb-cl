@@ -1,7 +1,7 @@
 from jax import random
 import os
 import yaml
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -40,7 +40,7 @@ def plot_iterative_eval():
         file_path = f"{exp_dir}/{exp_name}/{file_name}"
         print(file_path)
         if os.path.isfile(file_path):
-            all_data.append(np.load(file_path, allow_pickle=True).item())
+            all_data.append(jnp.load(file_path, allow_pickle=True).item())
 
     # Gather active function names
     # Gather eval output for each active function
@@ -86,8 +86,8 @@ def plot_iterative_eval():
     plt.savefig(f"{exp_dir}/{exp_name}/violations.png")
     plt.show()
 
-    # ys = [np.mean(np.array(all_eval[fn_key])) for fn_key in methods]
-    # yerr = [np.std(np.array(all_eval[fn_key])) for fn_key in methods]
+    # ys = [np.mean(jnp.array(all_eval[fn_key])) for fn_key in methods]
+    # yerr = [np.std(jnp.array(all_eval[fn_key])) for fn_key in methods]
     # plt.bar(xs, ys, yerr=yerr)
     # plt.xticks(xs, methods)
     # plt.show()

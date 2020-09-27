@@ -2,7 +2,7 @@
 experiment data. Easily outdated
 """
 import os
-import jax.numpy as np
+import jax.numpy as jnp
 import gym, rdb.envs.drive2d
 
 from jax import random
@@ -30,7 +30,7 @@ def load_data(env, exp_dir, exp_name):
         ]
         rng_key = str_to_key(file_seed)
 
-        eval_data = np.load(file_path, allow_pickle=True)
+        eval_data = jnp.load(file_path, allow_pickle=True)
         eval_hist = eval_data["eval_hist"].item()
         curr_obs = eval_data["curr_obs"].item()
         curr_tasks = eval_data["curr_tasks"].item()
@@ -76,7 +76,7 @@ def load_data(env, exp_dir, exp_name):
                         else:
                             candidates = CAND_TASKS[itr - 1]
                             equals = [
-                                np.allclose(c, curr_tasks[fn_key][itr])
+                                jnp.allclose(c, curr_tasks[fn_key][itr])
                                 for c in candidates
                             ]
                             if not sum(equals) > 0:
@@ -95,7 +95,7 @@ def save_data(env, all_data, exp_dir, exp_name):
         # Save eval data
         path = f"{exp_dir}/{exp_name}/{exp_name}_seed_{str(rng_key)}.npz"
         with open(path, "wb+") as f:
-            np.savez(f, **eval_data)
+            jnp.savez(f, **eval_data)
 
         # Save sample data
 

@@ -1,7 +1,7 @@
 from jax import random
 import os
 import yaml
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -26,9 +26,9 @@ sns.set_style(
 def read_seed(path):
     # print(path)
     if path.endswith("npy"):
-        data = np.load(path, allow_pickle=True).item()
+        data = jnp.load(path, allow_pickle=True).item()
     elif path.endswith("npz"):
-        data = np.load(path, allow_pickle=True)
+        data = jnp.load(path, allow_pickle=True)
     return data
 
 
@@ -124,8 +124,8 @@ def plot_feats_violate(data_dir, exp_name, data, itr=-1):
 
 
 def load_data():
-    npypaths = []
-    npydata = []
+    jnp.ypaths = []
+    jnp.ydata = []
     if os.path.isdir(os.path.join(exp_dir, exp_name)):
         for file in sorted(os.listdir(os.path.join(exp_dir, exp_name))):
             if "npy" in file and file.endswith("npy"):
@@ -136,10 +136,10 @@ def load_data():
                     not_bools = [str(s) in exp_path for s in not_seeds]
                     print(file, use_bools, not_bools)
                     if onp.any(use_bools) and not onp.any(not_bools):
-                        npypaths.append(exp_path)
+                        jnp.ypaths.append(exp_path)
 
-    for exp_path in npypaths:
-        npydata.append(read_seed(exp_path))
+    for exp_path in jnp.ypaths:
+        jnp.ydata.append(read_seed(exp_path))
 
     data = dict(
         perform=[],
@@ -151,11 +151,11 @@ def load_data():
     )
     designer_data = copy.deepcopy(data)
     ird_data = copy.deepcopy(data)
-    for idx, (npy_data, npy_path) in enumerate(zip(npydata, npypaths)):
-        if "designer" in npy_path:
+    for idx, (npy_data, jnp.y_path) in enumerate(zip(npydata, jnp.ypaths)):
+        if "designer" in jnp.y_path:
             data = designer_data
         else:
-            assert "ird" in npy_path
+            assert "ird" in jnp.y_path
             data = ird_data
         data["perform"].append([])
         data["rel_perform"].append([])
@@ -164,7 +164,7 @@ def load_data():
         data["rel_violation"].append([])
         data["feats_violation"].append([])
 
-        for beta, yhist in npy_data.items():
+        for beta, yhist in jnp.y_data.items():
             data["perform"][-1].append(yhist["perform"])
             data["rel_perform"][-1].append(yhist["rel_perform"])
             data["normalized_perform"][-1].append(yhist["normalized_perform"])

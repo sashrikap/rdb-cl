@@ -1,7 +1,7 @@
 from jax import random, vmap
 import pyro
 import pyro.distributions as pdist
-import jax.numpy as np
+import jax.numpy as jnp
 import torch
 import numpyro
 import numpyro.distributions as ndist
@@ -43,7 +43,7 @@ def ttest_factor_nuts():
         )
         obs = 1.0
         beta = 5
-        diff = np.abs(z - obs)
+        diff = jnp.abs(z - obs)
         numpyro.factor("obs_log_prob", -diff * beta)
 
     key = random.PRNGKey(1)
@@ -65,7 +65,7 @@ def ttest_condition_nuts():
         )
         obs = 1.0
         beta = 5
-        diff = np.abs(z - obs)
+        diff = jnp.abs(z - obs)
         numpyro.factor("obs_log_prob", -1.0 - diff * beta)
 
     key = random.PRNGKey(1)

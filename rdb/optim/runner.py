@@ -1,12 +1,13 @@
 import os
 import rdb
 import time
-import numpy as np
+import skimage
+import numpy as onp
+import jax.numpy as jnp
 from imageio import imsave
 from functools import partial
 from rdb.infer import *
 from rdb.optim.utils import *
-from scipy.misc import imresize
 from os.path import join, dirname
 from collections import OrderedDict
 from rdb.exps.utils import Profiler
@@ -86,7 +87,8 @@ class Runner(object):
                 time.sleep(0.1)
             elif mode == "rgb_array":
                 frame = self._env.render(mode="rgb_array", text=text)
-                frame = imresize(frame, (width, width))
+                # frame = imresize(frame, (width, width))
+                frame = skimage.transform.resize(frame, (width, width), order=3)
                 frames.append(frame)
             else:
                 raise NotImplementedError
@@ -186,7 +188,8 @@ class Runner(object):
         #     print(car.state)
         self._env.state = state
         frame = self._env.render(mode="rgb_array", text=text, paper=paper)
-        frame = imresize(frame, (width, width))
+        # frame = imresize(frame, (width, width))
+        frame = skimage.transform.resize(frame, (width, width), order=3)
         if close:
             self._env.close_window()
         imsave(path, frame)
@@ -205,7 +208,8 @@ class Runner(object):
         frame = self._env.render(
             mode="rgb_array", draw_heat=True, weights=weights, text=text
         )
-        frame = imresize(frame, (width, width))
+        # frame = imresize(frame, (width, width))
+        frame = skimage.transform.resize(frame, (width, width), order=3)
         if close:
             self._env.close_window()
         imsave(path, frame)
@@ -224,7 +228,8 @@ class Runner(object):
         frame = self._env.render(
             "rgb_array", draw_boundary=True, weights=weights, text=text
         )
-        frame = imresize(frame, (width, width))
+        # frame = imresize(frame, (width, width))
+        frame = skimage.transform.resize(frame, (width, width), order=3)
         if close:
             self._env.close_window()
         imsave(path, frame)
@@ -239,7 +244,8 @@ class Runner(object):
         self._env.reset()
         self._env.state = state
         frame = self._env.render(mode="rgb_array", draw_constraint_key=key, text=text)
-        frame = imresize(frame, (width, width))
+        # frame = imresize(frame, (width, width))
+        frame = skimage.transform.resize(frame, (width, width), order=3)
         if close:
             self._env.close_window()
         imsave(path, frame)
@@ -288,8 +294,8 @@ class Runner(object):
 
         """
         if expand_dims:
-            x0 = np.array([x0])
-            actions = np.array([actions])
+            x0 = jnp.array([x0])
+            actions = jnp.array([actions])
             weights = DictList([weights])
 
         assert len(weights) == 1
@@ -307,9 +313,9 @@ class Runner(object):
         assert output in {"l2", "det"}
         if output == "det":
             hessian_mat = hessian.reshape((T * udim, T * udim))
-            norm = np.linalg.norm(hessian_mat)
+            norm = jnp.linalg.norm(hessian_mat)
         else:
-            norm = np.sqrt(np.linalg.det(hessian))
+            norm = jnp.sqrt(jnp.linalg.det(hessian))
         return hessian, norm
 
     def __call__(
@@ -359,7 +365,7 @@ class Runner(object):
         nbatch = x0.shape[0]
         if actions is None:
             udim = self._env.udim
-            actions = np.zeros((nbatch, self._T, udim))
+            actions = jnp.zeros((nbatch, self._T, udim))
 
         # Track JIT recompile
         t_compile = None
@@ -383,7 +389,7 @@ class Runner(object):
         #  shape (T, nbatch, xdim)
         xs = self._roll_forward(x0, actions)
         if jax:
-            xs = np.array(xs)
+            xs = jnp.array(xs)
         else:
             xs = onp.array(xs)
 
@@ -411,9 +417,9 @@ class Runner(object):
                     costs.append(costs_i)
                     cost_sum.append(cost_sum_i)
                 #  shape (nbatch, nweights, T)
-                costs = np.array(costs).swapaxes(0, 1)
+                costs = jnp.array(costs).swapaxes(0, 1)
                 #  shape (nbatch, nweights)
-                cost_sum = np.array(cost_sum).swapaxes(0, 1)
+                cost_sum = jnp.array(cost_sum).swapaxes(0, 1)
             else:
                 raise NotImplementedError
 
@@ -446,6 +452,8 @@ class Runner(object):
                 f"JIT - Runner finish compile in {time.time() - t_compile:.3f}s: ac {self._a_shape}"
             )
 
+        #  shape (nbatch, T, xdim)
+        xs = xs.swapaxes(0, 1)
         # DictList conveniently deals with list of dicts
         info = {}
         info["costs"] = costs

@@ -21,7 +21,10 @@ def build_constraints():
         env=env, min_speed=-0.2
     )
     constraints_dict["uncomfortable"] = constraints.build_uncomfortable(
-        env=env, max_actions=env._control_bound
+        env=env,
+        max_throttle=env._max_throttle,
+        max_brake=env._max_brake,
+        max_steer=env._max_steer,
     )
     constraints_dict["wronglane"] = constraints.build_wronglane(env=env, lane_idx=2)
     constraints_dict["collision"] = constraints.build_collision(env=env)

@@ -1,7 +1,7 @@
 from jax import random
 import os
 import yaml
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -25,9 +25,9 @@ sns.set_style(
 def read_seed(path):
     # print(path)
     if path.endswith("npy"):
-        data = np.load(path, allow_pickle=True).item()
+        data = jnp.load(path, allow_pickle=True).item()
     elif path.endswith("npz"):
-        data = np.load(path, allow_pickle=True)
+        data = jnp.load(path, allow_pickle=True)
     return data
 
 

@@ -9,7 +9,7 @@ TODO:
 import abc
 import gym
 import jax
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 from pathlib import Path
 from os.path import join
@@ -126,7 +126,7 @@ class DriveWorld(RenderEnv):
             state.append(car.state)
         for obj in self._objects:
             state.append(obj.state)
-        state = np.concatenate(state, axis=1)
+        state = jnp.concatenate(state, axis=1)
         return state
 
     @state.setter
@@ -274,7 +274,7 @@ class DriveWorld(RenderEnv):
         cars = self._cars + [self.main_car]
         curr_idx, next_idx = 0, 0
         for key, car in zip(dynamics_keys, cars):
-            next_idx += np.prod(car.state.shape)
+            next_idx += onp.prod(car.state.shape)
             idx = (curr_idx, next_idx)
             curr_idx = next_idx
             # dynamics funcion
@@ -282,7 +282,7 @@ class DriveWorld(RenderEnv):
             fns[key] = fn
             indices[key] = idx
         for o_i, obj in enumerate(self._objects):
-            next_idx += np.prod(obj.state.shape)
+            next_idx += onp.prod(obj.state.shape)
             idx = (curr_idx, next_idx)
             curr_idx = next_idx
             key = f"{obj.name}_{o_i:02d}"
@@ -326,8 +326,8 @@ class DriveWorld(RenderEnv):
 
             def car_dist_fn(state, actions, car_idx=car_idx):
                 # Very important to keep third argument for variable closure
-                car_state = state[..., np.arange(*car_idx)]
-                main_state = state[..., np.arange(*main_idx)]
+                car_state = state[..., jnp.arange(*car_idx)]
+                main_state = state[..., jnp.arange(*main_idx)]
                 return feature.diff_to(car_state, main_state)
 
             car_fns[c_i] = car_dist_fn
@@ -337,7 +337,7 @@ class DriveWorld(RenderEnv):
         for l_i, lane in enumerate(self._lanes):
 
             def lane_dist_fn(state, actions, lane=lane):
-                main_state = state[..., np.arange(*main_idx)]
+                main_state = state[..., jnp.arange(*main_idx)]
                 dist = feature.dist_to_lane(main_state, lane.center, lane.normal)
                 return dist
 
@@ -349,15 +349,15 @@ class DriveWorld(RenderEnv):
             obj_idx = self._indices[f"{obj.name}_{o_i:02d}"]
 
             def obj_dist_fn(state, actions, obj_idx=obj_idx):
-                main_state = state[..., np.arange(*main_idx)]
-                obj_state = state[..., np.arange(*obj_idx)]
+                main_state = state[..., jnp.arange(*main_idx)]
+                obj_state = state[..., jnp.arange(*obj_idx)]
                 return feature.diff_to(main_state, obj_state)
 
             obj_fns[o_i] = obj_dist_fn
 
         # Speed feature function
         def speed_fn(state, actions):
-            return feature.speed_size(state[..., np.arange(*main_idx)])
+            return feature.speed_size(state[..., jnp.arange(*main_idx)])
 
         # Control feature function
         def control_mag_fn(state, actions):
@@ -373,7 +373,7 @@ class DriveWorld(RenderEnv):
             return feature.control_turn(actions)
 
         def bias_fn(state, actions):
-            return feature.ones(state[..., np.arange(*main_idx)])
+            return feature.ones(state[..., jnp.arange(*main_idx)])
 
         feats_dict["dist_cars"] = stack_funcs(car_fns, axis=1)
         feats_dict["dist_lanes"] = stack_funcs(lane_fns, axis=1)
@@ -686,7 +686,7 @@ class DriveWorld(RenderEnv):
 
         state = self.state
         labels = self._labels
-        const = self.constraints_fn(state[None, :], np.zeros((1, 1, 2)))
+        const = self.constraints_fn(state[None, :], jnp.zeros((1, 1, 2)))
         crash = (
             onp.sum(const["offtrack"])
             + onp.sum(const["collision"])
@@ -729,11 +729,11 @@ class DriveWorld(RenderEnv):
                 self._main_car.cost_runtime,
                 weights=weights.repeat(n_states).numpy_array(),
             )
-            states = np.repeat(state, n_states, axis=0)  # (n_states, xdim)
-            phis = np.array([np.pi / 3] * n_states)
+            states = jnp.repeat(state, n_states, axis=0)  # (n_states, xdim)
+            phis = jnp.array([jnp.pi / 3] * n_states)
             main_idx = self._indices["main_car"]
-            states[:, main_idx[0] : main_idx[0] + 3] = np.stack([xs, ys, phis], axis=1)
-            acts = np.zeros((n_states, self.udim))
+            states[:, main_idx[0] : main_idx[0] + 3] = jnp.stack([xs, ys, phis], axis=1)
+            acts = jnp.zeros((n_states, self.udim))
             return cost_fn(states, acts)
 
         self._viz_heat_fn = val
@@ -768,9 +768,9 @@ class DriveWorld(RenderEnv):
         SIZE = (32, 32)
         # SIZE = (16, 16)
         # Sweep for cost values
-        xs = np.linspace(c0[0], c1[0], SIZE[0])
-        ys = np.linspace(c0[1], c1[1], SIZE[1])
-        xvs, yvs = np.meshgrid(xs, ys)
+        xs = jnp.linspace(c0[0], c1[0], SIZE[0])
+        ys = jnp.linspace(c0[1], c1[1], SIZE[1])
+        xvs, yvs = jnp.meshgrid(xs, ys)
         vals = heat_fn(xvs.flatten(), yvs.flatten())
         vals = vals.reshape(SIZE)
         vals = (vals - onp.min(vals)) / (onp.max(vals) - onp.min(vals) + 1e-6)

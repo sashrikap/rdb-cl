@@ -1,5 +1,5 @@
 import jax
-import jax.numpy as np
+import jax.numpy as jnp
 from rdb.envs.drive2d.core.lane import *
 from rdb.envs.drive2d.core.feature import *
 import gym
@@ -17,8 +17,8 @@ def test_env_feats():
     speed_fn = feat_fns["speed"]
     control_fn = feat_fns["control"]
 
-    state = np.zeros(x_dim)
-    action = np.zeros(u_dim)
+    state = jnp.zeros(x_dim)
+    action = jnp.zeros(u_dim)
     assert dist_car_fn(state, action).shape == (2, 1)
     assert dist_lane_fn(state, action).shape == (3, 1)
     assert speed_fn(state, action).shape == (1,)
@@ -32,7 +32,7 @@ def test_rew_feats():
     x_dim = len(env.state)
     u_dim = 2
 
-    state = np.zeros(x_dim)
-    action = np.zeros(u_dim)
+    state = jnp.zeros(x_dim)
+    action = jnp.zeros(u_dim)
     print(rew_fn(state, action))
     assert rew_fn(state, action).shape == ()

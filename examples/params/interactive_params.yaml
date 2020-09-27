@@ -7,12 +7,12 @@ DESIGNER_ARGS:
   beta: 20
   num_normalizers: 1000
   proposal_decay: 0.7
+  max_val: 15.0
   sample_args:
     num_chains: 1
     num_samples: 500
     num_warmup: 100
   sample_init_args:
-    max_val: 15.0
     proposal_var: 0.3
   sample_method: MH
   task_method: sum
@@ -40,12 +40,12 @@ EXP_NAME: interactive_proposal_divide_training_03_propose_04_old
 IRD_ARGS:
   beta: 50
   proposal_decay: 0.9
+  max_val: 15.0
   sample_args:
     num_chains: 3
     num_samples: 8000
     num_warmup: 200
   sample_init_args:
-    max_val: 15.0
     proposal_var: 3
   sample_method: MH
   task_method: sum

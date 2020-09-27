@@ -106,11 +106,11 @@ def _load_data(use_torch=False):
     num_test = int(0.1 * NUM_DATA)
 
     data = np.load(os.path.join(SAVE_DIR, DATA_FILE), allow_pickle=True)
-    devel_idx = random_choice(
-        rng_key, np.arange(NUM_DATA), num_devel + num_test, replacement=False
+    devel_idx = random.choice(
+        rng_devel, np.arange(NUM_DATA), (num_devel + num_test,), replace=False
     )
-    test_idx = random_choice(
-        rng_key, np.arange(num_devel + num_test), num_test, replacement=False
+    test_idx = random.choice(
+        rng_test, np.arange(num_devel + num_test), (num_test,), replace=False
     )
     train_ones = onp.ones(NUM_DATA).astype(bool)
     train_ones[devel_idx] = False

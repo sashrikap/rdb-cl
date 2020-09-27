@@ -2,13 +2,15 @@ import gym
 import copy
 import numpy as onp
 import matplotlib
+import skimage
 
 matplotlib.use("Agg")
 from functools import partial
 from matplotlib import pyplot as plt
 from os import makedirs
 from os.path import join
-from scipy.misc import imsave, imresize
+
+# from scipy.misc import imsave
 from rdb.exps.utils import Profiler
 import multiprocessing
 
@@ -103,8 +105,9 @@ def render_env(
         dirname = path.replace(".mp4", "")
         makedirs(dirname, exist_ok=True)
         for i, frame in enumerate(frames):
-            frame = imresize(frame, (width, width))
-            imsave(join(dirname, f"frame_{i:03d}.png"), frame)
+            # frame = imresize(frame, (width, width))
+            frame = skimage.transform.resize(frame, (width, width), order=3)
+            skimage.io.imsave(join(dirname, f"frame_{i:03d}.png"), frame)
 
 
 def capture_env(
@@ -126,7 +129,7 @@ def capture_env(
     makedirs(dirname, exist_ok=True)
     for i, frame in enumerate(frames):
         frame = imresize(frame, (width, width))
-        imsave(join(dirname, f"frame_{i:03d}.png"), frame)
+        skimage.io.imsave(join(dirname, f"frame_{i:03d}.png"), frame)
     env._subframes = old_subframes
 
 

@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-import jax.numpy as np
+import jax.numpy as jnp
 import numpyro.distributions as dist
 import rdb.envs.drive2d
 import numpy as onp
@@ -40,7 +40,7 @@ optimizer, runner = build_mpc(
 
 
 def forward_one_step(prev_log_prob, curr_word, transition_log_prob, emission_log_prob):
-    log_prob_tmp = np.expand_dims(prev_log_prob, axis=1) + transition_log_prob
+    log_prob_tmp = jnp.expand_dims(prev_log_prob, axis=1) + transition_log_prob
     log_prob = log_prob_tmp + emission_log_prob[:, curr_word]
     return logsumexp(log_prob, axis=0)
 
@@ -48,7 +48,7 @@ def forward_one_step(prev_log_prob, curr_word, transition_log_prob, emission_log
 untraceable_controller_p = jax.core.Primitive("untraceable_controller")
 untraceable_controller_p.multiple_results = True
 # ad.defjvp2(
-#     untraceable_controller_p, None, lambda tangent, ans, key, a: np.ones_like(ans[0])
+#     untraceable_controller_p, None, lambda tangent, ans, key, a: jnp.ones_like(ans[0])
 # )
 
 
@@ -60,14 +60,14 @@ def untraceable_controller(weights_arr):
 
 def untraceable_controller_impl(weights_arr):
     # we don't want jax to trace this function: onp.array
-    state = np.repeat(env.state, nbatch, axis=0)
+    state = jnp.repeat(env.state, nbatch, axis=0)
     actions = optimizer(state, weights=None, weights_arr=weights_arr, batch=False)
     return (np.array(actions),)
     # return (np.array(weights_arr),)
 
 
 untraceable_controller_p.def_impl(untraceable_controller_impl)
-zero_actions = np.zeros((nbatch, T, env.udim))
+zero_actions = jnp.zeros((nbatch, T, env.udim))
 
 
 def untraceable_controller_abst(weights_arr):
@@ -102,14 +102,14 @@ ad.defvjp(untraceable_controller_p, lambda g, x: x * 0)
 
 @jax.jit
 def jax_sum(weights_arr, feats_arr):
-    return np.mean(weights_arr * feats_arr)
+    return jnp.mean(weights_arr * feats_arr)
 
 
 keys = env.features_keys
 
 
 def ird_experimental():
-    weights_arr = np.array(
+    weights_arr = jnp.array(
         [
             numpyro.sample(key, dist.Uniform(-10, 10), sample_shape=(nbatch,))
             for key in keys
@@ -117,13 +117,13 @@ def ird_experimental():
     )
     # weights_onp = {"dist_cars": onp.array(dist_cars)}
 
-    state = np.repeat(env.state, nbatch, axis=0)
+    state = jnp.repeat(env.state, nbatch, axis=0)
 
     # dummy compilation
     def cost_fn(weights_arr):
         # actions = untraceable_controller(np.array(weights_arr))[0]
         # with jax.disable_jit():
-        state = np.repeat(env.state, nbatch, axis=0)
+        state = jnp.repeat(env.state, nbatch, axis=0)
         actions = optimizer(state, weights=None, weights_arr=weights_arr, batch=False)
         print("actions", actions.shape)
         traj, costs, info = runner(
@@ -140,7 +140,7 @@ def ird_experimental():
 
 
 def warmup():
-    state = np.repeat(env.state, nbatch, axis=0)
+    state = jnp.repeat(env.state, nbatch, axis=0)
     optimizer(state, weights=None, weights_arr=np.zeros((11, nbatch)))
 
 
@@ -151,7 +151,7 @@ def main():
     rng_key = random.PRNGKey(2)
     init_params = {}
     for key in keys:
-        init_params[key] = np.ones((nbatch,))
+        init_params[key] = jnp.ones((nbatch,))
     kernel = MH(ird_experimental, proposal_var=0.05, jit=False)
     num_warmup = 20
     num_samples = 40

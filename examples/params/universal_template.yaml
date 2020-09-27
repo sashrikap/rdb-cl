@@ -20,10 +20,10 @@ DESIGNER_CONTROLLER_ARGS:
 SAVE_NAME: 200905
 # EXP_NAME: universal_simplified_joint_init1v1_2000
 # EXP_NAME: universal_simplified_joint_init1v1_2000_eval_risk
-EXP_NAME: universal_simplified_joint_init1v1_2000_old_eval_mean
+# EXP_NAME: universal_simplified_joint_init1v1_2000_old_eval_mean
 # EXP_NAME: universal_simplified_joint_init1v1_2000_uni_eval_mean
 # EXP_NAME: universal_simplified_joint_init1v1_2000_old_eval_risk
-# EXP_NAME: universal_simplified_joint_init1v1_2000_uni_eval_risk
+EXP_NAME: universal_simplified_joint_init1v1_2000_uni_eval_risk
 # EXP_NAME: universal_simplified_joint_init1v1_no
 
 
@@ -39,8 +39,8 @@ EXP_ARGS:
   # designer_betas: [0.1, 0.5, 1, 5]
   # ird_betas: [1, 5, 10, 50]
   designer_betas: []
-  # ird_betas: [1]
-  ird_betas: [1, 5, 10, 50]
+  ird_betas: [1]
+  # ird_betas: [0, 5, 50]
   # universal_model: model_v01/model_v01_02000.npz
   universal_model: null
   # risk_averse: True
@@ -59,8 +59,8 @@ DESIGNER_ARGS:
     # proposal_var: 1.5 # beta = 0.1
     # proposal_var: 2 # beta = 0.05
     # proposal_var: 1
-    max_val: 15.0
   proposal_decay: 0.7
+  max_val: 15.0
   sample_args:
     num_samples: 250
     num_warmup: 25
@@ -73,8 +73,8 @@ IRD_ARGS:
   sample_init_args:
     # proposal_var: 3 # beta=4
     proposal_var: 1
-    max_val: 15.0
   proposal_decay: 0.7
+  max_val: 15.0
   beta: 6
   mcmc_normalize: null
   sample_args:

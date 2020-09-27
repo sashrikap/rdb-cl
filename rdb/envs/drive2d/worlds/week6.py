@@ -5,7 +5,7 @@ There are obstacles (cones) in the highway
 
 
 import jax
-import jax.numpy as np
+import jax.numpy as jnp
 import numpyro
 import numpyro.distributions as dist
 import itertools, copy
@@ -47,7 +47,7 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
         # Define cars
         cars = []
         for state, speed in zip(car_states, car_speeds):
-            cars.append(car.FixSpeedCar(self, np.array(state), speed))
+            cars.append(car.FixSpeedCar(self, jnp.array(state), speed))
         main_car = car.OptimalControlCar(self, main_state, horizon)
         self._goal_speed = goal_speed
         self._goal_lane = goal_lane
@@ -63,7 +63,7 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
         # Define objects
         objs = []
         for state in obstacle_states:
-            objs.append(objects.Obstacle(np.array(state)))
+            objs.append(objects.Obstacle(jnp.array(state)))
         super().__init__(main_car, cars, num_lanes=num_lanes, objects=objs, dt=dt)
         # Define all tasks to sample from
         self._task_sampler = None
@@ -125,22 +125,22 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
         max_feats_dict = OrderedDict()
         nlr_feats_dict = OrderedDict()
         # Sum across ncars & state (nbatch, ncars, state)
-        sum_items = partial(np.sum, axis=(1, 2))
+        sum_items = partial(jnp.sum, axis=(1, 2))
         # Sum across state (nbatch, state)
-        sum_state = partial(np.sum, axis=1)
+        sum_state = partial(jnp.sum, axis=1)
         fence_const = 3.0
         ctrl_const = 3.0
         speed_const = 5.0
 
         ## Car distance feature
         ncars, car_dim = len(self._cars), 2
-        sigcar = np.array([self._car_width / 2, self._car_length])
+        sigcar = jnp.array([self._car_width / 2, self._car_length])
         nlr_feats_dict["dist_cars"] = compose(
             sum_items, partial(gaussian_feat, sigma=sigcar)
         )
-        # max_feats_dict["dist_cars"] = np.sum(gaussian_feat(np.zeros((car_dim, ncars, car_dim)), sigma=sigcar))
-        max_feats_dict["dist_cars"] = np.sum(
-            gaussian_feat(np.zeros((car_dim, 1, car_dim)), sigma=sigcar)
+        # max_feats_dict["dist_cars"] = jnp.sum(gaussian_feat(jnp.zeros((car_dim, ncars, car_dim)), sigma=sigcar))
+        max_feats_dict["dist_cars"] = jnp.sum(
+            gaussian_feat(jnp.zeros((car_dim, 1, car_dim)), sigma=sigcar)
         )
 
         ## Lane distance feature
@@ -164,40 +164,40 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
 
         ## Object distance feature
         nobjs, obj_dim = len(self._objects), 2
-        sigobj = np.array([self._car_width / 2, self._car_length * 2])
+        sigobj = jnp.array([self._car_width / 2, self._car_length * 2])
         nlr_feats_dict["dist_objects"] = compose(
             sum_items, partial(gaussian_feat, sigma=sigobj)
         )
-        # max_feats_dict["dist_objects"] = np.sum(gaussian_feat(
-        #     np.zeros((obj_dim, nobjs, obj_dim)), sigma=sigobj
+        # max_feats_dict["dist_objects"] = jnp.sum(gaussian_feat(
+        #     jnp.zeros((obj_dim, nobjs, obj_dim)), sigma=sigobj
         # ))
-        max_feats_dict["dist_objects"] = np.sum(
-            gaussian_feat(np.zeros((obj_dim, 1, obj_dim)), sigma=sigobj)
+        max_feats_dict["dist_objects"] = jnp.sum(
+            gaussian_feat(jnp.zeros((obj_dim, 1, obj_dim)), sigma=sigobj)
         )
 
         ## Control features
-        ones = np.ones((1, 1))  # (nbatch=1, dim=1)
-        max_control = np.array([self._max_steer, self._max_throttle]) * ctrl_const
+        ones = jnp.ones((1, 1))  # (nbatch=1, dim=1)
+        max_control = jnp.array([self._max_steer, self._max_throttle]) * ctrl_const
         nlr_feats_dict["control"] = compose(
             sum_state, partial(quadratic_feat, max_val=max_control)
         )
-        max_feats_dict["control"] = np.sum(quadratic_feat(ones * max_control))
+        max_feats_dict["control"] = jnp.sum(quadratic_feat(ones * max_control))
         nlr_feats_dict["control_throttle"] = compose(
             sum_state, partial(quadratic_feat, max_val=self._max_throttle * ctrl_const)
         )
-        max_feats_dict["control_throttle"] = np.sum(
+        max_feats_dict["control_throttle"] = jnp.sum(
             quadratic_feat(ones * self._max_throttle * ctrl_const)
         )
         nlr_feats_dict["control_brake"] = compose(
             sum_state, partial(quadratic_feat, max_val=self._max_brake * ctrl_const)
         )
-        max_feats_dict["control_brake"] = np.sum(
+        max_feats_dict["control_brake"] = jnp.sum(
             quadratic_feat(ones * self._max_brake * ctrl_const)
         )
         nlr_feats_dict["control_turn"] = compose(
             sum_state, partial(quadratic_feat, max_val=self._max_steer * ctrl_const)
         )
-        max_feats_dict["control_turn"] = np.sum(
+        max_feats_dict["control_turn"] = jnp.sum(
             quadratic_feat(ones * self._max_steer * ctrl_const)
         )
 
@@ -207,19 +207,19 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
             sum_state,
             partial(quadratic_feat, goal=self._goal_speed, max_val=max_dspeed),
         )
-        max_feats_dict["speed"] = np.sum(quadratic_feat(ones * max_dspeed))
+        max_feats_dict["speed"] = jnp.sum(quadratic_feat(ones * max_dspeed))
         nlr_feats_dict["speed_over"] = compose(
             sum_state,
             partial(quadratic_feat, max_val=max_dspeed),
             partial(more_than, y=self._goal_speed),
         )
-        max_feats_dict["speed_over"] = np.sum(quadratic_feat(ones * max_dspeed))
+        max_feats_dict["speed_over"] = jnp.sum(quadratic_feat(ones * max_dspeed))
         nlr_feats_dict["speed_under"] = compose(
             sum_state,
             partial(quadratic_feat, max_val=max_dspeed),
             partial(less_than, y=self._goal_speed),
         )
-        max_feats_dict["speed_under"] = np.sum(quadratic_feat(ones * max_dspeed))
+        max_feats_dict["speed_under"] = jnp.sum(quadratic_feat(ones * max_dspeed))
 
         nlr_feats_dict["bias"] = identity_feat
         max_feats_dict["bias"] = ones
@@ -271,11 +271,11 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
         self._grid_tasks = []
         for ci, car_range in enumerate(self._car_ranges):
             self._grid_tasks.append(
-                np.arange(car_range[0], car_range[1], self._car_delta)
+                jnp.arange(car_range[0], car_range[1], self._car_delta)
             )
         for oi in range(len(self._objects)):
-            obs_range_x = np.arange(obs_ranges[oi][0], obs_ranges[oi][1], obs_delta[0])
-            obs_range_y = np.arange(obs_ranges[oi][2], obs_ranges[oi][3], obs_delta[1])
+            obs_range_x = jnp.arange(obs_ranges[oi][0], obs_ranges[oi][1], obs_delta[0])
+            obs_range_y = jnp.arange(obs_ranges[oi][2], obs_ranges[oi][3], obs_delta[1])
             self._grid_tasks.append(obs_range_x)
             self._grid_tasks.append(obs_range_y)
         all_tasks = list(itertools.product(*self._grid_tasks))
@@ -292,7 +292,7 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
         elif self._task_naturalness == "distance":
             ## Difference to cars and objects
             all_states = self.get_init_states(tasks)
-            all_acs = np.zeros((len(tasks), 2))
+            all_acs = jnp.zeros((len(tasks), 2))
 
             diff_cars = self._raw_features_dict["dist_cars"](all_states, all_acs)
             diff_objs = self._raw_features_dict["dist_objects"](all_states, all_acs)
@@ -339,7 +339,7 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
             ## Mean of inverse of object distances
             ## Difference to cars and objects
             all_states = self.get_init_states(tasks)
-            all_acs = np.zeros((len(tasks), 2))
+            all_acs = jnp.zeros((len(tasks), 2))
 
             diff_cars = self._raw_features_dict["dist_cars"](all_states, all_acs)
             diff_objs = self._raw_features_dict["dist_objects"](all_states, all_acs)
@@ -347,10 +347,12 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
             diff_cars = diff_cars.reshape(-1, len(self._cars), 2)
             diff_objs = diff_objs.reshape(-1, len(self._objects), 2)
 
-            dist_cars = np.linalg.norm(diff_cars, axis=2)
-            dist_objs = np.linalg.norm(diff_objs, axis=2)
+            dist_cars = jnp.linalg.norm(diff_cars, axis=2)
+            dist_objs = jnp.linalg.norm(diff_objs, axis=2)
 
-            sum_invs = np.sum((1 / dist_cars), axis=1) + np.sum((1 / dist_objs), axis=1)
+            sum_invs = jnp.sum((1 / dist_cars), axis=1) + jnp.sum(
+                (1 / dist_objs), axis=1
+            )
             mean_invs = sum_invs / float(len(self._cars) + len(self._objects))
             # all_tasks = onp.array(tasks)[onp.array(too_close)]
             difficulties = mean_invs
@@ -367,7 +369,7 @@ class Week6_01(HighwayDriveWorld_Week6):
         ## Boilerplate
         main_speed = 0.7
         car_speed = 0.5
-        main_state = np.array([0, 0, np.pi / 2, main_speed])
+        main_state = jnp.array([0, 0, jnp.pi / 2, main_speed])
         goal_speed = 0.8
         goal_lane = 0
         horizon = 10
@@ -376,13 +378,13 @@ class Week6_01(HighwayDriveWorld_Week6):
         lane_width = 0.13
         num_lanes = 3
         # Car states
-        car1 = np.array([0.0, 0.3, np.pi / 2, 0])
-        car2 = np.array([-lane_width, 0.9, np.pi / 2, 0])
-        car_states = np.array([car1, car2])
-        car_speeds = np.array([car_speed, car_speed])
+        car1 = jnp.array([0.0, 0.3, jnp.pi / 2, 0])
+        car2 = jnp.array([-lane_width, 0.9, jnp.pi / 2, 0])
+        car_states = jnp.array([car1, car2])
+        car_speeds = jnp.array([car_speed, car_speed])
         # Obstacle states
-        # obstacle_states = np.array([[0.0, 0.3], [-lane_width, 0.3], [-lane_width, 0.5]])
-        obstacle_states = np.array([[0.0, 0.3]])
+        # obstacle_states = jnp.array([[0.0, 0.3], [-lane_width, 0.3], [-lane_width, 0.5]])
+        obstacle_states = jnp.array([[0.0, 0.3]])
         # Don't filter any task
         task_naturalness = "all"
 
@@ -409,7 +411,7 @@ class Week6_01_v1(HighwayDriveWorld_Week6):
         ## Boilerplate
         main_speed = 0.7
         car_speed = 0.5
-        main_state = np.array([0, 0, np.pi / 2, main_speed])
+        main_state = jnp.array([0, 0, jnp.pi / 2, main_speed])
         goal_speed = 0.8
         goal_lane = 0
         horizon = 10
@@ -418,13 +420,13 @@ class Week6_01_v1(HighwayDriveWorld_Week6):
         lane_width = 0.13
         num_lanes = 3
         # Car states
-        car1 = np.array([0.0, 0.3, np.pi / 2, 0])
-        car2 = np.array([-lane_width, 0.9, np.pi / 2, 0])
-        car_states = np.array([car1, car2])
-        car_speeds = np.array([car_speed, car_speed])
+        car1 = jnp.array([0.0, 0.3, jnp.pi / 2, 0])
+        car2 = jnp.array([-lane_width, 0.9, jnp.pi / 2, 0])
+        car_states = jnp.array([car1, car2])
+        car_speeds = jnp.array([car_speed, car_speed])
         # Obstacle states
-        # obstacle_states = np.array([[0.0, 0.3], [-lane_width, 0.3], [-lane_width, 0.5]])
-        obstacle_states = np.array([[0.0, 0.3]])
+        # obstacle_states = jnp.array([[0.0, 0.3], [-lane_width, 0.3], [-lane_width, 0.5]])
+        obstacle_states = jnp.array([[0.0, 0.3]])
         # Filter tasks based on initial car distance
         task_naturalness = "distance"
 
@@ -451,7 +453,7 @@ class Week6_02(HighwayDriveWorld_Week6):
         ## Boilerplate
         main_speed = 0.7
         car_speed = 0.5
-        main_state = np.array([0, 0, np.pi / 2, main_speed])
+        main_state = jnp.array([0, 0, jnp.pi / 2, main_speed])
         goal_speed = 0.8
         goal_lane = 0
         horizon = 10
@@ -460,13 +462,13 @@ class Week6_02(HighwayDriveWorld_Week6):
         lane_width = 0.13
         num_lanes = 3
         # Car states
-        car1 = np.array([0.0, 0.3, np.pi / 2, 0])
-        car2 = np.array([-lane_width, 0.9, np.pi / 2, 0])
-        car_states = np.array([car1, car2])
-        car_speeds = np.array([car_speed, car_speed])
+        car1 = jnp.array([0.0, 0.3, jnp.pi / 2, 0])
+        car2 = jnp.array([-lane_width, 0.9, jnp.pi / 2, 0])
+        car_states = jnp.array([car1, car2])
+        car_speeds = jnp.array([car_speed, car_speed])
         car_ranges = [[-0.4, 1.0], [-0.4, 1.0]]
         # Obstacle states
-        obstacle_states = np.array([[0.0, 0.3], [-lane_width, 0.3]])
+        obstacle_states = jnp.array([[0.0, 0.3], [-lane_width, 0.3]])
         # [x_min, x_max, y_min, y_max]
         obs_ranges = [[-0.16, 0.0, -0.4, 1.2], [0.0, 0.16, -0.4, 1.2]]
         # Don't filter any task
@@ -498,7 +500,7 @@ class Week6_02_v1(HighwayDriveWorld_Week6):
         ## Boilerplate
         main_speed = 0.7
         car_speed = 0.5
-        main_state = np.array([0, 0, np.pi / 2, main_speed])
+        main_state = jnp.array([0, 0, jnp.pi / 2, main_speed])
         goal_speed = 0.8
         goal_lane = 0
         horizon = 10
@@ -507,13 +509,13 @@ class Week6_02_v1(HighwayDriveWorld_Week6):
         lane_width = 0.13
         num_lanes = 3
         # Car states
-        car1 = np.array([0.0, 0.3, np.pi / 2, 0])
-        car2 = np.array([-lane_width, 0.9, np.pi / 2, 0])
-        car_states = np.array([car1, car2])
-        car_speeds = np.array([car_speed, car_speed])
+        car1 = jnp.array([0.0, 0.3, jnp.pi / 2, 0])
+        car2 = jnp.array([-lane_width, 0.9, jnp.pi / 2, 0])
+        car_states = jnp.array([car1, car2])
+        car_speeds = jnp.array([car_speed, car_speed])
         car_ranges = [[-0.4, 1.0], [-0.4, 1.0]]
         # Obstacle states
-        obstacle_states = np.array([[0.0, 0.3], [-lane_width, 0.3]])
+        obstacle_states = jnp.array([[0.0, 0.3], [-lane_width, 0.3]])
         # [x_min, x_max, y_min, y_max]
         obs_ranges = [[-0.16, 0.0, -0.4, 1.2], [0.0, 0.16, -0.4, 1.2]]
         # Don't filter any task
@@ -547,7 +549,7 @@ class Week6_03_v1(HighwayDriveWorld_Week6):
         ## Boilerplate
         main_speed = 0.7
         car_speed = 0.5
-        main_state = np.array([0, 0, np.pi / 2, main_speed])
+        main_state = jnp.array([0, 0, jnp.pi / 2, main_speed])
         goal_speed = 0.8
         goal_lane = 0
         horizon = 10
@@ -556,13 +558,13 @@ class Week6_03_v1(HighwayDriveWorld_Week6):
         lane_width = 0.13
         num_lanes = 3
         # Car states
-        car1 = np.array([0.0, 0.3, np.pi / 2, 0])
-        car2 = np.array([-lane_width, 0.9, np.pi / 2, 0])
-        car_states = np.array([car1, car2])
-        car_speeds = np.array([car_speed, car_speed])
+        car1 = jnp.array([0.0, 0.3, jnp.pi / 2, 0])
+        car2 = jnp.array([-lane_width, 0.9, jnp.pi / 2, 0])
+        car_states = jnp.array([car1, car2])
+        car_speeds = jnp.array([car_speed, car_speed])
         car_ranges = [[-2.0, 2.0], [-2.0, 2.0]]
         # Obstacle states
-        obstacle_states = np.array([[0.0, 0.3], [-lane_width, 0.3]])
+        obstacle_states = jnp.array([[0.0, 0.3], [-lane_width, 0.3]])
         # [x_min, x_max, y_min, y_max]
         obs_ranges = [[-0.16, 0.0, -2.0, 2.0], [0.0, 0.16, -2.0, 2.0]]
         # Don't filter any task
@@ -600,10 +602,10 @@ class Week6_04_v1(Week6_03_v1):
         )
 
         this_nlr_feats_dict = {}
-        sum_items = partial(np.sum, axis=(1, 2))
+        sum_items = partial(jnp.sum, axis=(1, 2))
 
         ## Lane distance feature to non-goal lanes
-        far_lane = np.abs(len(self._lanes) - 1 - self._goal_lane)
+        far_lane = jnp.abs(len(self._lanes) - 1 - self._goal_lane)
         key = f"dist_far_lanes"
         this_nlr_feats_dict[key] = compose(
             sum_items,
@@ -628,8 +630,8 @@ class Week6_04_v1(Week6_03_v1):
             partial(gaussian_feat, sigma=self._car_length),
             partial(item_index_feat, index=far_lane),
         )
-        max_feats_dict[key] = np.sum(
-            gaussian_feat(np.zeros((1, 1, 1)), sigma=self._car_length)
+        max_feats_dict[key] = jnp.sum(
+            gaussian_feat(jnp.zeros((1, 1, 1)), sigma=self._car_length)
         )
 
         key = f"neg_dist_lanes"
@@ -638,15 +640,15 @@ class Week6_04_v1(Week6_03_v1):
             partial(gaussian_feat, sigma=self._car_length),
             partial(item_index_feat, index=self._goal_lane),
         )
-        max_feats_dict[key] = np.sum(
-            gaussian_feat(np.zeros((1, 1, 1)), sigma=self._car_length)
+        max_feats_dict[key] = jnp.sum(
+            gaussian_feat(jnp.zeros((1, 1, 1)), sigma=self._car_length)
         )
 
         ## Speed features
         del nlr_feats_dict["speed"]
         speed_const = 5.0
-        sum_state = partial(np.sum, axis=1)
-        ones = np.ones((1, 1))  # (nbatch=1, dim=1)
+        sum_state = partial(jnp.sum, axis=1)
+        ones = jnp.ones((1, 1))  # (nbatch=1, dim=1)
         max_dspeed = speed_const * (self._max_speed - self._goal_speed)
 
         for speed_key, speed in zip(
@@ -655,7 +657,7 @@ class Week6_04_v1(Week6_03_v1):
             this_nlr_feats_dict[speed_key] = compose(
                 sum_state, partial(quadratic_feat, goal=speed, max_val=max_dspeed)
             )
-            max_feats_dict[speed_key] = np.sum(quadratic_feat(ones * max_dspeed))
+            max_feats_dict[speed_key] = jnp.sum(quadratic_feat(ones * max_dspeed))
 
         this_mapping = {
             "dist_far_lanes": "dist_lanes",

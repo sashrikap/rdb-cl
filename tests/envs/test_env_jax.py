@@ -1,6 +1,10 @@
 import jax.numpy as np
 import jax
 
+from jax.config import config
+
+config.update("jax_enable_x64", True)
+
 
 def test_vmap_array():
     def fun(val1, val2):
@@ -133,9 +137,9 @@ def test_juxt():
     funcs = [np.sum] * 100
 
     def juxt_max1(*args):
-        return np.max([fn(*args) for fn in funcs])
+        return np.max(np.array([fn(*args) for fn in funcs]))
 
-    juxt_max2 = compose(np.max, juxt(funcs))
+    juxt_max2 = compose(np.max, np.array, juxt(funcs))
     comp_fn = compose(np.square, juxt_max2)
     now = time.time()
     grad1 = jax.jit(jax.grad(juxt_max1))
@@ -144,11 +148,11 @@ def test_juxt():
     grad2 = jax.jit(jax.grad(juxt_max1))
     print("t2", time.time() - now)
     now = time.time()
-    grad1(jax.random.uniform(key, (100, 100))).shape
+    grad1(jax.random.uniform(key, shape=(100, 100))).shape
     print("t3", time.time() - now)
     now = time.time()
     grad2(jax.random.uniform(key, (100, 100))).shape
     print("t4", time.time() - now)
     now = time.time()
-    assert np.allclose(juxt_max2([10, 20, 30]), 60)
-    assert np.allclose(comp_fn([10, 20, 30]), 3600)
+    assert np.allclose(juxt_max2(np.array([10, 20, 30])), 60)
+    assert np.allclose(comp_fn(np.array([10, 20, 30])), 3600)

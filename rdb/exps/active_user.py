@@ -18,7 +18,7 @@ from tqdm.auto import tqdm
 from rdb.infer import *
 from jax import random
 import random as orandom
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import time
 import copy
@@ -255,7 +255,7 @@ class ExperimentActiveUser(object):
         self._train_tasks = self._model.env.all_tasks
         ## Propose first task
         self._initial_tasks = random_choice(
-            self._get_rng_task(), self._train_tasks, self._num_initial_tasks
+            self._get_rng_task(), self._train_tasks, (self._num_initial_tasks,)
         )
 
         ## Build server state store
@@ -643,7 +643,7 @@ class ExperimentActiveUser(object):
 
         ## Propose next task
         candidates = random_choice(
-            self._get_rng_task(), self._train_tasks, self._num_active_tasks
+            self._get_rng_task(), self._train_tasks, (self._num_active_tasks,)
         )
         candidate_scores = {}
         proposed_tasks = {method: None for method in self._active_keys}
@@ -693,13 +693,13 @@ class ExperimentActiveUser(object):
             next_id = random_choice(
                 self._get_rng_task(),
                 onp.arange(N_top),
-                self._num_propose,
-                replacement=False,
+                (self._num_propose,),
+                replace=False,
             )[0]
             next_task = difficult_tasks[next_id]
         elif method == "random":
             next_task = random_choice(
-                self._get_rng_task(), candidates, self._num_propose, replacement=False
+                self._get_rng_task(), candidates, (self._num_propose,), replace=False
             )[0]
         else:
             ## Pre-empt heavy computations
@@ -778,8 +778,8 @@ class ExperimentActiveUser(object):
         self._eval_tasks = random_choice(
             self._get_rng_eval(),
             eval_env.all_tasks,
-            self._num_eval_tasks,
-            replacement=False,
+            (self._num_eval_tasks,),
+            replace=False,
         )
         # Load belief
         # npz_path = f"{self._save_dir}/{self._exp_name}_seed_{self._rng_name}.npz"
@@ -868,7 +868,7 @@ class ExperimentActiveUser(object):
         npz_path = f"{self._save_root}/{self._exp_name}/{self._exp_name}_seed_{self._rng_name}.npz"
         os.makedirs(os.path.dirname(npz_path), exist_ok=True)
         with open(npz_path, "wb+") as f:
-            np.savez(f, **data)
+            jnp.savez(f, **data)
 
         ## Save user input yaml
         yaml_save = (
@@ -887,7 +887,7 @@ class ExperimentActiveUser(object):
         npy_path = f"{self._save_root}/{self._exp_name}/{self._exp_name}_eval_seed_{self._rng_name}.npy"
         os.makedirs(os.path.dirname(npy_path), exist_ok=True)
         data = dict(eval_info=self._eval_info, eval_tasks=self._eval_tasks)
-        np.save(npy_path, data)
+        jnp.save(npy_path, data)
 
 
 def run_experiment_server(

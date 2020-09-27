@@ -1,7 +1,7 @@
 from jax import random
 import os
 import yaml
-import jax.numpy as np
+import jax.numpy as jnp
 import numpy as onp
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -384,7 +384,7 @@ def plot_line_data(eval_plot_data, map_plot_data, obs_plot_data):
         while idx < len(method_ratios):
             mean_ratios.append(method_ratios[idx : idx + MAX_LEN])
             idx += len(method_ratios)
-        ratios.append(np.array(mean_ratios).mean(axis=0))
+        ratios.append(jnp.array(mean_ratios).mean(axis=0))
 
     # plt.xticks(x, list(data.keys()))
     ax.set_ylabel("Posterior Regret on Proposed task")
