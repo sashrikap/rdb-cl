@@ -1,7 +1,7 @@
 import os
 import rdb
 import time
-import skimage
+import skimage.transform
 import numpy as onp
 import jax.numpy as jnp
 from imageio import imsave
@@ -319,7 +319,14 @@ class Runner(object):
         return hessian, norm
 
     def __call__(
-        self, x0, actions, weights=None, weights_arr=None, batch=True, jax=False
+        self,
+        x0,
+        actions,
+        weights=None,
+        weights_arr=None,
+        batch=True,
+        jax=False,
+        verbose=False,
     ):
         """Run optimization.
 
@@ -370,12 +377,12 @@ class Runner(object):
         # Track JIT recompile
         t_compile = None
         a_shape = actions.shape
-        if self._a_shape is None:
+        if self._a_shape is None and verbose:
             print(f"JIT - Runner <{self._name}>")
             print(f"JIT - Runner first compile: ac {a_shape}")
             self._a_shape = a_shape
             t_compile = time.time()
-        elif actions.shape != self._a_shape:
+        elif actions.shape != self._a_shape and verbose:
             print(f"JIT - Runner <{self._name}>")
             print(
                 f"JIT - Runner recompile: ac {actions.shape}, previously {self._a_shape}"
@@ -447,7 +454,7 @@ class Runner(object):
         metadata = metadata.transpose()
 
         # Track JIT recompile
-        if t_compile is not None:
+        if t_compile is not None and verbose:
             print(
                 f"JIT - Runner finish compile in {time.time() - t_compile:.3f}s: ac {self._a_shape}"
             )

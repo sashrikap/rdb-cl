@@ -38,6 +38,9 @@ class ParticleWorkerSingle(object):
         self._runner(init_states, actions, weights=None, weights_arr=weights_arr)
         self._initialized = True
 
+    def controller(self):
+        return self._controller
+
     def initialize_done(self):
         return self._initialized
 
@@ -121,15 +124,20 @@ class ParticleServer(object):
         self._initialize_wait = initialize_wait
         self._workers = {}
         if self._parallel:
-            ray.init()
+            try:
+                ray.init()
+            except:
+                pass
 
-    def register(self, batch_name, num_workers):
+    def register(self, batch_name, num_workers, controller_fn=None):
         if not self._parallel:
             num_workers = 1
+        if controller_fn is None:
+            controller_fn = self._controller_fn
         self._workers[batch_name] = [
             self._worker_cls(
                 self._env_fn,
-                self._controller_fn,
+                controller_fn,
                 self._normalized_key,
                 self._weight_params,
                 self._max_batch,
@@ -149,7 +157,7 @@ class ParticleServer(object):
             for worker in self._workers[batch_name]:
                 worker.initialize()
 
-    def compute_tasks(self, batch_name, particles, tasks, verbose=True):
+    def compute_tasks(self, batch_name, particles, tasks, verbose=True, waittime=-1):
         """Compute all tasks for all particle weights.
 
         Note:
@@ -213,6 +221,9 @@ class ParticleServer(object):
                 assert weights_arr.shape[0] == nfeats
                 assert states_i.shape[0] == weights_arr.shape[1]
                 self._workers[batch_name][wi].compute.remote(weights_arr, states_i)
+            if waittime > 0:
+                for _ in tqdm(range(int(waittime))):
+                    time.sleep(1)
             # Retrieve
             for wi in range(num_workers):
                 result_w = ray.get(self._workers[batch_name][wi].get_result.remote())

@@ -86,7 +86,7 @@ if __name__ == "__main__":
         )
 
         params = {
-            "RANDOM_KEYS": list(range(0, 4)),
+            "RANDOM_KEYS": list(range(3)),
             # "NUM_EVAL_WORKERS": 8,
         }
         all_params = create_params(template, params)

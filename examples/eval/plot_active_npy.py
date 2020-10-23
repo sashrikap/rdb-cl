@@ -28,6 +28,9 @@ def read_seed(path):
         data = jnp.load(path, allow_pickle=True).item()
     elif path.endswith("npz"):
         data = jnp.load(path, allow_pickle=True)
+    import pdb
+
+    pdb.set_trace()
     return data
 
 
@@ -54,7 +57,7 @@ colors = {
 }
 
 
-def plot_perform(data_dir, exp_name, data, relative=False, normalized=False):
+def plot_perform(data_dir, exp_name, data, relative=False, normalized=False, var=False):
     sns.set_palette("husl")
     # fig, ax = plt.subplots(figsize=(10, 8))
     fig, ax = plt.subplots(figsize=(10, 8))
@@ -64,6 +67,16 @@ def plot_perform(data_dir, exp_name, data, relative=False, normalized=False):
             perf = onp.array(mdict["rel_perform"])
         elif normalized:
             perf = -1 * onp.array(mdict["normalized_perform"])
+        elif var:
+            # (nseeds, nround, ntasks, nparticles)
+            perf = onp.array(mdict["all_normalized_performs"], dtype=float).squeeze()
+            assert len(perf.shape) == 4
+            #  (nseeds, nround, nparticles)
+            perf = perf.mean(axis=2)
+            var_idx = int(0.05 * perf.shape[-1])
+            perf.sort(axis=-1)
+            perf = perf[:, :, var_idx]
+            perf = -1 * perf
         else:
             perf = onp.array(mdict["perform"])
         sns.tsplot(
@@ -72,34 +85,35 @@ def plot_perform(data_dir, exp_name, data, relative=False, normalized=False):
             data=perf,
             condition=method,
         )
+        # import pdb; pdb.set_trace()
         if plot_obs:
             obs_perf = -1 * mdict["obs_perform_normalized"]
             obs_mean = onp.array(obs_perf).mean(axis=0)
             print(method, onp.array(obs_perf).mean(axis=0).tolist())
-            if method == "infogain":
-                obs_mean = [
-                    0.2684237099023214,
-                    0.28381213230645097,
-                    0.20618107497336602,
-                    0.2584209869392536,
-                    0.16898932277707351,
-                ]
-            elif method == "random":
-                obs_mean = [
-                    0.2684237099023214,
-                    0.28099231913179384,
-                    0.27150938901271937,
-                    0.19122882878209124,
-                    0.1570842764181364,
-                ]
-            elif method == "difficult":
-                obs_mean = [
-                    0.2684237099023214,
-                    0.28222694291921147,
-                    0.21177849994778025,
-                    0.29627997066392747,
-                    0.18344383808450912,
-                ]
+            # if method == "infogain":
+            #     obs_mean = [
+            #         0.2684237099023214,
+            #         0.28381213230645097,
+            #         0.20618107497336602,
+            #         0.2584209869392536,
+            #         0.16898932277707351,
+            #     ]
+            # elif method == "random":
+            #     obs_mean = [
+            #         0.2684237099023214,
+            #         0.28099231913179384,
+            #         0.27150938901271937,
+            #         0.19122882878209124,
+            #         0.1570842764181364,
+            #     ]
+            # elif method == "difficult":
+            #     obs_mean = [
+            #         0.2684237099023214,
+            #         0.28222694291921147,
+            #         0.21177849994778025,
+            #         0.29627997066392747,
+            #         0.18344383808450912,
+            #     ]
             # sns.tsplot(
             #     time=range(1, 1 + len(perf[0])),
             #     color=colors[method],
@@ -107,6 +121,7 @@ def plot_perform(data_dir, exp_name, data, relative=False, normalized=False):
             #     linestyle="--",
             #     condition=method + " w/o IRD",
             # )
+
             ax.plot(
                 range(1, 1 + len(perf[0])),
                 obs_mean,
@@ -118,17 +133,21 @@ def plot_perform(data_dir, exp_name, data, relative=False, normalized=False):
     ax.spines["right"].set_visible(False)
     ax.spines["top"].set_visible(False)
     # ax.get_legend().remove()
-    plt.legend(loc="upper center", ncol=3, bbox_to_anchor=(1, 1.2))
+    # plt.legend(loc="upper center", ncol=3, bbox_to_anchor=(1, 1.2))
     plt.xlabel("Iteration")
     plt.ylabel("Regret")
     # import pdb; pdb.set_trace()
     plt.title(f"Posterior Regret")
-    plt.savefig(os.path.join(data_dir, exp_name, "performance.png"))
+    if var:
+        plt.savefig(os.path.join(data_dir, exp_name, "performance_var.png"))
+    else:
+        plt.savefig(os.path.join(data_dir, exp_name, "performance.png"))
     plt.tight_layout()
     plt.show()
 
 
 def plot_violate(data_dir, exp_name, data):
+    fig, ax = plt.subplots(figsize=(10, 8))
     sns.set_palette("husl")
     for i, (method, mdict) in enumerate(data.items()):
         perf = onp.array(mdict["violation"])
@@ -139,7 +158,7 @@ def plot_violate(data_dir, exp_name, data):
             condition=method,
         )
     plt.xticks(range(1, 1 + len(perf[0])))
-    plt.legend(loc="lower right")
+    plt.legend(loc="upper right")
     plt.xlabel("Iteration")
     plt.ylabel("Violation Gap")
     plt.title("IRD Posterior Violation")
@@ -209,16 +228,14 @@ def load_data():
             if (
                 # exp_name in file
                 # and "npy" in file
-                "npy" in file
-                and "map_seed" not in file
+                "map_seed" not in file
                 and file.endswith("npy")
             ):
                 exp_path = os.path.join(exp_dir, exp_name, file)
-                # print(exp_path)
                 if os.path.isfile(exp_path):
                     use_bools = [str(s) in exp_path for s in use_seeds]
                     not_bools = [str(s) in exp_path for s in not_seeds]
-                    print(file, use_bools, not_bools)
+                    # print(file, use_bools, not_bools)
                     if onp.any(use_bools) and not onp.any(not_bools):
                         npypaths.append(exp_path)
 
@@ -233,8 +250,10 @@ def load_data():
             if method not in data.keys():
                 data[method] = {
                     "perform": [],
+                    "all_performs": [],
                     "rel_perform": [],
                     "normalized_perform": [],
+                    "all_normalized_performs": [],
                     "obs_perform_normalized": [],
                     "log_prob_true": [],
                     "violation": [],
@@ -243,7 +262,9 @@ def load_data():
                 }
             data[method]["perform"].append([])
             data[method]["rel_perform"].append([])
+            data[method]["all_performs"].append([])
             data[method]["normalized_perform"].append([])
+            data[method]["all_normalized_performs"].append([])
             data[method]["log_prob_true"].append([])
             data[method]["violation"].append([])
             data[method]["obs_perform_normalized"].append([])
@@ -252,6 +273,13 @@ def load_data():
             for yh in yhist:
                 data[method]["perform"][-1].append(yh["perform"])
                 data[method]["rel_perform"][-1].append(yh["rel_perform"])
+                if "all_performs" in yh.keys():
+                    data[method]["all_performs"][-1].append(
+                        onp.array(yh["all_performs"])
+                    )
+                    data[method]["all_normalized_performs"][-1].append(
+                        onp.array(yh["all_normalized_performs"])
+                    )
                 data[method]["normalized_perform"][-1].append(yh["normalized_perform"])
                 data[method]["violation"][-1].append(yh["violation"])
                 data[method]["rel_violation"][-1].append(yh["rel_violation"])
@@ -268,8 +296,12 @@ def load_data():
         else:
             max_len = MAX_LEN
         mdict["perform"] = cleanup(mdict["perform"], max_len)
+        mdict["all_performs"] = cleanup(mdict["all_performs"], max_len)
         mdict["rel_perform"] = cleanup(mdict["rel_perform"], max_len)
         mdict["normalized_perform"] = cleanup(mdict["normalized_perform"], max_len)
+        mdict["all_normalized_performs"] = cleanup(
+            mdict["all_normalized_performs"], max_len
+        )
         mdict["violation"] = cleanup(mdict["violation"], max_len)
         mdict["rel_violation"] = cleanup(mdict["rel_violation"], max_len)
         mdict["log_prob_true"] = cleanup(mdict["log_prob_true"], max_len)
@@ -286,7 +318,7 @@ def load_separate_data():
     data = {}
     if os.path.isdir(os.path.join(exp_dir, exp_name)):
         for folder in sorted(os.listdir(os.path.join(exp_dir, exp_name))):
-            print(folder)
+            # print(folder)
             if folder not in use_methods:
                 continue
             npypaths = []
@@ -331,7 +363,7 @@ def load_separate_data():
                         data[method]["perform"][-1].append(yh["perform"])
                         data[method]["rel_perform"][-1].append(yh["rel_perform"])
                         data[method]["normalized_perform"][-1].append(
-                            yh["normalized_perform"]
+                            onp.array(yh["normalized_perform"])
                         )
                         data[method]["violation"][-1].append(yh["violation"])
                         data[method]["rel_violation"][-1].append(yh["rel_violation"])
@@ -367,10 +399,11 @@ def load_separate_data():
 
 
 def plot_data():
-    # data = load_data()
-    data = load_separate_data()
+    data = load_data()
+    # data = load_separate_data()
     # plot_feats_violate(exp_dir, exp_name, data, itr=5)
     plot_perform(exp_dir, exp_name, data, relative=False, normalized=True)
+    # plot_perform(exp_dir, exp_name, data, relative=False, normalized=False, var=True)
     # plot_perform(exp_dir, exp_name, data, relative=False)
     # plot_violate(exp_dir, exp_name, data)
     # plot_log_prob(exp_dir, exp_name, data)
@@ -378,23 +411,25 @@ def plot_data():
 
 if __name__ == "__main__":
     N = -1
+    # use_seeds = [0, 1, 2, 3, 4]
     use_seeds = [0, 1, 2, 3, 4]
     not_seeds = []
-    MAX_LEN = 5
-    MAX_RANDOM_LEN = 5
+    MAX_LEN = 10
+    MAX_RANDOM_LEN = 10
     PADDING = 0
     SEPARATE_SAVE = False
 
     use_seeds = [str(random.PRNGKey(si)) for si in use_seeds]
     not_seeds = [str(random.PRNGKey(si)) for si in not_seeds]
     use_methods = ["random", "infogain", "difficult"]
+    # use_methods = ["random"]
     not_methods = ["ratiomin"]
     plot_obs = True
 
-    exp_dir = "data/200604"
+    exp_dir = "data/201007"
     # exp_name = "active_ird_exp_ird_beta_50_true_w_map_sum_irdvar_3_adam200"
     # exp_name = "active_ird_ibeta_50_true_w1_eval_mean_128_seed_0_603_adam"
     # exp_name = "active_ird_ibeta_50_true_w1_eval_mean_128_seed_0_603_adam"
     # exp_name = "active_ird_simplified_indep_init_4v1_ibeta_6_obs_true_dbeta_0.02"
-    exp_name = "active_ird_simplified_joint_init_4v1_ibeta_6_true_w"
+    exp_name = "active_ird_6feat_indep_init_2v1_ibeta_6_dbeta_0.1_eval_mean"
     plot_data()

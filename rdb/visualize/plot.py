@@ -40,6 +40,7 @@ def plot_weights(
     title=None,
     max_weights=8.0,
     bins=100,
+    hist_weights=None,
     log_scale=True,
     viz_normalized_key=None,
     **kwargs,
@@ -51,6 +52,7 @@ def plot_weights(
         highlight_colors (list): list of colors for highlighting these weights
         highlight_labels (list): list of labels for denoting these weights
         max_weights (float): log range of weights ~ (-max_weights, max_weights)
+        hist_weights (list): plotting weights associated with each particle
 
     """
     assert len(highlight_dicts) == len(highlight_colors) == len(highlight_labels)
@@ -71,6 +73,7 @@ def plot_weights(
             facecolor="b",
             ec="k",
             alpha=0.3,
+            weights=hist_weights,
         )
         ybottom, ytop = axs[i].get_ylim()
         gap = (ytop - ybottom) / (len(highlight_dicts) - 1 + 1e-8)
@@ -196,6 +199,7 @@ def plot_weights_hist(
     max_weights=8.0,
     bins=100,
     log_scale=True,
+    hist_weights=None,
     loc="upper right",
     **kwargs,
 ):
@@ -229,7 +233,7 @@ def plot_weights_hist(
             values = onp.array(list(weights_dicts[key]))
             if not log_scale:
                 values = onp.log(values)
-            n, bins, patches = axs[i].hist(
+            n, _, patches = axs[i].hist(
                 values,
                 bins,
                 histtype="stepfilled",  # no vertical border
@@ -238,6 +242,7 @@ def plot_weights_hist(
                 label=label,
                 facecolor=color,
                 ec="k",  # border
+                weights=hist_weights,
                 alpha=0.25,
             )
             axs[i].set_xlabel(key)

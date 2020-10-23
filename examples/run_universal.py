@@ -17,6 +17,7 @@ from functools import partial
 from rdb.exps.utils import *
 from rdb.infer import *
 from jax import random
+from jax.config import config
 import gym, rdb.envs.drive2d
 import numpyro.distributions as dist
 import yaml, argparse, os
@@ -134,6 +135,7 @@ def main(random_key):
         save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
         exp_name=EXP_NAME,
         exp_params=PARAMS,
+        model_dir=MODEL_DIR,
         **EXP_ARGS,
     )
 
@@ -156,8 +158,10 @@ if __name__ == "__main__":
     # Load parameters
     if not GCP_MODE:
         PARAMS = load_params("examples/params/universal_template.yaml")
+        MODEL_DIR = "examples/universal"
     else:
         PARAMS = load_params("/dar_payload/rdb/examples/params/universal_params.yaml")
+        MODEL_DIR = "/dar_payload/rdb/examples/universal"
     locals().update(PARAMS)
 
     for ki in copy.deepcopy(RANDOM_KEYS):

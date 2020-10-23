@@ -17,18 +17,22 @@ DESIGNER_CONTROLLER_ARGS:
 
 ## Saving
 # Full sampling
-SAVE_NAME: 200905
-# EXP_NAME: universal_simplified_joint_init1v1_2000
-# EXP_NAME: universal_simplified_joint_init1v1_2000_eval_risk
-# EXP_NAME: universal_simplified_joint_init1v1_2000_old_eval_mean
-# EXP_NAME: universal_simplified_joint_init1v1_2000_uni_eval_mean
-# EXP_NAME: universal_simplified_joint_init1v1_2000_old_eval_risk
-EXP_NAME: universal_simplified_joint_init1v1_2000_uni_eval_risk
-# EXP_NAME: universal_simplified_joint_init1v1_no
+SAVE_NAME: 201019
+# EXP_NAME: universal_joint_init1v1_2000
+# EXP_NAME: universal_joint_init1v1_2000_uni_eval_risk
+# EXP_NAME: universal_joint_init1v1_2000_old_eval_risk_sz_0.1_expensive
+EXP_NAME: universal_joint_init1v1_2000_uni_eval_risk_sz_0.1
+# EXP_NAME: universal_joint_init1v2_2000_old_eval_mean
+# EXP_NAME: universal_joint_init1v2_2000_uni_eval_mean
+# EXP_NAME: universal_joint_init1v3_2000_old_eval_risk
+# EXP_NAME: universal_joint_init1v3_2000_old_eval_risk_exp
+# EXP_NAME: universal_joint_init1v1_no
 
 
 EXP_ARGS:
-  eval_method: mean
+  eval_method:
+    designer: mean
+    ird: map
   num_eval: 64
   num_eval_tasks: 500
   eval_env_name: Week6_02-v1
@@ -40,11 +44,18 @@ EXP_ARGS:
   # ird_betas: [1, 5, 10, 50]
   designer_betas: []
   ird_betas: [1]
-  # ird_betas: [0, 5, 50]
-  # universal_model: model_v01/model_v01_02000.npz
-  universal_model: null
-  # risk_averse: True
-  risk_averse: False
+  # ird_betas: [0, 1, 5, 10, 50]
+  # ird_betas: [1, 5, 10, 50]
+  # ird_expensive: True
+  ird_expensive: False
+  universal_model: model_v01/model_v01_02000.npz
+  # universal_model: null
+  risk_averse: True
+  # risk_averse: False
+  # make_mp4: True
+  make_mp4: False
+  # eval_only: False
+  eval_only: True
 ## Designer Settigns
 DESIGNER_ARGS:
   task_method: mean
@@ -55,16 +66,12 @@ DESIGNER_ARGS:
   select_mode: mean
   sample_init_args:
     # proposal_var: 0.1
-    proposal_var: 0.3 # beta = 1
+    proposal_var: 0.1 # beta = 1
     # proposal_var: 1.5 # beta = 0.1
     # proposal_var: 2 # beta = 0.05
     # proposal_var: 1
   proposal_decay: 0.7
   max_val: 15.0
-  sample_args:
-    num_samples: 250
-    num_warmup: 25
-    num_chains: 1
   beta: 0.02
 ## IRD Settings
 IRD_ARGS:
@@ -77,14 +84,77 @@ IRD_ARGS:
   max_val: 15.0
   beta: 6
   mcmc_normalize: null
+  # mcmc_normalize: offset
   sample_args:
     num_warmup: 200
-    num_samples: 20000
-    num_chains: 3
+    num_samples: 4000
+    num_chains: 1
 EVAL_ARGS:
   parallel: True
   num_eval_workers: 4
   max_batch: 500
+
+
+
+
+# ## Testing
+# SAVE_NAME: 201011
+# EXP_NAME: universal_test_expensive
+
+
+# EXP_ARGS:
+#   eval_method:
+#     designer: mean
+#     ird: map
+#   num_eval: 64
+#   num_eval_tasks: 15
+#   eval_env_name: Week6_02-v1
+#   eval_seed: 0
+#   num_prior_tasks: 0
+#   initial_tasks_file: Week6_04_1v1
+#   designer_betas: []
+#   ird_betas: [1]
+#   # universal_model: model_v01/model_v01_02000.npz
+#   universal_model: null
+#   ird_expensive: True
+#   make_mp4: False
+#   # risk_averse: True
+#   risk_averse: False
+# ## Designer Settigns
+# DESIGNER_ARGS:
+#   task_method: mean
+#   num_normalizers: 12
+#   sample_method: MH
+#   # design_mode: independent
+#   design_mode: joint
+#   select_mode: mean
+#   sample_init_args:
+#     proposal_var: 0.3 # beta = 1
+#   proposal_decay: 0.7
+#   max_val: 15.0
+#   beta: 0.02
+# ## IRD Settings
+# IRD_ARGS:
+#   task_method: sum
+#   sample_method: MH
+#   sample_init_args:
+#     # proposal_var: 3 # beta=4
+#     proposal_var: 1
+#   proposal_decay: 0.7
+#   max_val: 15.0
+#   beta: 6
+#   # mcmc_normalize: null
+#   mcmc_normalize: offset
+#   sample_args:
+#     num_warmup: 20
+#     num_samples: 50
+#     num_chains: 1
+# EVAL_ARGS:
+#   parallel: True
+#   num_eval_workers: 4
+#   max_batch: 500
+
+
 
 
 

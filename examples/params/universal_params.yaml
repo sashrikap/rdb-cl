@@ -1,61 +1,55 @@
-ACTIVE_FNS:
-- infogain
-- random
-- difficult
 DESIGNER_ARGS:
-  beta: 0.1
-  design_mode: independent
+  beta: 0.02
+  design_mode: joint
   max_val: 15.0
-  num_normalizers: 3000
+  num_normalizers: 1000
   proposal_decay: 0.7
-  sample_args:
-    num_chains: 1
-    num_samples: 250
-    num_warmup: 25
   sample_init_args:
-    proposal_var: 2
+    proposal_var: 0.3
   sample_method: MH
   select_mode: mean
   task_method: mean
-  use_true_w: false
 DESIGNER_CONTROLLER_ARGS:
   engine: jax
   horizon: 10
   method: adam
   replan: 5
-ENV_NAME: Week6_04-v1
+ENV_NAME: Week6_02-v1
 EVAL_ARGS:
   max_batch: 500
-  num_active_workers: 2
-  num_eval_workers: 2
+  num_eval_workers: 4
   parallel: true
-  risk_averse: false
 EXP_ARGS:
+  designer_betas: []
   eval_env_name: Week6_02-v1
-  eval_method: mean
+  eval_method:
+    designer: mean
+    ird: map
   eval_seed: 0
-  initial_tasks_file: Week6_04_2v1
-  initial_tasks_seed: 0
-  iterations: 10
-  num_active_sample: 500
-  num_active_tasks: 72
+  initial_tasks_file: Week6_04_1v3
+  ird_betas:
+  - 1
+  - 5
+  - 10
+  - 50
+  make_mp4: false
   num_eval: 64
   num_eval_tasks: 500
-  num_initial_tasks: 2
   num_prior_tasks: 0
-  obs_true: false
-  separate_save: false
-EXP_NAME: active_ird_6feat_indep_init_2v1_ibeta_6_dbeta_0.1_eval_mean
+  risk_averse: true
+  universal_model: model_v01/model_v01_02000.npz
+EXP_NAME: universal_joint_init1v3_2000_uni_eval_risk
 IRD_ARGS:
-  beta: 1
+  beta: 6
   max_val: 15.0
+  mcmc_normalize: null
   proposal_decay: 0.7
   sample_args:
     num_chains: 3
-    num_samples: 40000
+    num_samples: 20000
     num_warmup: 200
   sample_init_args:
-    proposal_var: 3
+    proposal_var: 1
   sample_method: MH
   task_method: sum
 IRD_CONTROLLER_ARGS:
@@ -65,7 +59,7 @@ IRD_CONTROLLER_ARGS:
   replan: 5
 RANDOM_KEYS:
 - 4
-SAVE_NAME: 201007
+SAVE_NAME: 200927
 TRUE_W:
   control: 2.0
   dist_cars: 1.0
@@ -84,3 +78,4 @@ WEIGHT_PARAMS:
   - control
   max_weights: 15.0
   normalized_key: __dummy__
+  viz_normalized_key: __dummy__

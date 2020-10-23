@@ -5,9 +5,9 @@ ACTIVE_ARGS:
   - difficult
 DESIGNER_ARGS:
   beta: 10
-  num_normalizers: 1000
-  proposal_decay: 0.7
   max_val: 15.0
+  num_normalizers: 1000
+  proposal_decay: 0.1
   sample_args:
     num_chains: 1
     num_samples: 500
@@ -24,31 +24,41 @@ DESIGNER_CONTROLLER_ARGS:
 ENV_NAME: Week6_03-v1
 EVAL_ARGS:
   max_batch: 500
-  num_active_workers: 1
+  num_active_workers: 4
   num_eval_workers: 1
   parallel: true
 EXP_ARGS:
+  default_initial_weights:
+    control: 20.0
+    dist_cars: 0.001
+    dist_fences: 0.001
+    dist_lanes: 5.0
+    dist_objects: 0.001
+    speed: 1.0
+    speed_over: 0.001
+  divide_and_conquer: true
   eval_env_name: Week6_02-v1
   eval_method: map
   eval_seed: 0
-  initial_tasks_file: Week6_04_1v2
+  initial_tasks_file: Week6_04_1v1
   iterations: 5
   load_previous: false
   num_active_sample: 500
   num_active_tasks: 64
-  num_eval: 64
+  num_eval: 128
   num_eval_tasks: 500
   plan_beta: 10
-EXP_NAME: iterative_divide_default_02
+  propose_wait: 200
+EXP_NAME: iterative_divide_initial_1v1_icra_20
 IRD_ARGS:
   beta: 1
-  proposal_decay: 0.7
+  max_val: 15.0
+  proposal_decay: 0.1
   sample_args:
-    num_chains: 3
+    num_chains: 1
     num_samples: 8000
     num_warmup: 200
   sample_init_args:
-    max_val: 15.0
     proposal_var: 0.5
   sample_method: MH
   task_method: sum
@@ -58,8 +68,8 @@ IRD_CONTROLLER_ARGS:
   method: adam
   replan: 5
 RANDOM_KEYS:
-- 3
-SAVE_NAME: 200501
+- 2
+SAVE_NAME: 201012
 WEIGHT_PARAMS:
   bins: 200
   feature_keys:

@@ -25,48 +25,39 @@ DESIGNER_CONTROLLER_ARGS:
 
 ## Saving
 # Full sampling
-SAVE_NAME: 200604
-# EXP_NAME: active_ird_ibeta_50_w1_indep_dbeta_3_dvar_1_initial_3_eval_map_128_prior_0_seed_0_604_adam
-# EXP_NAME: active_ird_ibeta_50_w1_indep_dbeta_20_dvar_1_initial_3_eval_map_128_prior_0_seed_0_604_adam
-# EXP_NAME: active_ird_new_ibeta_5_w1_joint_dbeta_1_initial_1_prior_0_eval_map_128_seed_0_604_adam
-# EXP_NAME: active_ird_new_ibeta_5_w1_joint_dbeta_1_initial_2v2_prior_0_eval_map_128_seed_0_604_adam
-# EXP_NAME: active_ird_test_initial_3_ibeta_1_dbeta_1
-# EXP_NAME: active_ird_test_initial_2_ibeta_5_dbeta_0.1_initseed_1
-# EXP_NAME: active_ird_test_initial_2v1_ibeta_3_dbeta_0.01_dvar_1.5_eval_map
-# EXP_NAME: active_ird_test_initial_1v2_ibeta_5_dbeta_0.1_simplified
-#EXP_NAME: active_ird_test_initial_4v1_ibeta_2_obs_true_dbeta_0.1_simplified
-# EXP_NAME: active_ird_test_initial_4v1_ibeta_4_true_w_simplified
-# EXP_NAME: active_ird_test_initial_4v1_ibeta_2_obs_false_dbeta_0.02_proxyeach_simplified
-# EXP_NAME: active_ird_simplified_joint_init_4v1_ibeta_6_obs_true_dbeta_0.02
-EXP_NAME: active_ird_simplified_indep_init_4v1_ibeta_6_obs_true_dbeta_0.02
-# EXP_NAME: active_ird_test_designer_ibeta_10_dbeta_0.02_tasks_6
-# SAVE_NAME: 200523
-# EXP_NAME: active_ird_ibeta_50_w1_indep_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam
+SAVE_NAME: 201007
+#EXP_NAME: active_ird_6feat_indep_init_4v1_ibeta_6_dbeta_0.1
+# EXP_NAME: active_ird_6feat_indep_init_1v1_ibeta_6_dbeta_0.1_eval_mean
+# EXP_NAME: active_ird_6feat_indep_init_2v1_ibeta_6_dbeta_0.1_eval_mean
+EXP_NAME: active_ird_6feat_indep_init_2v1_ibeta_6_dbeta_0.1_eval_mean
+# EXP_NAME: active_ird_test_initial_1
 
 
 EXP_ARGS:
-  eval_method: map
+  eval_method: mean
   num_eval: 64
   num_eval_tasks: 500
   # eval_method: post_mean
   # num_eval_tasks: 4096
-  obs_method: mean
-  obs_true: True
+  obs_true: False
   eval_env_name: Week6_02-v1
   iterations: 10
   num_active_tasks: 72
   num_active_sample: 500
   eval_seed: 0
   num_prior_tasks: 0
-  num_initial_tasks: 4
+  #num_initial_tasks: 4
+  num_initial_tasks: 2
   initial_tasks_seed: 0
   # initial_tasks_file: null
-  initial_tasks_file: Week6_04_4v1
-  separate_save: True
+  initial_tasks_file: Week6_04_2v1
+  # initial_tasks_file: Week6_04_2v2
+  # initial_tasks_file: Week6_04_2v3
+  separate_save: False
 ## Designer Settigns
 DESIGNER_ARGS:
   task_method: mean
-  num_normalizers: 1000
+  num_normalizers: 3000
   # use_true_w: True
   use_true_w: False
   sample_method: MH
@@ -85,7 +76,7 @@ DESIGNER_ARGS:
     num_samples: 250
     num_warmup: 25
     num_chains: 1
-  beta: 0.02
+  beta: 0.1
 ## IRD Settings
 IRD_ARGS:
   task_method: sum
@@ -95,7 +86,7 @@ IRD_ARGS:
     # proposal_var: 1
   proposal_decay: 0.7
   max_val: 15.0
-  beta: 6
+  beta: 1
   sample_args:
     num_warmup: 200
     num_samples: 40000
@@ -105,71 +96,91 @@ EVAL_ARGS:
   num_eval_workers: 2
   num_active_workers: 2
   max_batch: 500
-ACTIVE_FNS: [random]
+  risk_averse: False
+# ACTIVE_FNS: [random]
 #ACTIVE_FNS: [infogain, ratiomean, ratiomin, difficult, random]
 #ACTIVE_FNS: [infogain, random, difficult, ratiomean]
-#ACTIVE_FNS: [infogain, random, difficult]
+ACTIVE_FNS: [infogain, random, difficult]
+
+
+
+
+# ## Saving
+# SAVE_NAME: 200927
+# EXP_NAME: active_ird_test
 
 
 
 # ## Testing
-# ## Saving
-# SAVE_NAME: 200516
-# EXP_NAME: test
 # EXP_ARGS:
-#   num_eval: 2
-#   num_eval_tasks: 40
-#   eval_method: mean
-#   obs_method: mean
-#   obs_true: true
-#   iterations: 8
-#   eval_seed: 0
-#   initial_tasks_seed: 0
-#   initial_tasks_file: null
-#   num_prior_tasks: 0
-#   num_initial_tasks: 1
+#   eval_method: map
+#   num_eval: 12
+#   num_eval_tasks: 50
+#   # eval_method: post_mean
+#   # num_eval_tasks: 4096
+#   obs_true: False
 #   eval_env_name: Week6_02-v1
-#   separate_save: True
+#   iterations: 10
+#   num_active_tasks: 22
+#   num_active_sample: 50
+#   eval_seed: 0
+#   num_prior_tasks: 0
+#   num_initial_tasks: 4
+#   designer_mode: importance
+#   initial_tasks_seed: 0
+#   # initial_tasks_file: null
+#   initial_tasks_file: Week6_04_4v1
+#   separate_save: False
+# ## Designer Settigns
 # DESIGNER_ARGS:
-#   task_method: sum
-#   num_normalizers: 10
-#   sample_method: MH
+#   task_method: mean
+#   num_normalizers: 30
 #   # use_true_w: True
 #   use_true_w: False
-#   # design_mode: independent
-#   design_mode: joint
+#   sample_method: MH
+#   design_mode: independent
+#   # design_mode: joint
 #   select_mode: mean
 #   sample_init_args:
-#     proposal_var: 0.3
-#     max_val: 15.0
-#   sample_args:
-#     num_samples: 10
-#     num_warmup: 2
-#     num_chains: 1
-#   beta: 1
+#     # proposal_var: 0.1
+#     # proposal_var: 0.3 # beta = 1
+#     # proposal_var: 1.5 # beta = 0.1
+#     proposal_var: 2 # beta = 0.05
+#     # proposal_var: 1
+#   proposal_decay: 0.7
+#   max_val: 15.0
+#   beta: 0.02
+# ## IRD Settings
 # IRD_ARGS:
-#   sample_method: MH
 #   task_method: sum
+#   sample_method: MH
 #   sample_init_args:
-#     proposal_var: 2
-#     max_val: 15.0
+#     proposal_var: 3 # beta=4
+#     # proposal_var: 1
+#   proposal_decay: 0.7
+#   max_val: 15.0
+#   beta: 6
 #   sample_args:
-#     num_warmup: 20
-#     num_samples: 30
+#     num_warmup: 200
+#     num_samples: 40000
 #     num_chains: 3
-#   beta: 1
 # EVAL_ARGS:
+#   risk_averse: False
 #   parallel: True
 #   num_eval_workers: 2
 #   num_active_workers: 2
-#   max_batch: 10
-# ACTIVE_FNS: [random]
+#   max_batch: 500
+# ACTIVE_FNS: [infogain, random]
+# #ACTIVE_FNS: [infogain, ratiomean, ratiomin, difficult, random]
+# #ACTIVE_FNS: [infogain, random, difficult, ratiomean]
+# #ACTIVE_FNS: [infogain, random, difficult]
+
 
 
 
 ## Plotting & weight scaling
 WEIGHT_PARAMS:
-  normalized_key: dist_cars
+  normalized_key: __dummy__
   max_weights: 15.0
   bins: 200
   feature_keys:

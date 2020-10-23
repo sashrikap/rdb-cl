@@ -13,8 +13,7 @@ from rdb.exps.utils import load_params, examples_dir, data_dir
 def run():
     experiment = run_iterative(evaluate=evaluate, gcp_mode=GCP_MODE)
     for random_key in RANDOM_KEYS:
-        rng_key = random.PRNGKey(random_key)
-        experiment.update_key(rng_key)
+        experiment.update_key(random_key)
         experiment.evaluate()
         # experiment.add_evaluate_obs()
 

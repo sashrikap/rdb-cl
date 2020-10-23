@@ -154,7 +154,7 @@ def mh(model, proposal_var, jit=True):
     def _next(curr_state, curr_log_prob, model_args, model_kwargs, rng_key):
 
         curr_flat, unravel_fn = ravel_pytree(curr_state)
-        next_log_prob, next_flat = -np.inf, curr_flat
+        next_log_prob, next_flat = -jnp.inf, curr_flat
         # import pdb; pdb.set_trace()
         init_val = (next_flat, next_log_prob, False, 0.0, rng_key)
 
@@ -343,3 +343,6 @@ class MH(MCMCKernel):
         :return: Next `state` after running MH.
         """
         return self._sample_fn(state, model_args, model_kwargs)
+
+    def get_diagnostics_str(self, state):
+        return "acc. prob={:.2f}".format(state.mean_accept_prob)

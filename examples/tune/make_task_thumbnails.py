@@ -11,7 +11,7 @@ from rdb.infer import *
 
 
 ENV_NAME = "Week6_02-v1"  # Two Blockway
-FILE_NAME = "Week6_04_1v2"
+FILE_NAME = "Week6_04_2v3"
 
 THUMBNAIL = True
 HEATMAP = True

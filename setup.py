@@ -9,7 +9,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "numpy",
-        "pillow",
+        "Pillow==7.2.0",
         "scipy",
         "scikit-image",
         # "scipy==1.1.0",
@@ -17,9 +17,9 @@ setup(
         "matplotlib",
         "gym",
         "flax",
-        # "numpyro @ https://github.com/hzyjerry/numpyro/tarball/master#egg=numpyro"
-        # "jax==0.1.54",
-        # "jaxlib==0.1.38",  # numpyro installs the correct version
+        "numpyro@https://github.com/hzyjerry/numpyro/tarball/master#egg=numpyro",
+        "jax==0.2.0",
+        "jaxlib==0.1.55",
         "moviepy",
         "fast-histogram",
         "pygame",

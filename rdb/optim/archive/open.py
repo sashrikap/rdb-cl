@@ -156,7 +156,7 @@ class LocalOptimizer(OpenLoopOptimizer):
             _gu = jnp.expand_dims(_gxu[-self.udim :], 0)
             _hu = self.hessian_xu(xu)[-self.udim :, -self.udim :]
             _jux = self.jacobian_xu(xu)[-self.udim :, : -self.udim]
-            gx = _gx + _gu.dot(-np.linalg.solve(_hu + eps, _jux))
+            gx = _gx + _gu.dot(-jnp.linalg.solve(_hu + eps, _jux))
             gx = gx.squeeze(0)
             if invert:
                 gx = -1 * gx

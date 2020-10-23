@@ -12,6 +12,7 @@ from rdb.exps.active import ActiveInfoGain, ActiveRatioTest, ActiveRandom
 from rdb.exps.active_ird import ExperimentActiveIRD
 from rdb.distrib.particles import ParticleServer
 from rdb.infer.ird_oc import IRDOptimalControl
+from rdb.optim.mpc_risk import build_risk_averse_mpc
 from rdb.optim.mpc import build_mpc
 from functools import partial
 from rdb.exps.utils import *
@@ -49,11 +50,29 @@ def main(random_key):
         )
         return controller, runner
 
-    def ird_controller_fn(env, name=""):
-        controller, runner = build_mpc(
-            env, env.main_car.cost_runtime, dt=env.dt, name=name, **IRD_CONTROLLER_ARGS
-        )
+    def ird_controller_fn(env, name="", risk_averse=False):
+        if risk_averse:
+            controller, runner = build_risk_averse_mpc(
+                env,
+                env.main_car.cost_runtime,
+                dt=env.dt,
+                name=name,
+                **IRD_CONTROLLER_ARGS,
+                cost_args={"mode": "trajwise"},
+            )
+        else:
+            controller, runner = build_mpc(
+                env,
+                env.main_car.cost_runtime,
+                dt=env.dt,
+                name=name,
+                **IRD_CONTROLLER_ARGS,
+            )
         return controller, runner
+
+    risk_controller_fn = partial(
+        ird_controller_fn, risk_averse=EVAL_ARGS["risk_averse"]
+    )
 
     eval_server = ParticleServer(
         env_fn,
@@ -63,7 +82,9 @@ def main(random_key):
         weight_params=WEIGHT_PARAMS,
         max_batch=EVAL_ARGS["max_batch"],
     )
-    eval_server.register("Evaluation", EVAL_ARGS["num_eval_workers"])
+    eval_server.register(
+        "Evaluation", EVAL_ARGS["num_eval_workers"], controller_fn=risk_controller_fn
+    )
     eval_server.register("Active", EVAL_ARGS["num_active_workers"])
     ## Prior sampling & likelihood functions for PGM
     def prior_fn(name="", feature_keys=WEIGHT_PARAMS["feature_keys"]):
@@ -129,6 +150,8 @@ def main(random_key):
         save_root=f"{SAVE_ROOT}/{SAVE_NAME}",
         exp_name=EXP_NAME,
         exp_params=PARAMS,
+        risk_averse=EVAL_ARGS["risk_averse"],
+        risk_controller_fn=risk_controller_fn,
         **EXP_ARGS,
     )
 

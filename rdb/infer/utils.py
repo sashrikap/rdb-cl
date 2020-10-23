@@ -199,7 +199,6 @@ def collect_trajs(
                 if us0_i:
                     us0_pad = jnp.zeros((num_pad, us0_i.shape[1]))
                     us0_i = jnp.concatenate([us0_i, us0_pad], axis=0)
-            # import pdb; pdb.set_trace()
             actions_i = controller(
                 states_i, us0=us0_i, weights=None, weights_arr=weights_arr_i, jax=jax
             )

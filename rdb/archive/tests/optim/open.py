@@ -7,7 +7,7 @@ def test_easy_u():
         return x + u
 
     def f_rew(x, u, next_x):
-        return -np.sum((x - 1) ** 2)
+        return -jnp.sum((x - 1) ** 2)
 
     optim = LocalOptimizer(f_dyn, f_rew, 1, 1, 5)
     opt_u, opt_r, _ = optim.optimize_u(jnp.zeros(1), jnp.zeros(5))
@@ -24,7 +24,7 @@ def test_easy_x():
         return x + u
 
     def f_rew(x, u, next_x):
-        return -np.sum(x ** 2)
+        return -jnp.sum(x ** 2)
 
     optim = LocalOptimizer(f_dyn, f_rew, 1, 1, 5)
     t1 = time.time()

@@ -10,7 +10,8 @@ sns.set()
 
 def read_seed(path):
     # print(path)
-    data = jnp.load(path, allow_pickle=True)["eval_hist"].item()
+    # data = jnp.load(path, allow_pickle=True)["eval_hist"].item()
+    data = jnp.load(path, allow_pickle=True).item()
     return data
 
 
@@ -106,7 +107,7 @@ def plot_data():
 
 if __name__ == "__main__":
     N = -1
-    use_seeds = [4]
+    use_seeds = [0]
     # 200128, bad for random: 0 (2, 3), 3 (2), 4 (2, 5, 8), 6 (1, 2, 4), 7 (2, 3, 4)
     # 200128, bad for infogain: 4 (1)
     # 200128, bad for ratiomean: 1
@@ -114,7 +115,7 @@ if __name__ == "__main__":
     # not_seeds = [20, 21, 22, 23, 24]
     not_seeds = []
     MAX_LEN = 2
-    MAX_RANDOM_LEN = 3
+    MAX_RANDOM_LEN = 2
     PADDING = 0
 
     use_seeds = [str(random.PRNGKey(si)) for si in use_seeds]
@@ -122,8 +123,8 @@ if __name__ == "__main__":
     # exp_dir = "data/200116"
     # exp_name = "active_ird_exp_mid"
 
-    exp_dir = "data/200319"
-    exp_name = "active_ird_sum_ibeta_5_irdvar_3_true_w_w1_602_adam"
+    exp_dir = "data/200927"
+    exp_name = "active_ird_simplified_indep_init_4v1_ibeta_6_obs_true_dbeta_0.02"
     rand_dir = "data/200319"
-    rand_name = "active_ird_sum_ibeta_5_irdvar_3_true_w_w1_602_adam"
+    rand_name = "active_ird_simplified_indep_init_4v1_ibeta_6_obs_true_dbeta_0.02"
     plot_data()

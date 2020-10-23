@@ -172,7 +172,7 @@ class FiniteHorizonMPC(object):
         """
         return self._optimizer._minimize(fn, grad_fn, us0)
 
-    def _plan(self, x0, us0, weights_arr):
+    def _plan(self, x0, us0, weights_arr, verbose=True):
         """Plan for horizon.
 
         Args:
@@ -204,13 +204,13 @@ class FiniteHorizonMPC(object):
         else:
             # Track JIT recompile
             t_compile = None
-            if self._u_shape is None:
+            if self._u_shape is None and verbose:
                 print(f"JIT - Controller <{self._name}>")
                 print(f"JIT - Controller first compile: u0 {u_shape}")
                 print(f"JIT - Controller first compile: weights {weights_arr.shape}")
                 self._u_shape = u_shape
                 t_compile = time.time()
-            elif u_shape != self._u_shape:
+            elif u_shape != self._u_shape and verbose:
                 print(f"JIT - Controller <{self._name}>")
                 print(
                     f"JIT - Controller recompile: u0 {u_shape}, previously {self._u_shape}"
@@ -234,7 +234,7 @@ class FiniteHorizonMPC(object):
                     # xs_t (T, nbatch, x_dim)
                     xs_t = self.h_traj(x_t, opt_us_t)
 
-                if t == 0 and t_compile is not None:
+                if t == 0 and t_compile is not None and verbose:
                     print(
                         f"JIT - Controller finish compile in {time.time() - t_compile:.3f}s: u0 {self._u_shape}"
                     )
@@ -262,6 +262,7 @@ class FiniteHorizonMPC(object):
         weights_arr=None,
         init="zeros",
         jax=False,
+        verbose=True,
     ):
         """Run Optimizer.
 
@@ -304,7 +305,7 @@ class FiniteHorizonMPC(object):
             else:
                 raise NotImplementedError(f"Initialization undefined for '{init}'")
 
-        us_opt = self._plan(x0, us0, weights_arr)
+        us_opt = self._plan(x0, us0, weights_arr, verbose=verbose)
         return us_opt
 
 

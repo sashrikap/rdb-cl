@@ -30,18 +30,22 @@ colors = {
 }
 
 
-def plot_iterative_eval():
+def load_data(exp_names):
     all_data = []
     methods = None
-    for seed in use_seeds:
-        if seed in not_seeds:
-            continue
-        file_name = f"{exp_name}_eval_seed_{seed:02d}.npy"
-        file_path = f"{exp_dir}/{exp_name}/{file_name}"
-        print(file_path)
-        if os.path.isfile(file_path):
-            all_data.append(jnp.load(file_path, allow_pickle=True).item())
+    for exp_name in exp_names:
+        for seed in use_seeds:
+            if seed in not_seeds:
+                continue
+            file_name = f"{exp_name}_eval_seed_{seed:02d}.npy"
+            file_path = f"{exp_dir}/{exp_name}/{file_name}"
+            print(file_path)
+            if os.path.isfile(file_path):
+                all_data.append(jnp.load(file_path, allow_pickle=True).item())
+    return all_data
 
+
+def plot_iterative_eval(all_data, save_name):
     # Gather active function names
     # Gather eval output for each active function
     all_eval = dict()
@@ -52,19 +56,19 @@ def plot_iterative_eval():
             if fn_key not in all_eval:
                 all_eval[fn_key] = []
                 all_obs[fn_key] = []
-            all_eval[fn_key].append(data[fn_key]["violation"])
-            all_obs[fn_key].append(data[fn_key]["obs_violation"])
+            all_eval[fn_key].append(data[fn_key]["violation"][:length])
+            all_obs[fn_key].append(data[fn_key]["obs_violation"][:length])
             if n_xs is None:
-                n_xs = len(data[fn_key]["violation"])
+                n_xs = length
     fig, ax = plt.subplots(figsize=(10, 8))
 
     sns.set_palette("husl")
     for i, (method, evals) in enumerate(all_eval.items()):
-        print(method, onp.array(all_obs[method]).shape)
+        # print(method, onp.array(all_obs[method]).shape)
         sns.tsplot(
             time=range(1, 1 + length),
             color=colors[method],
-            data=onp.array(evals)[:, :length],
+            data=onp.array([e[:length] for e in evals]),
             condition=method,
         )
         print(onp.array(all_obs[method]).mean(axis=0)[:length])
@@ -79,11 +83,11 @@ def plot_iterative_eval():
     ax.spines["right"].set_visible(False)
     ax.spines["top"].set_visible(False)
     plt.legend(loc="upper center", ncol=3)
-    ax.get_legend().remove()
+    # ax.get_legend().remove()
     plt.xlabel("Iteration")
     plt.ylabel("Violation")
     plt.title("Posterior Violation")
-    plt.savefig(f"{exp_dir}/{exp_name}/violations.png")
+    plt.savefig(f"{exp_dir}/{save_name}/violations.png")
     plt.show()
 
     # ys = [np.mean(jnp.array(all_eval[fn_key])) for fn_key in methods]
@@ -94,12 +98,16 @@ def plot_iterative_eval():
 
 
 if __name__ == "__main__":
-    use_seeds = [0, 1, 2, 3]  # list(range(30))
+    use_seeds = [0, 1, 2]  # list(range(30))
     # use_seeds = [3]  # list(range(30))
     not_seeds = []
-    length = 5
+    length = 4
 
     not_methods = []
-    exp_dir = "data/200501"
-    exp_name = "iterative_divide_default_01"
-    plot_iterative_eval()
+    exp_dir = "data/201012"
+    exp_names = ["iterative_divide_initial_1v1_icra_19"]
+    # exp_names = [f"iterative_divide_initial_1v1_icra_{i:02}" for i in list(range(4, 11)) + [15, 17, 18, 19, 20]]
+    all_data = load_data(exp_names)
+
+    plot_iterative_eval(all_data, save_name=exp_names[0])
+    # plot_iterative_eval(all_data, save_name="results")

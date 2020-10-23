@@ -2,8 +2,8 @@
 # src_dir="data/200413/interactive_proposal_divide_training_03_propose_04/visualize"
 # target_dir="data/200413/interactive_proposal_divide_training_03_propose_04/gifs"
 
-src_dir="data/200501/interactive_proposal_divide_training_03_propose_04/mp4"
-target_dir="data/200501/interactive_proposal_divide_training_03_propose_04/gifs"
+src_dir="data/200927/universal_joint_init1v1_2000_old_eval_risk/recording"
+target_dir="data/200927/universal_joint_init1v1_2000_old_eval_risk/gifs"
 
 
 mkdir -p "$target_dir"

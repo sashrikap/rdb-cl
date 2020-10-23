@@ -28,7 +28,7 @@ class TestPrior(object):
         """ Uniformly 0 to 10, vectorized."""
         return jnp.where(
             jnp.logical_or(state < 0, state > 10.0),
-            -np.ones_like(state) * jnp.inf,
+            -jnp.ones_like(state) * jnp.inf,
             jnp.zeros_like(state),
         )
 

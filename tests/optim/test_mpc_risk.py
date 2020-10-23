@@ -33,6 +33,7 @@ controller, runner = build_risk_averse_mpc(
     env.dt,
     replan=False,
     T=T,
+    mode="trajwise",
     engine="scipy",
     method="lbfgs",
 )
@@ -43,6 +44,7 @@ adam_controller, _ = build_risk_averse_mpc(
     env.dt,
     replan=False,
     T=T,
+    mode="stepwise",
     engine="jax",
     method="adam",
 )

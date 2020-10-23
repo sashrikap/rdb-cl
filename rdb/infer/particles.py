@@ -75,8 +75,11 @@ class Particles(object):
             self._weights = weights.normalize_by_key(self._normalized_key)
         else:
             self._weights = None
+        self._importance = None  # set plot weights
+
         self._save_name = save_name
         self._expanded_name = f"weights_seed_{self._rng_name}_{self._save_name}"
+
         ## File system
         self._fig_dir = fig_dir
         self._save_dir = save_dir
@@ -84,6 +87,7 @@ class Particles(object):
             os.makedirs(fig_dir, exist_ok=True)
         if save_dir is not None:
             os.makedirs(save_dir, exist_ok=True)
+
         ## Cache data
         self.build_cache()
         self._hessian_computed = False
@@ -125,6 +129,14 @@ class Particles(object):
         return out
 
     @property
+    def rng_name(self):
+        return self._rng_name
+
+    @rng_name.setter
+    def rng_name(self, name):
+        self._rng_name = name
+
+    @property
     def risk_averse(self):
         return self._risk_averse
 
@@ -136,6 +148,15 @@ class Particles(object):
     @property
     def rng_key(self):
         return self._rng_key
+
+    @property
+    def importance(self):
+        return self._importance
+
+    @importance.setter
+    def importance(self, importance):
+        assert len(importance) == len(self._weights)
+        self._importance = importance
 
     def _clone(self, weights):
         return Particles(
@@ -152,6 +173,9 @@ class Particles(object):
             fig_dir=self._fig_dir,
             save_dir=self._save_dir,
         )
+
+    def copy(self):
+        return self._clone(self._weights)
 
     def combine(self, ps):
         """Combine with new particles and merge experience (intersection).
@@ -261,7 +285,9 @@ class Particles(object):
         return list(self._cache_feats.keys())
 
     def get_task_name(self, task):
-        assert len(onp.array(task).shape) == 1, "Task must be 1D"
+        assert (
+            len(onp.array(task).shape) == 1
+        ), f"Task must be 1D, got shape {onp.array(task).shape}"
         return str(list(task))
 
     def subsample(self, num_samples=None):
@@ -282,7 +308,11 @@ class Particles(object):
             # ), f"Not enough samples for {num_samples}."
             self._rng_key, rng_random = random.split(self._rng_key)
             weights = random_choice(
-                rng_random, self._weights, (num_samples,), replace=True
+                rng_random,
+                self._weights,
+                (num_samples,),
+                replace=True,
+                p=self._importance,
             )
             weights = DictList(weights)
             return self._clone(weights)
@@ -448,7 +478,7 @@ class Particles(object):
         return onp.array(acs)
 
     def compute_tasks(
-        self, tasks, us0=None, vectorize=True, desc=None, max_batch=500, jax=False
+        self, tasks, us0=None, vectorize=True, desc=None, max_batch=500, jax=True
     ):
         """Compute multiple tasks at once.
 
@@ -800,7 +830,7 @@ class Particles(object):
             ## Compute absolute difference
             diff_costs = target_ws * (this_fsums - that_fsums)
             diff_vios_by_name = this_vios - that_vios
-            #  shape (nbatch,)
+            #  shape (nbatch,), average across feats
             diff_rews = -1 * diff_costs.onp_array().mean(axis=0)
             diff_vios_sum = diff_vios_by_name.onp_array().sum(axis=0)
 
@@ -808,6 +838,7 @@ class Particles(object):
             lower_fsums = self.get_features_sum([task], lower=True)[0]
             lower_vios = self.get_violations([task], lower=True)[0]
             max_diff_costs = target_ws * (that_fsums - lower_fsums)
+            #  shape (nbatch,), average across feats
             max_diff_rews = -1 * max_diff_costs.onp_array().mean(axis=0)
             max_diff_vios_by_name = that_vios - lower_vios
             max_diff_vios_sum = max_diff_vios_by_name.onp_array().sum(axis=0)
@@ -815,6 +846,7 @@ class Particles(object):
             ## Compute normalized difference
             worst_fsums = DictList([self._env.max_feats_dict])
             worst_diff_costs = target_ws * (that_fsums - worst_fsums)
+            #  shape (nbatch,), average across feats
             worst_diff_rews = -1 * worst_diff_costs.onp_array().mean(axis=0)
             return dict(
                 rews=diff_rews,
@@ -1080,6 +1112,7 @@ class Particles(object):
             max_weights=max_weights,
             bins=bins,
             log_scale=log_scale,
+            hist_weights=self._importance,
         )
 
     def visualize_comparisons(self, tasks, target, fig_name):

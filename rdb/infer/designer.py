@@ -133,6 +133,7 @@ class Designer(object):
     @rng_name.setter
     def rng_name(self, name):
         self._rng_name = name
+        self._normalizer.rng_name = name
 
     def _build_controllers(self, controller_fn):
         self._controller, self._runner = controller_fn(self._env, "Designer Core")
@@ -211,6 +212,7 @@ class Designer(object):
             if key != self._normalized_key and key not in self._prior.feature_keys:
                 self._prior.add_feature(key)
                 update_normalizer = True
+                print(f"Designer prior updated: {key}")
         if update_normalizer:
             keys = self._prior.feature_keys
             self._rng_key, rng_norm = random.split(self._rng_key, 2)
@@ -231,6 +233,62 @@ class Designer(object):
             return self.simulate_impt(tasks, save_name, tqdm_position, universal_model)
         else:
             raise NotImplementedError
+
+    def simulate_impt(self, tasks, save_name, tqdm_position=0, universal_model=None):
+        """Sample weights (#normalizer) and compute importance weights.
+        """
+        feats_keys = self._env.features_keys
+
+        nfeats = len(feats_keys)
+        ntasks = len(tasks)
+        nnorms = len(self._normalizer.weights)
+        #  shape nfeats * (ntasks, nnorm)
+        norm_feats = self._normalizer.get_features_sum(tasks).prepare(feats_keys)
+
+        task_method = None
+        if self._task_method == "sum":
+            task_method = partial(jnp.sum, axis=0)
+        elif self._task_method == "mean":
+            task_method = partial(jnp.mean, axis=0)
+        else:
+            raise NotImplementedError
+
+        #  shape (ntasks, nnorm)
+        true_ws = DictList([self._true_w]).prepare(feats_keys)
+        true_arr = true_ws.expand_dims(-1).numpy_array()
+        #  shape (ntasks, nnorm)
+        imp_weights = -1 * (true_arr * norm_feats.numpy_array()).sum(axis=0)
+
+        #  shape (nnorm, )
+        imp_weights = task_method(imp_weights)
+        num_samples = nnorms
+        proxies = self._normalizer.copy()
+        proxies._save_name = save_name
+        proxies.importance = jnp.exp(
+            self._beta * imp_weights - logsumexp(self._beta * imp_weights)
+        )
+
+        visualize_mcmc_feature(
+            chains=[proxies.weights],
+            rates=[1.0],
+            fig_dir=f"{self._save_dir}/mcmc",
+            title=f"seed_{self._rng_name}_{save_name}_samples_{num_samples:04d}",
+            log_scale=False,
+            hist_weights=proxies.importance,
+            **self._weight_params,
+        )
+        # Visualize distribution per feature pairs
+        visualize_mcmc_pairs(
+            chains=[proxies.weights],
+            fig_dir=f"{self._save_dir}/mcmc/pairs",
+            title=f"seed_{self._rng_name}_{save_name}_samples_{num_samples}_pairs",
+            log_scale=False,
+            **self._weight_params,
+        )
+        proxies.visualize(true_w=self.true_w, obs_w=None)
+        proxies.save()
+
+        return proxies
 
     def simulate_mcmc(self, tasks, save_name, tqdm_position=0, universal_model=None):
         """Sample 1 set of weights from b(design_w) given true_w and prior tasks.
@@ -507,9 +565,8 @@ class Designer(object):
         def _normalized_likelihood(
             true_ws,
             true_offset,
-            # true_feats_sum,
+            true_feats_sum,
             sample_ws,
-            sample_feats_sum,
             normal_feats_sum,
             tasks,
             beta,
@@ -527,7 +584,7 @@ class Designer(object):
                     shape: (nfeats, ntasks, nbatch)
 
             Note:
-                * In IRD kernel, `sample_feats_sum` is used as proxy for `true_feats_sum`
+                * In IRD kernel, `obs_feats_sum` is used as proxy for `true_feats_sum`
                 * For performance, nbatch & nnorms can be huge in practice
                   nbatch * nnorms ~ 2000 * 200 in IRD kernel
                 * nbatch dimension has two uses
@@ -547,12 +604,12 @@ class Designer(object):
             nnorms = normal_feats_sum.shape[3]
             assert true_ws.shape == (nfeats, nbatch)  # same, repeated `nbatch` times
             assert sample_ws.shape == (nfeats, nbatch)
-            assert sample_feats_sum.shape == (nfeats, ntasks, nbatch)
+            assert true_feats_sum.shape == (nfeats, ntasks, nbatch)
             assert normal_feats_sum.shape == (nfeats, ntasks, nbatch, nnorms)
 
             #  shape (ntasks, nbatch)
             sample_rews = _likelihood(
-                true_ws, true_offset, sample_ws, sample_feats_sum, tasks, beta
+                true_ws, true_offset, sample_ws, true_feats_sum, tasks, beta
             )
 
             ## =================================================
@@ -561,12 +618,12 @@ class Designer(object):
             normal_truth = jnp.expand_dims(jnp.expand_dims(true_ws, axis=1), 3)
             #  shape (nfeats, ntasks, nbatch, nnorms + 1)
             normal_feats_sum = jnp.concatenate(
-                [normal_feats_sum, jnp.expand_dims(sample_feats_sum, axis=3)], axis=3
+                [normal_feats_sum, jnp.expand_dims(true_feats_sum, axis=3)], axis=3
             )
             #  shape (nfeats, ntasks, nbatch, nnorms + 1)
             normal_costs = normal_truth * normal_feats_sum
             #  shape (ntasks, nbatch, nnorms + 1)
-            normal_costs = normal_costs.sum(axis=0) + true_offset
+            normal_costs = normal_costs.sum(axis=0) + true_offset[:, None]
             normal_rews = -beta * normal_costs
             # normal_rews = -beta * normal_costs.mean(axis=0)
 

@@ -49,7 +49,8 @@ class ExperimentActiveIRD(object):
         model (object): IRD model
         iteration (int): algorithm iterations
         num_eval (int): how many particles to sample from posterior belief
-        eval_method (str): "map" or "mean"
+        eval_method (dict):
+            "designer"/"ird" -> "map" or "mean"
         num_active_tasks (int): # task candidates for active selection
         num_active_sample (int): running acquisition function on belief
             samples is costly, so subsample belief particles
@@ -72,12 +73,14 @@ class ExperimentActiveIRD(object):
         eval_method="map",
         eval_seed=None,
         obs_true=False,
+        designer_mode="importance",
+        risk_averse=False,
+        risk_controller_fn=None,
         # Initial tasks
         initial_tasks_seed=None,
         initial_tasks_file=None,
         num_initial_tasks=1,
         # Observation model
-        obs_method="map",
         num_prior_tasks=0,  # for designer
         # Active sampling
         num_active_tasks=4,
@@ -99,7 +102,6 @@ class ExperimentActiveIRD(object):
         self._true_w = true_w
         self._active_fns = active_fns
         self._eval_server = eval_server
-        self._obs_method = obs_method
         self._obs_true = obs_true
 
         # Random key & function
@@ -115,16 +117,18 @@ class ExperimentActiveIRD(object):
         self._num_initial_tasks = num_initial_tasks
 
         # Designer simulation
-        self._designer_server = DesignerServer(designer_fn)
-        self._designer_server.register(len(active_fns))
-        self._joint_mode = self._designer_server.designer.design_mode == "joint"
+        self._designer = model._designer
+        self._designer_mode = designer_mode
+        assert self._designer_mode in {"importance", "mcmc"}
+        self._joint_mode = self._designer.design_mode == "joint"
 
         # Evaluation
         self._num_eval = num_eval
         self._eval_method = eval_method
-        assert eval_method in {"map", "mean", "post_mean"}
         self._num_eval_tasks = num_eval_tasks
         self._eval_env_name = eval_env_name
+        self._risk_averse = risk_averse
+        self._risk_controller_fn = risk_controller_fn
 
         # Active Task proposal
         self._num_active_tasks = num_active_tasks
@@ -157,7 +161,6 @@ class ExperimentActiveIRD(object):
         self._hist_cand_scores = {}
         self._eval_tasks = []
         self._train_tasks, self._train_difficulties = [], None
-        self._curr_belief = {}
         for key in self._active_fns.keys():
             self._active_eval_hist[key] = []
             self._active_map_vs_obs_hist[key] = []
@@ -174,9 +177,9 @@ class ExperimentActiveIRD(object):
             rng_key, 5
         )
         self._model.update_key(rng_model)
-        self._designer_server.update_key(rng_designer)
-        self._designer_server.set_true_w(self._true_w)
-        self._designer_server.set_rng_name(str(rng_key))
+        self._designer.update_key(rng_designer)
+        self._designer.true_w = self._true_w
+        self._designer.rng_name = str(rng_key)
         # Active functions
         rng_active_keys = random.split(rng_active, len(list(self._active_fns.keys())))
         for fn, rng_key_fn in zip(list(self._active_fns.values()), rng_active_keys):
@@ -223,7 +226,7 @@ class ExperimentActiveIRD(object):
             (self._num_prior_tasks,),
             replace=False,
         )
-        self._designer_server.set_prior_tasks(prior_tasks)
+        self._designer.prior_tasks = prior_tasks
 
         ### Initial Design
         active_keys = list(self._active_fns.keys())
@@ -231,15 +234,14 @@ class ExperimentActiveIRD(object):
 
         if self._joint_mode:
             self._log_time("Initial designer sampling Begin")
-            proxies = self._designer_server.designer.simulate(
+            proxies = self._designer.simulate(
                 onp.array(tasks),
                 save_name=f"designer_initial_joint_{self._num_initial_tasks}",
+                mode=self._designer_mode,
             )
             initial_proxies = [proxies] * self._num_initial_tasks
             if self._obs_true:
-                initial_obs = [
-                    self._designer_server.designer.truth
-                ] * self._num_initial_tasks
+                initial_obs = [self._designer.truth] * self._num_initial_tasks
             else:
                 initial_obs = [
                     proxies.subsample(1) for _ in range(self._num_initial_tasks)
@@ -250,13 +252,14 @@ class ExperimentActiveIRD(object):
                 self._log_time(
                     f"Initial designer sampling Begin {idx}/{self._num_initial_tasks}"
                 )
-                proxies = self._designer_server.designer.simulate(
+                proxies = self._designer.simulate(
                     onp.array(tasks)[:idx],
                     save_name=f"designer_initial_independent_{idx}_{self._num_initial_tasks}",
+                    mode=self._designer_mode,
                 )
                 initial_proxies.append(proxies)
                 if self._obs_true:
-                    initial_obs.append(self._designer_server.designer.truth)
+                    initial_obs.append(self._designer.truth)
                 else:
                     initial_obs.append(proxies.subsample(1))
         for key in active_keys:
@@ -275,10 +278,7 @@ class ExperimentActiveIRD(object):
                 proxies = self._hist_proxies[key][-1]
                 if self._joint_mode:  # joint design, use same obs
                     if self._obs_true:
-                        obs = [
-                            self._designer_server.designer.truth
-                            for _ in range(len(obs))
-                        ]
+                        obs = [self._designer.truth for _ in range(len(obs))]
                     else:
                         obs = [proxies.subsample(1) for _ in range(len(obs))]
                 belief = self._model.sample(
@@ -287,7 +287,6 @@ class ExperimentActiveIRD(object):
                     save_name=f"ird_belief_method_{key}_itr_{itr:02d}",
                 )
                 self._hist_beliefs[key].append(belief)
-                self._curr_belief[key] = belief
                 self._log_time(f"Itr {itr} {key} IRD Sampling")
 
                 ## Evaluate, plot and Save
@@ -318,14 +317,16 @@ class ExperimentActiveIRD(object):
                     self._compare_on_next(key, hist_beliefs[-1], hist_obs[-1], task)
 
             ### Simulate Designer ###
-            tasks = onp.array(list(self._hist_tasks.values()))
-            all_proxies = self._designer_server.simulate(
-                onp.array(tasks), methods=active_keys, itr=itr
-            )
-            for proxies, key in zip(all_proxies, active_keys):
+            for key in active_keys:
+                tasks = onp.array(self._hist_tasks[key])
+                proxies = self._designer.simulate(
+                    onp.array(tasks),
+                    save_name=f"designer_itr_{itr}_method_{key}",
+                    mode=self._designer_mode,
+                )
                 self._hist_proxies[key].append(proxies)
                 if self._obs_true:
-                    self._hist_obs[key].append(self._designer_server.designer.truth)
+                    self._hist_obs[key].append(self._designer.truth)
                 else:
                     self._hist_obs[key].append(proxies.subsample(1))
             self._log_time(f"Itr {itr} Designer Simulated")
@@ -339,12 +340,12 @@ class ExperimentActiveIRD(object):
                     (self._num_initial_tasks,),
                 ).tolist()
                 scores = [onp.zeros(self._num_active_tasks)] * self._num_initial_tasks
+                assert self._num_initial_tasks > 0
+                assert len(tasks) == self._num_initial_tasks
             else:
                 filepath = f"{examples_dir()}/tasks/{self._initial_tasks_file}.yaml"
                 tasks = load_params(filepath)["TASKS"]
                 scores = [onp.zeros(self._num_active_tasks)] * self._num_initial_tasks
-            assert self._num_initial_tasks > 0
-            assert len(tasks) == self._num_initial_tasks
             self._initial_tasks = tasks
             self._initial_scores = scores
             return tasks, scores
@@ -439,15 +440,15 @@ class ExperimentActiveIRD(object):
         """
         belief = self._hist_beliefs[fn_key][-1]
         proxies = self._hist_proxies[fn_key][-1]
-        target = self._designer_server.designer.truth
+        target = self._designer.truth
 
         ## Compute proxies features
         proxies_sample = proxies.subsample(self._num_eval)
         self._eval_server.compute_tasks(
-            "Evaluation", proxies_sample, self._eval_tasks, verbose=True
+            "Active", proxies_sample, self._eval_tasks, verbose=True
         )
         self._eval_server.compute_tasks(
-            "Evaluation", target, self._eval_tasks, verbose=True
+            "Active", target, self._eval_tasks, verbose=True
         )
         obs_all_violates, obs_rel_violates = [], []
         obs_all_performs, obs_rel_performs = [], []
@@ -496,29 +497,42 @@ class ExperimentActiveIRD(object):
                 controller=self._model._sample_controller,
                 runner=self._model._sample_runner,
             )
+
+        ## Set risk averse parameter
+        print(f"Eval Risk averse mode {self._risk_averse}")
+        belief_sample.risk_averse = self._risk_averse
+
         print(f"Evaluating method {fn_key}: Begin")
         self._eval_server.compute_tasks(
             "Evaluation", belief_sample, self._eval_tasks, verbose=True
         )
         self._eval_server.compute_tasks(
-            "Evaluation", target, self._eval_tasks, verbose=True
+            "Active", target, self._eval_tasks, verbose=True
         )
-        all_violates, rel_violates = [], []
-        all_performs, rel_performs = [], []
-        normalized_performs = []
+        violates, all_violates, rel_violates = [], [], []
+        performs, all_performs, rel_performs = [], [], []
+        all_normalized_performs, normalized_performs = [], []
         feats_violates = []
         desc = f"Evaluating method {fn_key}"
         for task in tqdm(self._eval_tasks, desc=desc):
             comparisons = belief_sample.compare_with(task, target=target)
-            all_performs.append(comparisons["rews"].mean())
-            all_violates.append(comparisons["vios"].mean())  # (nweights,) -> (1,)
+            performs.append(comparisons["rews"].mean())
+            all_performs.append(comparisons["rews"])
+            violates.append(comparisons["vios"].mean())  # (nweights,) -> (1,)
+            all_violates.append(comparisons["vios"])  # (nweights,)
             rel_performs.append(comparisons["rews_relative"].mean())
             rel_violates.append(comparisons["vios_relative"].mean())
             feats_violates.append(comparisons["vios_by_name"])
             normalized_performs.append(comparisons["rews_normalized"].mean())
+            all_normalized_performs.append(comparisons["rews_normalized"])
 
-        avg_violate = onp.mean(onp.array(all_violates, dtype=float))
-        avg_perform = onp.mean(onp.array(all_performs, dtype=float))
+        avg_violate = onp.mean(onp.array(violates, dtype=float))
+        all_violates = onp.array(all_violates, dtype=float)
+        avg_perform = onp.mean(onp.array(performs, dtype=float))  # (1,)
+        all_perform = onp.array(performs, dtype=float)  # (ntasks, nweights)
+        all_normalized_performs = onp.array(
+            all_normalized_performs, dtype=float
+        )  # (ntasks, nweights)
         avg_rel_violate = onp.mean(onp.array(rel_violates, dtype=float))
         avg_rel_perform = onp.mean(onp.array(rel_performs, dtype=float))
         avg_feats_violate = feats_violates[0] * (1 / float(len(self._eval_tasks)))
@@ -540,13 +554,16 @@ class ExperimentActiveIRD(object):
 
         info = {
             "violation": avg_violate,
+            "all_violations": all_violates,
             "feats_violation": dict(avg_feats_violate),
             "perform": avg_perform,
+            "all_performs": all_performs,
             "log_prob_true": log_prob_true,
             "rel_violation": avg_rel_violate,
             "rel_perform": avg_rel_perform,
             "normalized_perform": avg_normalized_perform,
             ## Current observation
+            "all_normalized_performs": all_normalized_performs,
             "obs_normalized_perform": obs_avg_normalized_perform,
             "obs_violation": obs_avg_violate,
             "obs_feats_violation": dict(obs_avg_feats_violate),
@@ -571,7 +588,7 @@ class ExperimentActiveIRD(object):
         belief_sample.compute_tasks([next_task])
         joint_obs.compute_tasks([next_task])
 
-        target = self._designer_server.designer.truth
+        target = self._designer.truth
         desc = f"Evaluating method {fn_key}"
         belief_comparisons = belief_sample.compare_with(next_task, target=target)
         belief_perform = belief_comparisons["rews"]
@@ -637,8 +654,8 @@ class ExperimentActiveIRD(object):
             obs = self._model.create_particles(
                 [weights],
                 save_name=f"ird_prior_design_{i:02d}",
-                controller=self._designer_server.designer._sample_controller,
-                runner=self._designer_server.designer._sample_runner,
+                controller=self._designer._sample_controller,
+                runner=self._designer._sample_runner,
             )
             load_obs.append(obs)
             load_tasks.append(task)
@@ -694,7 +711,7 @@ class ExperimentActiveIRD(object):
             seed=self._rng_name,
             exp_params=self._exp_params,
             env_id=str(self._model.env_id),
-            true_w=self._designer_server.designer.true_w,
+            true_w=self._designer.true_w,
             curr_obs=np_obs,
             curr_tasks=self._hist_tasks,
             eval_hist=self._active_eval_hist,
@@ -717,7 +734,7 @@ class ExperimentActiveIRD(object):
 
         if fn_key is not None:
             ## Save belief sample information
-            true_w = self._designer_server.designer.true_w
+            true_w = self._designer.true_w
             # Ony save last belief, to save time
             itr = len(self._hist_beliefs[fn_key]) - 1
             belief = self._hist_beliefs[fn_key][-1]
@@ -807,7 +824,7 @@ class ExperimentActiveIRD(object):
         self._hist_candidates = data["candidate_tasks"]
         self._hist_cand_scores = data["candidate_scores"].item()
         self._eval_tasks = data["eval_tasks"]
-        target = self._designer_server.designer.truth
+        target = self._designer.truth
 
         for key in np_obs.keys():
             eval_hist = self._active_eval_hist[key]

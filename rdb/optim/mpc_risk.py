@@ -32,6 +32,7 @@ class RiskAverseMPC(FiniteHorizonMPC):
         weights_arr=None,
         init="zeros",
         jax=False,
+        verbose=False,
     ):
         """Run Optimizer.
 
@@ -66,10 +67,10 @@ class RiskAverseMPC(FiniteHorizonMPC):
         u_shape = (n_batch, self._horizon, self._udim)
         if us0 is None:
             if init == "zeros":
-                us0 = jnp.zeros(u_shape)
+                us0 = jnp.ones(u_shape) * 1e-5
             else:
                 raise NotImplementedError(f"Initialization undefined for '{init}'")
-        us_opt = self._plan(x0, us0, weights_arr)
+        us_opt = self._plan(x0, us0, weights_arr, verbose=verbose)
         return us_opt
 
 
@@ -140,12 +141,11 @@ def build_multi_costs(
 
         """
         assert len(all_weights.shape) == 3, f"Got shape {all_weights.shape}"
-        #  shape: (nweights, horizon, nbatch)
         proll_cost = partial(roll_cost, x=x, us=us)
         #  shape (nweights, nfeats, nbatch)
-        # all_weights = jnp.rollaxis(all_weights, 2, 0)
-        all_weights = jnp.swapaxes(all_weights, 0, 2)
-        all_weights = jnp.swapaxes(all_weights, 1, 2)
+        all_weights = jnp.rollaxis(all_weights, 2, 0)
+        # all_weights = jnp.swapaxes(all_weights, 0, 2)
+        # all_weights = jnp.swapaxes(all_weights, 1, 2)
         #  shape (nweights, horizon, nbatch)
         costs = jnp.array(jmap(proll_cost, all_weights))
         assert len(costs.shape) == 3
@@ -205,6 +205,7 @@ def build_risk_averse_mpc(
     name="",
     test_mode=False,
     add_bias=True,
+    mode="trajwise",
     mpc_cls=RiskAverseMPC,
     cost_args={},
 ):
@@ -218,6 +219,9 @@ def build_risk_averse_mpc(
         ```
 
     """
+
+    build_costs = partial(build_multi_costs, mode=mode)
+
     controller, runner = build_mpc(
         env=env,
         f_cost=f_cost,
@@ -230,7 +234,7 @@ def build_risk_averse_mpc(
         name=name,
         test_mode=test_mode,
         add_bias=add_bias,
-        build_costs=build_multi_costs,
+        build_costs=build_costs,
         mpc_cls=mpc_cls,
         cost_args=cost_args,
         support_batch=True,

@@ -23,6 +23,7 @@ import numpy as onp
 from rdb.infer.designer import Designer, DesignerInteractive
 from rdb.infer.particles import Particles
 from jax.scipy.special import logsumexp
+from rdb.exps.utils import Profiler
 from tqdm.auto import tqdm, trange
 from rdb.infer.utils import *
 from rdb.exps.utils import *
@@ -176,22 +177,22 @@ class IRDOptimalControl(object):
         self._sample_controller, self._sample_runner = controller_fn(
             self._env, "IRD Sample"
         )
-        self._batch_controller, self._batch_runner = controller_fn(
-            self._env, "IRD Batch"
-        )
+        self._obs_controller, self._obs_runner = controller_fn(self._env, "IRD Obs")
 
     def update_prior(self, keys):
         for key in keys:
             if key != self._normalized_key:
                 self._prior.add_feature(key)
 
-    def _build_model(self, obs, tasks, universal_model=False):
+    def _build_model(self, obs, tasks, universal_model=False, expensive=False):
         """Build IRD PGM model.
 
         Args:
             obs (list): list of observations seen so far
             tasks (ndarray): tasks seen so far
                 shape: (ntasks, task_dim)
+            universal_model (jax.model): universal planning network
+            expensive (bool): include expensive inner-opt operation during sampling
 
         Note:
             * To stabilize MH sampling
@@ -220,9 +221,7 @@ class IRDOptimalControl(object):
                 [ob.weights.prepare(feats_keys) for ob in obs], jax=True
             ).squeeze(1)
             obs_ps = self.create_particles(
-                weights=obs_ws,
-                controller=self._sample_controller,
-                runner=self._sample_runner,
+                weights=obs_ws, controller=self._obs_controller, runner=self._obs_runner
             )
             #  shape (nfeats, ntasks)
             obs_ws = obs_ws.prepare(feats_keys).normalize_across_keys().numpy_array()
@@ -317,9 +316,7 @@ class IRDOptimalControl(object):
         ## Designer kernels
         designer_ll = partial(
             self._designer.likelihood_ird,
-            # true_feats_sum=obs_feats_sum,
             sample_ws=obs_ws,
-            sample_feats_sum=obs_feats_sum,
             normal_feats_sum=designer_normal_fsum,
             tasks=obs_tasks,
             beta=self._designer.beta,
@@ -344,27 +341,32 @@ class IRDOptimalControl(object):
                 nonlocal designer_ll
                 nonlocal designer_normal_ws  # shape (nfeats, d_nnorms)
                 nonlocal designer_normal_fsum
-                true_ws = self._prior(1).prepare(feats_keys)
+                true_ws = self._prior(1)  # nfeats * (1,)
                 log_prior = jnp.log(true_ws.numpy_array())
                 infeasible = jnp.logical_or(
                     jnp.any(log_prior < -1 * self._max_val),
                     jnp.any(log_prior > self._max_val),
                 )
+                true_ws = true_ws.prepare(feats_keys)
 
-                ## ======= Not jit-able optimization: requires scipy/jax optimizer ======
-                # true_ps = self.create_particles(true_ws, controller=self._sample_controller, runner=self._sample_runner)
-                # true_ps.compute_tasks(tasks, jax=True)
-                # #  shape (nfeats, ntasks, 1)
-                # true_feats_sum = true_ps.get_features_sum(tasks).prepare(feats_keys)
-                # #  shape (nfeats, 1, ntasks)
-                # true_feats_sum = true_feats_sum.numpy_array().swapaxes(1, 2)
-
-                # ## ======= Jit-able cheap alternative ======
-                true_feats_sum = obs_feats_sum
-                # true_ws = true_ws.numpy_array()
+                if expensive:
+                    ## ======= Not jit-able optimization: requires scipy/jax optimizer ======
+                    true_ps = self.create_particles(
+                        true_ws,
+                        controller=self._sample_controller,
+                        runner=self._sample_runner,
+                    )
+                    true_ps.compute_tasks(tasks, jax=True, max_batch=ntasks)
+                    #  shape (nfeats, ntasks, 1)
+                    true_feats_sum = true_ps.get_features_sum(tasks).prepare(feats_keys)
+                    #  shape (nfeats, 1, ntasks)
+                    true_feats_sum = true_feats_sum.numpy_array().swapaxes(1, 2)
+                else:
+                    ## ======= Jit-able cheap alternative ======
+                    true_feats_sum = obs_feats_sum
 
                 ## Weight offset, only used when normalize mode is `offset`
-                true_offset = jnp.zeros(1)
+                true_offset = jnp.zeros(ntasks)
 
                 if self._mcmc_normalize == "hessian":
                     _, true_hnorm = obs_ps.get_hessians(tasks, true_ws)
@@ -376,7 +378,7 @@ class IRDOptimalControl(object):
                     # shape (1,)
                     # true_ws = true_ws.normalize_across_keys().numpy_array()
                     true_ws = true_ws.numpy_array()
-                    true_offset = -(true_ws * obs_feats_sum[:, :, -1]).sum(axis=0)
+                    true_offset = -(true_ws * obs_feats_sum[:, 0]).sum(axis=0)
                 elif self._mcmc_normalize is None:
                     true_ws = true_ws.numpy_array()
                 else:
@@ -398,15 +400,23 @@ class IRDOptimalControl(object):
                 nonlocal designer_normal_ws  # shape (nfeats, d_nnorms)
                 nonlocal designer_normal_fsum
                 true_ws = self._prior(1)
+                log_prior = jnp.log(true_ws.numpy_array())
+                infeasible = jnp.logical_or(
+                    jnp.any(log_prior < -1 * self._max_val),
+                    jnp.any(log_prior > self._max_val),
+                )
+
                 sample_input = true_ws.numpy_array().T
 
                 # ## ======= Jit-able cheap alternative ======
                 true_feats_sum = universal_model(sample_input)
 
                 ## Weight offset, only used when normalize mode is `offset`
-                true_offset = jnp.zeros(1)
+                true_offset = jnp.zeros(ntasks)
                 true_ws = true_ws.prepare(feats_keys).numpy_array()
-                log_prob = _likelihood(true_ws, true_feats_sum, true_offset)
+                log_prob = jnp.where(
+                    infeasible, -1e10, _likelihood(true_ws, true_feats_sum, true_offset)
+                )
                 numpyro.factor("ird_log_probs", log_prob)
 
         @jax.jit
@@ -438,11 +448,12 @@ class IRDOptimalControl(object):
             #  shape (ntasks,), designer nbatch = ntasks
 
             ird_true_probs = self._beta * designer_ll(
-                true_ws=ird_true_ws_n, true_offset=true_offset
+                true_ws=ird_true_ws_n,
+                true_offset=true_offset,
+                true_feats_sum=ird_true_feats_sum,
             )
             # ird_true_probs = designer_ll(ird_true_ws_n, ird_true_feats_sum)
             assert ird_true_probs.shape == (ntasks,)
-
             ## ==================================================
             ## ================= Aggregate tasks ================
             # log_prob = task_method(ird_true_probs - ird_normal_probs_)
@@ -451,7 +462,19 @@ class IRDOptimalControl(object):
 
         return _model
 
-    def sample(self, tasks, obs, save_name, verbose=True, universal_model=None):
+    def load_sample(self, save_name):
+        samples = self.create_particles(
+            [],
+            save_name=save_name,
+            runner=self._sample_runner,
+            controller=self._sample_controller,
+        )
+        samples.load()
+        return samples
+
+    def sample(
+        self, tasks, obs, save_name, verbose=True, universal_model=None, expensive=False
+    ):
         """Sample b(w) for true weights given obs.weights.
 
         Args:
@@ -477,7 +500,9 @@ class IRDOptimalControl(object):
         samp_args = copy.deepcopy(self._sample_args)
         decay = self._proposal_decay ** (ntasks - 1)
         init_args["proposal_var"] = init_args["proposal_var"] * decay
-        ird_model = self._build_model(obs, tasks, universal_model=universal_model)
+        ird_model = self._build_model(
+            obs, tasks, universal_model=universal_model, expensive=expensive
+        )
 
         num_chains = self._sample_args["num_chains"]
         num_keys = len(self._prior.feature_keys)
@@ -491,13 +516,19 @@ class IRDOptimalControl(object):
         if self._normalized_key in init_params:
             del init_params[self._normalized_key]
 
-        sampler = get_ird_sampler(self._sample_method, ird_model, init_args, samp_args)
-        # sampler = get_designer_sampler(self._sample_method, ird_model, init_args, samp_args)
+        if not expensive:
+            sampler = get_ird_sampler(
+                self._sample_method, ird_model, init_args, samp_args
+            )
+        else:
+            # Include expensive inner-opt operation during sampling
+            sampler = get_designer_sampler(
+                self._sample_method, ird_model, init_args, samp_args
+            )
 
         self._rng_key, rng_sampler = random.split(self._rng_key, 2)
         print(f"Sampling IRD (obs={len(obs)}): {save_name}, chains={num_chains}")
         t1 = time()
-        # with jax.disable_jit():
         sampler.run(
             rng_sampler,
             init_params=dict(init_params),

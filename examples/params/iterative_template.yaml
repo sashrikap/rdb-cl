@@ -1,7 +1,7 @@
 # ENV_NAME: Week6_01-v0
 
 
-RANDOM_KEYS: [3]
+RANDOM_KEYS: [0]
 
 ENV_NAME: Week6_03-v1
 
@@ -19,14 +19,14 @@ DESIGNER_CONTROLLER_ARGS:
 
 
 # Full sampling
-SAVE_NAME: 200501
-EXP_NAME: iterative_divide_default_02
+SAVE_NAME: 201012
+EXP_NAME: iterative_divide_initial_1v1_icra_20
 # EXP_NAME: interactive_proposal_batch_training_03_propose_04
 # SAVE_NAME: 200411
 
 ## Experiment Arguments
 EXP_ARGS:
-  num_eval: 64
+  num_eval: 128
   eval_method: map
   num_eval_tasks: 500
   eval_env_name: Week6_02-v1
@@ -35,29 +35,39 @@ EXP_ARGS:
   eval_seed: 0
   iterations: 5
   load_previous: False
-  initial_tasks_file: Week6_04_1v2
+  initial_tasks_file: Week6_04_1v1
   plan_beta: 10
+  divide_and_conquer: True
+  propose_wait: 200
+  default_initial_weights:
+    control: 20.0
+    dist_cars: 0.001
+    dist_fences: 0.001
+    dist_lanes: 5.0
+    dist_objects: 0.001
+    speed: 1.0
+    speed_over: 0.001
 ## IRD Settings
 IRD_ARGS:
   task_method: sum
   sample_method: MH
   sample_init_args:
     proposal_var: 0.5
-  proposal_decay: 0.7
+  proposal_decay: 0.1
   max_val: 15.0
   beta: 1
   sample_args:
     num_warmup: 200
     num_samples: 8000
-    num_chains: 3
+    num_chains: 1
 DESIGNER_ARGS:
   task_method: sum
   num_normalizers: 1000
   sample_method: MH
+  max_val: 15.0
   sample_init_args:
     proposal_var: 0.3
-    max_val: 15.0
-  proposal_decay: 0.7
+  proposal_decay: 0.1
   sample_args:
     num_samples: 500
     num_warmup: 100
@@ -67,7 +77,7 @@ DESIGNER_ARGS:
 EVAL_ARGS:
   parallel: True
   num_eval_workers: 1
-  num_active_workers: 1
+  num_active_workers: 4
   max_batch: 500
 ## Active Settings
 ACTIVE_ARGS:
@@ -79,7 +89,7 @@ ACTIVE_ARGS:
 
 # # Testing
 # ## Experiment Arguments
-# SAVE_NAME: 200501
+# SAVE_NAME: 201012
 # EXP_NAME: iterative_divide
 
 
@@ -89,33 +99,42 @@ ACTIVE_ARGS:
 #   num_eval_tasks: 10
 #   eval_env_name: Week6_02-v1
 #   num_active_tasks: 20
-#   num_active_sample: 500
+#   num_active_sample: 20
 #   iterations: 5
 #   eval_seed: 0
 #   initial_tasks_file: Week6_04_1v2
+#   divide_and_conquer: True
+#   default_initial_weights:
+#     control: 20.0
+#     dist_cars: 0.001
+#     dist_fences: 0.001
+#     dist_lanes: 5.0
+#     dist_objects: 0.001
+#     speed: 1.0
+#     speed_over: 0.001
 # ## IRD Settings
 # IRD_ARGS:
 #   task_method: sum
 #   sample_method: MH
+#   max_val: 15.0
 #   sample_init_args:
 #     proposal_var: 3
-#     max_val: 15.0
 #   proposal_decay: 0.7
 #   beta: 50
 #   sample_args:
 #     num_warmup: 100
-#     num_samples: 500
+#     num_samples: 100
 #     num_chains: 3
 # DESIGNER_ARGS:
 #   task_method: sum
 #   num_normalizers: 20
 #   sample_method: MH
+#   max_val: 15.0
 #   sample_init_args:
 #     proposal_var: 0.3
-#     max_val: 15.0
 #   proposal_decay: 0.7
 #   sample_args:
-#     num_samples: 500
+#     num_samples: 100
 #     num_warmup: 100
 #     num_chains: 1
 #   beta: 20
@@ -124,7 +143,7 @@ ACTIVE_ARGS:
 #   parallel: True
 #   num_eval_workers: 2
 #   num_active_workers: 2
-#   max_batch: 500
+#   max_batch: 50
 # ## Active Settings
 # ACTIVE_ARGS:
 #   #active_fns: [random, infogain, ratiomin, ratiomean, difficult]

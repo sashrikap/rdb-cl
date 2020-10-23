@@ -36,6 +36,7 @@ class ExperimentIterativeIRD(object):
         active_fns,
         # Evaluation parameters
         eval_server,
+        controller_fn,
         num_eval_tasks=4,
         num_eval=-1,
         eval_env_name=None,
@@ -47,13 +48,18 @@ class ExperimentIterativeIRD(object):
         initial_tasks_file=False,
         num_active_tasks=4,
         num_active_sample=-1,
+        # Experiment settings
         exp_mode="design",
+        divide_and_conquer=True,
+        default_initial_weights={},
+        propose_wait=-1,
         # Metadata
         load_previous=False,
         save_root="examples/notebook/test",
         design_root="examples/notebook/test",
         exp_name="iterative_proposal",
         exp_params={},
+        weight_params={},
     ):
         # IRD model
         self._model = model
@@ -71,6 +77,7 @@ class ExperimentIterativeIRD(object):
         self._num_eval_tasks = num_eval_tasks
         self._eval_env_name = eval_env_name
         self._num_propose = 1
+        self._divide_and_conquer = divide_and_conquer
         # Active Task proposal
         self._load_previous = load_previous
         self._num_active_tasks = num_active_tasks
@@ -79,6 +86,22 @@ class ExperimentIterativeIRD(object):
         self._initial_tasks_file = initial_tasks_file
         assert self._exp_mode in {"design", "evaluate"}
         # Save path
+        self._exp_params = exp_params
+        self._weight_params = weight_params
+        self._default_initial_weights = default_initial_weights
+        self._design_root = design_root
+        self._save_root = save_root
+        self._last_time = time.time()
+        self.set_exp_name(exp_name)
+        ## Initialize experiment
+        self._design_process = {"idx_training": 0, "idx_trial": 0, "weights": None}
+        self._feedback_process = []
+        self._propose_wait = propose_wait
+        self._prefix = {"mp4": "", "yaml": "", "img": ""}
+        self._design_env = env_fn(self._eval_env_name)
+        self._design_controller, self._design_runner = controller_fn(self._design_env)
+
+    def set_exp_name(self, exp_name):
         assert (
             "joint" in exp_name
             or "independent" in exp_name
@@ -86,15 +109,14 @@ class ExperimentIterativeIRD(object):
             or "batch" in exp_name
         )
         self._joint_mode = "joint" in exp_name or "batch" in exp_name
-        self._exp_params = exp_params
         self._exp_name = exp_name
-        self._design_root = design_root
-        self._save_root = save_root
         self._design_dir = f"{self._design_root}/{self._exp_name}"
         self._save_dir = f"{self._save_root}/{self._exp_name}"
-        self._last_time = time.time()
+        os.makedirs(self._save_dir, exist_ok=True)
+        os.makedirs(self._design_dir, exist_ok=True)
 
-    def update_key(self, rng_key):
+    def update_key(self, rng_key_val):
+        rng_key = random.PRNGKey(rng_key_val)
         self._rng_name = self._model.rng_name = f"{rng_key[-1]:02d}"
         self._rng_key, rng_model, rng_active = random.split(rng_key, 3)
         self._model.update_key(rng_model)
@@ -103,6 +125,9 @@ class ExperimentIterativeIRD(object):
         rng_active_keys = random.split(rng_active, len(list(self._active_fns.keys())))
         for fn, rng_key_fn in zip(list(self._active_fns.values()), rng_active_keys):
             fn.update_key(rng_key_fn)
+        self._prefix["mp4"] = f"mp4/rng_{rng_key_val:02d}"
+        self._prefix["yaml"] = f"yaml/rng_{rng_key_val:02d}"
+        self._prefix["img"] = f"img/rng_{rng_key_val:02d}"
 
     def _log_time(self, caption=""):
         if self._last_time is not None:
@@ -131,13 +156,19 @@ class ExperimentIterativeIRD(object):
         self._train_tasks = self._model.env.all_tasks
         ## Propose first task
         if self._initial_tasks_file is None:
-            initial_task = random_choice(self._get_rng_task(), self._train_tasks, 1)[0]
+            initial_task = random_choice(self._get_rng_task(), self._train_tasks, (1,))[
+                0
+            ]
         else:
             filepath = f"{examples_dir()}/tasks/{self._initial_tasks_file}.yaml"
             initial_task = load_params(filepath)["TASKS"][0]
         self._tasks = {key: [initial_task] for key in self._active_fns.keys()}
         self._obs = {key: [] for key in self._active_fns.keys()}
         self._obs_ws = {key: [] for key in self._active_fns.keys()}
+        self._trial_ws = {
+            key: [[] for _ in range(self._iterations)]
+            for key in self._active_fns.keys()
+        }
         self._beliefs = {key: [] for key in self._active_fns.keys()}
         self._eval_hist = {key: [] for key in self._active_fns.keys()}
 
@@ -158,21 +189,39 @@ class ExperimentIterativeIRD(object):
 
         return self._tasks[method][-1]
 
-    def add_obs(self, method, obs_ws):
-        """ Main function
+    def add_trial(self, method, obs_ws, idx):
+        """ User enters a trial.
         """
         assert method in self._active_fns.keys()
         n_tasks = len(self._tasks[method])
-        print(f"Method takes obs no.{n_tasks}")
-
         ## Record observation
-        if len(self._obs_ws[method]) < n_tasks:
+        if len(self._trial_ws[method]) <= idx:
+            self._trial_ws[method].append([])
+        self._trial_ws[method][idx].append(copy.deepcopy(obs_ws))
+
+    def add_obs(self, method, obs_ws, idx, verbose=True):
+        """ User confirm a design
+        """
+        assert method in self._active_fns.keys()
+        ## Record observation
+        if len(self._obs_ws[method]) <= idx:
             self._obs_ws[method].append(obs_ws)
         else:
-            self._obs_ws[method][n_tasks - 1] = obs_ws
+            self._obs_ws[method][idx] = obs_ws
 
     def propose(self):
         self._save()
+        ## Increase round
+        round_not_finished = []
+        idx_training = self._design_process["idx_training"]
+        for method, tasks in self._tasks.items():
+            if len(tasks) != idx_training + 1:
+                round_not_finished.append(method)
+
+        if len(round_not_finished) > 0:
+            print("Round not finished, please redo the round")
+            return
+
         if self._load_previous:
             ## Task already loaded
             return
@@ -207,7 +256,7 @@ class ExperimentIterativeIRD(object):
 
         ## Propose next task
         candidates = random_choice(
-            self._get_rng_task(), self._train_tasks, self._num_active_tasks
+            self._get_rng_task(), self._train_tasks, (self._num_active_tasks,)
         )
         candidate_scores = {}
         for method in self._active_fns.keys():
@@ -218,6 +267,320 @@ class ExperimentIterativeIRD(object):
         self._plot_candidate_scores(candidate_scores)
         self._log_time(f"Proposal finished")
         self._save()
+        self._design_process["idx_training"] += 1
+
+    def show_proposed_tasks_for_feedback(self):
+        from ipywidgets import Layout, Button, Box
+        from ipywidgets import Video
+
+        all_feedback_sliders = {}
+        all_feedback_questions = {}
+        for method in self._active_fns.keys():
+            feedback_questions = [
+                {
+                    "question": [
+                        "On a scale of 1 (strongly disagree) to 7 (strongly agree), how much",
+                        "do you think the left video shows good driving behavior ",
+                        "for autonomous vehicle?",
+                    ],
+                    "score": None,
+                },
+                {
+                    "question": [
+                        "On a scale of 1 (strongly disagree) to 7 (strongly agree), how much",
+                        "do you think the left video shows undesirable driving behavior ",
+                        "for autonomous vehicle?",
+                    ],
+                    "score": None,
+                },
+            ]
+            task = self._tasks[method][-1]
+            weights = self._obs_ws[method][-1]
+            path = self._generate_feedback_visualization(task, weights, method)
+            videos = [Video.from_file(path)]
+            video_layout = Layout(
+                display="flex", flex_flow="column", align_items="stretch", width="100%"
+            )
+            video_box = Box(children=videos, layout=video_layout)
+            # display(video_box)
+
+            all_sliders = []
+            all_question_apps = []
+            for q in feedback_questions:
+                labels = []
+                for l in q["question"]:
+                    labels.append(widgets.Label(value=l))
+                label_box = widgets.VBox(labels)
+                slider = widgets.IntSlider(
+                    value=4,
+                    min=1,
+                    max=7,
+                    step=1,
+                    description="Score:",
+                    disabled=False,
+                    continuous_update=False,
+                    orientation="horizontal",
+                    readout=True,
+                    readout_format="d",
+                )
+                slider_layout = Layout(
+                    display="flex",
+                    flex_flow="row",
+                    align_items="stretch",
+                    # border='solid',
+                    width="100%",
+                )
+                all_sliders.append(slider)
+                slider_box = Box(children=[slider], layout=slider_layout)
+                label_and_slider = widgets.VBox(children=[label_box, slider_box])
+                all_question_apps.append(label_and_slider)
+                # display(label_box)
+                # display(slider_box)
+            app = widgets.TwoByTwoLayout(
+                top_right=all_question_apps[0],
+                bottom_left=video_box,
+                bottom_right=all_question_apps[1],
+                align_items="center",
+                height="700px",
+            )
+            display(app)
+
+            all_feedback_sliders[method] = all_sliders
+            all_feedback_questions[method] = feedback_questions
+
+        submit_button = Button(description="Submit", button_style="danger")
+        button_items = [submit_button]
+        # button_layout = Layout(
+        #     display="flex", flex_flow="column", align_items="stretch", width="100%"
+        # )
+        button_box = widgets.HBox(children=button_items)
+        reminder_layout = Layout(height="80px", min_width="200px")
+        reminder = Button(
+            layout=reminder_layout,
+            description="Feedback not submitted!",
+            button_style="warning",
+        )
+        reminder.add_class("reminder")
+        reminder_box = widgets.HBox([reminder])
+
+        ## For interactive
+        idx_training = self._design_process["idx_training"]
+
+        def _submit_onclick(b):
+            nonlocal reminder_box
+            nonlocal all_sliders
+            reminder_box.close()
+            reminder_layout = Layout(height="80px", min_width="200px")
+            reminder = Button(
+                layout=reminder_layout,
+                description="Feedback submitted!",
+                button_style="success",
+            )
+            reminder.add_class("reminder")
+            reminder_box = widgets.HBox([reminder])
+
+            for method in self._active_fns.keys():
+                for question, feedback in zip(
+                    all_feedback_questions[method], all_feedback_sliders[method]
+                ):
+                    question["score"] = int(feedback.value)
+            display(reminder_box)
+            if len(self._feedback_process) >= idx_training:
+                self._feedback_process[idx_training - 1] = all_feedback_questions
+            else:
+                self._feedback_process.append(all_feedback_questions)
+
+        submit_button.on_click(_submit_onclick)
+        display(button_box)
+        display(reminder_box)
+
+    def _generate_feedback_visualization(self, task, weights, method):
+        idx_training = self._design_process["idx_training"]
+        idx_trial = self._design_process["idx_trial"]
+        self._design_env.set_task(task)
+        self._design_env.reset()
+        state = self._design_env.state
+        actions = self._design_controller(
+            state, weights=weights, batch=False, verbose=False
+        )
+        traj, cost, info = self._design_runner(
+            state, actions, weights=weights, batch=False, verbose=False
+        )
+        mp4_path = (
+            f"{self._prefix['mp4']}_feedback_{idx_training - 1}_method_{method}.mp4"
+        )
+        self._design_runner.collect_mp4(state, actions, path=mp4_path)
+        return mp4_path
+
+    def _generate_design_visualization(self, task, weights, method):
+        idx_training = self._design_process["idx_training"]
+        idx_trial = self._design_process["idx_trial"]
+        paths = []
+        if self._divide_and_conquer:
+            ranges = range(idx_training, idx_training + 1)
+        else:
+            ranges = range(idx_training + 1)
+        for _idx_training in ranges:
+            self._design_env.set_task(task)
+            self._design_env.reset()
+            state = self._design_env.state
+            actions = self._design_controller(
+                state, weights=weights, batch=False, verbose=False
+            )
+            traj, cost, info = self._design_runner(
+                state, actions, weights=weights, batch=False, verbose=False
+            )
+            mp4_path = f"{self._prefix['mp4']}_training_{idx_training}_method_{method}_trial_{idx_trial}batch_{_idx_training}.mp4"
+            self._design_runner.collect_mp4(state, actions, path=mp4_path)
+            paths.append(mp4_path)
+        self._design_process["idx_trial"] += 1
+        # self._design_process["weights"] = None
+        return paths
+
+    def query_user_input_from_notebook(self, methods):
+        from ipywidgets import Layout, Button, Box
+        from ipywidgets import Video
+
+        if isinstance(methods, list):
+            method = methods[0]
+            task = self.get_task(method)
+        else:
+            method = methods
+            task = self.get_task(method)
+            methods = [methods]
+
+        confirmed = False
+        display_text = "Current design not submitted"
+
+        input_layout = Layout(
+            display="flex", flex_flow="row", align_items="stretch", width="50%"
+        )
+
+        input_items = []
+        value_items = []
+        key_map = {
+            "dist_cars": "- stay away from other cars -",
+            "dist_lanes": "--------- change lane ---------",
+            "dist_fences": "--------- stay on road ---------",
+            "dist_objects": "-- stay away from objects ---",
+            "speed": "-------- stable speed ----------",
+            "control": "--- smooth & comfortable ----",
+        }
+        for key in self._weight_params["feature_keys"]:
+            style = {"description_width": "initial"}
+            float_slider = widgets.FloatLogSlider(
+                value=self._default_initial_weights[key],
+                base=10,
+                min=-5,  # max exponent of base
+                max=5,  # min exponent of base
+                step=0.2,  # exponent step
+                description=key_map[key],
+                readout_format=".3f",
+                layout={"width": "500px"},
+                style=style,
+            )
+            float_text = widgets.BoundedFloatText(
+                value=self._default_initial_weights[key],
+                min=0,
+                max=1e5,
+                step=0.1,
+                description="Value:",
+                disabled=False,
+                readout_format=".3f",
+            )
+            widgets.jslink((float_slider, "value"), (float_text, "value"))
+            value_items.append(float_slider)
+            float_layout = Layout(
+                display="flex",
+                flex_flow="row",
+                align_items="stretch",
+                # border='solid',
+                width="100%",
+            )
+            float_box = Box(children=[float_slider, float_text], layout=float_layout)
+            input_items.append(float_box)
+
+        input_layout = Layout(
+            display="flex", flex_flow="column", align_items="stretch", width="100%"
+        )
+        input_box = Box(children=input_items, layout=input_layout)
+
+        submit_button = Button(description="See Result", button_style="danger")
+        confirm_button = Button(description="Confirm", button_style="danger")
+        button_items = [submit_button, confirm_button]
+        # button_layout = Layout(
+        #     display="flex", flex_flow="column", align_items="stretch", width="100%"
+        # )
+        button_box = widgets.HBox(children=button_items)
+
+        # mp4_path = "/Users/jerry/Dropbox/Projects/SafeRew/rdb/data/200927/universal_joint_init1v1_2000_old_eval_risk/mp4/ird_ibeta_1_eval_0_map_00_costs_-5.959.mp4"
+        # ui_items = [input_box, video]
+        # ui_box = Box(children=ui_items, layout=ui_layout)
+        videos = []
+        video_layout = Layout(
+            display="flex", flex_flow="column", align_items="stretch", width="60%"
+        )
+
+        reminder_layout = Layout(height="80px", min_width="200px")
+        reminder = Button(
+            layout=reminder_layout, description=display_text, button_style="warning"
+        )
+        reminder.add_class("reminder")
+        reminder_box = widgets.HBox([reminder])
+
+        ## For interactive purpose
+        idx_training = self._design_process["idx_training"]
+        idx_trial = self._design_process["idx_trial"]
+
+        def _submit_onclick(b):
+            nonlocal videos
+            nonlocal reminder_box
+            for video in videos:
+                video.close()
+            # reminder_box.close()
+            ## TODO
+            weights = {}
+            for key, item in zip(self._weight_params["feature_keys"], value_items):
+                weights[key] = item.value
+            ## Record weights during design
+            trial_methods = methods
+            if idx_training == 0:
+                trial_methods = list(self._active_fns.keys())
+            for m in trial_methods:
+                self.add_trial(m, weights, idx_training)
+            mp4_paths = self._generate_design_visualization(task, weights, method)
+            videos = [Video.from_file(path) for path in mp4_paths]
+            video_layout = Layout(
+                display="flex", flex_flow="column", align_items="stretch", width="60%"
+            )
+            video_box = Box(children=videos, layout=video_layout)
+            display(video_box)
+
+        def _confirm_onclick(b):
+            nonlocal display_text
+            nonlocal reminder_box
+            weights = {}
+            for key, item in zip(self._weight_params["feature_keys"], value_items):
+                weights[key] = item.value
+            # self._design_process["weights"] = weights
+            print(f"Current training {idx_training} trial {idx_trial}")
+            # print(f"Current weights {self._design_process['weights']}")
+            # weights = self._design_process["weights"]
+
+            reminder_box.close()
+            display_text = "Design submitted."
+            for m in methods:
+                self.add_obs(m, weights, idx=idx_training, verbose=False)
+            reminder_box = Button(
+                layout=reminder_layout, description=display_text, button_style="success"
+            )
+            display(reminder_box)
+
+        submit_button.on_click(_submit_onclick)
+        confirm_button.on_click(_confirm_onclick)
+        display(reminder_box)
+        display(input_box)
+        display(button_box)
 
     def _propose_task(self, method, candidates, candidate_scores):
         belief = self._beliefs[method][-1].subsample(self._num_active_sample)
@@ -243,7 +606,9 @@ class ExperimentIterativeIRD(object):
             )[0]
         else:
             ## Pre-empt heavy computations
-            self._eval_server.compute_tasks("Active", belief, candidates, verbose=True)
+            self._eval_server.compute_tasks(
+                "Active", belief, candidates, verbose=True, waittime=self._propose_wait
+            )
             self._eval_server.compute_tasks("Active", obs[-1], candidates, verbose=True)
             scores = []
             desc = "Evaluaitng candidate tasks"
@@ -432,12 +797,25 @@ class ExperimentIterativeIRD(object):
             key: [v.tolist() if type(v) is not list else v for v in val]
             for (key, val) in self._tasks.items()
         }
-        # print(self._rng_name)
         with open(yaml_save, "w+") as stream:
             yaml.dump(
                 dict(tasks=tasks, designs=self._obs_ws),
                 stream,
                 default_flow_style=False,
+            )
+
+        ## Save user trial yaml
+        yaml_trial = f"{self._save_dir}/yaml/rng_{self._rng_name}_trials.yaml"
+        os.makedirs(os.path.dirname(yaml_trial), exist_ok=True)
+        with open(yaml_trial, "w+") as stream:
+            yaml.dump(dict(trials=self._trial_ws), stream, default_flow_style=False)
+
+        ## Save user feedbacks
+        yaml_feedbacks = f"{self._save_dir}/yaml/rng_{self._rng_name}_feedbacks.yaml"
+        os.makedirs(os.path.dirname(yaml_feedbacks), exist_ok=True)
+        with open(yaml_feedbacks, "w+") as stream:
+            yaml.dump(
+                dict(feedbacks=self._feedback_process), stream, default_flow_style=False
             )
 
     def _save_eval(self, eval_info):
@@ -520,7 +898,7 @@ class objectview(object):
         self.__dict__ = d
 
 
-def run_iterative(evaluate=False, gcp_mode=False):
+def run_iterative(evaluate=False, gcp_mode=False, use_local_params=False):
     """Iterative Experiment runner.
     """
     from rdb.exps.active import ActiveInfoGain, ActiveRatioTest, ActiveRandom
@@ -534,15 +912,22 @@ def run_iterative(evaluate=False, gcp_mode=False):
 
     # Load parameters
     if not gcp_mode:
-        PARAMS = load_params(f"{examples_dir()}/params/iterative_template.yaml")
+        if use_local_params:
+            params_path = os.path.join(os.path.abspath(""), "iterative_template.yaml")
+            print(params_path)
+        else:
+            params_path = f"{examples_dir()}/params/iterative_template.yaml"
+        PARAMS = load_params(params_path)
         p = objectview(PARAMS)
         # Copy design yaml data
         # locals().update(PARAMS)
-        yaml_dir = f"{examples_dir()}/designs/{p.SAVE_NAME}/{p.EXP_NAME}/yaml"
-        os.makedirs(yaml_dir, exist_ok=True)
-        if os.path.exists(yaml_dir):
-            shutil.rmtree(yaml_dir)
-        shutil.copytree(f"{data_dir()}/{p.SAVE_NAME}/{p.EXP_NAME}/yaml", yaml_dir)
+        exp_yaml_dir = f"{examples_dir()}/designs/{p.SAVE_NAME}/{p.EXP_NAME}/yaml"
+        exp_data_dir = f"{data_dir()}/{p.SAVE_NAME}/{p.EXP_NAME}/yaml"
+        os.makedirs(exp_yaml_dir, exist_ok=True)
+        os.makedirs(exp_data_dir, exist_ok=True)
+        if os.path.exists(exp_yaml_dir):
+            shutil.rmtree(exp_yaml_dir)
+        shutil.copytree(exp_data_dir, exp_yaml_dir)
     else:
         PARAMS = load_params("/dar_payload/rdb/examples/params/iterative_params.yaml")
         p = objectview(PARAMS)
@@ -659,12 +1044,14 @@ def run_iterative(evaluate=False, gcp_mode=False):
         env_fn=env_fn,
         active_fns=active_fns,
         eval_server=eval_server,
+        controller_fn=designer_controller_fn,
         exp_mode=exp_mode,
         # Saving
         save_root=f"{SAVE_ROOT}/{p.SAVE_NAME}",
         design_root=f"{DESIGN_ROOT}/{p.SAVE_NAME}",
         exp_name=p.EXP_NAME,
         exp_params=PARAMS,
+        weight_params=p.WEIGHT_PARAMS,
         **p.EXP_ARGS,
     )
     return experiment

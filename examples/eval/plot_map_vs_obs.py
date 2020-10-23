@@ -403,21 +403,21 @@ def plot_line_data(eval_plot_data, map_plot_data, obs_plot_data):
 
 if __name__ == "__main__":
     N = -1
-    all_seeds = [0, 1, 2, 3, 21, 22]
+    all_seeds = [0, 1, 2, 3, 4]
     not_seeds = []
-    exp_dir = "data/200604"
+    exp_dir = "data/201007"
     exp_name = (
-        "active_ird_simplified_indep_init_4v1_ibeta_6_obs_true_dbeta_0.02"
+        "active_ird_6feat_indep_init_2v1_ibeta_6_dbeta_0.1_eval_mean"
         # "active_ird_simplified_joint_init_4v1_ibeta_6_true_w"
     )
     # exp_name = "active_ird_ibeta_50_w0_indep_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam"
     # exp_name = "active_ird_ibeta_50_w0_joint_dbeta_20_dvar_0.1_eval_mean_128_seed_0_603_adam"
     # alt_name = "active_ird_ibeta_50_true_w1_eval_unif_128_seed_0_603_adam"
 
-    MAX_LEN = 5
-    MAX_RANDOM_LEN = 5
+    MAX_LEN = 9
+    MAX_RANDOM_LEN = 9
     PADDING = 0
-    SEPARATE_STORE = True
+    SEPARATE_STORE = False
 
     use_seeds = [str(random.PRNGKey(si)) for si in all_seeds]
     not_seeds = [str(random.PRNGKey(si)) for si in not_seeds]

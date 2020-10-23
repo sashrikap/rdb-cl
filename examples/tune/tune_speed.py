@@ -13,7 +13,7 @@ from rdb.visualize.render import render_env
 from rdb.visualize.preprocess import normalize_features
 
 DUMMY_ACTION = False
-REPLAN = False
+REPLAN = 5
 BENCHMARK = 500
 BENCHMARK_SINGLE = True
 BENCHMARK_BATCH = False
@@ -37,6 +37,19 @@ weights = {
     "speed": 0.05,
     "control": 0.1,
 }
+
+
+def make_weights():
+    return {
+        "dist_cars": onp.exp(onp.random.random()),
+        "dist_lanes": onp.exp(onp.random.random()),
+        "dist_fences": onp.exp(onp.random.random()),
+        "dist_objects": onp.exp(onp.random.random()),
+        "speed": onp.exp(onp.random.random()),
+        "control": onp.exp(onp.random.random()),
+    }
+
+
 # weights = {"dist_lanes": 5.35}
 if TASK == "RANDOM":
     num_tasks = len(env.all_tasks)
@@ -80,7 +93,15 @@ if BENCHMARK > 0:
         t1 = time.time()
         for _ in tqdm(range(N), total=N):
             env.reset()
-            acs_ = optimizer(state, weights=weights, batch=False)
+            weights = make_weights()
+            # acs_ = optimizer(state, weights=weights, batch=False)
+            acs_ = optimizer(
+                state,
+                weights=None,
+                weights_arr=DictList(weights, expand_dims=True)
+                .prepare(env.features_keys)
+                .numpy_array(),
+            )
         t_opt = time.time() - t1
         print(f"Optimizer fps {N/t_opt:.3f}")
 
