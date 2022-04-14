@@ -17,7 +17,7 @@ from copy import deepcopy
 from collections import OrderedDict
 from tqdm import tqdm
 from numpyro.handlers import seed
-
+from gym import spaces
 import pyglet
 from pyglet import gl, graphics
 
@@ -99,6 +99,13 @@ class DriveWorld(RenderEnv):
 
         ## Set up rendering
         self._labels = {}
+
+        acs_high = onp.array([self._main_car.max_steer, self._main_car.max_throttle])
+        acs_low = -1 * acs_high
+        obs_high = onp.array([onp.inf] * self._xdim)
+        self.action_space = spaces.Box(acs_low, acs_high, dtype=onp.float32)
+        self.observation_space = spaces.Box(-1 * obs_high, obs_high, dtype=onp.float32)
+
 
     @property
     def dt(self):
@@ -450,12 +457,19 @@ class DriveWorld(RenderEnv):
         self.main_car.reset()
 
     def step(self, action):
+        use_batch = True
+        if len(action.shape) == 1:
+            action = onp.array([action])
+            use_batch = False
         for car in self._cars:
             car.control(self.dt)
         self.main_car.control(action, self.dt)
         rew = 0
         done = False
-        return self.state, rew, done, {}
+        obs = self.state
+        if not use_batch:
+            obs = obs[0]
+        return obs, rew, done, {}
 
     #####################################################################
     ##################### Rendering Functionalities #####################
@@ -538,7 +552,7 @@ class DriveWorld(RenderEnv):
             img_data = (
                 pyglet.image.get_buffer_manager().get_color_buffer().get_image_data()
             )
-            arr = onp.fromstring(img_data.data, dtype=onp.uint8, sep="")
+            arr = onp.frombuffer(img_data.get_data(), dtype=onp.uint8)
             if SYSTEM == "Darwin":
                 arr = arr.reshape(int(WINDOW_W), int(WINDOW_H), 4)
             else:
@@ -587,7 +601,7 @@ class DriveWorld(RenderEnv):
         texture_group = pyglet.graphics.TextureGroup(
             texture_grid, self._layers.background
         )
-        tex_map = texture_grid.texture.tex_coords
+        tex_map = texture_grid.get_texture().tex_coords
         tex_verts = ("v2f", (-W, -W, W, -W, W, W, -W, W))
         tex_coords = ("t2f", (0.0, 0.0, W * 5.0, 0.0, W * 5.0, W * 5.0, 0.0, W * 5.0))
         self._layers.batch.add(4, gl.GL_QUADS, texture_group, tex_verts, tex_coords)

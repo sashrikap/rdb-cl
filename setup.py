@@ -13,7 +13,7 @@ setup(
         "scipy",
         "scikit-image",
         # "scipy==1.1.0",
-        "pyglet==1.3.2",
+        "pyglet==1.5.11",
         "matplotlib",
         "gym",
         "flax",

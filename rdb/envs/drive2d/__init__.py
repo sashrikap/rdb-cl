@@ -16,12 +16,12 @@ from .worlds import week3, week4, week5, week6
 def register_key_class(key, cls):
     if "_v1" in key:
         key = key.replace("_v1", "")
-        register(id=f"{key}-v1", entry_point=f"{c.__module__}:{c.__name__}")
+        register(id=f"{key}-v1", entry_point=f"{c.__module__}:{c.__name__}", max_episode_steps=10)
     elif "_v0" in key:
         key = key.replace("_v0", "")
-        register(id=f"{key}-v0", entry_point=f"{c.__module__}:{c.__name__}")
+        register(id=f"{key}-v0", entry_point=f"{c.__module__}:{c.__name__}", max_episode_steps=10)
     else:
-        register(id=f"{key}-v0", entry_point=f"{c.__module__}:{c.__name__}")
+        register(id=f"{key}-v0", entry_point=f"{c.__module__}:{c.__name__}", max_episode_steps=10)
 
 
 # Automatically register all Week3_xx environmnts
