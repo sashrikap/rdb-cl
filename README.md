@@ -16,8 +16,22 @@ pre-commit install
 ## Example Code
 ```bash
 # Simple merge lane example
-python examples/run_highway.py
+python examples/run_simple.py
+python examples/run_optimal_control.py
 ```
+
+
+### Citing
+
+If you find this codebase useful in your research, please consider citing:
+
+	@article{he2021assisted,
+  	    title={Assisted Robust Reward Design},
+  	    author={He, Jerry Zhi-Yang He and Dragan D. Anca},
+  	    journal={arXiv preprint arXiv:2111.09884},
+  	    year={2021}
+	}
+
 
 ### Credit
 Code reimplemented based on Prof. Dorsa Sadigh's [driving simulation](https://github.com/dsadigh/driving-interactions)
