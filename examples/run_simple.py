@@ -29,14 +29,14 @@ weights = {
     "control": 0.1,
 }
 env.set_task(TASK)
+obs = env.reset()
 env.render("human", draw_heat=DRAW_HEAT, weights=weights)
 
-obs = env.reset()
 done = False
 t = 0
 
 while not done:
-    obs, rew, done, info = env.step(env.action_space.sample())
+    obs, rew, done, truncated, info = env.step(env.action_space.sample())
     t += 1
     # env.render("human", draw_heat=DRAW_HEAT, weights=weights)
     env.render("human")

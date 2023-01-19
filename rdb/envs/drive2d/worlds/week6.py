@@ -94,8 +94,8 @@ class HighwayDriveWorld_Week6(HighwayDriveWorld):
         obj_idx = 12
         state = copy.deepcopy(self.state)
         for ci, car in enumerate(self.cars + [self._main_car]):
-            state[:, ci * 4 : (ci + 1) * 4] = car.init_state
-        all_states = onp.tile(state, (len(tasks), 1))
+            state = state.at[:, ci * 4 : (ci + 1) * 4].set(car.init_state)
+        all_states = onp.tile(onp.array(state), (len(tasks), 1))
         # Car state
         car_y0_idx, car_y1_idx = 1, 5
         all_states[:, car_y0_idx] = tasks[:, 0]

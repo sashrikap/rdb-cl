@@ -16,7 +16,7 @@ from rdb.optim.optimizer import *
 from rdb.optim.runner import Runner
 from rdb.exps.utils import Profiler
 from jax.lax import fori_loop, scan
-from jax.ops import index_update
+# from jax.ops import index_update ## Depreciated
 import jax.random as random
 import jax.numpy as jnp
 import numpy as onp

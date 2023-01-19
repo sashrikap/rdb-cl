@@ -469,7 +469,8 @@ class DriveWorld(RenderEnv):
         obs = self.state
         if not use_batch:
             obs = obs[0]
-        return obs, rew, done, {}
+        truncated = None # compatibility for gym after python>=3.9
+        return obs, rew, done, truncated, {}
 
     #####################################################################
     ##################### Rendering Functionalities #####################

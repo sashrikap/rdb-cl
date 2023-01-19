@@ -2,11 +2,13 @@
 
 Can we formally study reward hacking behaviors, such that our self-driving cars, presumably optimizing some reward, will work nicely and safely?
 
-README updated (19/02/04)
+README updated (22/12/14)
 
 ## Installation
 
 ```bash
+# Pre-requisite: you need to install conda
+conda create python=3.9 -n [name for environment]
 pip install -e .
 # To develop the code, do
 pip install pre-commit pytest

@@ -9,14 +9,14 @@ import numpyro
 import numpyro.distributions as dist
 from jax import random, lax
 from functools import partial
-from rdb.infer.mcmc import MH
+# from rdb.infer.mcmc import MH ## TODO: compatibility issue
 from rdb.optim.utils import *
 from rdb.infer.dictlist import *
 from numpyro.handlers import seed
 from tqdm.auto import tqdm, trange
 from rdb.exps.utils import Profiler
 from scipy.stats import gaussian_kde
-from numpyro.infer import HMC, MCMC, NUTS, SA
+# from numpyro.infer import HMC, MCMC, NUTS, SA  ## TODO: compatibility issue
 from rdb.visualize.plot import plot_weights_hist, plot_weights_2d
 
 

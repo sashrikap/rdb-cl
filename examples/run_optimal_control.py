@@ -40,7 +40,6 @@ if TASK == "RANDOM":
     num_tasks = len(env.all_tasks)
     print(f"Total tasks {num_tasks}")
     TASK = env.all_tasks[onp.random.randint(0, num_tasks)]
-    # import pdb; pdb.set_trace()
 env.set_task(TASK)
 env.reset()
 
