@@ -5,7 +5,7 @@ Wrappers around different scipy.minimize packages for MPC.
 """
 
 import jax.example_libraries.optimizers as jax_optimizers
-import numpyro.optim as np_optimizers
+# import numpyro.optim as np_optimizers
 from scipy.optimize import minimize, basinhopping
 from rdb.optim.utils import *
 from rdb.infer import *

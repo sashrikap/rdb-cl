@@ -4,6 +4,7 @@ __pycache__
 data/
 .DS_Store
 *.npz
+*.png
 .ipynb_checkpoints
 *ipynb
 examples/credentials

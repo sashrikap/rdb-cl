@@ -8,7 +8,7 @@ Used for representing list of dictionaries (nbatch, dict)
 """
 
 from rdb.optim.utils import *
-from rdb.infer.utils import *
+# from rdb.infer.utils import *
 import jax.numpy as jnp
 import numpy as onp
 import copy

@@ -16,7 +16,7 @@ from os.path import join
 from copy import deepcopy
 from collections import OrderedDict
 from tqdm import tqdm
-from numpyro.handlers import seed
+# from numpyro.handlers import seed
 from gym import spaces
 import pyglet
 from pyglet import gl, graphics
@@ -747,7 +747,8 @@ class DriveWorld(RenderEnv):
             states = jnp.repeat(state, n_states, axis=0)  # (n_states, xdim)
             phis = jnp.array([jnp.pi / 3] * n_states)
             main_idx = self._indices["main_car"]
-            states[:, main_idx[0] : main_idx[0] + 3] = jnp.stack([xs, ys, phis], axis=1)
+            # states[:, main_idx[0] : main_idx[0] + 3] = jnp.stack([xs, ys, phis], axis=1)
+            states = states.at[:, main_idx[0] : main_idx[0] + 3].set(jnp.stack([xs, ys, phis], axis=1))
             acts = jnp.zeros((n_states, self.udim))
             return cost_fn(states, acts)
 

@@ -19,7 +19,7 @@ import jax
 from rdb.infer.utils import random_uniform
 from jax.scipy.special import logsumexp
 from rdb.exps.utils import Profiler
-from numpyro.handlers import seed
+# from numpyro.handlers import seed
 from rdb.optim.utils import *
 from functools import partial
 from tqdm.auto import tqdm

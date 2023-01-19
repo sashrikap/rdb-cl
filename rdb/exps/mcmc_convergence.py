@@ -15,7 +15,7 @@ Includes:
 
 from rdb.infer.particles import Particles
 from rdb.exps.utils import Profiler, save_params
-from numpyro.handlers import seed
+# from numpyro.handlers import seed
 from functools import partial
 from tqdm.auto import tqdm
 from rdb.infer import *

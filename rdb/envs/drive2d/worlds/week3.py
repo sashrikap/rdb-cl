@@ -5,15 +5,15 @@ One autonomous car is merging with two other fix speed cars
 
 import jax
 import jax.numpy as jnp
-import numpyro
-import numpyro.distributions as dist
+# import numpyro
+# import numpyro.distributions as dist
 import itertools, copy
 from collections import OrderedDict
 from rdb.optim.utils import *
 from rdb.envs.drive2d.core import car, objects, feature, constraints
 from rdb.envs.drive2d.worlds.highway import HighwayDriveWorld
 from functools import partial
-from numpyro.handlers import seed
+# from numpyro.handlers import seed
 
 
 class HighwayDriveWorld_Week3(HighwayDriveWorld):
