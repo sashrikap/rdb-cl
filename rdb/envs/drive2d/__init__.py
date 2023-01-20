@@ -10,18 +10,30 @@ register(
 
 
 # Drive world
-from .worlds import week3, week4, week5, week6
+from .worlds import week3, week4, week5, week6, week7
 
 
 def register_key_class(key, cls):
     if "_v1" in key:
         key = key.replace("_v1", "")
-        register(id=f"{key}-v1", entry_point=f"{c.__module__}:{c.__name__}", max_episode_steps=10)
+        register(
+            id=f"{key}-v1",
+            entry_point=f"{c.__module__}:{c.__name__}",
+            max_episode_steps=10,
+        )
     elif "_v0" in key:
         key = key.replace("_v0", "")
-        register(id=f"{key}-v0", entry_point=f"{c.__module__}:{c.__name__}", max_episode_steps=10)
+        register(
+            id=f"{key}-v0",
+            entry_point=f"{c.__module__}:{c.__name__}",
+            max_episode_steps=10,
+        )
     else:
-        register(id=f"{key}-v0", entry_point=f"{c.__module__}:{c.__name__}", max_episode_steps=10)
+        register(
+            id=f"{key}-v0",
+            entry_point=f"{c.__module__}:{c.__name__}",
+            max_episode_steps=10,
+        )
 
 
 # Automatically register all Week3_xx environmnts
@@ -36,4 +48,7 @@ for k, c in week5.__dict__.items():
         register_key_class(k, c)
 for k, c in week6.__dict__.items():
     if "Week6_" in k:
+        register_key_class(k, c)
+for k, c in week7.__dict__.items():
+    if "Week7_" in k:
         register_key_class(k, c)

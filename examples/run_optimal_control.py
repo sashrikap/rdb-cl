@@ -12,6 +12,7 @@ from rdb.optim.runner import Runner
 from rdb.infer import *
 from rdb.visualize.render import render_env
 from rdb.visualize.preprocess import normalize_features
+from rdb.infer.dictlist import *
 
 DUMMY_ACTION = False
 DRAW_HEAT = False
@@ -19,8 +20,8 @@ REPLAN = False
 MAKE_MP4 = False
 ENGINE = "scipy"
 METHOD = "lbfgs"
-ENV_NAME = "Week6_02-v1"  # Two Blockway
-TASK = (-0.7, -0.7, 0.13, 0.4, -0.13, 0.4)
+ENV_NAME = "Week7_01"  # Two Blockway with Trees
+TASK = (-0.7, -0.7, 0.13, 0.4, -0.13, 0.4, -0.5, -0.5, 0.5, 0.5)
 
 env = gym.make(ENV_NAME)
 env.reset()
@@ -58,7 +59,7 @@ optimizer, runner = build_mpc(
     method=METHOD,
 )
 state = copy.deepcopy(env.state)
-t1 = time.time()
+t1 = time()
 w_list = DictList([weights])
 w_list = w_list.prepare(env.features_keys)
 actions = optimizer(state, weights=None, weights_arr=w_list.numpy_array())

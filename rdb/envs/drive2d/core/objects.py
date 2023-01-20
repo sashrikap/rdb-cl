@@ -101,6 +101,13 @@ class Obstacle(Object):
         super().__init__(state, self.NAME, scale)
 
 
+class Tree(Object):
+    NAME = "tree"
+
+    def __init__(self, state, scale=0.2):
+        super().__init__(state, self.NAME, scale)
+
+
 class Garage(Object):
     # NAME = "Garage"
     NAME = "parking-lot3"

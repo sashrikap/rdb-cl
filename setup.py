@@ -9,7 +9,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "numpy",
-        "Pillow==7.2.0",
+        "Pillow",
         "scipy",
         "scikit-image",
         # "scipy==1.1.0",

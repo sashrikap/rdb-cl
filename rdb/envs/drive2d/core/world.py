@@ -16,6 +16,7 @@ from os.path import join
 from copy import deepcopy
 from collections import OrderedDict
 from tqdm import tqdm
+
 # from numpyro.handlers import seed
 from gym import spaces
 import pyglet
@@ -105,7 +106,6 @@ class DriveWorld(RenderEnv):
         obs_high = onp.array([onp.inf] * self._xdim)
         self.action_space = spaces.Box(acs_low, acs_high, dtype=onp.float32)
         self.observation_space = spaces.Box(-1 * obs_high, obs_high, dtype=onp.float32)
-
 
     @property
     def dt(self):
@@ -469,7 +469,7 @@ class DriveWorld(RenderEnv):
         obs = self.state
         if not use_batch:
             obs = obs[0]
-        truncated = None # compatibility for gym after python>=3.9
+        truncated = None  # compatibility for gym after python>=3.9
         return obs, rew, done, truncated, {}
 
     #####################################################################
@@ -612,6 +612,7 @@ class DriveWorld(RenderEnv):
         # setup objects
         for obj in self._objects:
             obj.register(group=self._layers.object, batch=self._layers.batch)
+
         # Setup text
         if not paper:
             self._setup_text(
@@ -748,7 +749,9 @@ class DriveWorld(RenderEnv):
             phis = jnp.array([jnp.pi / 3] * n_states)
             main_idx = self._indices["main_car"]
             # states[:, main_idx[0] : main_idx[0] + 3] = jnp.stack([xs, ys, phis], axis=1)
-            states = states.at[:, main_idx[0] : main_idx[0] + 3].set(jnp.stack([xs, ys, phis], axis=1))
+            states = states.at[:, main_idx[0] : main_idx[0] + 3].set(
+                jnp.stack([xs, ys, phis], axis=1)
+            )
             acts = jnp.zeros((n_states, self.udim))
             return cost_fn(states, acts)
 

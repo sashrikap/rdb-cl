@@ -13,8 +13,8 @@ from rdb.optim.runner import Runner
 from rdb.infer.dictlist import DictList
 
 
-ENV_NAME = "Week6_02-v1"  # Two Blockway
-TASK = (-0.7, -0.7, 0.13, 0.4, -0.13, 0.4)
+ENV_NAME = "Week7_01"  # Two Blockway with Trees
+TASK = (-0.7, -0.7, 0.13, 0.4, -0.13, 0.4, -0.5, -0.5, 0.5, 0.5)
 HORIZON = 10
 
 HEATMAP_WEIGHTS = {
@@ -39,10 +39,9 @@ def render_popup():
     while t < HORIZON:
         obs, rew, done, truncated, info = env.step(env.action_space.sample())
         t += 1
-        print(f"Rendering pop-up mode step {t}/{HORIZON}")
+        print("Rendering pop-up mode step {}/{}".format(t, HORIZON))
         env.render("human")
         sleep(0.1)
-
 
 
 def render_raw_fps_to_file(draw_heat=False):
@@ -53,6 +52,7 @@ def render_raw_fps_to_file(draw_heat=False):
 
     # Script that ensures pyglet renders -> virtual display -> file
     from pyvirtualdisplay import Display
+
     display = Display(visible=0, size=(1400, 900))
     display.start()
 
@@ -71,30 +71,37 @@ def render_raw_fps_to_file(draw_heat=False):
         img = cv2.resize(img.astype(onp.uint8), (new_w, new_h))
         return img
 
-
     while t < HORIZON:
         obs, rew, done, truncated, info = env.step(env.action_space.sample())
         t += 1
-        print(f"Rendering raw fps mode heatmap {draw_heat} step {t}/{HORIZON}")
-        img = env.render("rgb_array", draw_heat=draw_heat, weights=DictList([HEATMAP_WEIGHTS], jax=True))
+        print(
+            "Rendering raw fps mode heatmap {} step {}/{}".format(draw_heat, t, HORIZON)
+        )
+        img = env.render(
+            "rgb_array",
+            draw_heat=draw_heat,
+            weights=DictList([HEATMAP_WEIGHTS], jax=True),
+        )
         frames.append(_resize(img, 0.4))
 
     # Specify your path & filename
-    write_apng(f"render-raw_fps-heatmap-{draw_heat}.png", frames, delay=100)
-
+    write_apng("render-raw_fps-heatmap-{}.png".format(draw_heat), frames, delay=100)
 
 
 def render_high_fps_to_file():
     """This mode leverages pyglet to interpolate between frames, which renders higher-fps videos
     """
     from rdb.visualize.render import forward_env
+
     env = gym.make(ENV_NAME)
     horizon = 10
     env.set_task(TASK)
     obs = env.reset()
-    actions = onp.array([env.action_space.sample() for _ in range(horizon)])[None] # (nenv, T, -1)
-    init_state = env.state # (nenv, -1)
-    print(f"Rendering high fps mode")
+    actions = onp.array([env.action_space.sample() for _ in range(horizon)])[
+        None
+    ]  # (nenv, T, -1)
+    init_state = env.state  # (nenv, -1)
+    print("Rendering high fps mode")
 
     # This handles (1) env reset. (2) env forwarding, (3) frame collection
     frames = forward_env(env, actions, init_state)
@@ -110,11 +117,8 @@ def render_high_fps_to_file():
         return img
 
     frames = [_resize(img, 0.4) for img in frames]
-    write_apng(f"render-high_fps.png", frames, delay=delay)
-    print(f"Rendering done")
-
-
-
+    write_apng("render-high_fps.png", frames, delay=delay)
+    print("Rendering done")
 
 
 def main():

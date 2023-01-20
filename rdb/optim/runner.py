@@ -3,11 +3,13 @@ import rdb
 import time
 import skimage.transform
 import numpy as onp
+import jax
 import jax.numpy as jnp
 from imageio import imsave
 from functools import partial
 from rdb.infer import *
 from rdb.optim.utils import *
+from rdb.infer.dictlist import *
 from os.path import join, dirname
 from collections import OrderedDict
 from rdb.exps.utils import Profiler
