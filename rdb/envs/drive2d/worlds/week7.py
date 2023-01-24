@@ -178,13 +178,24 @@ class HighwayDriveWorld_Week7(HighwayDriveWorld):
         ## Object distance feature
         nobjs, obj_dim = len(self._objects), 2
         sigobj = jnp.array([self._car_width / 2, self._car_length * 2])
-        nlr_feats_dict["dist_objects"] = compose(
+        # Obstacles
+        nlr_feats_dict["dist_obstacles"] = compose(
+            sum_items, partial(gaussian_feat, sigma=sigobj)
+        )
+        # Trees
+        nlr_feats_dict["dist_trees"] = compose(
             sum_items, partial(gaussian_feat, sigma=sigobj)
         )
         # max_feats_dict["dist_objects"] = jnp.sum(gaussian_feat(
         #     jnp.zeros((obj_dim, nobjs, obj_dim)), sigma=sigobj
         # ))
-        max_feats_dict["dist_objects"] = jnp.sum(
+        # max_feats_dict["dist_objects"] = jnp.sum(
+        #     gaussian_feat(jnp.zeros((obj_dim, 1, obj_dim)), sigma=sigobj)
+        # )
+        max_feats_dict["dist_obstacles"] = jnp.sum(
+            gaussian_feat(jnp.zeros((obj_dim, 1, obj_dim)), sigma=sigobj)
+        )
+        max_feats_dict["dist_trees"] = jnp.sum(
             gaussian_feat(jnp.zeros((obj_dim, 1, obj_dim)), sigma=sigobj)
         )
 
@@ -308,7 +319,9 @@ class HighwayDriveWorld_Week7(HighwayDriveWorld):
             all_acs = jnp.zeros((len(tasks), 2))
 
             diff_cars = self._raw_features_dict["dist_cars"](all_states, all_acs)
-            diff_objs = self._raw_features_dict["dist_objects"](all_states, all_acs)
+            # diff_objs = self._raw_features_dict["dist_objects"](all_states, all_acs)
+            diff_objs = self._raw_features_dict["dist_obstacles"](all_states, all_acs)
+            diff_objs = self._raw_features_dict["dist_trees"](all_states, all_acs)
 
             diff_cars = diff_cars.reshape(-1, len(self._cars), 2)
             diff_objs = diff_objs.reshape(-1, len(self._objects), 2)
@@ -355,7 +368,9 @@ class HighwayDriveWorld_Week7(HighwayDriveWorld):
             all_acs = jnp.zeros((len(tasks), 2))
 
             diff_cars = self._raw_features_dict["dist_cars"](all_states, all_acs)
-            diff_objs = self._raw_features_dict["dist_objects"](all_states, all_acs)
+            # diff_objs = self._raw_features_dict["dist_objects"](all_states, all_acs)
+            diff_objs = self._raw_features_dict["dist_obstacles"](all_states, all_acs)
+            diff_objs = self._raw_features_dict["dist_trees"](all_states, all_acs)
 
             diff_cars = diff_cars.reshape(-1, len(self._cars), 2)
             diff_objs = diff_objs.reshape(-1, len(self._objects), 2)

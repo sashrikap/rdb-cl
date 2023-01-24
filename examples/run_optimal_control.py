@@ -32,7 +32,8 @@ weights = {
     "dist_cars": 5,
     "dist_lanes": 5,
     "dist_fences": 0.35,
-    "dist_objects": 10.25,
+    "dist_obstacles": 10.25,
+    "dist_trees": 12,
     "speed": 5,
     "control": 0.1,
 }
