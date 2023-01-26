@@ -20,6 +20,14 @@ def car_sprite(color, scale=0.15 / 600.0, batch=None, group=None):
     return sprite
 
 
+def truck_sprite(scale=0.2 / 600.0, batch=None, group=None):
+    sprite = pyglet.sprite.Sprite(
+        centered_image("firetruck.png"), subpixel=True, group=group, batch=batch
+    )
+    sprite.scale = scale
+    return sprite
+
+
 class Car(object):
     def __init__(self, env, init_state, horizon, color, friction=0.1):
         """General Car Object.
@@ -187,6 +195,20 @@ class FixSpeedCar(Car):
             self.horizon,
             self.color,
         )
+
+
+class FixSpeedTruck(FixSpeedCar):
+    def __init__(self, env, init_state, fix_speed, horizon=1):
+        super().__init__(env, init_state, fix_speed, horizon)
+        pass
+
+    def register(self, batch, group, opacity=255):
+        """Register render layer"""
+        self._sprite = truck_sprite(batch=batch, group=group)
+        self._sprite.opacity = opacity
+        self._sprite.rotation = -self._state[0, 2] * 180 / onp.pi
+        state = self._state
+        self._sprite.x, self._sprite.y = state[0, 0], state[0, 1]
 
 
 class OptimalControlCar(Car):

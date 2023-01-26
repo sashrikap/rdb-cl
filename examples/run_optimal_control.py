@@ -20,7 +20,7 @@ REPLAN = False
 MAKE_MP4 = False
 ENGINE = "scipy"
 METHOD = "lbfgs"
-ENV_NAME = "Week7_01"  # Two Blockway with Trees
+ENV_NAME = "Week7_02"  # Two Blockway with Trees
 TASK = (-0.7, -0.7, 0.13, 0.4, -0.13, 0.4, -0.5, -0.5, 0.5, 0.5)
 
 env = gym.make(ENV_NAME)

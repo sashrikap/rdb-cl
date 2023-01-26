@@ -46,10 +46,15 @@ class HighwayDriveWorld_Week7(HighwayDriveWorld):
         obs_delta=[0.04, 0.1],
         tree_states=[],
     ):
-        # Define cars
-        cars = []
+        # Define vehicles (including both non-ego cars and trucks)
+        # TODO clean this up, brute forcing the addition of the truck
+        vehicles = []
+        truck_state = car_states.tolist().pop(len(car_states) - 1)
+        truck_speed = car_speeds.tolist().pop(len(car_states) - 1)
         for state, speed in zip(car_states, car_speeds):
-            cars.append(car.FixSpeedCar(self, jnp.array(state), speed))
+            vehicles.append(car.FixSpeedCar(self, jnp.array(state), speed))
+        vehicles.append(car.FixSpeedTruck(self, jnp.array(truck_state), truck_speed))
+
         main_car = car.OptimalControlCar(self, main_state, horizon)
         self._goal_speed = goal_speed
         self._goal_lane = goal_lane
@@ -75,7 +80,7 @@ class HighwayDriveWorld_Week7(HighwayDriveWorld):
         for state in tree_states:
             objs.append(objects.Tree(jnp.array(state)))
 
-        super().__init__(main_car, cars, num_lanes=num_lanes, objects=objs, dt=dt)
+        super().__init__(main_car, vehicles, num_lanes=num_lanes, objects=objs, dt=dt)
 
         # Define all tasks to sample from
         self._task_sampler = None
@@ -101,7 +106,9 @@ class HighwayDriveWorld_Week7(HighwayDriveWorld):
         """Vectorized version of `get_init_state`
         """
         tasks = onp.array(tasks)
-        assert tasks.shape[-1] == 2 + 2 * len(self._objects), "Task format incorrect"
+        assert tasks.shape[-1] == 2 + 2 * len(
+            self._objects
+        ), f"Task format incorrect - expected length {2 + 2 * len(self._objects)} but got {tasks.shape[-1]}"
         obj_idx = 12
         state = copy.deepcopy(self.state)
         for ci, car in enumerate(self.cars + [self._main_car]):
@@ -287,6 +294,7 @@ class HighwayDriveWorld_Week7(HighwayDriveWorld):
     def update_key(self, rng_key):
         super().update_key(rng_key)
 
+
 class Week7_01(HighwayDriveWorld_Week7):
     """
     Highway merging scenario, with two obstacles and trees
@@ -301,18 +309,22 @@ class Week7_01(HighwayDriveWorld_Week7):
         goal_lane = 0
         horizon = 10
         dt = 0.25
+
         # Lane size
         lane_width = 0.13
         num_lanes = 3
+
         # Car states
         car1 = jnp.array([0.0, 0.3, jnp.pi / 2, 0])
         car2 = jnp.array([-lane_width, 0.9, jnp.pi / 2, 0])
         car_states = jnp.array([car1, car2])
         car_speeds = jnp.array([car_speed, car_speed])
         car_ranges = [[-0.4, 1.0], [-0.4, 1.0]]
+
         # Obstacle states
         obstacle_states = jnp.array([[0.0, 0.3], [-lane_width, 0.3]])
         tree_states = jnp.array([[0.0, 0.3], [0.0, 0.3]])
+
         # [x_min, x_max, y_min, y_max]
         obs_ranges = [[-0.16, 0.0, -0.4, 1.2], [0.0, 0.16, -0.4, 1.2]]
 
@@ -331,4 +343,57 @@ class Week7_01(HighwayDriveWorld_Week7):
             obs_delta=[0.04, 0.1],
             obstacle_states=obstacle_states,
             tree_states=tree_states,
+        )
+
+
+class Week7_02(HighwayDriveWorld_Week7):
+    """
+    Highway merging scenario with a truck.
+    """
+
+    def __init__(self):
+        ## Boilerplate
+        main_speed = 0.7
+        car_speed = 0.5
+        main_state = jnp.array([0, 0, jnp.pi / 2, main_speed])
+        goal_speed = 0.8
+        goal_lane = 0
+        horizon = 10
+        dt = 0.25
+
+        # Lane size
+        lane_width = 0.13
+        num_lanes = 3
+
+        # Add truck
+        car1 = jnp.array([0.0, 0.3, jnp.pi / 2, 0])
+        car2 = jnp.array([-lane_width, 0.9, jnp.pi / 2, 0])
+        truck = jnp.array([-lane_width, 0.9, jnp.pi / 2, 0])
+
+        car_states = jnp.array([car1, car2, truck])
+        car_speeds = jnp.array([car_speed, car_speed, car_speed])
+        car_ranges = [[-0.4, 1.0], [-0.4, 1.0], [-0.4, 1.0]]
+
+        # Obstacle states
+        obstacle_states = jnp.array([[0.0, 0.3], [-lane_width, 0.3]])
+        tree_states = jnp.array([[0.0, 0.3], [0.0, 0.3]])
+
+        # [x_min, x_max, y_min, y_max]
+        obs_ranges = [[-0.16, 0.0, -0.4, 1.2], [0.0, 0.16, -0.4, 1.2]]
+
+        super().__init__(
+            main_state,
+            goal_speed=goal_speed,
+            goal_lane=goal_lane,
+            car_states=car_states,
+            car_speeds=car_speeds,
+            dt=dt,
+            horizon=horizon,
+            num_lanes=num_lanes,
+            lane_width=lane_width,
+            car_ranges=car_ranges,
+            obs_ranges=obs_ranges,
+            obs_delta=[0.04, 0.1],
+            obstacle_states=obstacle_states,
+            # tree_states=tree_states,
         )

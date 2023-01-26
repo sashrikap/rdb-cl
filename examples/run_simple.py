@@ -13,8 +13,9 @@ from rdb.optim.runner import Runner
 from rdb.infer.dictlist import DictList
 
 
-ENV_NAME = "Week7_01"  # Two Blockway with Trees
-TASK = (-0.7, -0.7, 0.13, 0.4, -0.13, 0.4, -0.5, -0.5, 0.5, 0.5)
+ENV_NAME = "Week7_02"  # Truck
+# TASK = (-0.7, -0.7, 0.13, 0.4, -0.13, 0.4, -0.5, -0.5, 0.5, 0.5)
+TASK = (-0.7, -0.7, 0.13, 0.4, -0.13, 0.4)
 HORIZON = 10
 
 HEATMAP_WEIGHTS = {
