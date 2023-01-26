@@ -44,7 +44,6 @@ class HighwayDriveWorld_Week7(HighwayDriveWorld):
         obstacle_states=[],
         obs_ranges=[[-0.16, 0.16, -0.8, 0.8]],
         obs_delta=[0.04, 0.1],
-        task_naturalness="all",
         tree_states=[],
     ):
         # Define cars
@@ -80,7 +79,6 @@ class HighwayDriveWorld_Week7(HighwayDriveWorld):
 
         # Define all tasks to sample from
         self._task_sampler = None
-        self._task_naturalness = task_naturalness
         self._car_ranges = car_ranges
         self._car_delta = car_delta
         self._obs_ranges = obs_ranges
@@ -289,106 +287,6 @@ class HighwayDriveWorld_Week7(HighwayDriveWorld):
     def update_key(self, rng_key):
         super().update_key(rng_key)
 
-    def _setup_tasks(self):
-        obs_ranges = self._obs_ranges
-        obs_delta = self._obs_delta
-        self._grid_tasks = []
-        for ci, car_range in enumerate(self._car_ranges):
-            self._grid_tasks.append(
-                jnp.arange(car_range[0], car_range[1], self._car_delta)
-            )
-        for oi in range(len(self._objects)):
-            obs_range_x = jnp.arange(obs_ranges[oi][0], obs_ranges[oi][1], obs_delta[0])
-            obs_range_y = jnp.arange(obs_ranges[oi][2], obs_ranges[oi][3], obs_delta[1])
-            self._grid_tasks.append(obs_range_x)
-            self._grid_tasks.append(obs_range_y)
-        all_tasks = list(itertools.product(*self._grid_tasks))
-        self._all_tasks = self._get_natural_tasks(all_tasks)
-        self._all_task_difficulties = self._get_task_difficulties(self._all_tasks)
-
-    def _get_natural_tasks(self, tasks):
-        """Filter out tasks that are not natural (keep tasks where initial positions
-        of other cars and objects are far).
-
-        """
-        if self._task_naturalness == "all":
-            all_tasks = tasks
-        elif self._task_naturalness == "distance":
-            ## Difference to cars and objects
-            all_states = self.get_init_states(tasks)
-            all_acs = jnp.zeros((len(tasks), 2))
-
-            diff_cars = self._raw_features_dict["dist_cars"](all_states, all_acs)
-            # diff_objs = self._raw_features_dict["dist_objects"](all_states, all_acs)
-            diff_objs = self._raw_features_dict["dist_obstacles"](all_states, all_acs)
-            diff_objs = self._raw_features_dict["dist_trees"](all_states, all_acs)
-
-            diff_cars = diff_cars.reshape(-1, len(self._cars), 2)
-            diff_objs = diff_objs.reshape(-1, len(self._objects), 2)
-
-            head_length = 2 * self._car_length
-            back_length = self._car_length
-            car_width = self._car_width
-
-            # Whether any car is too close
-            cars_x_too_close = onp.logical_and(
-                diff_cars[:, :, 0] < car_width, diff_cars[:, :, 0] > -car_width
-            )
-            cars_y_too_close = onp.logical_and(
-                diff_cars[:, :, 1] < head_length, diff_cars[:, :, 1] > -back_length
-            )
-            cars_too_close = onp.any(
-                onp.logical_and(cars_x_too_close, cars_y_too_close), axis=-1
-            )
-            # Whether any object is too close
-            objs_x_too_close = onp.logical_and(
-                diff_objs[:, :, 0] < car_width, diff_objs[:, :, 0] > -car_width
-            )
-            objs_y_too_close = onp.logical_and(
-                diff_objs[:, :, 1] < head_length, diff_objs[:, :, 1] > -back_length
-            )
-            objs_too_close = onp.any(
-                onp.logical_or(objs_x_too_close, objs_y_too_close), axis=-1
-            )
-
-            too_close = onp.logical_or(cars_too_close, objs_too_close)
-            all_tasks = onp.array(tasks)[onp.logical_not(onp.array(too_close))]
-            # all_tasks = onp.array(tasks)[onp.array(too_close)]
-        else:
-            raise NotImplementedError
-        return all_tasks
-
-    def _get_task_difficulties(self, tasks, method="mean_inv"):
-        """ Compute task difficulties.
-        """
-        if method == "mean_inv":
-            ## Mean of inverse of object distances
-            ## Difference to cars and objects
-            all_states = self.get_init_states(tasks)
-            all_acs = jnp.zeros((len(tasks), 2))
-
-            diff_cars = self._raw_features_dict["dist_cars"](all_states, all_acs)
-            # diff_objs = self._raw_features_dict["dist_objects"](all_states, all_acs)
-            diff_objs = self._raw_features_dict["dist_obstacles"](all_states, all_acs)
-            diff_objs = self._raw_features_dict["dist_trees"](all_states, all_acs)
-
-            diff_cars = diff_cars.reshape(-1, len(self._cars), 2)
-            diff_objs = diff_objs.reshape(-1, len(self._objects), 2)
-
-            dist_cars = jnp.linalg.norm(diff_cars, axis=2)
-            dist_objs = jnp.linalg.norm(diff_objs, axis=2)
-
-            sum_invs = jnp.sum((1 / dist_cars), axis=1) + jnp.sum(
-                (1 / dist_objs), axis=1
-            )
-            mean_invs = sum_invs / float(len(self._cars) + len(self._objects))
-            # all_tasks = onp.array(tasks)[onp.array(too_close)]
-            difficulties = mean_invs
-        else:
-            raise NotImplementedError
-        return difficulties
-
-
 class Week7_01(HighwayDriveWorld_Week7):
     """
     Highway merging scenario, with two obstacles and trees
@@ -417,8 +315,6 @@ class Week7_01(HighwayDriveWorld_Week7):
         tree_states = jnp.array([[0.0, 0.3], [0.0, 0.3]])
         # [x_min, x_max, y_min, y_max]
         obs_ranges = [[-0.16, 0.0, -0.4, 1.2], [0.0, 0.16, -0.4, 1.2]]
-        # Don't filter any task
-        task_naturalness = "distance"
 
         super().__init__(
             main_state,
@@ -434,6 +330,5 @@ class Week7_01(HighwayDriveWorld_Week7):
             obs_ranges=obs_ranges,
             obs_delta=[0.04, 0.1],
             obstacle_states=obstacle_states,
-            task_naturalness=task_naturalness,
             tree_states=tree_states,
         )
