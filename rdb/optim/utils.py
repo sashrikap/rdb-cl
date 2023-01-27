@@ -201,10 +201,10 @@ def concat_funcs(funcs, axis=-1):
 
 
 def stack_funcs(funcs, axis=0):
-    """Concatenate output values of list of functions into a list.
+    """Stack output values of list of functions into a list.
 
     Example:
-        >>> [next_x1, next_x2] = f([x1, x2])
+        >>> [next_x1; next_x2] = f([x1, x2])
     Note:
         * Useful for Dynamics function
 

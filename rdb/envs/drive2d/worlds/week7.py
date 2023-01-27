@@ -45,15 +45,18 @@ class HighwayDriveWorld_Week7(HighwayDriveWorld):
         obs_ranges=[[-0.16, 0.16, -0.8, 0.8]],
         obs_delta=[0.04, 0.1],
         tree_states=[],
+        num_trucks=0,
     ):
         # Define vehicles (including both non-ego cars and trucks)
-        # TODO clean this up, brute forcing the addition of the truck
         vehicles = []
-        truck_state = car_states.tolist().pop(len(car_states) - 1)
-        truck_speed = car_speeds.tolist().pop(len(car_states) - 1)
-        for state, speed in zip(car_states, car_speeds):
+        num_cars = len(car_states) - num_trucks
+
+        for state, speed in zip(car_states[:num_cars], car_speeds[:num_cars]):
             vehicles.append(car.FixSpeedCar(self, jnp.array(state), speed))
-        vehicles.append(car.FixSpeedTruck(self, jnp.array(truck_state), truck_speed))
+
+        # Pop last `num_trucks` vehicle objects and make them trucks
+        for state, speed in zip(car_states[num_cars:], car_speeds[num_cars:]):
+            vehicles.append(car.FixSpeedTruck(self, jnp.array(state), speed))
 
         main_car = car.OptimalControlCar(self, main_state, horizon)
         self._goal_speed = goal_speed
@@ -114,10 +117,12 @@ class HighwayDriveWorld_Week7(HighwayDriveWorld):
         for ci, car in enumerate(self.cars + [self._main_car]):
             state = state.at[:, ci * 4 : (ci + 1) * 4].set(car.init_state)
         all_states = onp.tile(onp.array(state), (len(tasks), 1))
+
         # Car state
         car_y0_idx, car_y1_idx = 1, 5
         all_states[:, car_y0_idx] = tasks[:, 0]
         all_states[:, car_y1_idx] = tasks[:, 1]
+
         # Object state
         state_idx, task_idx = obj_idx, 2
         for obj in self._objects:
@@ -183,26 +188,28 @@ class HighwayDriveWorld_Week7(HighwayDriveWorld):
         ## Object distance feature
         nobjs, obj_dim = len(self._objects), 2
         sigobj = jnp.array([self._car_width / 2, self._car_length * 2])
-        # Obstacles
-        nlr_feats_dict["dist_obstacles"] = compose(
-            sum_items, partial(gaussian_feat, sigma=sigobj)
-        )
-        # Trees
-        nlr_feats_dict["dist_trees"] = compose(
-            sum_items, partial(gaussian_feat, sigma=sigobj)
-        )
-        # max_feats_dict["dist_objects"] = jnp.sum(gaussian_feat(
-        #     jnp.zeros((obj_dim, nobjs, obj_dim)), sigma=sigobj
-        # ))
-        # max_feats_dict["dist_objects"] = jnp.sum(
-        #     gaussian_feat(jnp.zeros((obj_dim, 1, obj_dim)), sigma=sigobj)
-        # )
-        max_feats_dict["dist_obstacles"] = jnp.sum(
-            gaussian_feat(jnp.zeros((obj_dim, 1, obj_dim)), sigma=sigobj)
-        )
-        max_feats_dict["dist_trees"] = jnp.sum(
-            gaussian_feat(jnp.zeros((obj_dim, 1, obj_dim)), sigma=sigobj)
-        )
+
+        if self._objects:
+            # Obstacles
+            nlr_feats_dict["dist_obstacles"] = compose(
+                sum_items, partial(gaussian_feat, sigma=sigobj)
+            )
+            # Trees
+            nlr_feats_dict["dist_trees"] = compose(
+                sum_items, partial(gaussian_feat, sigma=sigobj)
+            )
+            # max_feats_dict["dist_objects"] = jnp.sum(gaussian_feat(
+            #     jnp.zeros((obj_dim, nobjs, obj_dim)), sigma=sigobj
+            # ))
+            # max_feats_dict["dist_objects"] = jnp.sum(
+            #     gaussian_feat(jnp.zeros((obj_dim, 1, obj_dim)), sigma=sigobj)
+            # )
+            max_feats_dict["dist_obstacles"] = jnp.sum(
+                gaussian_feat(jnp.zeros((obj_dim, 1, obj_dim)), sigma=sigobj)
+            )
+            max_feats_dict["dist_trees"] = jnp.sum(
+                gaussian_feat(jnp.zeros((obj_dim, 1, obj_dim)), sigma=sigobj)
+            )
 
         ## Control features
         ones = jnp.ones((1, 1))  # (nbatch=1, dim=1)
@@ -280,7 +287,10 @@ class HighwayDriveWorld_Week7(HighwayDriveWorld):
             env=self, lane_idx=2
         )
         constraints_dict["collision"] = constraints.build_collision(env=self)
-        constraints_dict["crash_objects"] = constraints.build_crash_objects(env=self)
+        if self._objects:
+            constraints_dict["crash_objects"] = constraints.build_crash_objects(
+                env=self
+            )
         self._constraints_fn = merge_dict_funcs(constraints_dict)
         self._constraints_dict = constraints_dict
 
@@ -366,17 +376,12 @@ class Week7_02(HighwayDriveWorld_Week7):
         num_lanes = 3
 
         # Add truck
-        car1 = jnp.array([0.0, 0.3, jnp.pi / 2, 0])
-        car2 = jnp.array([-lane_width, 0.9, jnp.pi / 2, 0])
-        truck = jnp.array([-lane_width, 0.9, jnp.pi / 2, 0])
+        truck = jnp.array([-lane_width, 0.9, 0, 0])
+        num_trucks = 1
 
-        car_states = jnp.array([car1, car2, truck])
-        car_speeds = jnp.array([car_speed, car_speed, car_speed])
-        car_ranges = [[-0.4, 1.0], [-0.4, 1.0], [-0.4, 1.0]]
-
-        # Obstacle states
-        obstacle_states = jnp.array([[0.0, 0.3], [-lane_width, 0.3]])
-        tree_states = jnp.array([[0.0, 0.3], [0.0, 0.3]])
+        car_states = jnp.array([truck])
+        car_speeds = jnp.array([car_speed])
+        car_ranges = [[-0.4, 1.0]]
 
         # [x_min, x_max, y_min, y_max]
         obs_ranges = [[-0.16, 0.0, -0.4, 1.2], [0.0, 0.16, -0.4, 1.2]]
@@ -394,6 +399,5 @@ class Week7_02(HighwayDriveWorld_Week7):
             car_ranges=car_ranges,
             obs_ranges=obs_ranges,
             obs_delta=[0.04, 0.1],
-            obstacle_states=obstacle_states,
-            # tree_states=tree_states,
+            num_trucks=num_trucks,
         )

@@ -466,6 +466,10 @@ class DriveWorld(RenderEnv):
         for car in self._cars:
             car.control(self.dt)
         self.main_car.control(action, self.dt)
+        # compute all raw feats
+        # compute all nlr feats
+        # multiply nlr feats with weights -> rew
+        # TODO: (Jerry) add cost computation back in
         rew = 0
         done = False
         obs = self.state
@@ -709,6 +713,8 @@ class DriveWorld(RenderEnv):
             onp.sum(const["offtrack"])
             + onp.sum(const["collision"])
             + onp.sum(const["crash_objects"])
+            if self._objects
+            else 0
         ) > 0
         labels["main"].text = f"Speed: {speed * self._speed_factor:.2f} mph"
         labels["brake"].text = f"Brake: {brake:.2f}"
