@@ -34,6 +34,8 @@ class HighwayDriveWorld_Week7(HighwayDriveWorld):
         # States
         car_states=[],
         car_speeds=[],
+        truck_states=[],
+        truck_speeds=[],
         dt=0.1,
         horizon=10,
         num_lanes=3,
@@ -45,17 +47,14 @@ class HighwayDriveWorld_Week7(HighwayDriveWorld):
         obs_ranges=[[-0.16, 0.16, -0.8, 0.8]],
         obs_delta=[0.04, 0.1],
         tree_states=[],
-        num_trucks=0,
     ):
         # Define vehicles (including both non-ego cars and trucks)
         vehicles = []
-        num_cars = len(car_states) - num_trucks
 
-        for state, speed in zip(car_states[:num_cars], car_speeds[:num_cars]):
+        for state, speed in zip(car_states, car_speeds):
             vehicles.append(car.FixSpeedCar(self, jnp.array(state), speed))
 
-        # Pop last `num_trucks` vehicle objects and make them trucks
-        for state, speed in zip(car_states[num_cars:], car_speeds[num_cars:]):
+        for state, speed in zip(truck_states, truck_speeds):
             vehicles.append(car.FixSpeedTruck(self, jnp.array(state), speed))
 
         main_car = car.OptimalControlCar(self, main_state, horizon)
@@ -87,7 +86,9 @@ class HighwayDriveWorld_Week7(HighwayDriveWorld):
 
         # Define all tasks to sample from
         self._task_sampler = None
-        self._car_ranges = car_ranges
+        self._car_ranges = (
+            car_ranges
+        )  # Use car_ranges to refer both car and truck ranges
         self._car_delta = car_delta
         self._obs_ranges = obs_ranges
         self._obs_delta = obs_delta
@@ -358,13 +359,14 @@ class Week7_01(HighwayDriveWorld_Week7):
 
 class Week7_02(HighwayDriveWorld_Week7):
     """
-    Highway merging scenario with a truck.
+    Highway merging scenario, with truck and one other car
     """
 
     def __init__(self):
         ## Boilerplate
         main_speed = 0.7
         car_speed = 0.5
+        truck_speed = 0.5
         main_state = jnp.array([0, 0, jnp.pi / 2, main_speed])
         goal_speed = 0.8
         goal_lane = 0
@@ -375,12 +377,11 @@ class Week7_02(HighwayDriveWorld_Week7):
         lane_width = 0.13
         num_lanes = 3
 
-        # Add truck
+        # Truck states
+        # truck = jnp.array([0.0, 0.3, 0, 0])
         truck = jnp.array([-lane_width, 0.9, 0, 0])
-        num_trucks = 1
-
-        car_states = jnp.array([truck])
-        car_speeds = jnp.array([car_speed])
+        truck_states = jnp.array([truck])
+        truck_speeds = jnp.array([truck_speed])
         car_ranges = [[-0.4, 1.0]]
 
         # [x_min, x_max, y_min, y_max]
@@ -390,8 +391,10 @@ class Week7_02(HighwayDriveWorld_Week7):
             main_state,
             goal_speed=goal_speed,
             goal_lane=goal_lane,
-            car_states=car_states,
-            car_speeds=car_speeds,
+            car_states=[],
+            car_speeds=[],
+            truck_states=truck_states,
+            truck_speeds=truck_speeds,
             dt=dt,
             horizon=horizon,
             num_lanes=num_lanes,
@@ -399,5 +402,4 @@ class Week7_02(HighwayDriveWorld_Week7):
             car_ranges=car_ranges,
             obs_ranges=obs_ranges,
             obs_delta=[0.04, 0.1],
-            num_trucks=num_trucks,
         )

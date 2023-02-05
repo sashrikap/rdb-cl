@@ -13,7 +13,7 @@ from rdb.optim.runner import Runner
 from rdb.infer.dictlist import DictList
 
 
-ENV_NAME = "Week7_02"  # Truck and no obstacles
+ENV_NAME = "Week7_02"  # Single truck
 TASK = (-0.7, -0.7)
 HORIZON = 10
 
