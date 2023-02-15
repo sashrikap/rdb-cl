@@ -206,7 +206,7 @@ class FixSpeedTruck(FixSpeedCar):
         """Register render layer"""
         self._sprite = truck_sprite(batch=batch, group=group)
         self._sprite.opacity = opacity
-        self._sprite.rotation = 0
+        self._sprite.rotation = -self._state[0, 2] * 180 / onp.pi
         state = self._state
         self._sprite.x, self._sprite.y = state[0, 0], state[0, 1]
 
