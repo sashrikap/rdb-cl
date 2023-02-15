@@ -378,8 +378,7 @@ class Week7_02(HighwayDriveWorld_Week7):
         num_lanes = 3
 
         # Truck states
-        # truck = jnp.array([0.0, 0.3, 0, 0])
-        truck = jnp.array([-lane_width, 0.9, 0, 0])
+        truck = jnp.array([-lane_width, 0.9, jnp.pi / 2, 0])
         truck_states = jnp.array([truck])
         truck_speeds = jnp.array([truck_speed])
         car_ranges = [[-0.4, 1.0]]

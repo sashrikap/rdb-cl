@@ -11,6 +11,7 @@ from tqdm import tqdm
 from rdb.optim.mpc import build_mpc
 from rdb.optim.runner import Runner
 from rdb.infer.dictlist import DictList
+from PIL import Image
 
 
 ENV_NAME = "Week7_02"  # Single truck
@@ -86,7 +87,8 @@ def render_raw_fps_to_file(draw_heat=False):
         frames.append(_resize(img, 0.4))
 
     # Specify your path & filename
-    write_apng("render-raw_fps-heatmap-{}.png".format(draw_heat), frames, delay=100)
+    imgs = [Image.fromarray(img) for img in frames]
+    imgs[0].save("render-raw_fps-heatmap-{}.gif".format(draw_heat), save_all = True, append_images=imgs[1:], duration=100, loop=0)
 
 
 def render_high_fps_to_file():
@@ -118,7 +120,9 @@ def render_high_fps_to_file():
         return img
 
     frames = [_resize(img, 0.4) for img in frames]
-    write_apng("render-high_fps.png", frames, delay=delay)
+    imgs = [Image.fromarray(img) for img in frames]
+    imgs[0].save("render-high-fps.gif", save_all = True, append_images=imgs[1:], duration=100, loop=0)
+
     print("Rendering done")
 
 
