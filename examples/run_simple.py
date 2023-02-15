@@ -4,6 +4,7 @@ import copy
 import jax.numpy as jnp
 import numpy as onp
 from numpngw import write_apng
+from sys import platform
 import rdb.envs.drive2d
 
 from time import time, sleep
@@ -53,10 +54,11 @@ def render_raw_fps_to_file(draw_heat=False):
     obs = env.reset()
 
     # Script that ensures pyglet renders -> virtual display -> file
-    from pyvirtualdisplay import Display
+    if platform == "win32": # Windows
+        from pyvirtualdisplay import Display
 
-    display = Display(visible=0, size=(1400, 900))
-    display.start()
+        display = Display(visible=0, size=(1400, 900))
+        display.start()
 
     # Save rendering to a file
     env.render("rgb_array")

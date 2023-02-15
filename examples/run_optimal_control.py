@@ -13,15 +13,17 @@ from rdb.infer import *
 from rdb.visualize.render import render_env
 from rdb.visualize.preprocess import normalize_features
 from rdb.infer.dictlist import *
+from PIL import Image
 
 DUMMY_ACTION = False
 DRAW_HEAT = False
 REPLAN = False
-MAKE_MP4 = False
+MAKE_MP4 = True
 ENGINE = "scipy"
 METHOD = "lbfgs"
 ENV_NAME = "Week7_02"  # Two Blockway with Trees
-TASK = (-0.7, -0.7, 0.13, 0.4, -0.13, 0.4, -0.5, -0.5, 0.5, 0.5)
+# TASK = (-0.7, -0.7, 0.13, 0.4, -0.13, 0.4, -0.5, -0.5, 0.5, 0.5)
+TASK = (-0.7, -0.7)
 
 env = gym.make(ENV_NAME)
 env.reset()
@@ -30,14 +32,14 @@ horizon = 10
 T = 10
 weights = {
     "dist_cars": 5,
-    "dist_lanes": 5,
+    "dist_lanes": 0.1,
     "dist_fences": 0.35,
     "dist_obstacles": 10.25,
     "dist_trees": 12,
     "speed": 5,
     "control": 0.1,
 }
-# weights = {"dist_lanes": 5.35}
+
 if TASK == "RANDOM":
     num_tasks = len(env.all_tasks)
     print(f"Total tasks {num_tasks}")
@@ -68,13 +70,19 @@ traj, cost, info = runner(state, actions, weights=weights, batch=False)
 print("cost", cost)
 env.reset()
 env.render("human", draw_heat=DRAW_HEAT, weights=weights)
+frames = []
 
 for t in range(T):
     env.step(actions[:, t])
-    env.render("human", draw_heat=DRAW_HEAT, weights=weights)
+    # env.render("human", draw_heat=DRAW_HEAT, weights=weights)
+    img = env.render("rgb_array")
+    frames.append(img)
     sleep(0.2)
 
 
-if MAKE_MP4:
-    pathname = f"data/run_highway.mp4"
-    render_env(env, state, actions, 10, pathname)
+imgs = [Image.fromarray(img) for img in frames]
+imgs[0].save("render-optimal-control.gif", save_all = True, append_images=imgs[1:], duration=100, loop=0)
+
+# if MAKE_MP4:
+#     pathname = f"data/run_highway.mp4"
+#     render_env(env, state, actions, 10, pathname)

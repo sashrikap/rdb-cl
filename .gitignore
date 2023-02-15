@@ -13,3 +13,4 @@ xvfb.log
 examples/figures/*/frames
 runs/
 examples/notebook
+*.gif
