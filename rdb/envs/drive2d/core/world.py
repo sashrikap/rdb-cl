@@ -154,6 +154,7 @@ class DriveWorld(RenderEnv):
         """Set initial state."""
         if len(state.shape) == 1:
             state = state[None, :]
+        print("cars: ", self._cars)
         cars = self._cars + [self._main_car]
         last_idx = 0
         for car in cars:
@@ -382,7 +383,7 @@ class DriveWorld(RenderEnv):
         def bias_fn(state, actions):
             return feature.ones(state[..., jnp.arange(*main_idx)])
 
-        feats_dict["dist_cars"] = stack_funcs(car_fns, axis=1)
+        # feats_dict["dist_cars"] = stack_funcs(car_fns, axis=1)
         feats_dict["dist_lanes"] = stack_funcs(lane_fns, axis=1)
         feats_dict["dist_objects"] = stack_funcs(obj_fns, axis=1)
         feats_dict["dist_obstacles"] = stack_funcs(obj_fns, axis=1)
@@ -711,7 +712,7 @@ class DriveWorld(RenderEnv):
         const = self.constraints_fn(state[None, :], jnp.zeros((1, 1, 2)))
         crash = (
             onp.sum(const["offtrack"])
-            + onp.sum(const["collision"])
+            + onp.sum(const["collision"]) if "collision" in const else 0
             + onp.sum(const["crash_objects"])
             if self._objects
             else 0

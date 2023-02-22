@@ -22,7 +22,7 @@ MAKE_MP4 = True
 ENGINE = "scipy"
 METHOD = "lbfgs"
 ENV_NAME = "Week9_01"  # One obstacle
-TASK = (-0.7, -0.7, 0.13, 0.4)#-0.13, 0.4) #, -0.5, -0.5, 0.5, 0.5)
+TASK = (0, 0, 0.13, 0.4)
 
 env = gym.make(ENV_NAME)
 env.reset()
@@ -30,7 +30,6 @@ main_car = env.main_car
 horizon = 10
 T = 10
 weights = {
-    "dist_cars": 5,
     "dist_lanes": 0.1,
     "dist_fences": 0.35,
     "dist_obstacles": 10.25,

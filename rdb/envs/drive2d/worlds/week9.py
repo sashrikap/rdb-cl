@@ -90,17 +90,13 @@ class HighwayDriveWorld_Week9(HighwayDriveWorld):
         """
         tasks = onp.array(tasks)
         assert tasks.shape[-1] == 2 + 2 * len(self._objects), "Task format incorrect"
-        obj_idx = 12
+        obj_idx = 8
         state = copy.deepcopy(self.state)
         for ci, car in enumerate(self.cars + [self._main_car]):
             state = state.at[:, ci * 4 : (ci + 1) * 4].set(car.init_state)
         all_states = onp.tile(onp.array(state), (len(tasks), 1))
-        # Car state
-        car_y0_idx, car_y1_idx = 1, 5
-        all_states[:, car_y0_idx] = tasks[:, 0]
-        all_states[:, car_y1_idx] = tasks[:, 1]
         # Object state
-        state_idx, task_idx = obj_idx, 2
+        state_idx, task_idx = 0, 0 #0, 2
         for obj in self._objects:
             next_task_idx = task_idx + obj.xdim
             next_state_idx = state_idx + obj.xdim
@@ -134,13 +130,13 @@ class HighwayDriveWorld_Week9(HighwayDriveWorld):
         ## Car distance feature
         ncars, car_dim = len(self._cars), 2
         sigcar = jnp.array([self._car_width / 2, self._car_length])
-        nlr_feats_dict["dist_cars"] = compose(
-            sum_items, partial(gaussian_feat, sigma=sigcar)
-        )
-        # max_feats_dict["dist_cars"] = jnp.sum(gaussian_feat(jnp.zeros((car_dim, ncars, car_dim)), sigma=sigcar))
-        max_feats_dict["dist_cars"] = jnp.sum(
-            gaussian_feat(jnp.zeros((car_dim, 1, car_dim)), sigma=sigcar)
-        )
+        # nlr_feats_dict["dist_cars"] = compose(
+        #     sum_items, partial(gaussian_feat, sigma=sigcar)
+        # )
+        # # max_feats_dict["dist_cars"] = jnp.sum(gaussian_feat(jnp.zeros((car_dim, ncars, car_dim)), sigma=sigcar))
+        # max_feats_dict["dist_cars"] = jnp.sum(
+        #     gaussian_feat(jnp.zeros((car_dim, 1, car_dim)), sigma=sigcar)
+        # )
 
         ## Lane distance feature
         nlr_feats_dict["dist_lanes"] = compose(
@@ -230,16 +226,6 @@ class HighwayDriveWorld_Week9(HighwayDriveWorld):
         nlr_feats_dict["bias"] = identity_feat
         max_feats_dict["bias"] = ones
 
-        # TODO(sashrika) remove debugging code:
-        for nlr in list(nlr_feats_dict.keys()):
-            if nlr not in list(feats_dict.keys()):
-                print (f"NLR {nlr} missing")
-
-        for feat in list(feats_dict.keys()):
-            if feat not in list(nlr_feats_dict.keys()):
-                print (f"FEATS {feat} missing")
-        # debugging code end
-
         nlr_feats_dict = chain_dict_funcs(nlr_feats_dict, feats_dict)
 
         ## JAX compile
@@ -266,7 +252,8 @@ class HighwayDriveWorld_Week9(HighwayDriveWorld):
         constraints_dict["wronglane"] = constraints.build_wronglane(
             env=self, lane_idx=2
         )
-        constraints_dict["collision"] = constraints.build_collision(env=self)
+        # Commenting out since there are no other cars
+        # constraints_dict["collision"] = constraints.build_collision(env=self)
         constraints_dict["crash_objects"] = constraints.build_crash_objects(env=self)
         self._constraints_fn = merge_dict_funcs(constraints_dict)
         self._constraints_dict = constraints_dict
@@ -313,7 +300,7 @@ class HighwayDriveWorld_Week9(HighwayDriveWorld):
             diff_cars = self._raw_features_dict["dist_cars"](all_states, all_acs)
             diff_objs = self._raw_features_dict["dist_objects"](all_states, all_acs)
 
-            diff_cars = diff_cars.reshape(-1, len(self._cars), 2)
+            # diff_cars = diff_cars.reshape(-1, len(self._cars), 2)
             diff_objs = diff_objs.reshape(-1, len(self._objects), 2)
 
             head_length = 2 * self._car_length
@@ -370,7 +357,7 @@ class HighwayDriveWorld_Week9(HighwayDriveWorld):
                 (1 / dist_objs), axis=1
             )
             mean_invs = sum_invs / float(len(self._cars) + len(self._objects))
-            # all_tasks = onp.array(tasks)[onp.array(too_close)]
+            all_tasks = onp.array(tasks)[onp.array(too_close)]
             difficulties = mean_invs
         else:
             raise NotImplementedError
@@ -395,14 +382,8 @@ class Week9_01(HighwayDriveWorld_Week9):
         # Lane size
         lane_width = 0.13
         num_lanes = 3
-        # Car states
-        car1 = jnp.array([0.0, 0.3, jnp.pi / 2, 0])
-        car2 = jnp.array([-lane_width, 0.9, jnp.pi / 2, 0])
-        car_states = jnp.array([car1, car2])
-        car_speeds = jnp.array([car_speed, car_speed])
         # Obstacle states
-        # obstacle_states = jnp.array([[0.0, 0.3], [-lane_width, 0.3], [-lane_width, 0.5]])
-        obstacle_states = jnp.array([[2.0, 2]])
+        obstacle_states = jnp.array([[lane_width, 1]])
         # Don't filter any task
         task_naturalness = "all"
 
@@ -410,8 +391,6 @@ class Week9_01(HighwayDriveWorld_Week9):
             main_state,
             goal_speed=goal_speed,
             goal_lane=goal_lane,
-            car_states=car_states,
-            car_speeds=car_speeds,
             dt=dt,
             horizon=horizon,
             num_lanes=num_lanes,
