@@ -384,9 +384,9 @@ class DriveWorld(RenderEnv):
 
         feats_dict["dist_cars"] = stack_funcs(car_fns, axis=1)
         feats_dict["dist_lanes"] = stack_funcs(lane_fns, axis=1)
-        # feats_dict["dist_objects"] = stack_funcs(obj_fns, axis=1)
+        feats_dict["dist_objects"] = stack_funcs(obj_fns, axis=1)
         feats_dict["dist_obstacles"] = stack_funcs(obj_fns, axis=1)
-        feats_dict["dist_trees"] = stack_funcs(obj_fns, axis=1)
+        # feats_dict["dist_trees"] = stack_funcs(obj_fns, axis=1)
         feats_dict["speed"] = speed_fn
         feats_dict["speed_over"] = speed_fn
         feats_dict["speed_under"] = speed_fn

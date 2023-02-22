@@ -100,7 +100,7 @@ def build_crash_objects(env):
     vfn = jax.vmap(
         env.raw_features_dict[
             "dist_obstacles"
-        ]  # TODO does this need to include "dist_trees" dict?
+        ]
     )  # (T, nbatch, nobjs, obj_xdim)
 
     @jax.jit
