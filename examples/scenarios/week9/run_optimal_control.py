@@ -17,25 +17,25 @@ from PIL import Image
 
 DUMMY_ACTION = False
 DRAW_HEAT = False
-REPLAN = False
+REPLAN = True
 MAKE_MP4 = True
 ENGINE = "scipy"
 METHOD = "lbfgs"
-ENV_NAME = "Week9_02"  # One obstacle
+ENV_NAME = "Week9_01"  # One obstacle
 TASK = (0, 0, 0.13, 0.4)
 
 env = gym.make(ENV_NAME)
 env.reset()
 main_car = env.main_car
-horizon = 10
-T = 10
+horizon = 20
+T = 50 # increased from T = 10 to replan more sparsley
+
 weights = {
-    "dist_lanes": 0,
-    "dist_fences": 2.25,
-    "dist_obstacles": 10,
-    "dist_objects": 10,
+    "dist_lanes": 0.1,
+    "dist_fences": 1,
+    "dist_obstacles": 0.1,
     "speed": 5,
-    "control": .1,
+    "control": 0.1,
 }
 
 if TASK == "RANDOM":

@@ -21,22 +21,20 @@ REPLAN = False
 MAKE_MP4 = True
 ENGINE = "scipy"
 METHOD = "lbfgs"
-ENV_NAME = "Week8_02"
+ENV_NAME = "Week8_03"
 TASK = (0, 0)
 
 env = gym.make(ENV_NAME)
 env.reset()
 main_car = env.main_car
-horizon = 30
+horizon = 10
 T = 10
 weights = {
-    "dist_cars": 10.25,
-    "dist_lanes": 0.1,
-    "dist_fences": 0,
-    "dist_obstacles": 10.25,
-    "dist_trees": 12,
-    "speed": 0.1,
-    "control": 0.1,
+    "dist_cars": 1,
+    "dist_lanes": 1,
+    "dist_fences": 5,
+    "speed": 1,
+    "control": 1,
 }
 
 if TASK == "RANDOM":

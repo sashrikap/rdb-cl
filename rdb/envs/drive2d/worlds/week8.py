@@ -35,6 +35,8 @@ class HighwayDriveWorld_Week8(HighwayDriveWorld):
         car_speeds=[],
         truck_states=[],
         truck_speeds=[],
+        motorcycle_states=[],
+        motorcycle_speeds=[],
         dt=0.1,
         horizon=10,
         num_lanes=3,
@@ -47,7 +49,7 @@ class HighwayDriveWorld_Week8(HighwayDriveWorld):
         obs_delta=[0.04, 0.1],
         tree_states=[],
     ):
-        # Define vehicles (including both non-ego cars and trucks)
+        # Define vehicles
         vehicles = []
 
         for state, speed in zip(car_states, car_speeds):
@@ -55,6 +57,9 @@ class HighwayDriveWorld_Week8(HighwayDriveWorld):
 
         for state, speed in zip(truck_states, truck_speeds):
             vehicles.append(car.FixSpeedTruck(self, jnp.array(state), speed))
+        
+        for state, speed in zip(motorcycle_states, motorcycle_speeds):
+            vehicles.append(car.FixSpeedMotorcycle(self, jnp.array(state), speed))
 
         main_car = car.OptimalControlCar(self, main_state, horizon)
         self._goal_speed = goal_speed
@@ -360,7 +365,7 @@ class Week8_02(HighwayDriveWorld_Week8):
     def __init__(self):
         ## Boilerplate
         main_speed = 0.7
-        truck_speed = 0.5
+        truck_speed = 0.3
         main_state = jnp.array([0, 0, jnp.pi / 2, main_speed])
         goal_speed = 0.8
         goal_lane = 0
@@ -388,6 +393,52 @@ class Week8_02(HighwayDriveWorld_Week8):
             car_speeds=[],
             truck_states=truck_states,
             truck_speeds=truck_speeds,
+            dt=dt,
+            horizon=horizon,
+            num_lanes=num_lanes,
+            lane_width=lane_width,
+            car_ranges=car_ranges,
+            obs_ranges=obs_ranges,
+            obs_delta=[0.04, 0.1],
+        )
+
+class Week8_03(HighwayDriveWorld_Week8):
+    """
+    Highway merging scenario, with scooter in the lane left of the car 
+    and slightly ahead. 
+    """
+
+    def __init__(self):
+        ## Boilerplate
+        main_speed = 0.7
+        motorcycle_speed = 0.3
+        main_state = jnp.array([0, 0, jnp.pi / 2, main_speed])
+        goal_speed = 0.8
+        goal_lane = 0
+        horizon = 10
+        dt = 0.25
+
+        # Lane size
+        lane_width = 0.13
+        num_lanes = 3
+
+        # Motorcycle states
+        motorcycle = jnp.array([-lane_width, 0.5, jnp.pi / 2, 0])
+        motorcycle_states = jnp.array([motorcycle])
+        motorcycle_speeds = jnp.array([motorcycle_speed])
+        car_ranges = [[-0.4, 1.0]]
+
+        # [x_min, x_max, y_min, y_max]
+        obs_ranges = [[-0.16, 0.0, -0.4, 1.2], [0.0, 0.16, -0.4, 1.2]]
+
+        super().__init__(
+            main_state,
+            goal_speed=goal_speed,
+            goal_lane=goal_lane,
+            car_states=[],
+            car_speeds=[],
+            motorcycle_states=motorcycle_states,
+            motorcycle_speeds=motorcycle_speeds,
             dt=dt,
             horizon=horizon,
             num_lanes=num_lanes,
