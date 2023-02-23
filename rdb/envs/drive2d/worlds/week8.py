@@ -404,7 +404,7 @@ class Week8_02(HighwayDriveWorld_Week8):
 
 class Week8_03(HighwayDriveWorld_Week8):
     """
-    Highway merging scenario, with scooter in the lane left of the car 
+    Highway merging scenario, with motorcycle in the lane left of the car 
     and slightly ahead. 
     """
 

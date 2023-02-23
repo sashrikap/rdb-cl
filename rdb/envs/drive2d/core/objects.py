@@ -107,6 +107,11 @@ class Tree(Object):
     def __init__(self, state, scale=0.2):
         super().__init__(state, self.NAME, scale)
 
+class Debris(Object):
+    NAME = "debris"
+
+    def __init__(self, state, scale=0.2):
+        super().__init__(state, self.NAME, scale)
 
 class Garage(Object):
     # NAME = "Garage"

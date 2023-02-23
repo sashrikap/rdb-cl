@@ -40,6 +40,7 @@ class HighwayDriveWorld_Week9(HighwayDriveWorld):
         car_delta=0.1,
         obstacle_states=[],
         tree_states=[],
+        debris_states=[],
         obs_ranges=[[-0.16, 0.16, -0.8, 0.8]],
         obs_delta=[0.04, 0.1],
         task_naturalness="all",
@@ -70,6 +71,10 @@ class HighwayDriveWorld_Week9(HighwayDriveWorld):
         # Add trees
         for state in tree_states:
             objs.append(objects.Tree(jnp.array(state)))
+        
+        # Add debris
+        for state in debris_states:
+            objs.append(objects.Debris(jnp.array(state)))
 
         super().__init__(main_car, cars, num_lanes=num_lanes, objects=objs, dt=dt)
 
@@ -169,22 +174,26 @@ class HighwayDriveWorld_Week9(HighwayDriveWorld):
         ## Object distance feature
         nobjs, obj_dim = len(self._objects), 2
         sigobj = jnp.array([self._car_width / 2, self._car_length * 2])
-        # nlr_feats_dict["dist_objects"] = compose(
-        #     sum_items, partial(gaussian_feat, sigma=sigobj)
-        # )
-        # max_feats_dict["dist_objects"] = jnp.sum(
-        #     gaussian_feat(jnp.zeros((obj_dim, 1, obj_dim)), sigma=sigobj)
-        # )
-
-        ## TODO(sashrika): change from default Obstacle distance feature
-        nobjs, obj_dim = len(self._objects), 2
-        sigobj = jnp.array([self._car_width / 2, self._car_length * 2])
-        # nlr_feats_dict["dist_obstacles"] = compose(
-        #     sum_items, partial(gaussian_feat, sigma=sigobj)
-        # )
-        # max_feats_dict["dist_obstacles"] = jnp.sum(
-        #     gaussian_feat(jnp.zeros((obj_dim, 1, obj_dim)), sigma=sigobj)
-        # )
+        
+        if self._objects:
+            nlr_feats_dict["dist_obstacles"] = compose(
+                sum_items, partial(gaussian_feat, sigma=sigobj)
+            )
+            nlr_feats_dict["dist_trees"] = compose(
+                sum_items, partial(gaussian_feat, sigma=sigobj)
+            )
+            nlr_feats_dict["dist_debris"] = compose(
+                sum_items, partial(gaussian_feat, sigma=sigobj)
+            )
+            max_feats_dict["dist_obstacles"] = jnp.sum(
+                gaussian_feat(jnp.zeros((obj_dim, 1, obj_dim)), sigma=sigobj)
+            )
+            max_feats_dict["dist_trees"] = jnp.sum(
+                gaussian_feat(jnp.zeros((obj_dim, 1, obj_dim)), sigma=sigobj)
+            )
+            max_feats_dict["dist_debris"] = jnp.sum(
+                gaussian_feat(jnp.zeros((obj_dim, 1, obj_dim)), sigma=sigobj)
+            )
 
         ## Control features
         ones = jnp.ones((1, 1))  # (nbatch=1, dim=1)
@@ -443,4 +452,38 @@ class Week9_02(HighwayDriveWorld_Week9):
             tree_states=tree_states,
             task_naturalness=task_naturalness,
         )
-       
+
+class Week9_03(HighwayDriveWorld_Week9):
+    """
+    Highway merging scenario with one obstacle, a fallen tree to the right and
+    ahead of the car.
+    """
+
+    def __init__(self):
+        ## Boilerplate
+        main_speed = 0.7
+        car_speed = 0.5
+        main_state = jnp.array([0, 0, jnp.pi / 2, main_speed])
+        goal_speed = 0.8
+        goal_lane = 0
+        horizon = 10
+        dt = 0.25
+        # Lane size
+        lane_width = 0.13
+        num_lanes = 3
+        # Debris states
+        debris_states = jnp.array([[0, 1]])
+        # Don't filter any task
+        task_naturalness = "all"
+
+        super().__init__(
+            main_state,
+            goal_speed=goal_speed,
+            goal_lane=goal_lane,
+            dt=dt,
+            horizon=horizon,
+            num_lanes=num_lanes,
+            lane_width=lane_width,
+            debris_states=debris_states,
+            task_naturalness=task_naturalness,
+        )       

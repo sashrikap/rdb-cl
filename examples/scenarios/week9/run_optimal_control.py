@@ -17,12 +17,12 @@ from PIL import Image
 
 DUMMY_ACTION = False
 DRAW_HEAT = False
-REPLAN = True
+REPLAN = False
 MAKE_MP4 = True
 ENGINE = "scipy"
 METHOD = "lbfgs"
-ENV_NAME = "Week9_01"  # One obstacle
-TASK = (0, 0, 0.13, 0.4)
+ENV_NAME = "Week9_03"  # One obstacle
+TASK = (0, 0, .5, .5)
 
 env = gym.make(ENV_NAME)
 env.reset()
@@ -34,6 +34,7 @@ weights = {
     "dist_lanes": 0.1,
     "dist_fences": 1,
     "dist_obstacles": 0.1,
+    "dist_debris": 0.1,
     "speed": 5,
     "control": 0.1,
 }
