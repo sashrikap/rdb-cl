@@ -39,6 +39,7 @@ class HighwayDriveWorld_Week9(HighwayDriveWorld):
         car_ranges=[[-0.4, 1.0], [-0.4, 1.0]],
         car_delta=0.1,
         obstacle_states=[],
+        tree_states=[],
         obs_ranges=[[-0.16, 0.16, -0.8, 0.8]],
         obs_delta=[0.04, 0.1],
         task_naturalness="all",
@@ -51,6 +52,7 @@ class HighwayDriveWorld_Week9(HighwayDriveWorld):
         self._goal_speed = goal_speed
         self._goal_lane = goal_lane
         self._max_speed = max_speed
+
         # Control bound
         self._max_throttle = max_throttle
         self._max_steer = max_steer
@@ -59,11 +61,18 @@ class HighwayDriveWorld_Week9(HighwayDriveWorld):
         main_car.max_steer = max_steer
         main_car.max_brake = max_brake
         main_car.max_speed = max_speed
+
         # Define objects
         objs = []
         for state in obstacle_states:
             objs.append(objects.Obstacle(jnp.array(state)))
+
+        # Add trees
+        for state in tree_states:
+            objs.append(objects.Tree(jnp.array(state)))
+
         super().__init__(main_car, cars, num_lanes=num_lanes, objects=objs, dt=dt)
+
         # Define all tasks to sample from
         self._task_sampler = None
         self._task_naturalness = task_naturalness
@@ -398,3 +407,40 @@ class Week9_01(HighwayDriveWorld_Week9):
             obstacle_states=obstacle_states,
             task_naturalness=task_naturalness,
         )
+
+class Week9_02(HighwayDriveWorld_Week9):
+    """
+    Highway merging scenario with one obstacle, a tree to the right and
+    ahead of the car.
+    """
+
+    def __init__(self):
+        ## Boilerplate
+        main_speed = 0.7
+        car_speed = 0.5
+        main_state = jnp.array([0, 0, jnp.pi / 2, main_speed])
+        goal_speed = 0.8
+        goal_lane = 0
+        horizon = 10
+        dt = 0.25
+        # Lane size
+        lane_width = 0.13
+        num_lanes = 3
+        # Tree states
+        tree_states = jnp.array([[0.5, 1]])
+        # Don't filter any task
+        task_naturalness = "all"
+
+        super().__init__(
+            main_state,
+            goal_speed=goal_speed,
+            goal_lane=goal_lane,
+            dt=dt,
+            horizon=horizon,
+            num_lanes=num_lanes,
+            lane_width=lane_width,
+            # obstacle_states=obstacle_states,
+            tree_states=tree_states,
+            task_naturalness=task_naturalness,
+        )
+       
