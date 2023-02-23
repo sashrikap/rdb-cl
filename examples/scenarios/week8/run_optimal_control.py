@@ -22,7 +22,7 @@ MAKE_MP4 = True
 ENGINE = "scipy"
 METHOD = "lbfgs"
 ENV_NAME = "Week8_02"
-TASK = (-0.7, -0.7)
+TASK = (0, 0)
 
 env = gym.make(ENV_NAME)
 env.reset()

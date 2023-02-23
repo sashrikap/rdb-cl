@@ -154,7 +154,6 @@ class DriveWorld(RenderEnv):
         """Set initial state."""
         if len(state.shape) == 1:
             state = state[None, :]
-        print("cars: ", self._cars)
         cars = self._cars + [self._main_car]
         last_idx = 0
         for car in cars:
@@ -383,7 +382,8 @@ class DriveWorld(RenderEnv):
         def bias_fn(state, actions):
             return feature.ones(state[..., jnp.arange(*main_idx)])
 
-        # feats_dict["dist_cars"] = stack_funcs(car_fns, axis=1)
+        # TODO add if checks for this, or some param that prevents having to comment out explicitly
+        feats_dict["dist_cars"] = stack_funcs(car_fns, axis=1)
         feats_dict["dist_lanes"] = stack_funcs(lane_fns, axis=1)
         feats_dict["dist_objects"] = stack_funcs(obj_fns, axis=1)
         feats_dict["dist_obstacles"] = stack_funcs(obj_fns, axis=1)

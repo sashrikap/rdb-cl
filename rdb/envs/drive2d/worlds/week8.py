@@ -112,7 +112,7 @@ class HighwayDriveWorld_Week8(HighwayDriveWorld):
         assert tasks.shape[-1] == 2 + 2 * len(
             self._objects
         ), f"Task format incorrect - expected length {2 + 2 * len(self._objects)} but got {tasks.shape[-1]}"
-        obj_idx = 12
+        obj_idx = 2
         state = copy.deepcopy(self.state)
         for ci, car in enumerate(self.cars + [self._main_car]):
             state = state.at[:, ci * 4 : (ci + 1) * 4].set(car.init_state)
@@ -319,11 +319,17 @@ class Week8_01(HighwayDriveWorld_Week8):
         lane_width = 0.13
         num_lanes = 3
 
+        # Car states
+        car1 = jnp.array([0.0, 0.3, jnp.pi / 2, 0])
+        car2 = jnp.array([-lane_width, 0.9, jnp.pi / 2, 0])
+        car_states = jnp.array([car1, car2])
+        car_speeds = jnp.array([car_speed, car_speed])
+
         # Truck states
         truck = jnp.array([-lane_width, 0.9, jnp.pi / 2, 0])
         truck_states = jnp.array([truck])
         truck_speeds = jnp.array([truck_speed])
-        car_ranges = [[-0.4, 1.0]]
+        car_ranges = [[-0.4, 1.0] for _ in range(3)]
 
         # [x_min, x_max, y_min, y_max]
         obs_ranges = [[-0.16, 0.0, -0.4, 1.2], [0.0, 0.16, -0.4, 1.2]]
@@ -332,8 +338,8 @@ class Week8_01(HighwayDriveWorld_Week8):
             main_state,
             goal_speed=goal_speed,
             goal_lane=goal_lane,
-            car_states=[],
-            car_speeds=[],
+            car_states=car_states,
+            car_speeds=car_speeds,
             truck_states=truck_states,
             truck_speeds=truck_speeds,
             dt=dt,
@@ -366,7 +372,7 @@ class Week8_02(HighwayDriveWorld_Week8):
         num_lanes = 3
 
         # Truck states
-        truck = jnp.array([-lane_width, 1.0, jnp.pi / 2, truck_speed])
+        truck = jnp.array([-lane_width, 5, jnp.pi / 2, 0])
         truck_states = jnp.array([truck])
         truck_speeds = jnp.array([truck_speed])
         car_ranges = [[-0.4, 1.0]]

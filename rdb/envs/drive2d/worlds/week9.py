@@ -160,22 +160,22 @@ class HighwayDriveWorld_Week9(HighwayDriveWorld):
         ## Object distance feature
         nobjs, obj_dim = len(self._objects), 2
         sigobj = jnp.array([self._car_width / 2, self._car_length * 2])
-        nlr_feats_dict["dist_objects"] = compose(
-            sum_items, partial(gaussian_feat, sigma=sigobj)
-        )
-        max_feats_dict["dist_objects"] = jnp.sum(
-            gaussian_feat(jnp.zeros((obj_dim, 1, obj_dim)), sigma=sigobj)
-        )
+        # nlr_feats_dict["dist_objects"] = compose(
+        #     sum_items, partial(gaussian_feat, sigma=sigobj)
+        # )
+        # max_feats_dict["dist_objects"] = jnp.sum(
+        #     gaussian_feat(jnp.zeros((obj_dim, 1, obj_dim)), sigma=sigobj)
+        # )
 
         ## TODO(sashrika): change from default Obstacle distance feature
         nobjs, obj_dim = len(self._objects), 2
         sigobj = jnp.array([self._car_width / 2, self._car_length * 2])
-        nlr_feats_dict["dist_obstacles"] = compose(
-            sum_items, partial(gaussian_feat, sigma=sigobj)
-        )
-        max_feats_dict["dist_obstacles"] = jnp.sum(
-            gaussian_feat(jnp.zeros((obj_dim, 1, obj_dim)), sigma=sigobj)
-        )
+        # nlr_feats_dict["dist_obstacles"] = compose(
+        #     sum_items, partial(gaussian_feat, sigma=sigobj)
+        # )
+        # max_feats_dict["dist_obstacles"] = jnp.sum(
+        #     gaussian_feat(jnp.zeros((obj_dim, 1, obj_dim)), sigma=sigobj)
+        # )
 
         ## Control features
         ones = jnp.ones((1, 1))  # (nbatch=1, dim=1)
