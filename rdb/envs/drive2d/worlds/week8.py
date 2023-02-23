@@ -119,9 +119,9 @@ class HighwayDriveWorld_Week8(HighwayDriveWorld):
         all_states = onp.tile(onp.array(state), (len(tasks), 1))
 
         # Car state
-        car_y0_idx, car_y1_idx = 1, 5
-        all_states[:, car_y0_idx] = tasks[:, 0]
-        all_states[:, car_y1_idx] = tasks[:, 1]
+        # car_y0_idx, car_y1_idx = 1, 5
+        # all_states[:, car_y0_idx] = tasks[:, 0]
+        # all_states[:, car_y1_idx] = tasks[:, 1]
 
         # Object state
         state_idx, task_idx = obj_idx, 2
@@ -372,7 +372,7 @@ class Week8_02(HighwayDriveWorld_Week8):
         num_lanes = 3
 
         # Truck states
-        truck = jnp.array([-lane_width, 5, jnp.pi / 2, 0])
+        truck = jnp.array([-lane_width, 0.5, jnp.pi / 2, 0])
         truck_states = jnp.array([truck])
         truck_speeds = jnp.array([truck_speed])
         car_ranges = [[-0.4, 1.0]]
