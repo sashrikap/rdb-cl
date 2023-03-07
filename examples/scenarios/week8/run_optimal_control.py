@@ -17,7 +17,7 @@ from PIL import Image
 
 DUMMY_ACTION = False
 DRAW_HEAT = False
-REPLAN = False
+REPLAN = True
 MAKE_MP4 = True
 ENGINE = "scipy"
 METHOD = "lbfgs"
@@ -28,7 +28,7 @@ env = gym.make(ENV_NAME)
 env.reset()
 main_car = env.main_car
 horizon = 10
-T = 10
+T = 100
 weights = {
     "dist_cars": 1,
     "dist_lanes": 1,
@@ -64,9 +64,13 @@ w_list = DictList([weights])
 w_list = w_list.prepare(env.features_keys)
 actions = optimizer(state, weights=None, weights_arr=w_list.numpy_array())
 traj, cost, info = runner(state, actions, weights=weights, batch=False)
+for key, val in info["feats_sum"].items():
+    print(f"Feature {key}: {val[0]}")
+
 print("cost", cost)
 env.reset()
-env.render("human", draw_heat=DRAW_HEAT, weights=weights)
+## TODO: visualization
+env.render("human", draw_heat=DRAW_HEAT, weights=DictList([weights], jax=True))
 frames = []
 
 for t in range(T):

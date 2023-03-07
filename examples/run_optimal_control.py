@@ -17,19 +17,19 @@ from PIL import Image
 
 DUMMY_ACTION = False
 DRAW_HEAT = False
-REPLAN = False
+REPLAN = 1
 MAKE_MP4 = True
 ENGINE = "scipy"
 METHOD = "lbfgs"
-ENV_NAME = "Week6_02"  # Two Blockway with Trees
+ENV_NAME = "Week9_01"  # Two Blockway with Trees
 TASK = (-0.7, -0.7, 0.13, 0.4, -0.13, 0.4, -0.5, -0.5, 0.5, 0.5)
 # TASK = (-0.7, -0.7)
 
 env = gym.make(ENV_NAME)
 env.reset()
 main_car = env.main_car
-horizon = 10
-T = 10
+horizon = 5
+T = 15
 weights = {
     "dist_cars": 5,
     "dist_lanes": 0.1,

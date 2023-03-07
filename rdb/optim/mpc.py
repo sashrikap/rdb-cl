@@ -233,6 +233,7 @@ class FiniteHorizonMPC(object):
                     opt_us_t, cmin_t, grad_us_t = res["us"], res["cost"], res["grad"]
                     # xs_t (T, nbatch, x_dim)
                     xs_t = self.h_traj(x_t, opt_us_t)
+                    # import pdb; pdb.set_trace()
 
                 if t == 0 and t_compile is not None and verbose:
                     print(
@@ -342,9 +343,13 @@ def build_forward(f_dyn, xdim, udim, horizon, dt):
 
         """
 
+        # def step(curr_x, u):
+        #     next_x = curr_x + f_dyn(curr_x, u) * dt
+        #     return next_x, curr_x
+
         def step(curr_x, u):
             next_x = curr_x + f_dyn(curr_x, u) * dt
-            return next_x, curr_x
+            return next_x, next_x
 
         last_x, xs = scan(step, x, us)
         return xs

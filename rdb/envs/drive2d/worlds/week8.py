@@ -57,7 +57,7 @@ class HighwayDriveWorld_Week8(HighwayDriveWorld):
 
         for state, speed in zip(truck_states, truck_speeds):
             vehicles.append(car.FixSpeedTruck(self, jnp.array(state), speed))
-        
+
         for state, speed in zip(motorcycle_states, motorcycle_speeds):
             vehicles.append(car.FixSpeedMotorcycle(self, jnp.array(state), speed))
 
@@ -358,8 +358,8 @@ class Week8_01(HighwayDriveWorld_Week8):
 
 class Week8_02(HighwayDriveWorld_Week8):
     """
-    Highway merging scenario, with truck in the lane left of the car 
-    and slightly ahead. 
+    Highway merging scenario, with truck in the lane left of the car
+    and slightly ahead.
     """
 
     def __init__(self):
@@ -404,8 +404,8 @@ class Week8_02(HighwayDriveWorld_Week8):
 
 class Week8_03(HighwayDriveWorld_Week8):
     """
-    Highway merging scenario, with motorcycle in the lane left of the car 
-    and slightly ahead. 
+    Highway merging scenario, with motorcycle in the lane left of the car
+    and slightly ahead.
     """
 
     def __init__(self):
