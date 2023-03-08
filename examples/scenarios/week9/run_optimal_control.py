@@ -4,6 +4,7 @@ import copy
 import jax.numpy as jnp
 import numpy as onp
 import rdb.envs.drive2d
+import json
 
 from time import time, sleep
 from tqdm import tqdm
@@ -17,27 +18,21 @@ from PIL import Image
 
 DUMMY_ACTION = False
 DRAW_HEAT = False
-REPLAN = False
+REPLAN = True
 MAKE_MP4 = True
 ENGINE = "scipy"
 METHOD = "lbfgs"
-ENV_NAME = "Week9_03"  # One obstacle
+ENV_NAME = "Week9_03"
 TASK = (0, 0, .5, .5)
 
 env = gym.make(ENV_NAME)
 env.reset()
 main_car = env.main_car
-horizon = 20
-T = 50 # increased from T = 10 to replan more sparsley
-
-weights = {
-    "dist_lanes": 0.1,
-    "dist_fences": 1,
-    "dist_obstacles": 0.1,
-    "dist_debris": 0.1,
-    "speed": 5,
-    "control": 0.1,
-}
+horizon = 10
+T = 30
+fname = ENV_NAME.lower()
+with open(f"../weights/{fname}_02.json") as json_file:
+    weights = json.load(json_file)
 
 if TASK == "RANDOM":
     num_tasks = len(env.all_tasks)

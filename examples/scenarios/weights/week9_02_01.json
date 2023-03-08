@@ -1,0 +1,8 @@
+{
+    "dist_lanes": 0,
+    "dist_fences": 2.25,
+    "dist_obstacles": 1,
+    "dist_objects": 1,
+    "speed": 5,
+    "control": 0.1
+}

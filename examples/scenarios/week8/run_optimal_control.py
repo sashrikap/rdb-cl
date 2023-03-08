@@ -4,6 +4,7 @@ import copy
 import jax.numpy as jnp
 import numpy as onp
 import rdb.envs.drive2d
+import json
 
 from time import time, sleep
 from tqdm import tqdm
@@ -21,21 +22,17 @@ REPLAN = True
 MAKE_MP4 = True
 ENGINE = "scipy"
 METHOD = "lbfgs"
-ENV_NAME = "Week8_03"
+ENV_NAME = "Week9_01"
 TASK = (0, 0)
 
 env = gym.make(ENV_NAME)
 env.reset()
 main_car = env.main_car
 horizon = 10
-T = 100
-weights = {
-    "dist_cars": 1,
-    "dist_lanes": 1,
-    "dist_fences": 5,
-    "speed": 1,
-    "control": 1,
-}
+T = 30
+fname = ENV_NAME.lower()
+with open(f"../weights/{fname}.json") as json_file:
+    weights = json.load(json_file)
 
 if TASK == "RANDOM":
     num_tasks = len(env.all_tasks)

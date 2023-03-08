@@ -342,11 +342,7 @@ def build_forward(f_dyn, xdim, udim, horizon, dt):
             Output includes the first x and omits the last x
 
         """
-
-        # def step(curr_x, u):
-        #     next_x = curr_x + f_dyn(curr_x, u) * dt
-        #     return next_x, curr_x
-
+        
         def step(curr_x, u):
             next_x = curr_x + f_dyn(curr_x, u) * dt
             return next_x, next_x
