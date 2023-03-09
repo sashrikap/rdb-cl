@@ -1,8 +1,8 @@
 {
-    "dist_lanes": 5,
-    "dist_fences": 5,
-    "dist_obstacles": 3,
-    "dist_objects": 3,
-    "speed": 2,
+    "dist_lanes": 2,
+    "dist_fences": 0.35,
+    "dist_obstacles": 10.25,
+    "dist_objects": 0,
+    "speed": 5,
     "control": 0.1
 }

@@ -22,7 +22,7 @@ REPLAN = True
 MAKE_MP4 = True
 ENGINE = "scipy"
 METHOD = "lbfgs"
-ENV_NAME = "Week9_01"
+ENV_NAME = "Week8_03"
 TASK = (0, 0)
 
 env = gym.make(ENV_NAME)
@@ -30,8 +30,8 @@ env.reset()
 main_car = env.main_car
 horizon = 10
 T = 30
-fname = ENV_NAME.lower()
-with open(f"../weights/{fname}.json") as json_file:
+fname = f"{ENV_NAME}_04"
+with open(f"../weights/{fname.lower()}.json") as json_file:
     weights = json.load(json_file)
 
 if TASK == "RANDOM":
@@ -78,4 +78,4 @@ for t in range(T):
 
 
 imgs = [Image.fromarray(img) for img in frames]
-imgs[0].save(f"render_optimal_control_{ENV_NAME}.gif", save_all = True, append_images=imgs[1:], duration=100, loop=0)
+imgs[0].save(f"render_optimal_control_{fname}.gif", save_all = True, append_images=imgs[1:], duration=100, loop=0)

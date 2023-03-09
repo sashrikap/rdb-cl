@@ -394,7 +394,7 @@ class Week9_01(HighwayDriveWorld_Week9):
         car_speed = 0.5
         main_state = jnp.array([0, 0, jnp.pi / 2, main_speed])
         goal_speed = 0.8
-        goal_lane = 0
+        goal_lane = 1
         horizon = 10
         dt = 0.25
         # Lane size
@@ -429,7 +429,7 @@ class Week9_02(HighwayDriveWorld_Week9):
         car_speed = 0.5
         main_state = jnp.array([0, 0, jnp.pi / 2, main_speed])
         goal_speed = 0.8
-        goal_lane = 0
+        goal_lane = 1
         horizon = 10
         dt = 0.25
         # Lane size
@@ -465,7 +465,7 @@ class Week9_03(HighwayDriveWorld_Week9):
         car_speed = 0.5
         main_state = jnp.array([0, 0, jnp.pi / 2, main_speed])
         goal_speed = 0.8
-        goal_lane = 0
+        goal_lane = 1
         horizon = 10
         dt = 0.25
         # Lane size

@@ -1,0 +1,7 @@
+{
+    "dist_cars": 5,
+    "dist_lanes": 0.1,
+    "dist_obstacles": 10.25,
+    "speed": 5,
+    "control": 0.1
+}
