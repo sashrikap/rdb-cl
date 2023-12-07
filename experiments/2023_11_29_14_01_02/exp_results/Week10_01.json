@@ -1,0 +1,20 @@
+{
+  "dist_cars": 0.09638364204486231,
+  "dist_lanes": -19.55734008356881,
+  "dist_fences": 0.39379514250471603,
+  "control": 1.315083764023857,
+  "control_throttle": 0.2772965569653552,
+  "control_brake": 0.0,
+  "control_turn": 0.4340912361414466,
+  "speed": 0.009071476691306157,
+  "speed_over": 0.0,
+  "speed_under": 0.009071476691306157,
+  "bias": 30.0,
+  "cost": 47.105885953130525,
+  "offtrack": 10,
+  "overspeed": 0,
+  "underspeed": 0,
+  "uncomfortable": 1,
+  "wronglane": 27,
+  "collision": 0
+}

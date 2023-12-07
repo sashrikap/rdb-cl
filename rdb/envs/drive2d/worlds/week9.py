@@ -66,6 +66,7 @@ class HighwayDriveWorld_Week9(HighwayDriveWorld):
         # Define objects
         objs = []
         for state in obstacle_states:
+            print("obj state", state)
             objs.append(objects.Obstacle(jnp.array(state)))
 
         # Add trees
@@ -487,3 +488,38 @@ class Week9_03(HighwayDriveWorld_Week9):
             debris_states=debris_states,
             task_naturalness=task_naturalness,
         )       
+
+class Week9_04(HighwayDriveWorld_Week9):
+    """
+    Highway merging scenario with one obstacle, a cone to the right and
+    ahead of the car and another to the left and ahead of the car.
+    """
+
+    def __init__(self):
+        ## Boilerplate
+        main_speed = 0.7
+        car_speed = 0.5
+        main_state = jnp.array([0, 0, jnp.pi / 2, main_speed])
+        goal_speed = 0.8
+        goal_lane = 1
+        horizon = 10
+        dt = 0.25
+        # Lane size
+        lane_width = 0.13
+        num_lanes = 3
+        # Obstacle states
+        obstacle_states = jnp.array([[lane_width, 1], [-lane_width, 0.5]])
+        # Don't filter any task
+        task_naturalness = "all"
+
+        super().__init__(
+            main_state,
+            goal_speed=goal_speed,
+            goal_lane=goal_lane,
+            dt=dt,
+            horizon=horizon,
+            num_lanes=num_lanes,
+            lane_width=lane_width,
+            obstacle_states=obstacle_states,
+            task_naturalness=task_naturalness,
+        )

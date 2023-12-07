@@ -306,7 +306,8 @@ class HighwayDriveWorld_Week8(HighwayDriveWorld):
 
 class Week8_01(HighwayDriveWorld_Week8):
     """
-    Highway merging scenario, with truck on the left shoulder of the car.
+    Highway merging scenario, with truck on the left shoulder of the car 
+    and non-ego car ahead of it.
     """
 
     def __init__(self):
@@ -426,6 +427,54 @@ class Week8_03(HighwayDriveWorld_Week8):
         motorcycle = jnp.array([-lane_width, 0.5, jnp.pi / 2, 0])
         motorcycle_states = jnp.array([motorcycle])
         motorcycle_speeds = jnp.array([motorcycle_speed])
+        car_ranges = [[-0.4, 1.0]]
+
+        # [x_min, x_max, y_min, y_max]
+        obs_ranges = [[-0.16, 0.0, -0.4, 1.2], [0.0, 0.16, -0.4, 1.2]]
+
+        super().__init__(
+            main_state,
+            goal_speed=goal_speed,
+            goal_lane=goal_lane,
+            car_states=[],
+            car_speeds=[],
+            motorcycle_states=motorcycle_states,
+            motorcycle_speeds=motorcycle_speeds,
+            dt=dt,
+            horizon=horizon,
+            num_lanes=num_lanes,
+            lane_width=lane_width,
+            car_ranges=car_ranges,
+            obs_ranges=obs_ranges,
+            obs_delta=[0.04, 0.1],
+        )
+
+class Week8_04(HighwayDriveWorld_Week8):
+    """
+    Highway merging scenario, with motorcycle in the lane left of the car
+    and slightly ahead and another motorcyle in front of it.
+    """
+
+    def __init__(self):
+        ## Boilerplate
+        main_speed = 0.7
+        motorcycle_speed = 0.3
+        main_state = jnp.array([0, 0, jnp.pi / 2, main_speed])
+        goal_speed = 0.8
+        goal_lane = 0
+        horizon = 10
+        dt = 0.25
+
+        # Lane size
+        lane_width = 0.13
+        num_lanes = 3
+
+        # Motorcycle states
+        motorcycle1 = jnp.array([-lane_width, 0.5, jnp.pi / 2, 0])
+        motorcycle2 = jnp.array([-lane_width, 1, jnp.pi / 2, 0])
+        motorcycle3 = jnp.array([-lane_width, 1.25, jnp.pi / 2, 0])
+        motorcycle_states = jnp.array([motorcycle1, motorcycle2, motorcycle3])
+        motorcycle_speeds = jnp.array([motorcycle_speed, motorcycle_speed * 0.75, motorcycle_speed * 1.25])
         car_ranges = [[-0.4, 1.0]]
 
         # [x_min, x_max, y_min, y_max]

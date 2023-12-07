@@ -15,15 +15,15 @@ from rdb.infer.dictlist import DictList
 from PIL import Image
 
 
-ENV_NAME = "Week9_01"  # One obstacle
-TASK = (0, 0, 0.13, 0.4)
+ENV_NAME = "Week9_04"  # One obstacle
+TASK = (0, 0, 0.5, 0.5, -0.5, -0.5)
 HORIZON = 20
 
 HEATMAP_WEIGHTS = {    
     "dist_lanes": 0.1,
-    "dist_fences": 10,
+    "dist_fences": 0.1,
     "dist_obstacles": 0.1,
-    "speed": 5,
+    "speed": 0.1,
     "control": 0.1,
 }
 

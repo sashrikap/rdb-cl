@@ -1,0 +1,87 @@
+running experiments:  ['Week8_01', 'Week8_02', 'Week8_03', 'Week8_04', 'Week9_01', 'Week9_02', 'Week9_03', 'Week9_04', 'Week10_01', 'Week10_02']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_11_29_18_52_22
+
+running experiments:  ['Week8_01', 'Week8_02', 'Week8_03', 'Week8_04', 'Week9_01', 'Week9_02', 'Week9_03', 'Week9_04', 'Week10_01', 'Week10_02']
+starter:  experiments/uniform.json
+saved to folder:  experiments/2023_11_29_18_55_02
+
+running experiments:  ['Week8_01', 'Week8_01', 'Week8_01', 'Week8_01', 'Week8_01', 'Week8_01', 'Week8_01', 'Week8_01', 'Week8_01', 'Week8_01']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_11_29_18_57_41
+
+running experiments:  ['Week8_01', 'Week8_01', 'Week8_01', 'Week8_01', 'Week8_01', 'Week8_01', 'Week8_01', 'Week8_01', 'Week8_01', 'Week8_01']
+starter:  experiments/uniform.json
+saved to folder:  experiments/2023_11_29_19_00_27
+
+running experiments:  ['Week8_02', 'Week8_02', 'Week8_02', 'Week8_02', 'Week8_02', 'Week8_02', 'Week8_02', 'Week8_02', 'Week8_02', 'Week8_02']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_11_29_19_03_13
+
+running experiments:  ['Week8_02', 'Week8_02', 'Week8_02', 'Week8_02', 'Week8_02', 'Week8_02', 'Week8_02', 'Week8_02', 'Week8_02', 'Week8_02']
+starter:  experiments/uniform.json
+saved to folder:  experiments/2023_11_29_19_05_44
+
+running experiments:  ['Week8_03', 'Week8_03', 'Week8_03', 'Week8_03', 'Week8_03', 'Week8_03', 'Week8_03', 'Week8_03', 'Week8_03', 'Week8_03']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_11_29_19_08_14
+
+running experiments:  ['Week8_03', 'Week8_03', 'Week8_03', 'Week8_03', 'Week8_03', 'Week8_03', 'Week8_03', 'Week8_03', 'Week8_03', 'Week8_03']
+starter:  experiments/uniform.json
+saved to folder:  experiments/2023_11_29_19_10_45
+
+running experiments:  ['Week8_04', 'Week8_04', 'Week8_04', 'Week8_04', 'Week8_04', 'Week8_04', 'Week8_04', 'Week8_04', 'Week8_04', 'Week8_04']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_11_29_19_13_14
+
+running experiments:  ['Week8_04', 'Week8_04', 'Week8_04', 'Week8_04', 'Week8_04', 'Week8_04', 'Week8_04', 'Week8_04', 'Week8_04', 'Week8_04']
+starter:  experiments/uniform.json
+saved to folder:  experiments/2023_11_29_19_16_02
+
+running experiments:  ['Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_11_29_19_18_49
+
+running experiments:  ['Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01']
+starter:  experiments/uniform.json
+saved to folder:  experiments/2023_11_29_19_21_23
+
+running experiments:  ['Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_11_29_19_23_58
+
+running experiments:  ['Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02']
+starter:  experiments/uniform.json
+saved to folder:  experiments/2023_11_29_19_26_39
+
+running experiments:  ['Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_11_29_19_29_20
+
+running experiments:  ['Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03']
+starter:  experiments/uniform.json
+saved to folder:  experiments/2023_11_29_19_32_00
+
+running experiments:  ['Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_11_29_19_34_40
+
+running experiments:  ['Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04']
+starter:  experiments/uniform.json
+saved to folder:  experiments/2023_11_29_19_37_30
+
+running experiments:  ['Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_11_29_19_40_20
+
+running experiments:  ['Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01']
+starter:  experiments/uniform.json
+saved to folder:  experiments/2023_11_29_19_42_55
+
+running experiments:  ['Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_11_29_19_45_30
+
+running experiments:  ['Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02']
+starter:  experiments/uniform.json
+saved to folder:  experiments/2023_11_29_19_48_13

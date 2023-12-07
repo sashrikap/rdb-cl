@@ -1,0 +1,1199 @@
+nohup: ignoring input
+No GPU/TPU found, falling back to CPU. (Set TF_CPP_MIN_LOG_LEVEL=0 and rerun for more info.)
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week8_01-v0` instead of the unversioned environment `Week8_01`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week8_02-v0` instead of the unversioned environment `Week8_02`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week8_03-v0` instead of the unversioned environment `Week8_03`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week8_04-v0` instead of the unversioned environment `Week8_04`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week10_01-v0` instead of the unversioned environment `Week10_01`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week10_02-v0` instead of the unversioned environment `Week10_02`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week9_01-v0` instead of the unversioned environment `Week9_01`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+heuristic num_obstacles
+running experiments:  ['Week8_01', 'Week8_02', 'Week8_03', 'Week8_04', 'Week10_01', 'Week10_02', 'Week9_01', 'Week9_02', 'Week9_03', 'Week9_04']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_12_01_15_56_08
+Task (0, 0)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (11, 1)
+JIT - Controller finish compile in 4.020s: u0 (1, 10, 2)
+Feature dist_cars: 7.864542380644893
+Feature dist_lanes: -74.06360039454898
+Feature dist_fences: 0.0
+Feature control: 5.505489074268225
+Feature control_throttle: 0.00038513291470968793
+Feature control_brake: 2.6803144079383796
+Feature control_turn: 2.3115693962655013
+Feature speed: 18.54921659411609
+Feature speed_over: 0.0
+Feature speed_under: 7.400974645433871
+Feature bias: 30.0
+input_dict: {'dist_cars': 7.864542380644893, 'dist_lanes': -74.06360039454898, 'dist_fences': 0.0, 'control': 5.505489074268225, 'control_throttle': 0.00038513291470968793, 'control_brake': 2.6803144079383796, 'control_turn': 2.3115693962655013, 'speed': 18.54921659411609, 'speed_over': 0.0, 'speed_under': 7.400974645433871, 'bias': 30.0}
+cost:  -144.93527598419502
+results:  {'dist_cars': 7.864542380644893, 'dist_lanes': -74.06360039454898, 'dist_fences': 0.0, 'control': 5.505489074268225, 'control_throttle': 0.00038513291470968793, 'control_brake': 2.6803144079383796, 'control_turn': 2.3115693962655013, 'speed': 18.54921659411609, 'speed_over': 0.0, 'speed_under': 7.400974645433871, 'bias': 30.0, 'cost': -144.93527598419502, 'offtrack': 0, 'overspeed': 0, 'underspeed': 0, 'uncomfortable': 2, 'wronglane': 0, 'collision': 0}
+Task (0, 0)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (11, 1)
+JIT - Controller finish compile in 3.191s: u0 (1, 10, 2)
+Feature dist_cars: 0.0028633295712305737
+Feature dist_lanes: -1.8965953596310385
+Feature dist_fences: 11.047116670626547
+Feature control: 3.4674919058481044
+Feature control_throttle: 2.373603015358656
+Feature control_brake: 0.08014293756539319
+Feature control_turn: 53.922646397063666
+Feature speed: 0.17469087317438783
+Feature speed_over: 0.17353028995240308
+Feature speed_under: 0.0011605832219847305
+Feature bias: 30.0
+input_dict: {'dist_cars': 0.0028633295712305737, 'dist_lanes': -1.8965953596310385, 'dist_fences': 11.047116670626547, 'control': 3.4674919058481044, 'control_throttle': 2.373603015358656, 'control_brake': 0.08014293756539319, 'control_turn': 53.922646397063666, 'speed': 0.17469087317438783, 'speed_over': 0.17353028995240308, 'speed_under': 0.0011605832219847305, 'bias': 30.0}
+cost:  162.82181724891905
+results:  {'dist_cars': 0.0028633295712305737, 'dist_lanes': -1.8965953596310385, 'dist_fences': 11.047116670626547, 'control': 3.4674919058481044, 'control_throttle': 2.373603015358656, 'control_brake': 0.08014293756539319, 'control_turn': 53.922646397063666, 'speed': 0.17469087317438783, 'speed_over': 0.17353028995240308, 'speed_under': 0.0011605832219847305, 'bias': 30.0, 'cost': 162.82181724891905, 'offtrack': 29, 'overspeed': 4, 'underspeed': 0, 'uncomfortable': 1, 'wronglane': 0, 'collision': 0}
+Task (0, 0)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (11, 1)
+JIT - Controller finish compile in 3.269s: u0 (1, 10, 2)
+Feature dist_cars: 0.006489857101363864
+Feature dist_lanes: -19.905249690115646
+Feature dist_fences: 0.3806622302429552
+Feature control: 0.8725234393142061
+Feature control_throttle: 0.03992468262399279
+Feature control_brake: 0.0
+Feature control_turn: 0.27296235299755006
+Feature speed: 1.6903398707547095
+Feature speed_over: 0.0
+Feature speed_under: 1.6903398707547095
+Feature bias: 30.0
+input_dict: {'dist_cars': 0.006489857101363864, 'dist_lanes': -19.905249690115646, 'dist_fences': 0.3806622302429552, 'control': 0.8725234393142061, 'control_throttle': 0.03992468262399279, 'control_brake': 0.0, 'control_turn': 0.27296235299755006, 'speed': 1.6903398707547095, 'speed_over': 0.0, 'speed_under': 1.6903398707547095, 'bias': 30.0}
+cost:  45.27819775823345
+results:  {'dist_cars': 0.006489857101363864, 'dist_lanes': -19.905249690115646, 'dist_fences': 0.3806622302429552, 'control': 0.8725234393142061, 'control_throttle': 0.03992468262399279, 'control_brake': 0.0, 'control_turn': 0.27296235299755006, 'speed': 1.6903398707547095, 'speed_over': 0.0, 'speed_under': 1.6903398707547095, 'bias': 30.0, 'cost': 45.27819775823345, 'offtrack': 11, 'overspeed': 0, 'underspeed': 0, 'uncomfortable': 1, 'wronglane': 26, 'collision': 0}
+Task (0, 0)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (11, 1)
+JIT - Controller finish compile in 3.955s: u0 (1, 10, 2)
+Feature dist_cars: 0.0028633464238557375
+Feature dist_lanes: -1.8532311297941828
+Feature dist_fences: 11.084896617411683
+Feature control: 3.5314036447345085
+Feature control_throttle: 2.3499294414752474
+Feature control_brake: 0.13577238089199684
+Feature control_turn: 46.57961206490406
+Feature speed: 0.43790357580578604
+Feature speed_over: 0.4333592728761193
+Feature speed_under: 0.004544302929666812
+Feature bias: 30.0
+input_dict: {'dist_cars': 0.0028633464238557375, 'dist_lanes': -1.8532311297941828, 'dist_fences': 11.084896617411683, 'control': 3.5314036447345085, 'control_throttle': 2.3499294414752474, 'control_brake': 0.13577238089199684, 'control_turn': 46.57961206490406, 'speed': 0.43790357580578604, 'speed_over': 0.4333592728761193, 'speed_under': 0.004544302929666812, 'bias': 30.0}
+cost:  44.930086750595024
+results:  {'dist_cars': 0.0028633464238557375, 'dist_lanes': -1.8532311297941828, 'dist_fences': 11.084896617411683, 'control': 3.5314036447345085, 'control_throttle': 2.3499294414752474, 'control_brake': 0.13577238089199684, 'control_turn': 46.57961206490406, 'speed': 0.43790357580578604, 'speed_over': 0.4333592728761193, 'speed_under': 0.004544302929666812, 'bias': 30.0, 'cost': 44.930086750595024, 'offtrack': 29, 'overspeed': 6, 'underspeed': 0, 'uncomfortable': 1, 'wronglane': 0, 'collision': 0}
+Task (0, 0)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (11, 1)
+JIT - Controller finish compile in 3.434s: u0 (1, 10, 2)
+Feature dist_cars: 0.09873886457552432
+Feature dist_lanes: -20.453485004568503
+Feature dist_fences: 0.2933403526866597
+Feature control: 0.8836556353722964
+Feature control_throttle: 0.06862926853305575
+Feature control_brake: 0.0
+Feature control_turn: 0.28652258809267234
+Feature speed: 1.0646611186437385
+Feature speed_over: 0.0
+Feature speed_under: 1.0646611186437385
+Feature bias: 30.0
+input_dict: {'dist_cars': 0.09873886457552432, 'dist_lanes': -20.453485004568503, 'dist_fences': 0.2933403526866597, 'control': 0.8836556353722964, 'control_throttle': 0.06862926853305575, 'control_brake': 0.0, 'control_turn': 0.28652258809267234, 'speed': 1.0646611186437385, 'speed_over': 0.0, 'speed_under': 1.0646611186437385, 'bias': 30.0}
+cost:  44.74372897238574
+Task (0, 0)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (11, 1)
+JIT - Controller finish compile in 3.853s: u0 (1, 10, 2)
+Feature dist_cars: 0.07591548892500802
+Feature dist_lanes: -1.831928028671031
+Feature dist_fences: 11.109453189836914
+Feature control: 3.5205587280177224
+Feature control_throttle: 2.3263160504408233
+Feature control_brake: 0.15396329197797076
+Feature control_turn: 40.98791999300151
+Feature speed: 0.7630194744357788
+Feature speed_over: 0.7510227779084366
+Feature speed_under: 0.011996696527342018
+Feature bias: 30.0
+input_dict: {'dist_cars': 0.07591548892500802, 'dist_lanes': -1.831928028671031, 'dist_fences': 11.109453189836914, 'control': 3.5205587280177224, 'control_throttle': 2.3263160504408233, 'control_brake': 0.15396329197797076, 'control_turn': 40.98791999300151, 'speed': 0.7630194744357788, 'speed_over': 0.7510227779084366, 'speed_under': 0.011996696527342018, 'bias': 30.0}
+cost:  44.65897791678624
+obj state [0.13 1.  ]
+Task (0, 0, 0.5, 0.5)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week9_02-v0` instead of the unversioned environment `Week9_02`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week9_03-v0` instead of the unversioned environment `Week9_03`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week9_04-v0` instead of the unversioned environment `Week9_04`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week9_01-v0` instead of the unversioned environment `Week9_01`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week9_02-v0` instead of the unversioned environment `Week9_02`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week9_03-v0` instead of the unversioned environment `Week9_03`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week9_04-v0` instead of the unversioned environment `Week9_04`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+JIT - Controller first compile: weights (13, 1)
+JIT - Controller finish compile in 3.753s: u0 (1, 10, 2)
+Feature dist_lanes: -28.297333937954793
+Feature dist_fences: 3.066678504112958
+Feature dist_obstacles: 0.002464027048463719
+Feature dist_trees: 0.002464027048463719
+Feature dist_debris: 0.002464027048463719
+Feature control: 1.152597130560238
+Feature control_throttle: 0.1235504747579928
+Feature control_brake: 0.0
+Feature control_turn: 0.8068603340336198
+Feature speed: 0.5869732310991871
+Feature speed_over: 0.0
+Feature speed_under: 0.5869732310991871
+Feature bias: 30.0
+input_dict: {'dist_lanes': -28.297333937954793, 'dist_fences': 3.066678504112958, 'dist_obstacles': 0.002464027048463719, 'dist_trees': 0.002464027048463719, 'dist_debris': 0.002464027048463719, 'control': 1.152597130560238, 'control_throttle': 0.1235504747579928, 'control_brake': 0.0, 'control_turn': 0.8068603340336198, 'speed': 0.5869732310991871, 'speed_over': 0.0, 'speed_under': 0.5869732310991871, 'bias': 30.0}
+cost:  90.41395116691828
+Task (0, 0, 0.5, 0.5)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (13, 1)
+JIT - Controller finish compile in 3.671s: u0 (1, 10, 2)
+Feature dist_lanes: -2.4933892525089543
+Feature dist_fences: 11.310000000000002
+Feature dist_obstacles: 1.1895047486009045e-39
+Feature dist_trees: 1.1895047486009045e-39
+Feature dist_debris: 1.1895047486009045e-39
+Feature control: 3.0599999999999996
+Feature control_throttle: 2.25
+Feature control_brake: 1.3273266194687675e-33
+Feature control_turn: 0.8099999999999998
+Feature speed: 7.499999999999997
+Feature speed_over: 7.499999999999997
+Feature speed_under: 0.0
+Feature bias: 30.0
+input_dict: {'dist_lanes': -2.4933892525089543, 'dist_fences': 11.310000000000002, 'dist_obstacles': 1.1895047486009045e-39, 'dist_trees': 1.1895047486009045e-39, 'dist_debris': 1.1895047486009045e-39, 'control': 3.0599999999999996, 'control_throttle': 2.25, 'control_brake': 1.3273266194687675e-33, 'control_turn': 0.8099999999999998, 'speed': 7.499999999999997, 'speed_over': 7.499999999999997, 'speed_under': 0.0, 'bias': 30.0}
+cost:  113.1696486498292
+Task (0, 0, 0.5, 0.5)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (13, 1)
+JIT - Controller finish compile in 3.760s: u0 (1, 10, 2)
+Feature dist_lanes: -22.087640722832095
+Feature dist_fences: 4.034880824367817
+Feature dist_obstacles: 4.452011318732329
+Feature dist_trees: 4.452011318732329
+Feature dist_debris: 4.452011318732329
+Feature control: 1.9572197428050115
+Feature control_throttle: 0.31426004834726773
+Feature control_brake: 0.0
+Feature control_turn: 1.4014921315552191
+Feature speed: 0.0058376188130360405
+Feature speed_over: 0.0007919388079986353
+Feature speed_under: 0.005045680005037406
+Feature bias: 30.0
+input_dict: {'dist_lanes': -22.087640722832095, 'dist_fences': 4.034880824367817, 'dist_obstacles': 4.452011318732329, 'dist_trees': 4.452011318732329, 'dist_debris': 4.452011318732329, 'control': 1.9572197428050115, 'control_throttle': 0.31426004834726773, 'control_brake': 0.0, 'control_turn': 1.4014921315552191, 'speed': 0.0058376188130360405, 'speed_over': 0.0007919388079986353, 'speed_under': 0.005045680005037406, 'bias': 30.0}
+cost:  106.74046266926977
+obj state [0.13 1.  ]
+obj state [-0.13  0.5 ]
+Task (0, 0, 0.5, 0.5, -0.5, -0.5)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (13, 1)
+JIT - Controller finish compile in 4.402s: u0 (1, 10, 2)
+Feature dist_lanes: -1.9711388138353116
+Feature dist_fences: 11.310000000000002
+Feature dist_obstacles: 0.15309554568529604
+Feature dist_trees: 0.15309554568529604
+Feature dist_debris: 0.15309554568529604
+Feature control: 3.060000000000003
+Feature control_throttle: 2.25
+Feature control_brake: 7.901634874955328e-16
+Feature control_turn: 0.8100000000000033
+Feature speed: 7.499999999999997
+Feature speed_over: 7.499999999999997
+Feature speed_under: 0.0
+Feature bias: 30.0
+input_dict: {'dist_lanes': -1.9711388138353116, 'dist_fences': 11.310000000000002, 'dist_obstacles': 0.15309554568529604, 'dist_trees': 0.15309554568529604, 'dist_debris': 0.15309554568529604, 'control': 3.060000000000003, 'control_throttle': 2.25, 'control_brake': 7.901634874955328e-16, 'control_turn': 0.8100000000000033, 'speed': 7.499999999999997, 'speed_over': 7.499999999999997, 'speed_under': 0.0, 'bias': 30.0}
+cost:  96.56834881698178
+heuristic num_vehicles
+running experiments:  ['Week9_01', 'Week9_02', 'Week9_03', 'Week9_04', 'Week10_01', 'Week8_02', 'Week8_03', 'Week10_02', 'Week8_01', 'Week8_04']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_12_01_15_58_47
+obj state [0.13 1.  ]
+Task (0, 0, 0.5, 0.5)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (13, 1)
+JIT - Controller finish compile in 3.754s: u0 (1, 10, 2)
+Feature dist_lanes: -74.80078397680786
+Feature dist_fences: 0.0
+Feature dist_obstacles: 0.12069845334493046
+Feature dist_trees: 0.12069845334493046
+Feature dist_debris: 0.12069845334493046
+Feature control: 0.40307451500047226
+Feature control_throttle: 0.2008665876646225
+Feature control_brake: 0.0
+Feature control_turn: 0.20201779157712768
+Feature speed: 0.09164630805369961
+Feature speed_over: 0.0
+Feature speed_under: 0.09164630805369961
+Feature bias: 30.0
+input_dict: {'dist_lanes': -74.80078397680786, 'dist_fences': 0.0, 'dist_obstacles': 0.12069845334493046, 'dist_trees': 0.12069845334493046, 'dist_debris': 0.12069845334493046, 'control': 0.40307451500047226, 'control_throttle': 0.2008665876646225, 'control_brake': 0.0, 'control_turn': 0.20201779157712768, 'speed': 0.09164630805369961, 'speed_over': 0.0, 'speed_under': 0.09164630805369961, 'bias': 30.0}
+cost:  -149.52795618064133
+Task (0, 0, 0.5, 0.5)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (13, 1)
+JIT - Controller finish compile in 3.784s: u0 (1, 10, 2)
+Feature dist_lanes: -2.4933892525089543
+Feature dist_fences: 11.310000000000002
+Feature dist_obstacles: 1.1895047486009045e-39
+Feature dist_trees: 1.1895047486009045e-39
+Feature dist_debris: 1.1895047486009045e-39
+Feature control: 3.060000000268926
+Feature control_throttle: 2.2500000000672316
+Feature control_brake: 1.5611518822868466e-28
+Feature control_turn: 0.8100000002689262
+Feature speed: 7.499999999999997
+Feature speed_over: 7.499999999999997
+Feature speed_under: 0.0
+Feature bias: 30.0
+input_dict: {'dist_lanes': -2.4933892525089543, 'dist_fences': 11.310000000000002, 'dist_obstacles': 1.1895047486009045e-39, 'dist_trees': 1.1895047486009045e-39, 'dist_debris': 1.1895047486009045e-39, 'control': 3.060000000268926, 'control_throttle': 2.2500000000672316, 'control_brake': 1.5611518822868466e-28, 'control_turn': 0.8100000002689262, 'speed': 7.499999999999997, 'speed_over': 7.499999999999997, 'speed_under': 0.0, 'bias': 30.0}
+cost:  188.42822617342924
+Task (0, 0, 0.5, 0.5)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (13, 1)
+JIT - Controller finish compile in 3.741s: u0 (1, 10, 2)
+Feature dist_lanes: -22.087640722954895
+Feature dist_fences: 4.034880824353976
+Feature dist_obstacles: 4.452011318944558
+Feature dist_trees: 4.452011318944558
+Feature dist_debris: 4.452011318944558
+Feature control: 1.957219742756054
+Feature control_throttle: 0.31426004836837956
+Feature control_brake: 0.0
+Feature control_turn: 1.4014921315660356
+Feature speed: 0.005837618812486101
+Feature speed_over: 0.0007919388082960514
+Feature speed_under: 0.00504568000419005
+Feature bias: 30.0
+input_dict: {'dist_lanes': -22.087640722954895, 'dist_fences': 4.034880824353976, 'dist_obstacles': 4.452011318944558, 'dist_trees': 4.452011318944558, 'dist_debris': 4.452011318944558, 'control': 1.957219742756054, 'control_throttle': 0.31426004836837956, 'control_brake': 0.0, 'control_turn': 1.4014921315660356, 'speed': 0.005837618812486101, 'speed_over': 0.0007919388082960514, 'speed_under': 0.00504568000419005, 'bias': 30.0}
+cost:  106.74046266979184
+obj state [0.13 1.  ]
+obj state [-0.13  0.5 ]
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week10_01-v0` instead of the unversioned environment `Week10_01`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week8_02-v0` instead of the unversioned environment `Week8_02`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week8_03-v0` instead of the unversioned environment `Week8_03`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week10_02-v0` instead of the unversioned environment `Week10_02`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week8_01-v0` instead of the unversioned environment `Week8_01`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week8_04-v0` instead of the unversioned environment `Week8_04`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+Task (0, 0, 0.5, 0.5, -0.5, -0.5)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (13, 1)
+JIT - Controller finish compile in 4.375s: u0 (1, 10, 2)
+Feature dist_lanes: -1.97113881383531
+Feature dist_fences: 11.310000000000002
+Feature dist_obstacles: 0.15309554568529604
+Feature dist_trees: 0.15309554568529604
+Feature dist_debris: 0.15309554568529604
+Feature control: 3.060000000000003
+Feature control_throttle: 2.25
+Feature control_brake: 7.901633086725108e-16
+Feature control_turn: 0.8100000000000033
+Feature speed: 7.499999999999997
+Feature speed_over: 7.499999999999997
+Feature speed_under: 0.0
+Feature bias: 30.0
+input_dict: {'dist_lanes': -1.97113881383531, 'dist_fences': 11.310000000000002, 'dist_obstacles': 0.15309554568529604, 'dist_trees': 0.15309554568529604, 'dist_debris': 0.15309554568529604, 'control': 3.060000000000003, 'control_throttle': 2.25, 'control_brake': 7.901633086725108e-16, 'control_turn': 0.8100000000000033, 'speed': 7.499999999999997, 'speed_over': 7.499999999999997, 'speed_under': 0.0, 'bias': 30.0}
+cost:  96.5683488169783
+Task (0, 0)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (11, 1)
+JIT - Controller finish compile in 3.479s: u0 (1, 10, 2)
+Feature dist_cars: 0.09638439901633383
+Feature dist_lanes: -19.55379028000488
+Feature dist_fences: 0.3948008440017976
+Feature control: 1.313895005070716
+Feature control_throttle: 0.27719316102260005
+Feature control_brake: 0.0
+Feature control_turn: 0.4337759112415423
+Feature speed: 0.009098526364857782
+Feature speed_over: 0.0
+Feature speed_under: 0.009098526364857782
+Feature bias: 30.0
+input_dict: {'dist_cars': 0.09638439901633383, 'dist_lanes': -19.55379028000488, 'dist_fences': 0.3948008440017976, 'control': 1.313895005070716, 'control_throttle': 0.27719316102260005, 'control_brake': 0.0, 'control_turn': 0.4337759112415423, 'speed': 0.009098526364857782, 'speed_over': 0.0, 'speed_under': 0.009098526364857782, 'bias': 30.0}
+cost:  47.10682862732802
+Task (0, 0)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (11, 1)
+JIT - Controller finish compile in 3.187s: u0 (1, 10, 2)
+Feature dist_cars: 0.0028633295712305737
+Feature dist_lanes: -1.7932227729788417
+Feature dist_fences: 11.290226092129982
+Feature control: 3.0601132771039685
+Feature control_throttle: 2.25
+Feature control_brake: 5.6638551963511676e-05
+Feature control_turn: 2.872193905892107
+Feature speed: 6.2163088935501225
+Feature speed_over: 6.2163088935501225
+Feature speed_under: 0.0
+Feature bias: 30.0
+input_dict: {'dist_cars': 0.0028633295712305737, 'dist_lanes': -1.7932227729788417, 'dist_fences': 11.290226092129982, 'control': 3.0601132771039685, 'control_throttle': 2.25, 'control_brake': 5.6638551963511676e-05, 'control_turn': 2.872193905892107, 'speed': 6.2163088935501225, 'speed_over': 6.2163088935501225, 'speed_under': 0.0, 'bias': 30.0}
+cost:  43.599195598698564
+results:  {'dist_cars': 0.0028633295712305737, 'dist_lanes': -1.7932227729788417, 'dist_fences': 11.290226092129982, 'control': 3.0601132771039685, 'control_throttle': 2.25, 'control_brake': 5.6638551963511676e-05, 'control_turn': 2.872193905892107, 'speed': 6.2163088935501225, 'speed_over': 6.2163088935501225, 'speed_under': 0.0, 'bias': 30.0, 'cost': 43.599195598698564, 'offtrack': 29, 'overspeed': 30, 'underspeed': 0, 'uncomfortable': 1, 'wronglane': 0, 'collision': 0}
+Task (0, 0)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (11, 1)
+JIT - Controller finish compile in 3.228s: u0 (1, 10, 2)
+Feature dist_cars: 0.006751434387973433
+Feature dist_lanes: -21.044503286410922
+Feature dist_fences: 0.1571031824426408
+Feature control: 1.2713406293268008
+Feature control_throttle: 0.2673860281355743
+Feature control_brake: 0.0
+Feature control_turn: 0.43521206507892923
+Feature speed: 0.013837932288323428
+Feature speed_over: 0.0
+Feature speed_under: 0.013837932288323428
+Feature bias: 30.0
+input_dict: {'dist_cars': 0.006751434387973433, 'dist_lanes': -21.044503286410922, 'dist_fences': 0.1571031824426408, 'control': 1.2713406293268008, 'control_throttle': 0.2673860281355743, 'control_brake': 0.0, 'control_turn': 0.43521206507892923, 'speed': 0.013837932288323428, 'speed_over': 0.0, 'speed_under': 0.013837932288323428, 'bias': 30.0}
+cost:  43.48769952144933
+results:  {'dist_cars': 0.006751434387973433, 'dist_lanes': -21.044503286410922, 'dist_fences': 0.1571031824426408, 'control': 1.2713406293268008, 'control_throttle': 0.2673860281355743, 'control_brake': 0.0, 'control_turn': 0.43521206507892923, 'speed': 0.013837932288323428, 'speed_over': 0.0, 'speed_under': 0.013837932288323428, 'bias': 30.0, 'cost': 43.48769952144933, 'offtrack': 3, 'overspeed': 0, 'underspeed': 0, 'uncomfortable': 1, 'wronglane': 27, 'collision': 0}
+Task (0, 0)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (11, 1)
+JIT - Controller finish compile in 3.953s: u0 (1, 10, 2)
+Feature dist_cars: 0.06277782292068
+Feature dist_lanes: -1.7924166841986584
+Feature dist_fences: 11.310000000000002
+Feature control: 3.06000000000001
+Feature control_throttle: 2.250000000000003
+Feature control_brake: 9.913886223939721e-19
+Feature control_turn: 0.8100000000000103
+Feature speed: 7.499999999999997
+Feature speed_over: 7.499999999999997
+Feature speed_under: 0.0
+Feature bias: 30.0
+input_dict: {'dist_cars': 0.06277782292068, 'dist_lanes': -1.7924166841986584, 'dist_fences': 11.310000000000002, 'control': 3.06000000000001, 'control_throttle': 2.250000000000003, 'control_brake': 9.913886223939721e-19, 'control_turn': 0.8100000000000103, 'speed': 7.499999999999997, 'speed_over': 7.499999999999997, 'speed_under': 0.0, 'bias': 30.0}
+cost:  43.49186645291762
+Task (0, 0)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (11, 1)
+JIT - Controller finish compile in 4.041s: u0 (1, 10, 2)
+Feature dist_cars: 32.3127230912751
+Feature dist_lanes: -20.721681602028795
+Feature dist_fences: 0.151863503685742
+Feature control: 1.5182100406373076
+Feature control_throttle: 0.27361865039539335
+Feature control_brake: 0.0
+Feature control_turn: 0.5265749862155427
+Feature speed: 0.010110844674594744
+Feature speed_over: 0.0
+Feature speed_under: 0.010110844674594744
+Feature bias: 30.0
+input_dict: {'dist_cars': 32.3127230912751, 'dist_lanes': -20.721681602028795, 'dist_fences': 0.151863503685742, 'control': 1.5182100406373076, 'control_throttle': 0.27361865039539335, 'control_brake': 0.0, 'control_turn': 0.5265749862155427, 'speed': 0.010110844674594744, 'speed_over': 0.0, 'speed_under': 0.010110844674594744, 'bias': 30.0}
+cost:  45.609540522533216
+results:  {'dist_cars': 32.3127230912751, 'dist_lanes': -20.721681602028795, 'dist_fences': 0.151863503685742, 'control': 1.5182100406373076, 'control_throttle': 0.27361865039539335, 'control_brake': 0.0, 'control_turn': 0.5265749862155427, 'speed': 0.010110844674594744, 'speed_over': 0.0, 'speed_under': 0.010110844674594744, 'bias': 30.0, 'cost': 45.609540522533216, 'offtrack': 3, 'overspeed': 0, 'underspeed': 0, 'uncomfortable': 1, 'wronglane': 27, 'collision': 1}
+Task (0, 0)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (11, 1)
+JIT - Controller finish compile in 4.109s: u0 (1, 10, 2)
+Feature dist_cars: 0.0028633464238557375
+Feature dist_lanes: -1.792416788758552
+Feature dist_fences: 11.310000000000002
+Feature control: 3.0600002036538916
+Feature control_throttle: 2.2500000000000004
+Feature control_brake: 1.0182693448088074e-07
+Feature control_turn: 0.001523303789660136
+Feature speed: 7.499999999999997
+Feature speed_over: 7.499999999999997
+Feature speed_under: 0.0
+Feature bias: 30.0
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week8_01-v0` instead of the unversioned environment `Week8_01`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week8_02-v0` instead of the unversioned environment `Week8_02`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week8_03-v0` instead of the unversioned environment `Week8_03`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week8_04-v0` instead of the unversioned environment `Week8_04`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week9_01-v0` instead of the unversioned environment `Week9_01`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week9_02-v0` instead of the unversioned environment `Week9_02`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+input_dict: {'dist_cars': 0.0028633464238557375, 'dist_lanes': -1.792416788758552, 'dist_fences': 11.310000000000002, 'control': 3.0600002036538916, 'control_throttle': 2.2500000000000004, 'control_brake': 1.0182693448088074e-07, 'control_turn': 0.001523303789660136, 'speed': 7.499999999999997, 'speed_over': 7.499999999999997, 'speed_under': 0.0, 'bias': 30.0}
+cost:  43.6735431101788
+results:  {'dist_cars': 0.0028633464238557375, 'dist_lanes': -1.792416788758552, 'dist_fences': 11.310000000000002, 'control': 3.0600002036538916, 'control_throttle': 2.2500000000000004, 'control_brake': 1.0182693448088074e-07, 'control_turn': 0.001523303789660136, 'speed': 7.499999999999997, 'speed_over': 7.499999999999997, 'speed_under': 0.0, 'bias': 30.0, 'cost': 43.6735431101788, 'offtrack': 29, 'overspeed': 30, 'underspeed': 0, 'uncomfortable': 1, 'wronglane': 0, 'collision': 0}
+heuristic num_auto_vehicles
+running experiments:  ['Week8_01', 'Week8_02', 'Week8_03', 'Week8_04', 'Week9_01', 'Week9_02', 'Week9_03', 'Week9_04', 'Week10_01', 'Week10_02']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_12_01_16_01_24
+Task (0, 0)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (11, 1)
+JIT - Controller finish compile in 4.162s: u0 (1, 10, 2)
+Feature dist_cars: 7.864542380644893
+Feature dist_lanes: -74.06360039454898
+Feature dist_fences: 0.0
+Feature control: 5.505489074268225
+Feature control_throttle: 0.00038513291470968793
+Feature control_brake: 2.6803144079383796
+Feature control_turn: 2.3115693962655013
+Feature speed: 18.54921659411609
+Feature speed_over: 0.0
+Feature speed_under: 7.400974645433871
+Feature bias: 30.0
+input_dict: {'dist_cars': 7.864542380644893, 'dist_lanes': -74.06360039454898, 'dist_fences': 0.0, 'control': 5.505489074268225, 'control_throttle': 0.00038513291470968793, 'control_brake': 2.6803144079383796, 'control_turn': 2.3115693962655013, 'speed': 18.54921659411609, 'speed_over': 0.0, 'speed_under': 7.400974645433871, 'bias': 30.0}
+cost:  -144.93527598419502
+results:  {'dist_cars': 7.864542380644893, 'dist_lanes': -74.06360039454898, 'dist_fences': 0.0, 'control': 5.505489074268225, 'control_throttle': 0.00038513291470968793, 'control_brake': 2.6803144079383796, 'control_turn': 2.3115693962655013, 'speed': 18.54921659411609, 'speed_over': 0.0, 'speed_under': 7.400974645433871, 'bias': 30.0, 'cost': -144.93527598419502, 'offtrack': 0, 'overspeed': 0, 'underspeed': 0, 'uncomfortable': 2, 'wronglane': 0, 'collision': 0}
+Task (0, 0)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (11, 1)
+JIT - Controller finish compile in 3.316s: u0 (1, 10, 2)
+Feature dist_cars: 0.0028633295712305737
+Feature dist_lanes: -1.8965953596310385
+Feature dist_fences: 11.047116670626547
+Feature control: 3.4674919058481044
+Feature control_throttle: 2.373603015358656
+Feature control_brake: 0.08014293756539319
+Feature control_turn: 53.922646397063666
+Feature speed: 0.17469087317438783
+Feature speed_over: 0.17353028995240308
+Feature speed_under: 0.0011605832219847305
+Feature bias: 30.0
+input_dict: {'dist_cars': 0.0028633295712305737, 'dist_lanes': -1.8965953596310385, 'dist_fences': 11.047116670626547, 'control': 3.4674919058481044, 'control_throttle': 2.373603015358656, 'control_brake': 0.08014293756539319, 'control_turn': 53.922646397063666, 'speed': 0.17469087317438783, 'speed_over': 0.17353028995240308, 'speed_under': 0.0011605832219847305, 'bias': 30.0}
+cost:  162.82181724891905
+results:  {'dist_cars': 0.0028633295712305737, 'dist_lanes': -1.8965953596310385, 'dist_fences': 11.047116670626547, 'control': 3.4674919058481044, 'control_throttle': 2.373603015358656, 'control_brake': 0.08014293756539319, 'control_turn': 53.922646397063666, 'speed': 0.17469087317438783, 'speed_over': 0.17353028995240308, 'speed_under': 0.0011605832219847305, 'bias': 30.0, 'cost': 162.82181724891905, 'offtrack': 29, 'overspeed': 4, 'underspeed': 0, 'uncomfortable': 1, 'wronglane': 0, 'collision': 0}
+Task (0, 0)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (11, 1)
+JIT - Controller finish compile in 3.358s: u0 (1, 10, 2)
+Feature dist_cars: 0.006489857101363864
+Feature dist_lanes: -19.905249690115646
+Feature dist_fences: 0.3806622302429552
+Feature control: 0.8725234393142061
+Feature control_throttle: 0.03992468262399279
+Feature control_brake: 0.0
+Feature control_turn: 0.27296235299755006
+Feature speed: 1.6903398707547095
+Feature speed_over: 0.0
+Feature speed_under: 1.6903398707547095
+Feature bias: 30.0
+input_dict: {'dist_cars': 0.006489857101363864, 'dist_lanes': -19.905249690115646, 'dist_fences': 0.3806622302429552, 'control': 0.8725234393142061, 'control_throttle': 0.03992468262399279, 'control_brake': 0.0, 'control_turn': 0.27296235299755006, 'speed': 1.6903398707547095, 'speed_over': 0.0, 'speed_under': 1.6903398707547095, 'bias': 30.0}
+cost:  45.27819775823345
+results:  {'dist_cars': 0.006489857101363864, 'dist_lanes': -19.905249690115646, 'dist_fences': 0.3806622302429552, 'control': 0.8725234393142061, 'control_throttle': 0.03992468262399279, 'control_brake': 0.0, 'control_turn': 0.27296235299755006, 'speed': 1.6903398707547095, 'speed_over': 0.0, 'speed_under': 1.6903398707547095, 'bias': 30.0, 'cost': 45.27819775823345, 'offtrack': 11, 'overspeed': 0, 'underspeed': 0, 'uncomfortable': 1, 'wronglane': 26, 'collision': 0}
+Task (0, 0)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (11, 1)
+JIT - Controller finish compile in 4.174s: u0 (1, 10, 2)
+Feature dist_cars: 0.0028633464238557375
+Feature dist_lanes: -1.8532311297941828
+Feature dist_fences: 11.084896617411683
+Feature control: 3.5314036447345085
+Feature control_throttle: 2.3499294414752474
+Feature control_brake: 0.13577238089199684
+Feature control_turn: 46.57961206490406
+Feature speed: 0.43790357580578604
+Feature speed_over: 0.4333592728761193
+Feature speed_under: 0.004544302929666812
+Feature bias: 30.0
+input_dict: {'dist_cars': 0.0028633464238557375, 'dist_lanes': -1.8532311297941828, 'dist_fences': 11.084896617411683, 'control': 3.5314036447345085, 'control_throttle': 2.3499294414752474, 'control_brake': 0.13577238089199684, 'control_turn': 46.57961206490406, 'speed': 0.43790357580578604, 'speed_over': 0.4333592728761193, 'speed_under': 0.004544302929666812, 'bias': 30.0}
+cost:  44.930086750595024
+results:  {'dist_cars': 0.0028633464238557375, 'dist_lanes': -1.8532311297941828, 'dist_fences': 11.084896617411683, 'control': 3.5314036447345085, 'control_throttle': 2.3499294414752474, 'control_brake': 0.13577238089199684, 'control_turn': 46.57961206490406, 'speed': 0.43790357580578604, 'speed_over': 0.4333592728761193, 'speed_under': 0.004544302929666812, 'bias': 30.0, 'cost': 44.930086750595024, 'offtrack': 29, 'overspeed': 6, 'underspeed': 0, 'uncomfortable': 1, 'wronglane': 0, 'collision': 0}
+obj state [0.13 1.  ]
+Task (0, 0, 0.5, 0.5)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (13, 1)
+JIT - Controller finish compile in 3.812s: u0 (1, 10, 2)
+Feature dist_lanes: -27.983189790108327
+Feature dist_fences: 3.1170066246312134
+Feature dist_obstacles: 0.0024242753465317335
+Feature dist_trees: 0.0024242753465317335
+Feature dist_debris: 0.0024242753465317335
+Feature control: 1.125027774409498
+Feature control_throttle: 0.09407608481306126
+Feature control_brake: 0.0
+Feature control_turn: 0.8139250848382895
+Feature speed: 0.9692467992663061
+Feature speed_over: 0.0
+Feature speed_under: 0.9692467992663061
+Feature bias: 30.0
+input_dict: {'dist_lanes': -27.983189790108327, 'dist_fences': 3.1170066246312134, 'dist_obstacles': 0.0024242753465317335, 'dist_trees': 0.0024242753465317335, 'dist_debris': 0.0024242753465317335, 'control': 1.125027774409498, 'control_throttle': 0.09407608481306126, 'control_brake': 0.0, 'control_turn': 0.8139250848382895, 'speed': 0.9692467992663061, 'speed_over': 0.0, 'speed_under': 0.9692467992663061, 'bias': 30.0}
+cost:  90.80886329707545
+Task (0, 0, 0.5, 0.5)
+JIT - Controller <>
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week9_03-v0` instead of the unversioned environment `Week9_03`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week9_04-v0` instead of the unversioned environment `Week9_04`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week10_01-v0` instead of the unversioned environment `Week10_01`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week10_02-v0` instead of the unversioned environment `Week10_02`.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:127: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(f"Box bound precision lowered by casting to {self.dtype}")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:174: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed a `seed` instead of using `Env.seed` for resetting the environment random number generator.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:187: UserWarning: [33mWARN: Future gym versions will require that `Env.reset` can be passed `options` to allow the environment initialisation to be passed additional information.[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:195: UserWarning: [33mWARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'NoneType'>`[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:238: UserWarning: [33mWARN: Expects `truncated` signal to be a boolean, actual type: <class 'NoneType'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:137: UserWarning: [33mWARN: The obs returned by the `step()` method was expecting a numpy array, actual type: <class 'jaxlib.xla_extension.Array'>[0m
+  logger.warn(
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/spaces/box.py:227: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  logger.warn("Casting input x to numpy array.")
+/home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/utils/passive_env_checker.py:165: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (13, 1)
+JIT - Controller finish compile in 3.852s: u0 (1, 10, 2)
+Feature dist_lanes: -2.4933892525252035
+Feature dist_fences: 11.310000000000002
+Feature dist_obstacles: 1.1895047486009045e-39
+Feature dist_trees: 1.1895047486009045e-39
+Feature dist_debris: 1.1895047486009045e-39
+Feature control: 3.060000000095576
+Feature control_throttle: 2.25
+Feature control_brake: 2.3894147808881898e-11
+Feature control_turn: 0.8100000000955764
+Feature speed: 7.499999999999997
+Feature speed_over: 7.499999999999997
+Feature speed_under: 0.0
+Feature bias: 30.0
+input_dict: {'dist_lanes': -2.4933892525252035, 'dist_fences': 11.310000000000002, 'dist_obstacles': 1.1895047486009045e-39, 'dist_trees': 1.1895047486009045e-39, 'dist_debris': 1.1895047486009045e-39, 'control': 3.060000000095576, 'control_throttle': 2.25, 'control_brake': 2.3894147808881898e-11, 'control_turn': 0.8100000000955764, 'speed': 7.499999999999997, 'speed_over': 7.499999999999997, 'speed_under': 0.0, 'bias': 30.0}
+cost:  115.738265582906
+Task (0, 0, 0.5, 0.5)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (13, 1)
+JIT - Controller finish compile in 3.810s: u0 (1, 10, 2)
+Feature dist_lanes: -22.08764072276899
+Feature dist_fences: 4.034880824382898
+Feature dist_obstacles: 4.452011318771078
+Feature dist_trees: 4.452011318771078
+Feature dist_debris: 4.452011318771078
+Feature control: 1.9572197427996605
+Feature control_throttle: 0.3142600483536556
+Feature control_brake: 0.0
+Feature control_turn: 1.4014921315653182
+Feature speed: 0.005837618812942638
+Feature speed_over: 0.0007919388081121107
+Feature speed_under: 0.005045680004830527
+Feature bias: 30.0
+input_dict: {'dist_lanes': -22.08764072276899, 'dist_fences': 4.034880824382898, 'dist_obstacles': 4.452011318771078, 'dist_trees': 4.452011318771078, 'dist_debris': 4.452011318771078, 'control': 1.9572197427996605, 'control_throttle': 0.3142600483536556, 'control_brake': 0.0, 'control_turn': 1.4014921315653182, 'speed': 0.005837618812942638, 'speed_over': 0.0007919388081121107, 'speed_under': 0.005045680004830527, 'bias': 30.0}
+cost:  106.74046266981189
+obj state [0.13 1.  ]
+obj state [-0.13  0.5 ]
+Task (0, 0, 0.5, 0.5, -0.5, -0.5)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (13, 1)
+JIT - Controller finish compile in 4.417s: u0 (1, 10, 2)
+Feature dist_lanes: -1.9711388138353119
+Feature dist_fences: 11.310000000000002
+Feature dist_obstacles: 0.15309554568529604
+Feature dist_trees: 0.15309554568529604
+Feature dist_debris: 0.15309554568529604
+Feature control: 3.060000000000003
+Feature control_throttle: 2.25
+Feature control_brake: 7.901635162135222e-16
+Feature control_turn: 0.8100000000000033
+Feature speed: 7.499999999999997
+Feature speed_over: 7.499999999999997
+Feature speed_under: 0.0
+Feature bias: 30.0
+input_dict: {'dist_lanes': -1.9711388138353119, 'dist_fences': 11.310000000000002, 'dist_obstacles': 0.15309554568529604, 'dist_trees': 0.15309554568529604, 'dist_debris': 0.15309554568529604, 'control': 3.060000000000003, 'control_throttle': 2.25, 'control_brake': 7.901635162135222e-16, 'control_turn': 0.8100000000000033, 'speed': 7.499999999999997, 'speed_over': 7.499999999999997, 'speed_under': 0.0, 'bias': 30.0}
+cost:  96.56834881702277
+Task (0, 0)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (11, 1)
+JIT - Controller finish compile in 3.515s: u0 (1, 10, 2)
+Feature dist_cars: 0.09638439901633392
+Feature dist_lanes: -19.553790280004883
+Feature dist_fences: 0.39480084400180127
+Feature control: 1.3138950050706997
+Feature control_throttle: 0.27719316102259905
+Feature control_brake: 0.0
+Feature control_turn: 0.4337759112415391
+Feature speed: 0.009098526364857876
+Feature speed_over: 0.0
+Feature speed_under: 0.009098526364857876
+Feature bias: 30.0
+input_dict: {'dist_cars': 0.09638439901633392, 'dist_lanes': -19.553790280004883, 'dist_fences': 0.39480084400180127, 'control': 1.3138950050706997, 'control_throttle': 0.27719316102259905, 'control_brake': 0.0, 'control_turn': 0.4337759112415391, 'speed': 0.009098526364857876, 'speed_over': 0.0, 'speed_under': 0.009098526364857876, 'bias': 30.0}
+cost:  47.10682862732806
+Task (0, 0)
+JIT - Controller <>
+JIT - Controller first compile: u0 (1, 10, 2)
+JIT - Controller first compile: weights (11, 1)
+JIT - Controller finish compile in 4.005s: u0 (1, 10, 2)
+Feature dist_cars: 0.06282568346168264
+Feature dist_lanes: -1.7932231149371505
+Feature dist_fences: 11.29020916602788
+Feature control: 3.0601132071713226
+Feature control_throttle: 2.25
+Feature control_brake: 5.660358564100709e-05
+Feature control_turn: 2.8781516415289126
+Feature speed: 6.215661746477888
+Feature speed_over: 6.215661746477888
+Feature speed_under: 0.0
+Feature bias: 30.0
+input_dict: {'dist_cars': 0.06282568346168264, 'dist_lanes': -1.7932231149371505, 'dist_fences': 11.29020916602788, 'control': 3.0601132071713226, 'control_throttle': 2.25, 'control_brake': 5.660358564100709e-05, 'control_turn': 2.8781516415289126, 'speed': 6.215661746477888, 'speed_over': 6.215661746477888, 'speed_under': 0.0, 'bias': 30.0}
+cost:  43.604969058314694

@@ -229,7 +229,6 @@ class FixSpeedMotorcycle(FixSpeedCar):
         state = self._state
         self._sprite.x, self._sprite.y = state[0, 0], state[0, 1]
 
-
 class OptimalControlCar(Car):
     def __init__(self, env, init_state, horizon=10, color="yellow"):
         """Autonomous car with optimal controller.

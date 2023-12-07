@@ -1,0 +1,22 @@
+{
+  "dist_lanes": -22.087640672337013,
+  "dist_fences": 4.034880833764953,
+  "dist_obstacles": 1.19565827362872e-39,
+  "dist_trees": 1.19565827362872e-39,
+  "dist_debris": 1.19565827362872e-39,
+  "control": 1.9572197487044762,
+  "control_throttle": 0.3142600479928481,
+  "control_brake": 0.0,
+  "control_turn": 1.4014921349915717,
+  "speed": 0.0058376188539347755,
+  "speed_over": 0.0007919388157231579,
+  "speed_under": 0.005045680038211618,
+  "bias": 30.0,
+  "cost": 106.74046283549939,
+  "offtrack": 25,
+  "overspeed": 0,
+  "underspeed": 0,
+  "uncomfortable": 2,
+  "wronglane": 0,
+  "crash_objects": 0
+}

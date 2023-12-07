@@ -1,0 +1,30 @@
+heuristic num_obstacles
+running experiments:  ['Week8_01', 'Week8_02', 'Week8_03', 'Week8_04', 'Week10_01', 'Week10_02', 'Week9_01', 'Week9_02', 'Week9_03', 'Week9_04']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_11_30_13_02_17
+
+heuristic num_obstacles
+running experiments:  ['Week8_01', 'Week8_02', 'Week8_03', 'Week8_04', 'Week10_01', 'Week10_02', 'Week9_01', 'Week9_02', 'Week9_03', 'Week9_04']
+starter:  experiments/uniform.json
+saved to folder:  experiments/2023_11_30_13_04_56
+
+
+heuristic num_vehicles
+running experiments:  ['Week9_01', 'Week9_02', 'Week9_03', 'Week9_04', 'Week10_01', 'Week8_02', 'Week8_03', 'Week10_02', 'Week8_01', 'Week8_04']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_11_30_13_07_35
+
+heuristic num_vehicles
+running experiments:  ['Week9_01', 'Week9_02', 'Week9_03', 'Week9_04', 'Week10_01', 'Week8_02', 'Week8_03', 'Week10_02', 'Week8_01', 'Week8_04']
+starter:  experiments/uniform.json
+saved to folder:  experiments/2023_11_30_13_10_14
+
+heuristic num_auto_vehicles
+running experiments:  ['Week8_01', 'Week8_02', 'Week8_03', 'Week8_04', 'Week9_01', 'Week9_02', 'Week9_03', 'Week9_04', 'Week10_01', 'Week10_02']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_11_30_13_12_53
+
+heuristic num_auto_vehicles
+running experiments:  ['Week8_01', 'Week8_02', 'Week8_03', 'Week8_04', 'Week9_01', 'Week9_02', 'Week9_03', 'Week9_04', 'Week10_01', 'Week10_02']
+starter:  experiments/uniform.json
+saved to folder:  experiments/2023_11_30_13_15_33

@@ -465,8 +465,11 @@ class DriveWorld(RenderEnv):
         if len(action.shape) == 1:
             action = onp.array([action])
             use_batch = False
-        for car in self._cars:
-            car.control(self.dt)
+        for vehicle in self._cars:
+            if isinstance(vehicle, car.OptimalControlCar):
+                vehicle.control(action, self.dt)
+            else:    
+                vehicle.control(self.dt)
         self.main_car.control(action, self.dt)
         # compute all raw feats
         # compute all nlr feats

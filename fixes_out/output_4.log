@@ -1,0 +1,78 @@
+running experiments:  ['Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_12_01_15_13_42
+cost:  -149.52795618064133
+cost:  188.42850958943606
+cost:  106.74046632245059
+cost:  106.74046659206059
+cost:  106.74046658845357
+cost:  106.74046662369756
+cost:  106.74046662322604
+cost:  106.74046656492227
+cost:  106.74046656570228
+cost:  106.74046660627695
+running experiments:  ['Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_12_01_15_16_15
+cost:  -149.55338447056792
+cost:  188.49915540146387
+cost:  106.74046267305842
+cost:  106.74046602075671
+cost:  106.7404659953743
+cost:  106.74046274460092
+cost:  106.7404627692519
+cost:  106.74047892070934
+cost:  106.74047879574856
+cost:  106.74046270403971
+running experiments:  ['Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_12_01_15_18_53
+cost:  -146.92316043592524
+cost:  238.79250857780167
+cost:  109.90463617377452
+cost:  109.90463487603428
+cost:  109.90463488872379
+cost:  109.90463488864313
+cost:  109.90463488864393
+cost:  109.90463488864387
+cost:  109.9046348886439
+cost:  109.9046348886439
+running experiments:  ['Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_12_01_15_21_31
+cost:  -145.91106445494466
+cost:  175.49038032470008
+cost:  91.43320936046672
+cost:  89.53113825124163
+cost:  88.76558112766563
+cost:  88.76388768118115
+cost:  88.76395575086919
+cost:  88.76395514249187
+cost:  88.76395442193429
+cost:  88.76395438690402
+running experiments:  ['Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_12_01_15_24_19
+cost:  -145.9068747722437
+cost:  150.78844227878486
+cost:  44.82516759758669
+cost:  44.72845388134854
+cost:  44.548636879827605
+cost:  44.45200769713721
+cost:  44.27085296311833
+cost:  45.83837437089571
+cost:  43.487565902215884
+cost:  43.48756593662941
+running experiments:  ['Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_12_01_15_26_52
+cost:  -145.38542319874608
+cost:  153.67062317635538
+cost:  44.18787993102426
+cost:  45.325145425434215
+cost:  43.48817974700971
+cost:  43.48817986669789
+cost:  43.486616297747034
+cost:  43.48661623702957
+cost:  43.486616235926796
+cost:  43.48661623592679

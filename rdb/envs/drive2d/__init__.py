@@ -10,7 +10,7 @@ register(
 
 
 # Drive world
-from .worlds import week3, week4, week5, week6, week7, week8, week9
+from .worlds import week3, week4, week5, week6, week7, week8, week9, week10
 
 
 def register_key_class(key, cls):
@@ -58,4 +58,6 @@ for k, c in week8.__dict__.items():
 for k, c in week9.__dict__.items():
     if "Week9_" in k:
         register_key_class(k, c)
-
+for k, c in week10.__dict__.items():
+    if "Week10_" in k:
+        register_key_class(k, c)

@@ -1,0 +1,154 @@
+running experiments:  ['Week8_01', 'Week8_02', 'Week8_03', 'Week8_04', 'Week9_01', 'Week9_02', 'Week9_03', 'Week9_04', 'Week10_01', 'Week10_02']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_11_29_18_52_22
+cost:  -144.93527598419502
+cost:  162.82181724891905
+cost:  45.27819775823345
+cost:  44.930086750595024
+running experiments:  ['Week8_01', 'Week8_02', 'Week8_03', 'Week8_04', 'Week9_01', 'Week9_02', 'Week9_03', 'Week9_04', 'Week10_01', 'Week10_02']
+starter:  experiments/uniform.json
+saved to folder:  experiments/2023_11_29_18_55_02
+cost:  -4.095029273104535
+cost:  152.07943874336954
+cost:  45.20276254680569
+cost:  44.91180576798501
+running experiments:  ['Week8_01', 'Week8_01', 'Week8_01', 'Week8_01', 'Week8_01', 'Week8_01', 'Week8_01', 'Week8_01', 'Week8_01', 'Week8_01']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_11_29_18_57_41
+cost:  -144.93527598419502
+cost:  224.34499698826286
+cost:  116.12806308486472
+cost:  114.19170176331008
+cost:  113.75763747585201
+cost:  111.81679647749102
+cost:  111.099586652205
+cost:  110.72436829533956
+cost:  110.69920646259497
+cost:  110.66202542118783
+running experiments:  ['Week8_01', 'Week8_01', 'Week8_01', 'Week8_01', 'Week8_01', 'Week8_01', 'Week8_01', 'Week8_01', 'Week8_01', 'Week8_01']
+starter:  experiments/uniform.json
+saved to folder:  experiments/2023_11_29_19_00_27
+cost:  -4.095029273104535
+cost:  236.706619180716
+cost:  116.6171757670639
+cost:  114.20485917800407
+cost:  113.8635651648037
+cost:  111.74902783849686
+cost:  111.07704898978255
+cost:  110.71814697956567
+cost:  110.69097116928914
+cost:  110.66268630982603
+running experiments:  ['Week8_02', 'Week8_02', 'Week8_02', 'Week8_02', 'Week8_02', 'Week8_02', 'Week8_02', 'Week8_02', 'Week8_02', 'Week8_02']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_11_29_19_03_13
+cost:  -147.14265248638534
+cost:  151.47551113423
+cost:  44.81453141997934
+cost:  44.71891107923895
+cost:  44.539575524689184
+cost:  44.442697330941975
+cost:  44.26164736699792
+cost:  45.82389099468218
+cost:  43.485075589452656
+cost:  43.485077962848415
+running experiments:  ['Week8_02', 'Week8_02', 'Week8_02', 'Week8_02', 'Week8_02', 'Week8_02', 'Week8_02', 'Week8_02', 'Week8_02', 'Week8_02']
+starter:  experiments/uniform.json
+saved to folder:  experiments/2023_11_29_19_05_44
+cost:  -6.893282337461438
+cost:  130.3535727209161
+cost:  43.48507587655365
+cost:  43.485077965431024
+cost:  43.483949320721074
+cost:  43.48394929767392
+cost:  43.48394929754933
+cost:  43.48394929754931
+cost:  43.483949297549344
+cost:  43.48394929754932
+running experiments:  ['Week8_03', 'Week8_03', 'Week8_03', 'Week8_03', 'Week8_03', 'Week8_03', 'Week8_03', 'Week8_03', 'Week8_03', 'Week8_03']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_11_29_19_08_14
+cost:  -147.14265248638534
+cost:  151.47551113423
+cost:  44.81453141997934
+cost:  44.71891107923895
+cost:  44.539575524689184
+cost:  44.442697330941975
+cost:  44.26164736699792
+cost:  45.82389099468218
+cost:  43.485075589452656
+cost:  43.485077962848415
+running experiments:  ['Week8_03', 'Week8_03', 'Week8_03', 'Week8_03', 'Week8_03', 'Week8_03', 'Week8_03', 'Week8_03', 'Week8_03', 'Week8_03']
+starter:  experiments/uniform.json
+saved to folder:  experiments/2023_11_29_19_10_45
+cost:  -6.893282337461438
+cost:  130.3535727209161
+cost:  43.48507587655365
+cost:  43.485077965431024
+cost:  43.483949320721074
+cost:  43.48394929767392
+cost:  43.48394929754933
+cost:  43.48394929754931
+cost:  43.483949297549344
+cost:  43.48394929754932
+running experiments:  ['Week8_04', 'Week8_04', 'Week8_04', 'Week8_04', 'Week8_04', 'Week8_04', 'Week8_04', 'Week8_04', 'Week8_04', 'Week8_04']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_11_29_19_13_14
+cost:  -143.39257096730972
+cost:  163.33899431968433
+cost:  44.76162485863175
+cost:  44.5912149343812
+cost:  44.43419312149142
+cost:  44.34138023692007
+cost:  44.11704783468701
+cost:  45.035905813970714
+cost:  43.508461506501206
+cost:  43.48615065120064
+running experiments:  ['Week8_04', 'Week8_04', 'Week8_04', 'Week8_04', 'Week8_04', 'Week8_04', 'Week8_04', 'Week8_04', 'Week8_04', 'Week8_04']
+starter:  experiments/uniform.json
+saved to folder:  experiments/2023_11_29_19_16_02
+cost:  /home/sashrika/miniconda3/envs/rdb/lib/python3.9/site-packages/gym/envs/registration.py:563: UserWarning: [33mWARN: Using the latest versioned environment `Week8_04-v0` instead of the unversioned environment `Week8_04`.[0m
+cost:  151.50286122638636
+cost:  44.65354877627682
+cost:  43.590997036845756
+cost:  43.482703203831264
+cost:  43.48270442919501
+cost:  43.482704430037316
+cost:  43.482704430037955
+cost:  43.482704430037984
+cost:  43.48270443003799
+running experiments:  ['Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_11_29_19_18_49
+running experiments:  ['Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01', 'Week9_01']
+starter:  experiments/uniform.json
+saved to folder:  experiments/2023_11_29_19_21_23
+running experiments:  ['Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_11_29_19_23_58
+running experiments:  ['Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02', 'Week9_02']
+starter:  experiments/uniform.json
+saved to folder:  experiments/2023_11_29_19_26_39
+running experiments:  ['Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_11_29_19_29_20
+running experiments:  ['Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03', 'Week9_03']
+starter:  experiments/uniform.json
+saved to folder:  experiments/2023_11_29_19_32_00
+running experiments:  ['Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_11_29_19_34_40
+running experiments:  ['Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04', 'Week9_04']
+starter:  experiments/uniform.json
+saved to folder:  experiments/2023_11_29_19_37_30
+running experiments:  ['Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_11_29_19_40_20
+running experiments:  ['Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01', 'Week10_01']
+starter:  experiments/uniform.json
+saved to folder:  experiments/2023_11_29_19_42_55
+running experiments:  ['Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02']
+starter:  experiments/standard.json
+saved to folder:  experiments/2023_11_29_19_45_30
+running experiments:  ['Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02', 'Week10_02']
+starter:  experiments/uniform.json
+saved to folder:  experiments/2023_11_29_19_48_13

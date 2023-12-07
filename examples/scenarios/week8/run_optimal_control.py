@@ -16,66 +16,84 @@ from rdb.visualize.preprocess import normalize_features
 from rdb.infer.dictlist import *
 from PIL import Image
 
-DUMMY_ACTION = False
-DRAW_HEAT = False
-REPLAN = True
-MAKE_MP4 = True
-ENGINE = "scipy"
-METHOD = "lbfgs"
-ENV_NAME = "Week8_03"
-TASK = (0, 0)
+from utils import format_weights_dict
 
-env = gym.make(ENV_NAME)
-env.reset()
-main_car = env.main_car
-horizon = 10
-T = 30
-fname = f"{ENV_NAME}_04"
-with open(f"../weights/{fname.lower()}.json") as json_file:
-    weights = json.load(json_file)
+def run_opt_week8(ENV_NAME, TASK, folder, weights_file): # ex: envname "Week8_01"
+    DUMMY_ACTION = False
+    DRAW_HEAT = False
+    REPLAN = True
+    MAKE_MP4 = True
+    ENGINE = "scipy"
+    METHOD = "lbfgs"
 
-if TASK == "RANDOM":
-    num_tasks = len(env.all_tasks)
-    print(f"Total tasks {num_tasks}")
-    TASK = env.all_tasks[onp.random.randint(0, num_tasks)]
-env.set_task(TASK)
-env.reset()
+    env = gym.make(ENV_NAME)
+    env.reset()
+    main_car = env.main_car
+    horizon = 10
+    T = 30
+    fname = f"{ENV_NAME}_01"
 
-print(f"Task {TASK}")
+    with open(weights_file) as json_file:
+        weights = json.load(json_file)
 
-if not REPLAN:
-    T = horizon
-optimizer, runner = build_mpc(
-    env,
-    main_car.cost_runtime,
-    horizon,
-    env.dt,
-    replan=REPLAN,
-    T=T,
-    engine=ENGINE,
-    method=METHOD,
-)
-state = copy.deepcopy(env.state)
-t1 = time()
-w_list = DictList([weights])
-w_list = w_list.prepare(env.features_keys)
-actions = optimizer(state, weights=None, weights_arr=w_list.numpy_array())
-traj, cost, info = runner(state, actions, weights=weights, batch=False)
-for key, val in info["feats_sum"].items():
-    print(f"Feature {key}: {val[0]}")
+    if TASK == "RANDOM":
+        num_tasks = len(env.all_tasks)
+        print(f"Total tasks {num_tasks}")
+        TASK = env.all_tasks[onp.random.randint(0, num_tasks)]
+    env.set_task(TASK)
+    env.reset()
 
-print("cost", cost)
-env.reset()
-## TODO: visualization
-env.render("human", draw_heat=DRAW_HEAT, weights=DictList([weights], jax=True))
-frames = []
+    print(f"Task {TASK}")
 
-for t in range(T):
-    env.step(actions[:, t])
-    img = env.render("rgb_array")
-    frames.append(img)
-    sleep(0.2)
+    if not REPLAN:
+        T = horizon
+    optimizer, runner = build_mpc(
+        env,
+        main_car.cost_runtime,
+        horizon,
+        env.dt,
+        replan=REPLAN,
+        T=T,
+        engine=ENGINE,
+        method=METHOD,
+    )
+    state = copy.deepcopy(env.state)
+    t1 = time()
+    w_list = DictList([weights])
+    w_list = w_list.prepare(env.features_keys)
+    actions = optimizer(state, weights=None, weights_arr=w_list.numpy_array())
+    traj, cost, info = runner(state, actions, weights=weights, batch=False)
 
+    output_dict = {}
 
-imgs = [Image.fromarray(img) for img in frames]
-imgs[0].save(f"render_optimal_control_{fname}.gif", save_all = True, append_images=imgs[1:], duration=100, loop=0)
+    for key, val in info["feats_sum"].items():
+        output_dict[key] = val.item()
+        print(f"Feature {key}: {val.item()}")
+
+    env.reset()
+    ## TODO: visualization
+    env.render("human", draw_heat=DRAW_HEAT, weights=DictList([weights], jax=True))
+    frames = []
+
+    for t in range(T):
+        env.step(actions[:, t])
+        img = env.render("rgb_array")
+        frames.append(img)
+        sleep(0.2)
+
+    imgs = [Image.fromarray(img) for img in frames]
+    imgs[0].save(f"render_optimal_control_{fname}.gif", save_all = True, append_images=imgs[1:], duration=100, loop=0)
+
+    with open(f'{folder}/exp_weights/{ENV_NAME}.json', 'w') as json_file:
+        json.dump(format_weights_dict(output_dict), json_file, indent=2)
+    
+    # also save exp results for violations and costs
+    output_dict['cost'] = cost.item()
+    print("cost: ", cost.item())
+    for key, val in info["vios_sum"].items():
+        output_dict[key] = val.item()
+
+    print("results: ", output_dict)
+        
+    with open(f'{folder}/exp_results/{ENV_NAME}.json', 'w') as json_file:
+        json.dump(output_dict, json_file, indent=2)
