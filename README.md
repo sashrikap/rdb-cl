@@ -1,8 +1,6 @@
-## Reward Debugging Framework
+## Reward Hacking in Simulated Autonomous Vehicle Environments
 
-Can we formally study reward hacking behaviors, such that our self-driving cars, presumably optimizing some reward, will work nicely and safely?
-
-README updated (22/12/14)
+Studying the generalizability of reward functions in simulated autonomous vehicle environments by 1) examining if transferring reward functions across environments is robust to environment ordering and beneficial to the model’s performance and 2) determining what methods serve as a proxy for better environment orderings.
 
 ## Installation
 
@@ -23,17 +21,5 @@ python examples/run_optimal_control.py
 ```
 
 
-### Citing
-
-If you find this codebase useful in your research, please consider citing:
-
-	@article{he2021assisted,
-  	    title={Assisted Robust Reward Design},
-  	    author={He, Jerry Zhi-Yang He and Dragan D. Anca},
-  	    journal={arXiv preprint arXiv:2111.09884},
-  	    year={2021}
-	}
-
-
 ### Credit
-Code reimplemented based on Prof. Dorsa Sadigh's [driving simulation](https://github.com/dsadigh/driving-interactions)
+Code reimplemented based on Jerry Zhi-Yang He's implementation of [assisted robust reward design](https://arxiv.org/abs/2111.09884) and Prof. Dorsa Sadigh's [driving simulation](https://github.com/dsadigh/driving-interactions)
